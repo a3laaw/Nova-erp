@@ -50,3 +50,4 @@ firestore = initializedInstances.firestore;
 
 export { app, auth, firestore };
 export * from './provider';
+export { useCollection } from 'react-firebase-hooks/firestore';
