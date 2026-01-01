@@ -7,30 +7,43 @@ import { Languages } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 
 const getTitleFromPathname = (pathname: string, lang: 'ar' | 'en') => {
-    const titles = {
-        ar: {
-            '/dashboard': 'لوحة التحكم',
-            '/dashboard/projects': 'المشاريع',
-            '/dashboard/clients': 'العملاء',
-            '/dashboard/appointments': 'المواعيد',
-            '/dashboard/accounting': 'المحاسبة',
-            '/dashboard/warehouse': 'المستودع',
-            '/dashboard/settings': 'الإعدادات',
-        },
-        en: {
-            '/dashboard': 'Dashboard',
-            '/dashboard/projects': 'Projects',
-            '/dashboard/clients': 'Clients',
-            '/dashboard/appointments': 'Appointments',
-            '/dashboard/accounting': 'Accounting',
-            '/dashboard/warehouse': 'Warehouse',
-            '/dashboard/settings': 'Settings',
-        }
-    };
-    
-    const key = Object.keys(titles.ar).find(key => pathname.startsWith(key as keyof typeof titles.ar) && (key !== '/dashboard' || pathname === '/dashboard')) || '/dashboard';
+    const baseKey = Object.keys(titles.ar).find(key => 
+        pathname.startsWith(key) && (key !== '/dashboard' || pathname === '/dashboard')
+    );
 
+    const dynamicMatch = pathname.match(/\/dashboard\/projects\/([a-zA-Z0-9-]+)/);
+    if (dynamicMatch && dynamicMatch[1]) {
+        return lang === 'ar' ? 'تفاصيل المشروع' : 'Project Details';
+    }
+
+    const newCashReceiptMatch = pathname.match(/\/dashboard\/accounting\/cash-receipts\/new/);
+    if (newCashReceiptMatch) {
+        return lang === 'ar' ? 'سند قبض جديد' : 'New Cash Receipt';
+    }
+
+    const key = baseKey || '/dashboard';
     return titles[lang][key as keyof typeof titles.ar] || (lang === 'ar' ? 'لوحة التحكم' : 'Dashboard');
+};
+
+const titles = {
+    ar: {
+        '/dashboard': 'لوحة التحكم',
+        '/dashboard/projects': 'المشاريع',
+        '/dashboard/clients': 'العملاء',
+        '/dashboard/appointments': 'المواعيد',
+        '/dashboard/accounting': 'المحاسبة',
+        '/dashboard/warehouse': 'المستودع',
+        '/dashboard/settings': 'الإعدادات',
+    },
+    en: {
+        '/dashboard': 'Dashboard',
+        '/dashboard/projects': 'Projects',
+        '/dashboard/clients': 'Clients',
+        '/dashboard/appointments': 'Appointments',
+        '/dashboard/accounting': 'Accounting',
+        '/dashboard/warehouse': 'Warehouse',
+        '/dashboard/settings': 'Settings',
+    }
 };
 
 
