@@ -66,7 +66,7 @@ export function UpcomingAppointments() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    {engineer?.name}
+                    {engineer?.fullName}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                      {format(new Date(appt.date), "EEE, dd MMM yyyy 'at' h:mm a")}

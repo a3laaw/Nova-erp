@@ -86,11 +86,11 @@ export function MainNav() {
             <SidebarMenuItem>
                 <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={currentUser.avatarUrl} alt={currentUser.name} />
-                    <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
+                    <AvatarFallback>{currentUser.fullName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="grid text-sm">
-                    <span className="font-semibold text-foreground">{currentUser.name}</span>
+                    <span className="font-semibold text-foreground">{currentUser.fullName}</span>
                     <span className="text-muted-foreground">{currentUser.email}</span>
                   </div>
                   <Button variant="ghost" size="icon" className="ml-auto">

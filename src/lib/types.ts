@@ -2,10 +2,12 @@ export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Client' | 'Secreta
 
 export type User = {
   id: string;
-  name: string;
+  username: string;
+  fullName: string;
   email: string;
   avatarUrl: string;
   role: UserRole;
+  isActive: boolean;
 };
 
 export type Client = {

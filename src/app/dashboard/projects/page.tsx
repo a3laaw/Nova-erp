@@ -98,10 +98,10 @@ export default function ProjectsPage() {
                   <TableCell className="hidden md:table-cell">
                     <div className='flex items-center gap-2'>
                         <Avatar className="h-8 w-8">
-                            <AvatarImage src={leadEngineer?.avatarUrl} alt={leadEngineer?.name} />
-                            <AvatarFallback>{leadEngineer?.name.charAt(0)}</AvatarFallback>
+                            <AvatarImage src={leadEngineer?.avatarUrl} alt={leadEngineer?.fullName} />
+                            <AvatarFallback>{leadEngineer?.fullName.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <span>{leadEngineer?.name}</span>
+                        <span>{leadEngineer?.fullName}</span>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">

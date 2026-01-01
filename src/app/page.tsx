@@ -19,42 +19,39 @@ export default function LoginPage() {
               <h1 className="text-3xl font-bold font-headline">EmaratiScope</h1>
             </div>
             <p className="text-balance text-muted-foreground">
-              Enter your email below to login to your account
+              أدخل اسم المستخدم الخاص بك أدناه لتسجيل الدخول إلى حسابك
             </p>
           </div>
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">اسم المستخدم</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
+                id="username"
+                type="text"
+                placeholder="e.g. ali.ahmed"
                 required
               />
             </div>
             <div className="grid gap-2">
               <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">كلمة المرور</Label>
                 <Link
                   href="#"
                   className="ml-auto inline-block text-sm underline"
                 >
-                  Forgot your password?
+                  نسيت كلمة المرور؟
                 </Link>
               </div>
               <Input id="password" type="password" required />
             </div>
             <Button type="submit" className="w-full" asChild>
-              <Link href="/dashboard">Login</Link>
-            </Button>
-            <Button variant="outline" className="w-full">
-              Login with Google
+              <Link href="/dashboard">تسجيل الدخول</Link>
             </Button>
           </div>
           <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
+            ليس لديك حساب؟{' '}
             <Link href="#" className="underline">
-              Sign up
+              أنشئ حسابك
             </Link>
           </div>
         </div>

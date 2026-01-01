@@ -70,7 +70,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                 </div>
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  <span><strong>Lead Engineer:</strong> {leadEngineer?.name}</span>
+                  <span><strong>Lead Engineer:</strong> {leadEngineer?.fullName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />

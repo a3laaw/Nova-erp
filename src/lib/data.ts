@@ -4,12 +4,12 @@ import { PlaceHolderImages } from './placeholder-images';
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
 
 export const users: User[] = [
-  { id: 'user-1', name: 'Ali Ahmed', email: 'ali.ahmed@example.com', avatarUrl: getUserAvatar('user-avatar-1'), role: 'Admin' },
-  { id: 'user-2', name: 'Fatima Al-Mansoori', email: 'fatima.almansoori@example.com', avatarUrl: getUserAvatar('user-avatar-2'), role: 'Engineer' },
-  { id: 'user-3', name: 'Yusuf Khan', email: 'yusuf.khan@example.com', avatarUrl: getUserAvatar('user-avatar-3'), role: 'Accountant' },
-  { id: 'user-4', name: 'Noor Al-Falahi', email: 'noor.alfalahi@example.com', avatarUrl: getUserAvatar('user-avatar-4'), role: 'Client' },
-  { id: 'user-5', name: 'Hassan Ibrahim', email: 'hassan.ibrahim@example.com', avatarUrl: getUserAvatar('user-avatar-5'), role: 'Engineer' },
-  { id: 'user-6', name: 'Salama Al-Mazrouei', email: 'salama.almazrouei@example.com', avatarUrl: getUserAvatar('user-avatar-6'), role: 'Secretary' },
+  { id: 'user-1', username: 'ali.ahmed', fullName: 'Ali Ahmed', email: 'ali.ahmed@example.com', avatarUrl: getUserAvatar('user-avatar-1'), role: 'Admin', isActive: true },
+  { id: 'user-2', username: 'fatima.almansoori', fullName: 'Fatima Al-Mansoori', email: 'fatima.almansoori@example.com', avatarUrl: getUserAvatar('user-avatar-2'), role: 'Engineer', isActive: true },
+  { id: 'user-3', username: 'yusuf.khan', fullName: 'Yusuf Khan', email: 'yusuf.khan@example.com', avatarUrl: getUserAvatar('user-avatar-3'), role: 'Accountant', isActive: true },
+  { id: 'user-4', username: 'noor.alfalahi', fullName: 'Noor Al-Falahi', email: 'noor.alfalahi@example.com', avatarUrl: getUserAvatar('user-avatar-4'), role: 'Client', isActive: true },
+  { id: 'user-5', username: 'hassan.ibrahim', fullName: 'Hassan Ibrahim', email: 'hassan.ibrahim@example.com', avatarUrl: getUserAvatar('user-avatar-5'), role: 'Engineer', isActive: true },
+  { id: 'user-6', username: 'salama.almazrouei', fullName: 'Salama Al-Mazrouei', email: 'salama.almazrouei@example.com', avatarUrl: getUserAvatar('user-avatar-6'), role: 'Secretary', isActive: true },
 ];
 
 export const clients: Client[] = [
