@@ -11,6 +11,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import { UsersTable } from '@/components/settings/users-table';
 
 export default function SettingsPage() {
   return (
@@ -22,10 +23,11 @@ export default function SettingsPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="profile">
-          <TabsList>
+        <Tabs defaultValue="profile" dir='rtl'>
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="team">Team Members</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
@@ -44,6 +46,9 @@ export default function SettingsPage() {
                     Invite, edit, and remove team members based on roles.
                 </p>
             </div>
+          </TabsContent>
+           <TabsContent value="users" className="mt-4">
+            <UsersTable />
           </TabsContent>
            <TabsContent value="billing" className="mt-4">
             <div className="p-8 text-center border-2 border-dashed rounded-lg">
