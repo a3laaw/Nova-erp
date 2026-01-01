@@ -77,18 +77,16 @@ export function MainNav() {
         <SidebarMenu>
           {currentNavItems.map((item) => (
             <SidebarMenuItem key={item.label}>
-              <Link href={item.href} passHref legacyBehavior>
-                <SidebarMenuButton
-                  isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
-                  asChild
-                  tooltip={item.label}
-                >
-                  <a>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </a>
-                </SidebarMenuButton>
-              </Link>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
+                tooltip={item.label}
+              >
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
@@ -96,14 +94,16 @@ export function MainNav() {
       <SidebarFooter className="p-2">
         <SidebarMenu>
              <SidebarMenuItem>
-                <Link href={currentSettingsItem.href} passHref legacyBehavior>
-                    <SidebarMenuButton isActive={pathname.startsWith(currentSettingsItem.href)} asChild tooltip={currentSettingsItem.label}>
-                        <a>
-                            <Settings />
-                            <span>{currentSettingsItem.label}</span>
-                        </a>
-                    </SidebarMenuButton>
-                </Link>
+                <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(currentSettingsItem.href)}
+                    tooltip={currentSettingsItem.label}
+                >
+                    <Link href={currentSettingsItem.href}>
+                        <Settings />
+                        <span>{currentSettingsItem.label}</span>
+                    </Link>
+                </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <div className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none transition-colors text-muted-foreground">
