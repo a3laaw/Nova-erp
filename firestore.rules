@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    function isAuthOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isSecretary() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'secretary';
+    }
+
+    match /users/{userId} {
+      allow read, write: if isAuthOwner(userId) || isAdmin();
+    }
+    
+    match /clients/{clientId} {
+      allow read, write: if isAdmin() || isSecretary();
+    }
+  }
+}

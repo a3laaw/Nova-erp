@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user profile in the system.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's username for login."
+        },
+        "passwordHash": {
+          "type": "string",
+          "description": "The securely hashed password for the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role in the system.",
+          "enum": [
+            "admin",
+            "architectural_engineer",
+            "structural_engineer",
+            "electrical_engineer",
+            "plumbing_engineer",
+            "interior_designer",
+            "exterior_designer",
+            "secretary",
+            "accountant"
+          ]
+        },
+        "fullName": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the user's account is active."
+        }
+      },
+      "required": [
+        "uid",
+        "username",
+        "passwordHash",
+        "role",
+        "fullName",
+        "isActive"
+      ]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Represents a client of the consultancy.",
+      "type": "object",
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "description": "The full name of the client."
+        },
+        "mobile": {
+          "type": "string",
+          "description": "The client's mobile phone number."
+        },
+        "civilId": {
+          "type": "string",
+          "description": "The client's Civil ID number."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the client's file.",
+          "enum": [
+            "new",
+            "received",
+            "completed",
+            "rejected"
+          ]
+        },
+        "assignedEngineer": {
+          "type": "string",
+          "description": "The ID of the engineer assigned to this client."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the client was created."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the client is active."
+        }
+      },
+      "required": [
+        "fullName",
+        "mobile",
+        "civilId",
+        "status",
+        "createdAt",
+        "isActive"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "google.com"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores user profile information."
+    },
+    "/clients/{clientId}": {
+      "schema": {
+        "$ref": "#/entities/Client"
+      },
+      "description": "Stores information about the company's clients."
+    }
+  }
+}
