@@ -37,6 +37,12 @@
       "imageHint": "man engineer"
     },
     {
+      "id": "user-avatar-6",
+      "description": "Avatar for Salama Al-Mazrouei",
+      "imageUrl": "https://images.unsplash.com/photo-1573497491208-6b1acb260507?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3b21hbiUyMHNlY3JldGFyeXxlbnwwfHx8fDE3NjcyNTAyODh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman secretary"
+    },
+    {
       "id": "project-image-1",
       "description": "Image for Downtown Dubai Villa",
       "imageUrl": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjB2aWxsYXxlbnwwfHx8fDE3NjcyMTMzMDN8MA&ixlib=rb-4.1.0&q=80&w=1080",

@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Client';
+export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Client' | 'Secretary';
 
 export type User = {
   id: string;
@@ -112,6 +112,18 @@ export type Invoice = {
   dueDate: string;
   status: InvoiceStatus;
   type: 'Receivable' | 'Payable';
+};
+
+export type CashReceipt = {
+    id: string;
+    voucherNumber: string;
+    date: string;
+    clientId: string;
+    amount: number;
+    amountInWords: string;
+    paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer';
+    reference?: string; // Cheque number or transfer reference
+    description: string;
 };
 
 export type Transaction = {

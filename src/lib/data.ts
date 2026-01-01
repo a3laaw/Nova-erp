@@ -1,4 +1,4 @@
-import type { User, Client, Project, Appointment, Contract, Invoice, InventoryItem } from './types';
+import type { User, Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
@@ -9,6 +9,7 @@ export const users: User[] = [
   { id: 'user-3', name: 'Yusuf Khan', email: 'yusuf.khan@example.com', avatarUrl: getUserAvatar('user-avatar-3'), role: 'Accountant' },
   { id: 'user-4', name: 'Noor Al-Falahi', email: 'noor.alfalahi@example.com', avatarUrl: getUserAvatar('user-avatar-4'), role: 'Client' },
   { id: 'user-5', name: 'Hassan Ibrahim', email: 'hassan.ibrahim@example.com', avatarUrl: getUserAvatar('user-avatar-5'), role: 'Engineer' },
+  { id: 'user-6', name: 'Salama Al-Mazrouei', email: 'salama.almazrouei@example.com', avatarUrl: getUserAvatar('user-avatar-6'), role: 'Secretary' },
 ];
 
 export const clients: Client[] = [
@@ -120,6 +121,21 @@ export const invoices: Invoice[] = [
     { id: 'inv-1', invoiceNumber: 'INV-2023-001', clientId: 'client-1', projectId: 'proj-1', amount: 1000000, issueDate: '2023-11-16', dueDate: '2023-12-16', status: 'Paid', type: 'Receivable' },
     { id: 'inv-2', invoiceNumber: 'INV-2024-001', clientId: 'client-2', projectId: 'proj-2', amount: 25000, issueDate: '2024-03-10', dueDate: '2024-04-10', status: 'Sent', type: 'Receivable' },
 ];
+
+export const cashReceipts: CashReceipt[] = [
+    {
+        id: 'cr-1',
+        voucherNumber: 'CRV-2024-001',
+        date: '2024-07-20',
+        clientId: 'client-1',
+        amount: 50000,
+        amountInWords: 'Fifty Thousand Dirhams only',
+        paymentMethod: 'Cheque',
+        reference: '123456',
+        description: 'Advance payment for Downtown Dubai Villa',
+    }
+];
+
 
 export const inventory: InventoryItem[] = [
     { id: 'item-1', name: 'Cement', quantity: 500, unit: 'bags', lowStockThreshold: 100, supplier: 'Emirates Cement Co.' },

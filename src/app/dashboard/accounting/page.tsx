@@ -24,6 +24,9 @@ import { clients, invoices } from '@/lib/data';
 import { formatCurrency } from '@/lib/utils';
 import type { InvoiceStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { PlusCircle } from 'lucide-react';
 
 const statusStyles: Record<InvoiceStatus, string> = {
     'Paid': 'bg-green-100 text-green-800 border-green-200',
@@ -36,28 +39,29 @@ export default function AccountingPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Accounting</CardTitle>
+        <CardTitle>المحاسبة</CardTitle>
         <CardDescription>
-          Manage invoices, track income and expenses, and view financial reports.
+          إدارة الفواتير وتتبع الإيرادات والمصروفات وعرض التقارير المالية.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="invoices">
+        <Tabs defaultValue="invoices" dir="rtl">
           <TabsList>
-            <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="transactions">Income/Expense</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="invoices">الفواتير</TabsTrigger>
+            <TabsTrigger value="cash-receipts">سندات القبض</TabsTrigger>
+            <TabsTrigger value="transactions">الإيرادات/المصروفات</TabsTrigger>
+            <TabsTrigger value="reports">التقارير</TabsTrigger>
           </TabsList>
           <TabsContent value="invoices" className="mt-4">
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Issue Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>رقم الفاتورة</TableHead>
+                        <TableHead>العميل</TableHead>
+                        <TableHead>تاريخ الإصدار</TableHead>
+                        <TableHead>تاريخ الاستحقاق</TableHead>
+                        <TableHead>الحالة</TableHead>
+                        <TableHead className="text-left">المبلغ</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -67,31 +71,47 @@ export default function AccountingPage() {
                             <TableRow key={invoice.id}>
                                 <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                                 <TableCell>{client?.name}</TableCell>
-                                <TableCell>{new Date(invoice.issueDate).toLocaleDateString()}</TableCell>
-                                <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
+                                <TableCell>{new Date(invoice.issueDate).toLocaleDateString('ar-AE')}</TableCell>
+                                <TableCell>{new Date(invoice.dueDate).toLocaleDateString('ar-AE')}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={cn(statusStyles[invoice.status])}>{invoice.status}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right">{formatCurrency(invoice.amount)}</TableCell>
+                                <TableCell className="text-left">{formatCurrency(invoice.amount)}</TableCell>
                             </TableRow>
                         )
                     })}
                 </TableBody>
             </Table>
           </TabsContent>
+          <TabsContent value="cash-receipts" className="mt-4">
+            <div className="flex justify-end mb-4">
+                <Button asChild>
+                    <Link href="/dashboard/accounting/cash-receipts/new">
+                        <PlusCircle className="ml-2 h-4 w-4" />
+                        إنشاء سند قبض
+                    </Link>
+                </Button>
+            </div>
+            <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                <h3 className="mt-4 text-lg font-medium">قائمة سندات القبض</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    سيتم عرض قائمة بجميع سندات القبض هنا.
+                </p>
+            </div>
+          </TabsContent>
           <TabsContent value="transactions" className="mt-4">
              <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">Transaction Log Coming Soon</h3>
+                <h3 className="mt-4 text-lg font-medium">سجل المعاملات قريباً</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                    A complete log of income and expenses will be available here.
+                    سجل كامل للإيرادات والمصروفات سيكون متاحاً هنا.
                 </p>
             </div>
           </TabsContent>
           <TabsContent value="reports" className="mt-4">
              <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">Financial Reports Coming Soon</h3>
+                <h3 className="mt-4 text-lg font-medium">التقارير المالية قريباً</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                    Profit & Loss, Balance Sheet, and Cash Flow reports will be generated here.
+                    سيتم إنشاء تقارير الأرباح والخسائر والميزانية العمومية والتدفقات النقدية هنا.
                 </p>
             </div>
           </TabsContent>
