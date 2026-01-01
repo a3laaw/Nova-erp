@@ -106,17 +106,17 @@ export function MainNav() {
                 </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all">
+              <div className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none transition-colors text-muted-foreground">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback>{currentUser.fullName.charAt(0)}</AvatarFallback>
                   </Avatar>
-                  <div className="grid text-sm">
+                  <div className="grid flex-1 text-sm">
                     <span className="font-semibold text-foreground">{currentUser.fullName}</span>
                     <span className="text-muted-foreground">{currentUser.email}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="ml-auto">
-                    <LogOut className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0">
+                    <LogOut />
                   </Button>
                 </div>
             </SidebarMenuItem>
