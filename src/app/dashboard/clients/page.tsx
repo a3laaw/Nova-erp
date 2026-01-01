@@ -25,11 +25,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { collection, doc, updateDoc, serverTimestamp, addDoc, query, orderBy, getFirestore, type DocumentData } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
-import { collection, doc, updateDoc, serverTimestamp, addDoc, query, orderBy } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
-import type { DocumentData } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
+import { useFirebase } from '@/firebase';
+
 
 type ClientStatus = 'new' | 'received' | 'completed' | 'rejected';
 
@@ -57,7 +57,8 @@ const statusColors: Record<ClientStatus, string> = {
 
 export default function ClientsPage() {
   const { language } = useLanguage();
-  const firestore = useFirestore();
+  const { app } = useFirebase();
+  const firestore = app ? getFirestore(app) : undefined;
   const [clients, setClients] = useState<Client[]>([]);
 
   const clientsCollection = firestore ? collection(firestore, 'clients') : null;
