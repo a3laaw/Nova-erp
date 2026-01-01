@@ -1,0 +1,102 @@
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+    Activity,
+    ArrowUpRight,
+    Briefcase,
+    CalendarCheck,
+    Users,
+    CircleDollarSign,
+} from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { projects, clients, appointments } from '@/lib/data';
+import { formatCurrency } from '@/lib/utils';
+import { TaskPrioritization } from '@/components/dashboard/task-prioritization';
+import { RecentActivity } from '@/components/dashboard/recent-activity';
+import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments';
+
+export default function DashboardPage() {
+
+  const totalRevenue = 1250000; // Mock data
+  const activeProjects = projects.filter(p => p.status === 'In Progress').length;
+  const totalClients = clients.length;
+  const upcomingAppointmentsCount = appointments.filter(a => new Date(a.date) > new Date()).length;
+
+  return (
+    <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:col-span-3">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                    Total Revenue
+                </CardTitle>
+                <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+                <p className="text-xs text-muted-foreground">
+                    +20.1% from last month
+                </p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                    Active Projects
+                </CardTitle>
+                <Briefcase className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">{activeProjects}</div>
+                <p className="text-xs text-muted-foreground">
+                    +2 since last month
+                </p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">+{totalClients}</div>
+                <p className="text-xs text-muted-foreground">
+                    +1 since last quarter
+                </p>
+                </CardContent>
+            </Card>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Upcoming Appointments</CardTitle>
+                <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">{upcomingAppointmentsCount}</div>
+                <p className="text-xs text-muted-foreground">
+                    in the next 7 days
+                </p>
+                </CardContent>
+            </Card>
+        </div>
+
+        <div className="grid gap-4 xl:col-span-2">
+           <TaskPrioritization />
+        </div>
+        
+        <div className="grid gap-4">
+            <RecentActivity />
+        </div>
+
+        <div className="grid gap-4 xl:col-span-3">
+            <UpcomingAppointments />
+        </div>
+
+    </div>
+  );
+}
