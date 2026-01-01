@@ -119,7 +119,7 @@ export function MainNav() {
                     <LogOut className="h-4 w-4" />
                   </Button>
                 </div>
-            </SIDebarMenuItem>
+            </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </>
