@@ -26,19 +26,39 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { users } from '@/lib/data';
+import { useLanguage } from '@/context/language-context';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/dashboard/projects', label: 'Projects', icon: Briefcase },
-  { href: '/dashboard/clients', label: 'Clients', icon: Users },
-  { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
-  { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet },
-  { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse },
-];
+const navItems = {
+  ar: [
+    { href: '/dashboard', label: 'لوحة التحكم', icon: Home },
+    { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase },
+    { href: '/dashboard/clients', label: 'العملاء', icon: Users },
+    { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar },
+    { href: '/dashboard/accounting', label: 'المحاسبة', icon: Wallet },
+    { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse },
+  ],
+  en: [
+      { href: '/dashboard', label: 'Dashboard', icon: Home },
+      { href: '/dashboard/projects', label: 'Projects', icon: Briefcase },
+      { href: '/dashboard/clients', label: 'Clients', icon: Users },
+      { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
+      { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet },
+      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse },
+  ]
+};
+
+const settingsItem = {
+    ar: { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings },
+    en: { href: '/dashboard/settings', label: 'Settings', icon: Settings }
+}
 
 export function MainNav() {
   const pathname = usePathname();
   const currentUser = users[0];
+  const { language } = useLanguage();
+  const currentNavItems = navItems[language];
+  const currentSettingsItem = settingsItem[language];
+
 
   return (
     <>
@@ -47,13 +67,15 @@ export function MainNav() {
             <Logo />
             <div className="flex flex-col">
                 <span className="text-lg font-semibold font-headline tracking-tighter">EmaratiScope</span>
-                <span className="text-xs text-muted-foreground">Engineering Management</span>
+                <span className="text-xs text-muted-foreground">
+                    {language === 'ar' ? 'إدارة المشاريع الهندسية' : 'Engineering Management'}
+                </span>
             </div>
         </div>
       </SidebarHeader>
       <SidebarContent className="p-2">
         <SidebarMenu>
-          {navItems.map((item) => (
+          {currentNavItems.map((item) => (
             <SidebarMenuItem key={item.label}>
               <Link href={item.href} passHref legacyBehavior>
                 <SidebarMenuButton
@@ -74,11 +96,11 @@ export function MainNav() {
       <SidebarFooter className="p-2">
         <SidebarMenu>
              <SidebarMenuItem>
-                <Link href="/dashboard/settings" passHref legacyBehavior>
-                    <SidebarMenuButton isActive={pathname.startsWith('/dashboard/settings')} asChild tooltip="Settings">
+                <Link href={currentSettingsItem.href} passHref legacyBehavior>
+                    <SidebarMenuButton isActive={pathname.startsWith(currentSettingsItem.href)} asChild tooltip={currentSettingsItem.label}>
                         <a>
                             <Settings />
-                            <span>Settings</span>
+                            <span>{currentSettingsItem.label}</span>
                         </a>
                     </SidebarMenuButton>
                 </Link>
@@ -97,7 +119,7 @@ export function MainNav() {
                     <LogOut className="h-4 w-4" />
                   </Button>
                 </div>
-            </SidebarMenuItem>
+            </SIDebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </>
