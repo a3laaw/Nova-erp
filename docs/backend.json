@@ -24,7 +24,8 @@
             "admin",
             "secretary",
             "accountant",
-            "engineer"
+            "engineer",
+            "hr"
           ]
         },
         "fullName": {

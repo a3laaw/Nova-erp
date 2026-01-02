@@ -40,7 +40,8 @@ const roleTranslations: Record<UserRole, string> = {
     Engineer: 'مهندس',
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
-    Client: 'عميل'
+    Client: 'عميل',
+    HR: 'موارد بشرية'
 };
 
 export function UsersTable() {
@@ -90,7 +91,7 @@ export function UsersTable() {
 
   return (
     <>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4" dir="rtl">
             <div>
                 <h3 className='text-lg font-medium'>إدارة المستخدمين</h3>
                 <p className='text-sm text-muted-foreground'>
@@ -98,11 +99,11 @@ export function UsersTable() {
                 </p>
             </div>
             <Button onClick={handleAddUser} size="sm" className="gap-1">
-                <PlusCircle className="h-4 w-4" />
+                <PlusCircle className="ml-2 h-4 w-4" />
                 إضافة مستخدم
             </Button>
         </div>
-        <div className='border rounded-lg'>
+        <div className='border rounded-lg' dir="rtl">
             <Table>
             <TableHeader>
                 <TableRow>
@@ -152,7 +153,7 @@ export function UsersTable() {
                             <DropdownMenuItem onClick={() => handleEditUser(user)}>تعديل</DropdownMenuItem>
                             <DropdownMenuItem>إعادة تعيين كلمة المرور</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">
+                            <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive focus:text-destructive focus:bg-red-50">
                                 إلغاء التنشيط
                             </DropdownMenuItem>
                         </DropdownMenuContent>

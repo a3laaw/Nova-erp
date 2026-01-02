@@ -29,13 +29,14 @@ interface UserFormProps {
   user?: User | null;
 }
 
-const roles: UserRole[] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'Client'];
+const roles: UserRole[] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'Client', 'HR'];
 const roleTranslations: Record<UserRole, string> = {
     Admin: 'مدير',
     Engineer: 'مهندس',
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
-    Client: 'عميل'
+    Client: 'عميل',
+    HR: 'موارد بشرية'
 };
 
 
@@ -86,11 +87,11 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
       e.preventDefault();
       // Basic validation
       if (!formData.fullName || !formData.username || !formData.role) {
-          alert('Please fill all required fields.');
+          alert('الرجاء تعبئة كل الحقول المطلوبة.');
           return;
       }
       if (!isEditing && !password) {
-          alert('Password is required for new users.');
+          alert('كلمة المرور مطلوبة للمستخدمين الجدد.');
           return;
       }
       // In a real app, you would handle password hashing here or on the server
@@ -121,7 +122,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
                 <Input id="username" value={formData.username} onChange={handleInputChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="password">
+                <Label htmlFor="password" className="text-right">
                 كلمة المرور
                 </Label>
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={isEditing ? 'اتركه فارغاً لعدم التغيير' : '********'} className="col-span-3" />
