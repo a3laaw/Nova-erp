@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -90,9 +90,8 @@ const statusColors: Record<Employee['status'], string> = {
   terminated: 'bg-red-100 text-red-800 border-red-200',
 };
 
-const calculateAnnualLeaveBalance = (employee: Employee): number => {
+const calculateAnnualLeaveBalance = (employee: Employee, today: Date): number => {
     const hireDate = new Date(employee.hireDate);
-    const today = new Date();
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
     if (yearsOfService < 1) {
@@ -109,9 +108,19 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     return Math.min(45, totalBalance);
 };
 
-
 export function EmployeesTable() {
-    const [employees, setEmployees] = useState(initialEmployees);
+    const [employees, setEmployees] = useState(initialEmployees.map(e => ({...e, leaveBalance: null as number | null })));
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+        const today = new Date();
+        setEmployees(initialEmployees.map(e => ({
+            ...e,
+            leaveBalance: calculateAnnualLeaveBalance(e, today)
+        })));
+    }, []);
+
 
     return (
         <>
@@ -151,7 +160,7 @@ export function EmployeesTable() {
                         <TableCell>{employee.department}</TableCell>
                         <TableCell>{new Date(employee.hireDate).toLocaleDateString('ar-KW')}</TableCell>
                         <TableCell className='font-medium'>
-                            {calculateAnnualLeaveBalance(employee)} يوم
+                            {isClient && employee.leaveBalance !== null ? `${employee.leaveBalance} يوم` : '...'}
                         </TableCell>
                         <TableCell>
                             <Badge variant={'outline'} className={statusColors[employee.status]}>
