@@ -146,3 +146,20 @@ export type InventoryItem = {
   lowStockThreshold: number;
   supplier: string;
 };
+
+export type Employee = {
+    id: string;
+    fullName: string;
+    civilId: string;
+    mobile: string;
+    hireDate: string; // ISO String
+    terminationDate: string | null;
+    terminationReason: 'resignation' | 'termination' | null;
+    contractType: 'permanent' | 'temporary' | 'subcontractor';
+    department: string;
+    basicSalary: number; // KWD
+    housingAllowance?: number;
+    transportAllowance?: number;
+    status: 'active' | 'on-leave' | 'terminated';
+    lastVacationAccrualDate: string; // ISO String
+};

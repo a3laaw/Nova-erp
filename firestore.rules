@@ -19,6 +19,10 @@ service cloud.firestore {
         return getUserRole() == 'secretary';
     }
 
+    function isHR() {
+        return getUserRole() == 'hr';
+    }
+
     match /users/{userId} {
       // Admins can read and write any user profile
       // Users can only read their own profile
@@ -28,6 +32,10 @@ service cloud.firestore {
     
     match /clients/{clientId} {
       allow read, write: if isAdmin() || isSecretary();
+    }
+
+    match /employees/{employeeId} {
+      allow read, write: if isAdmin() || isHR();
     }
   }
 }

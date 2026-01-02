@@ -101,6 +101,37 @@
         "createdAt",
         "isActive"
       ]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Represents an employee in the company.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "civilId": { "type": "string" },
+        "mobile": { "type": "string" },
+        "hireDate": { "type": "string", "format": "date-time" },
+        "terminationDate": { "type": "string", "format": "date-time" },
+        "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
+        "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor"] },
+        "department": { "type": "string" },
+        "basicSalary": { "type": "number" },
+        "housingAllowance": { "type": "number" },
+        "transportAllowance": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "on-leave", "terminated"] },
+        "lastVacationAccrualDate": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "fullName",
+        "civilId",
+        "mobile",
+        "hireDate",
+        "contractType",
+        "department",
+        "basicSalary",
+        "status",
+        "lastVacationAccrualDate"
+      ]
     }
   },
   "auth": {
@@ -120,6 +151,10 @@
         "$ref": "#/entities/Client"
       },
       "description": "Stores information about the company's clients."
+    },
+    "/employees/{employeeId}": {
+        "schema": { "$ref": "#/entities/Employee" },
+        "description": "Stores HR information about company employees."
     }
   }
 }

@@ -19,7 +19,8 @@ import {
   Warehouse,
   Settings,
   LogOut,
-  Bell
+  Bell,
+  HeartHandshake
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -30,20 +31,22 @@ import { useLanguage } from '@/context/language-context';
 
 const navItems = {
   ar: [
-    { href: '/dashboard', label: 'لوحة التحكم', icon: Home },
-    { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase },
-    { href: '/dashboard/clients', label: 'العملاء', icon: Users },
-    { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar },
-    { href: '/dashboard/accounting', label: 'المحاسبة', icon: Wallet },
-    { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse },
+    { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { href: '/dashboard/accounting', label: 'المحاسبة', icon: Wallet, roles: ['Admin', 'Accountant'] },
+    { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
+    { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR'] },
   ],
   en: [
-      { href: '/dashboard', label: 'Dashboard', icon: Home },
-      { href: '/dashboard/projects', label: 'Projects', icon: Briefcase },
-      { href: '/dashboard/clients', label: 'Clients', icon: Users },
-      { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
-      { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet },
-      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse },
+      { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+      { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
+      { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+      { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
+      { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet, roles: ['Admin', 'Accountant'] },
+      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
+      { href: '/dashboard/hr', label: 'Human Resources', icon: HeartHandshake, roles: ['Admin', 'HR'] },
   ]
 };
 
@@ -54,9 +57,11 @@ const settingsItem = {
 
 export function MainNav() {
   const pathname = usePathname();
-  const currentUser = users[0];
+  // In a real app, you'd get the current user from an auth context.
+  const currentUser = users[0]; // Mocking as Admin for now to show all items.
   const { language } = useLanguage();
-  const currentNavItems = navItems[language];
+  
+  const currentNavItems = navItems[language].filter(item => item.roles.includes(currentUser.role));
   const currentSettingsItem = settingsItem[language];
 
 

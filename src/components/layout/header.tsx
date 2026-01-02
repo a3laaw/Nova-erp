@@ -33,6 +33,7 @@ const titles = {
         '/dashboard/appointments': 'المواعيد',
         '/dashboard/accounting': 'المحاسبة',
         '/dashboard/warehouse': 'المستودع',
+        '/dashboard/hr': 'الموارد البشرية',
         '/dashboard/settings': 'الإعدادات',
     },
     en: {
@@ -42,6 +43,7 @@ const titles = {
         '/dashboard/appointments': 'Appointments',
         '/dashboard/accounting': 'Accounting',
         '/dashboard/warehouse': 'Warehouse',
+        '/dashboard/hr': 'Human Resources',
         '/dashboard/settings': 'Settings',
     }
 };
