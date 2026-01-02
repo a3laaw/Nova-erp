@@ -43,6 +43,14 @@ const typeColors: Record<string, string> = {
 export default function LeaveRequestsPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ar-KW', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+  }
+
   return (
     <>
       <Card dir="rtl">
@@ -80,8 +88,8 @@ export default function LeaveRequestsPage() {
                                 <TableCell>
                                     <Badge variant="outline" className={typeColors[req.type]}>{req.type}</Badge>
                                 </TableCell>
-                                <TableCell>{new Date(req.startDate).toLocaleDateString('ar-KW')}</TableCell>
-                                <TableCell>{new Date(req.endDate).toLocaleDateString('ar-KW')}</TableCell>
+                                <TableCell>{formatDate(req.startDate)}</TableCell>
+                                <TableCell>{formatDate(req.endDate)}</TableCell>
                                 <TableCell>{req.days}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={statusColors[req.status]}>{req.status}</Badge>
