@@ -13,28 +13,27 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Centralized Firebase services instances
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let firestore: Firestore | null = null;
-
-function initializeFirebase() {
-  if (!firebaseConfig.apiKey) {
-    console.error("Firebase API key is missing. Please check your environment variables.");
-    return { app: null, auth: null, firestore: null };
+function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore } {
+  if (!firebaseConfig.projectId) {
+    throw new Error("Firebase project ID is missing. Please check your environment variables.");
   }
-
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
-  firestore = getFirestore(app);
+  
+  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  const auth = getAuth(app);
+  const firestore = getFirestore(app);
 
   if (process.env.NODE_ENV === 'development') {
     if (process.env.NEXT_PUBLIC_EMULATOR_HOST) {
         try {
-            connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST}:9099`, { disableWarnings: true });
-            connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST, 8080);
+            // Check if emulators are already connected
+            if (!(auth as any).emulatorConfig) {
+                connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST}:9099`, { disableWarnings: true });
+            }
+            if (!(firestore as any)._settings.host) {
+                 connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST, 8080);
+            }
         } catch (e) {
-            console.error('Error connecting to Firebase emulators:', e);
+            // console.error('Error connecting to Firebase emulators:', e);
         }
     }
   }
@@ -42,12 +41,7 @@ function initializeFirebase() {
   return { app, auth, firestore };
 }
 
-// Initialize Firebase on module load
-const initializedInstances = initializeFirebase();
-app = initializedInstances.app;
-auth = initializedInstances.auth;
-firestore = initializedInstances.firestore;
-
-export { app, auth, firestore };
+// We export the function to be called on demand, not the instances themselves.
+export { initializeFirebase };
 export * from './provider';
 export { useCollection } from 'react-firebase-hooks/firestore';

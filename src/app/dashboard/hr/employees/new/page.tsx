@@ -82,13 +82,12 @@ export default function NewEmployeePage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات. الرجاء المحاولة مرة أخرى.' });
             return;
         }
         setIsLoading(true);
         
         try {
-            const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
 
             if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الحساب الدولي (IBAN) مطلوب عند اختيار التحويل البنكي.' });
@@ -96,8 +95,16 @@ export default function NewEmployeePage() {
                 return;
             }
 
-            const employeeData = {
+            const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
+
+            const employeeData: Omit<Employee, 'id'> = {
                 ...formData,
+                fullName: formData.fullName || '',
+                mobile: formData.mobile || '',
+                civilId: formData.civilId || '',
+                department: formData.department || '',
+                jobTitle: formData.jobTitle || '',
+                contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
                 housingAllowance: Number(formData.housingAllowance) || 0,
                 transportAllowance: Number(formData.transportAllowance) || 0,
@@ -114,15 +121,18 @@ export default function NewEmployeePage() {
                 carriedLeaveDays: 0,
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
-                maxEmergencyLeave: 5, // Default value
+                maxEmergencyLeave: 5,
+                status: 'active',
+                terminationDate: null,
+                terminationReason: null,
             };
 
-            const docRef = await addDoc(collection(firestore, 'employees'), employeeData);
+            await addDoc(collection(firestore, 'employees'), employeeData);
             toast({ title: 'نجاح', description: 'تم حفظ الموظف بنجاح.' });
             router.push('/dashboard/hr');
         } catch (error) {
             console.error("Error adding employee: ", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ الموظف. الرجاء المحاولة مرة أخرى.' });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: (error as Error).message || 'لم يتم حفظ الموظف. الرجاء المحاولة مرة أخرى.' });
         } finally {
             setIsLoading(false);
         }
@@ -330,7 +340,7 @@ export default function NewEmployeePage() {
                             {(formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
-                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} required />
+                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} required={formData.contractType !== 'permanent'} />
                                 </div>
                             )}
                         </div>

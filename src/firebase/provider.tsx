@@ -11,7 +11,7 @@ interface FirebaseContextType {
   firestore: Firestore | null;
 }
 
-const FirebaseContext = createContext<FirebaseContextType>({ app: null, auth: null, firestore: null });
+const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
 export function FirebaseProvider({
   children,
@@ -32,9 +32,17 @@ export function useFirebase() {
 }
 
 export function useAuth() {
-  return useFirebase().auth;
+  const context = useContext(FirebaseContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within a FirebaseProvider');
+  }
+  return context.auth;
 }
 
 export function useFirestore() {
-    return useFirebase().firestore;
+  const context = useContext(FirebaseContext);
+  if (context === undefined) {
+    throw new Error('useFirestore must be used within a FirebaseProvider');
+  }
+    return context.firestore;
 }
