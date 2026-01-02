@@ -88,13 +88,13 @@ export function GratuityCalculator() {
 
     let gratuity = 0;
     if (terminationReason === 'resignation') {
-        if (yearsOfService < 3) {
-            gratuity = totalMonthlySalary * 0.5 * yearsOfService;
-        } else {
-            gratuity = totalMonthlySalary * yearsOfService;
-        }
-    } else { // 'termination' (by employer)
+      if (yearsOfService < 3) {
+        gratuity = totalMonthlySalary * 0.5 * yearsOfService;
+      } else {
         gratuity = totalMonthlySalary * yearsOfService;
+      }
+    } else { // 'termination' (by employer)
+      gratuity = totalMonthlySalary * yearsOfService;
     }
     
     const leaveBalance = calculateAnnualLeaveBalance(selectedEmployee);
