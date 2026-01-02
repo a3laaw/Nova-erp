@@ -68,7 +68,7 @@ export default function NewEmployeePage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleSelectChange = (id: keyof Employee, value: string) => {
+    const handleSelectChange = (id: keyof Employee, value: any) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
@@ -258,7 +258,7 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
-                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])}>
+                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v)}>
                                     <SelectTrigger id="contractType"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="permanent">دائم</SelectItem>
@@ -296,7 +296,7 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="salaryPaymentType">نوع الراتب</Label>
-                                <Select dir="rtl" value={formData.salaryPaymentType} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])}>
+                                <Select dir="rtl" value={formData.salaryPaymentType} onValueChange={(v) => handleSelectChange('salaryPaymentType', v)}>
                                     <SelectTrigger id="salaryPaymentType"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="transfer">تحويل بنكي</SelectItem>
