@@ -185,6 +185,7 @@ export type Employee = {
     carriedLeaveDays?: number;
     sickLeaveUsed?: number;
     emergencyLeaveUsed?: number;
-maxEmergencyLeave?: number;
+    maxEmergencyLeave?: number;
     lastLeaveResetDate?: string; // ISO String
+    createdAt?: any; // To support serverTimestamp
 };

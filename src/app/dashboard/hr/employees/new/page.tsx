@@ -80,6 +80,8 @@ export default function NewEmployeePage() {
         }
         setIsLoading(true);
 
+        const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
+
         try {
             const docRef = await addDoc(collection(firestore, 'employees'), {
                 ...formData,
@@ -87,9 +89,9 @@ export default function NewEmployeePage() {
                 housingAllowance: Number(formData.housingAllowance) || 0,
                 transportAllowance: Number(formData.transportAllowance) || 0,
                 dependents: Number(formData.dependents) || 0,
-                hireDate: new Date(formData.hireDate || Date.now()).toISOString(),
-                lastVacationAccrualDate: new Date(formData.hireDate || Date.now()).toISOString(),
-                lastLeaveResetDate: new Date(formData.hireDate || Date.now()).toISOString(),
+                hireDate: hireDate.toISOString(),
+                lastVacationAccrualDate: hireDate.toISOString(),
+                lastLeaveResetDate: hireDate.toISOString(),
                 createdAt: serverTimestamp(),
                 annualLeaveAccrued: 0,
                 annualLeaveUsed: 0,
@@ -337,5 +339,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
