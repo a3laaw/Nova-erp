@@ -7,16 +7,23 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return getUserRole() == 'admin';
     }
 
     function isSecretary() {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'secretary';
+        return getUserRole() == 'secretary';
     }
 
     match /users/{userId} {
-      allow read, write: if isAuthOwner(userId) || isAdmin();
+      // Admins can read and write any user profile
+      // Users can only read their own profile
+      allow read: if isAdmin() || isAuthOwner(userId);
+      allow write: if isAdmin();
     }
     
     match /clients/{clientId} {

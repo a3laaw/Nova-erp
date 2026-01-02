@@ -22,14 +22,9 @@
           "description": "The user's role in the system.",
           "enum": [
             "admin",
-            "architectural_engineer",
-            "structural_engineer",
-            "electrical_engineer",
-            "plumbing_engineer",
-            "interior_designer",
-            "exterior_designer",
             "secretary",
-            "accountant"
+            "accountant",
+            "engineer"
           ]
         },
         "fullName": {
@@ -39,6 +34,11 @@
         "isActive": {
           "type": "boolean",
           "description": "Whether the user's account is active."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the user was created."
         }
       },
       "required": [
@@ -47,7 +47,8 @@
         "passwordHash",
         "role",
         "fullName",
-        "isActive"
+        "isActive",
+        "createdAt"
       ]
     },
     "Client": {
