@@ -36,7 +36,10 @@ const initialEmployees: Employee[] = [
         status: 'active',
         terminationDate: null,
         terminationReason: null,
-        lastVacationAccrualDate: new Date().toISOString()
+        lastVacationAccrualDate: new Date().toISOString(),
+        annualLeaveAccrued: 30,
+        annualLeaveUsed: 10,
+        carriedLeaveDays: 5,
     },
     { 
         id: 'emp-2',
@@ -50,7 +53,28 @@ const initialEmployees: Employee[] = [
         status: 'active',
         terminationDate: null,
         terminationReason: null,
-        lastVacationAccrualDate: new Date().toISOString()
+        lastVacationAccrualDate: new Date().toISOString(),
+        annualLeaveAccrued: 30,
+        annualLeaveUsed: 5,
+        carriedLeaveDays: 0,
+    },
+    { 
+        id: 'emp-3',
+        fullName: 'سارة عبدالله',
+        civilId: '112233445566',
+        mobile: '0567778888',
+        // Hired less than a year ago
+        hireDate: new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString(),
+        contractType: 'permanent',
+        department: 'سكرتارية',
+        basicSalary: 700,
+        status: 'active',
+        terminationDate: null,
+        terminationReason: null,
+        lastVacationAccrualDate: new Date().toISOString(),
+        annualLeaveAccrued: 0,
+        annualLeaveUsed: 0,
+        carriedLeaveDays: 0,
     }
 ];
 
@@ -64,6 +88,24 @@ const statusColors: Record<Employee['status'], string> = {
   active: 'bg-green-100 text-green-800 border-green-200',
   'on-leave': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   terminated: 'bg-red-100 text-red-800 border-red-200',
+};
+
+const calculateAnnualLeaveBalance = (employee: Employee): number => {
+    const hireDate = new Date(employee.hireDate);
+    const today = new Date();
+    const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+
+    if (yearsOfService < 1) {
+        return 0;
+    }
+    
+    const accrued = employee.annualLeaveAccrued || 0;
+    const used = employee.annualLeaveUsed || 0;
+    const carried = employee.carriedLeaveDays || 0;
+
+    // As per Kuwait law, max carry-over is often 30 days total if company policy allows, but the user requested 15 days can be carried.
+    // The total balance that can be used shouldn't exceed a certain limit, e.g., 45 (30 current + 15 carried). Let's use MIN(45, ...).
+    return Math.min(45, accrued + carried - used);
 };
 
 
@@ -91,6 +133,7 @@ export function EmployeesTable() {
                     <TableHead>اسم الموظف</TableHead>
                     <TableHead>القسم</TableHead>
                     <TableHead>تاريخ التعيين</TableHead>
+                    <TableHead>رصيد الإجازة السنوية</TableHead>
                     <TableHead>الحالة</TableHead>
                     <TableHead>
                         <span className="sr-only">الإجراءات</span>
@@ -106,6 +149,9 @@ export function EmployeesTable() {
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>
                         <TableCell>{new Date(employee.hireDate).toLocaleDateString('ar-KW')}</TableCell>
+                        <TableCell className='font-medium'>
+                            {calculateAnnualLeaveBalance(employee)} يوم
+                        </TableCell>
                         <TableCell>
                             <Badge variant={'outline'} className={statusColors[employee.status]}>
                                 {statusTranslations[employee.status]}

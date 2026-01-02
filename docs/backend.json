@@ -119,7 +119,13 @@
         "housingAllowance": { "type": "number" },
         "transportAllowance": { "type": "number" },
         "status": { "type": "string", "enum": ["active", "on-leave", "terminated"] },
-        "lastVacationAccrualDate": { "type": "string", "format": "date-time" }
+        "lastVacationAccrualDate": { "type": "string", "format": "date-time" },
+        "annualLeaveAccrued": { "type": "number" },
+        "annualLeaveUsed": { "type": "number" },
+        "carriedLeaveDays": { "type": "number" },
+        "sickLeaveUsedThisYear": { "type": "number" },
+        "sickLeaveHalfPayUsed": { "type": "number" },
+        "lastLeaveResetDate": { "type": "string", "format": "date-time" }
       },
       "required": [
         "fullName",

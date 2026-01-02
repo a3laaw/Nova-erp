@@ -162,4 +162,10 @@ export type Employee = {
     transportAllowance?: number;
     status: 'active' | 'on-leave' | 'terminated';
     lastVacationAccrualDate: string; // ISO String
+    annualLeaveAccrued?: number;
+    annualLeaveUsed?: number;
+    carriedLeaveDays?: number;
+    sickLeaveUsedThisYear?: number;
+    sickLeaveHalfPayUsed?: number;
+    lastLeaveResetDate?: string; // ISO String
 };
