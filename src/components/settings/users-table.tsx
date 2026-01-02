@@ -51,6 +51,19 @@ export function UsersTable() {
         setSelectedUser(user);
         setIsFormOpen(true);
     }
+    
+    const handleSaveUser = (user: User) => {
+        if (selectedUser) {
+            // In a real app, you would call an API to update the user
+            setUsers(users.map(u => u.id === user.id ? user : u));
+        } else {
+            // In a real app, you would call an API to create the user
+            const newUser = { ...user, id: `user-${Date.now()}`, avatarUrl: '' }; // Mock avatar
+            setUsers([newUser, ...users]);
+        }
+        setIsFormOpen(false);
+        setSelectedUser(null);
+    }
 
     const handleDeleteClick = (user: User) => {
         setUserToDelete(user);
@@ -143,7 +156,7 @@ export function UsersTable() {
             </Table>
         </div>
         
-        {isFormOpen && <UserForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} user={selectedUser} />}
+        {isFormOpen && <UserForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSave={handleSaveUser} user={selectedUser} />}
 
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
             <AlertDialogContent dir="rtl">
