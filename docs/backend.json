@@ -148,7 +148,6 @@
         "gender",
         "civilId",
         "visaType",
-        "residencyExpiry",
         "mobile",
         "department",
         "jobTitle",
@@ -157,7 +156,8 @@
         "contractType",
         "basicSalary",
         "status",
-        "lastVacationAccrualDate"
+        "lastVacationAccrualDate",
+        "iban"
       ]
     }
   },

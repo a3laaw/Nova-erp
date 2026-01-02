@@ -48,7 +48,7 @@ export default function NewEmployeePage() {
         maritalStatus: undefined,
         dependents: 0,
         civilId: '',
-        visaType: undefined,
+        visaType: 'kuwaiti',
         residencyExpiry: '',
         contractExpiry: '',
         mobile: '',
@@ -89,6 +89,13 @@ export default function NewEmployeePage() {
         
         try {
             const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
+
+            if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
+                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الحساب الدولي (IBAN) مطلوب عند اختيار التحويل البنكي.' });
+                setIsLoading(false);
+                return;
+            }
+
             const employeeData = {
                 ...formData,
                 basicSalary: Number(formData.basicSalary) || 0,
@@ -252,7 +259,7 @@ export default function NewEmployeePage() {
                             {formData.visaType !== 'kuwaiti' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti' && !!formData.visaType} />
+                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti'} />
                                 </div>
                             )}
                         </div>
@@ -375,7 +382,7 @@ export default function NewEmployeePage() {
                                     </div>
                                     <div className="grid gap-2 md:col-span-2">
                                         <Label htmlFor="iban">رقم الحساب الدولي (IBAN)</Label>
-                                        <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required />
+                                        <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
                                     </div>
                                 </>
                             )}
@@ -392,5 +399,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
