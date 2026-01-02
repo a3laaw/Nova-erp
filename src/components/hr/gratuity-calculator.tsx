@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -27,10 +27,36 @@ import { formatCurrency } from '@/lib/utils';
 
 type TerminationReason = 'resignation' | 'termination';
 
+const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
+    if (!employee) return 0;
+    const hireDate = new Date(employee.hireDate);
+    const today = new Date();
+    const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+
+    if (yearsOfService < 1) {
+        return 0;
+    }
+    
+    const accrued = employee.annualLeaveAccrued || 0;
+    const used = employee.annualLeaveUsed || 0;
+    const carried = employee.carriedLeaveDays || 0;
+
+    // As per previous logic, balance is capped at 45. We'll use this for payout calculation.
+    const totalBalance = accrued + Math.min(carried, 15) - used;
+    
+    return Math.min(45, totalBalance);
+};
+
+
 export function GratuityCalculator() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [terminationDate, setTerminationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [terminationReason, setTerminationReason] = useState<TerminationReason | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const selectedEmployee = useMemo(() => {
     return initialEmployees.find((emp) => emp.id === selectedEmployeeId) || null;
@@ -50,28 +76,30 @@ export function GratuityCalculator() {
 
     const yearsOfService = Math.floor((termDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
 
-    if (yearsOfService < 1) {
-      return { yearsOfService, totalMonthlySalary: 0, gratuity: 0 };
-    }
-
     const totalMonthlySalary =
       (selectedEmployee.basicSalary || 0) +
       (selectedEmployee.housingAllowance || 0) +
       (selectedEmployee.transportAllowance || 0);
 
     let gratuity = 0;
-
-    if (terminationReason === 'resignation') {
-      if (yearsOfService < 3) {
-        gratuity = totalMonthlySalary * 0.5 * yearsOfService;
-      } else {
-        gratuity = totalMonthlySalary * yearsOfService;
-      }
-    } else { // 'termination'
-      gratuity = totalMonthlySalary * yearsOfService;
+    if (yearsOfService >= 1) {
+        if (terminationReason === 'resignation') {
+            if (yearsOfService < 3) {
+                gratuity = totalMonthlySalary * 0.5 * yearsOfService;
+            } else {
+                gratuity = totalMonthlySalary * yearsOfService;
+            }
+        } else { // 'termination'
+            gratuity = totalMonthlySalary * yearsOfService;
+        }
     }
+    
+    const leaveBalance = calculateAnnualLeaveBalance(selectedEmployee);
+    const leavePayout = (totalMonthlySalary / 30) * leaveBalance;
+    
+    const totalPayout = gratuity + leavePayout;
 
-    return { yearsOfService, totalMonthlySalary, gratuity, error: null };
+    return { yearsOfService, totalMonthlySalary, gratuity, leaveBalance, leavePayout, totalPayout, error: null };
   }, [selectedEmployee, terminationDate, terminationReason]);
 
   return (
@@ -79,7 +107,7 @@ export function GratuityCalculator() {
       <CardHeader>
         <CardTitle>حاسبة مكافأة نهاية الخدمة</CardTitle>
         <CardDescription>
-          حساب تقديري لمكافأة نهاية الخدمة وفقاً لقانون العمل الكويتي.
+          حساب تقديري لمكافأة نهاية الخدمة وبدل الإجازات وفقاً لقانون العمل الكويتي.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -106,6 +134,7 @@ export function GratuityCalculator() {
               type="date"
               value={terminationDate}
               onChange={(e) => setTerminationDate(e.target.value)}
+              disabled={!isClient}
             />
           </div>
           <div className="space-y-2">
@@ -122,7 +151,7 @@ export function GratuityCalculator() {
           </div>
         </div>
 
-        {calculationResult && !calculationResult.error && selectedEmployee && (
+        {isClient && calculationResult && !calculationResult.error && selectedEmployee && (
           <Alert>
              <Landmark className="h-4 w-4" />
             <AlertTitle>ملخص الحساب</AlertTitle>
@@ -136,10 +165,19 @@ export function GratuityCalculator() {
                     <span>الراتب الشهري المحتسب:</span>
                     <span className='font-mono'>{formatCurrency(calculationResult.totalMonthlySalary)}</span>
                 </div>
-                <hr className='my-2' />
+                 <hr className='my-2' />
+                <div className='flex justify-between'>
+                    <span>مكافأة نهاية الخدمة:</span>
+                    <span className='font-mono'>{formatCurrency(calculationResult.gratuity)}</span>
+                </div>
+                <div className='flex justify-between'>
+                    <span>بدل رصيد الإجازات ({calculationResult.leaveBalance} يوم):</span>
+                    <span className='font-mono'>{formatCurrency(calculationResult.leavePayout)}</span>
+                </div>
+                <hr className='my-2 border-dashed' />
                 <div className='flex justify-between items-center text-lg'>
-                    <span className='font-semibold'>القيمة التقريبية للمكافأة:</span>
-                    <span className='font-bold text-primary'>{formatCurrency(calculationResult.gratuity)}</span>
+                    <span className='font-semibold'>إجمالي المستحقات التقريبية:</span>
+                    <span className='font-bold text-primary'>{formatCurrency(calculationResult.totalPayout)}</span>
                 </div>
               </div>
             </AlertDescription>
