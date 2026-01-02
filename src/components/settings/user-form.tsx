@@ -85,6 +85,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
           alert('Password is required for new users.');
           return;
       }
+      // In a real app, you would handle password hashing here or on the server
       onSave(formData as User);
   }
 
