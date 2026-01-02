@@ -87,16 +87,18 @@ export default function NewEmployeePage() {
         }
         setIsLoading(true);
         
-        const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
-
         try {
-            const docRef = await addDoc(collection(firestore, 'employees'), {
+            const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
+            const employeeData = {
                 ...formData,
                 basicSalary: Number(formData.basicSalary) || 0,
                 housingAllowance: Number(formData.housingAllowance) || 0,
                 transportAllowance: Number(formData.transportAllowance) || 0,
                 dependents: Number(formData.dependents) || 0,
                 hireDate: hireDate.toISOString(),
+                dob: formData.dob ? new Date(formData.dob).toISOString() : null,
+                residencyExpiry: formData.residencyExpiry ? new Date(formData.residencyExpiry).toISOString() : null,
+                contractExpiry: formData.contractExpiry ? new Date(formData.contractExpiry).toISOString() : null,
                 lastVacationAccrualDate: hireDate.toISOString(),
                 lastLeaveResetDate: hireDate.toISOString(),
                 createdAt: serverTimestamp(),
@@ -106,7 +108,9 @@ export default function NewEmployeePage() {
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
                 maxEmergencyLeave: 5, // Default value
-            });
+            };
+
+            const docRef = await addDoc(collection(firestore, 'employees'), employeeData);
             toast({ title: 'نجاح', description: 'تم حفظ الموظف بنجاح.' });
             router.push('/dashboard/hr');
         } catch (error) {
