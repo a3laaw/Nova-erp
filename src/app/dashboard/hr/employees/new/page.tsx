@@ -79,7 +79,7 @@ export default function NewEmployeePage() {
             return;
         }
         setIsLoading(true);
-
+        
         const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
 
         try {
@@ -187,7 +187,7 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="visaType">نوع الإقامة / التأشيرة</Label>
-                                <Select dir="rtl" required value={formData.visaType} onValueChange={(v) => handleSelectChange('visaType', v)}>
+                                <Select dir="rtl" value={formData.visaType} onValueChange={(v) => handleSelectChange('visaType', v)}>
                                     <SelectTrigger id="visaType"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="kuwaiti">كويتي</SelectItem>
@@ -198,10 +198,12 @@ export default function NewEmployeePage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required />
-                            </div>
+                            {formData.visaType !== 'kuwaiti' && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
+                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti'} />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -258,7 +260,7 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
-                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v)}>
+                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v: Employee['contractType']) => handleSelectChange('contractType', v)}>
                                     <SelectTrigger id="contractType"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="permanent">دائم</SelectItem>
