@@ -55,12 +55,6 @@ export function UserForm({ isOpen, onClose, user }: UserFormProps) {
             </Label>
             <Input id="username" defaultValue={user?.username} className="col-span-3" />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="email" className="text-right">
-              البريد الإلكتروني
-            </Label>
-            <Input id="email" type="email" defaultValue={user?.email} className="col-span-3" />
-          </div>
            <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="password">
               كلمة المرور
