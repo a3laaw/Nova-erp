@@ -1,3 +1,5 @@
+'use client';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,9 +13,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { users } from '@/lib/data';
+import { useState, useEffect } from 'react';
 
 export function UserNav() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const currentUser = users.find(u => u.role === 'Admin') || users[0];
+
+  if (!isClient) {
+    return (
+      <div className="relative h-9 w-9 rounded-full bg-muted border animate-pulse"></div>
+    );
+  }
 
   return (
     <DropdownMenu>
