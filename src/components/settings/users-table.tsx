@@ -23,7 +23,7 @@ import { users as initialUsers } from '@/lib/data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '../ui/badge';
 import { UserForm } from './user-form';
-import type { User } from '@/lib/types';
+import type { User, UserRole } from '@/lib/types';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -34,6 +34,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
+const roleTranslations: Record<UserRole, string> = {
+    Admin: 'مدير',
+    Engineer: 'مهندس',
+    Accountant: 'محاسب',
+    Secretary: 'سكرتارية',
+    Client: 'عميل'
+};
 
 export function UsersTable() {
     const [users, setUsers] = useState(initialUsers);
@@ -84,25 +92,25 @@ export function UsersTable() {
     <>
         <div className="flex items-center justify-between mb-4">
             <div>
-                <h3 className='text-lg font-medium'>User Management</h3>
+                <h3 className='text-lg font-medium'>إدارة المستخدمين</h3>
                 <p className='text-sm text-muted-foreground'>
-                    Create, edit, and manage employee accounts and roles.
+                    إنشاء وتعديل وإدارة حسابات الموظفين وأدوارهم.
                 </p>
             </div>
             <Button onClick={handleAddUser} size="sm" className="gap-1">
                 <PlusCircle className="h-4 w-4" />
-                Add User
+                إضافة مستخدم
             </Button>
         </div>
         <div className='border rounded-lg'>
             <Table>
             <TableHeader>
                 <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>المستخدم</TableHead>
+                <TableHead>الدور</TableHead>
+                <TableHead>الحالة</TableHead>
                 <TableHead>
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">الإجراءات</span>
                 </TableHead>
                 </TableRow>
             </TableHeader>
@@ -121,10 +129,10 @@ export function UsersTable() {
                             </div>
                         </div>
                     </TableCell>
-                    <TableCell>{user.role}</TableCell>
+                    <TableCell>{roleTranslations[user.role]}</TableCell>
                     <TableCell>
                         <Badge variant={user.isActive ? 'secondary' : 'outline'} className={user.isActive ? 'bg-green-100 text-green-800 border-green-200' : ''}>
-                            {user.isActive ? 'Active' : 'Inactive'}
+                            {user.isActive ? 'فعال' : 'غير فعال'}
                         </Badge>
                     </TableCell>
                     <TableCell>
@@ -140,12 +148,12 @@ export function UsersTable() {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEditUser(user)}>Edit</DropdownMenuItem>
-                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
+                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleEditUser(user)}>تعديل</DropdownMenuItem>
+                            <DropdownMenuItem>إعادة تعيين كلمة المرور</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">
-                                Deactivate
+                                إلغاء التنشيط
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                         </DropdownMenu>

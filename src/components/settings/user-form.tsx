@@ -30,6 +30,14 @@ interface UserFormProps {
 }
 
 const roles: UserRole[] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'Client'];
+const roleTranslations: Record<UserRole, string> = {
+    Admin: 'مدير',
+    Engineer: 'مهندس',
+    Accountant: 'محاسب',
+    Secretary: 'سكرتارية',
+    Client: 'عميل'
+};
+
 
 export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
   const isEditing = !!user;
@@ -128,7 +136,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
                     </SelectTrigger>
                     <SelectContent>
                         {roles.map(role => (
-                            <SelectItem key={role} value={role}>{role}</SelectItem>
+                            <SelectItem key={role} value={role}>{roleTranslations[role]}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
