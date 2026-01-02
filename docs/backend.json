@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -5,10 +6,6 @@
       "description": "Represents a user profile in the system.",
       "type": "object",
       "properties": {
-        "uid": {
-          "type": "string",
-          "description": "The user's unique ID."
-        },
         "username": {
           "type": "string",
           "description": "The user's username for login."
@@ -43,7 +40,6 @@
         }
       },
       "required": [
-        "uid",
         "username",
         "passwordHash",
         "role",

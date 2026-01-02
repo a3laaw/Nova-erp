@@ -1,3 +1,4 @@
+
 import {
   Card,
   CardContent,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/tabs';
 import { EmployeesTable } from '@/components/hr/employees-table';
 import Link from 'next/link';
+import { GratuityCalculator } from '@/components/hr/gratuity-calculator';
 
 export default function HRPage() {
   return (
@@ -39,12 +41,7 @@ export default function HRPage() {
              {/* This content will be rendered on its own page now */}
           </TabsContent>
           <TabsContent value="gratuity" className="mt-4">
-             <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">تقارير نهاية الخدمة قريباً</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    سيتم هنا حساب وعرض تقارير مكافآت نهاية الخدمة للموظفين المنتهية خدمتهم.
-                </p>
-            </div>
+            <GratuityCalculator />
           </TabsContent>
         </Tabs>
       </CardContent>

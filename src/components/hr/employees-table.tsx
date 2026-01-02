@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -33,6 +34,8 @@ export const initialEmployees: Employee[] = [
         contractType: 'permanent',
         department: 'هندسة',
         basicSalary: 1200,
+        housingAllowance: 400,
+        transportAllowance: 100,
         status: 'active',
         terminationDate: null,
         terminationReason: null,
@@ -50,6 +53,7 @@ export const initialEmployees: Employee[] = [
         contractType: 'permanent',
         department: 'محاسبة',
         basicSalary: 950,
+        housingAllowance: 300,
         status: 'active',
         terminationDate: null,
         terminationReason: null,
@@ -114,12 +118,17 @@ export function EmployeesTable() {
 
     useEffect(() => {
         setIsClient(true);
-        const today = new Date();
-        setEmployees(initialEmployees.map(e => ({
-            ...e,
-            leaveBalance: calculateAnnualLeaveBalance(e, today)
-        })));
     }, []);
+
+    useEffect(() => {
+        if (isClient) {
+            const today = new Date();
+            setEmployees(initialEmployees.map(e => ({
+                ...e,
+                leaveBalance: calculateAnnualLeaveBalance(e, today)
+            })));
+        }
+    }, [isClient]);
 
 
     return (
@@ -158,7 +167,7 @@ export function EmployeesTable() {
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>
-                        <TableCell>{new Date(employee.hireDate).toLocaleDateString('ar-KW')}</TableCell>
+                        <TableCell>{new Date(employee.hireDate).toLocaleDateString('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric' })}</TableCell>
                         <TableCell className='font-medium'>
                             {isClient && employee.leaveBalance !== null ? `${employee.leaveBalance} يوم` : '...'}
                         </TableCell>
