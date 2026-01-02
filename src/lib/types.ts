@@ -1,4 +1,5 @@
 
+
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Client' | 'Secretary' | 'HR';
 
 export type User = {
@@ -149,9 +150,26 @@ export type InventoryItem = {
 
 export type Employee = {
     id: string;
-    fullName: string;
+    fullName: string; // Will be used as nameAr
+    nameEn?: string;
+    dob?: string;
+    gender?: 'male' | 'female';
+    maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
+    dependents?: number;
     civilId: string;
+    visaType?: 'worker' | 'engineer' | 'driver' | 'admin' | 'kuwaiti';
+    residencyExpiry?: string;
+    contractExpiry?: string;
     mobile: string;
+    emergencyContact?: string;
+    email?: string;
+    jobTitle?: string;
+    position?: 'head' | 'employee' | 'assistant' | 'contractor';
+    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
+    bankName?: string;
+    accountNumber?: string;
+    iban?: string;
+    profilePicture?: string;
     hireDate: string; // ISO String
     terminationDate: string | null;
     terminationReason: 'resignation' | 'termination' | null;
@@ -167,6 +185,6 @@ export type Employee = {
     carriedLeaveDays?: number;
     sickLeaveUsed?: number;
     emergencyLeaveUsed?: number;
-    maxEmergencyLeave?: number;
+maxEmergencyLeave?: number;
     lastLeaveResetDate?: string; // ISO String
 };

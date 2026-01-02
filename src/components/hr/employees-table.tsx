@@ -1,6 +1,8 @@
 
+
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -73,6 +75,8 @@ export const initialEmployees: Employee[] = [
         contractType: 'permanent',
         department: 'سكرتارية',
         basicSalary: 700,
+        housingAllowance: 0,
+        transportAllowance: 50,
         status: 'active',
         terminationDate: null,
         terminationReason: null,
@@ -95,8 +99,10 @@ const statusColors: Record<Employee['status'], string> = {
   terminated: 'bg-red-100 text-red-800 border-red-200',
 };
 
-const calculateAnnualLeaveBalance = (employee: Employee, today: Date): number => {
+const calculateAnnualLeaveBalance = (employee: Employee): number => {
     const hireDate = new Date(employee.hireDate);
+    // Use a client-side safe date
+    const today = new Date();
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
     if (yearsOfService < 1) {
@@ -110,7 +116,7 @@ const calculateAnnualLeaveBalance = (employee: Employee, today: Date): number =>
     // Max carry-over is 15 days, total balance cannot exceed 45 (30 current + 15 carried).
     const totalBalance = accrued + Math.min(carried, 15) - used;
     
-    return Math.min(45, totalBalance);
+    return Math.max(0, Math.min(45, totalBalance));
 };
 
 export function EmployeesTable() {
@@ -118,15 +124,15 @@ export function EmployeesTable() {
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
+        // This ensures the component has mounted on the client
         setIsClient(true);
     }, []);
 
     useEffect(() => {
         if (isClient) {
-            const today = new Date();
             setEmployees(initialEmployees.map(e => ({
                 ...e,
-                leaveBalance: calculateAnnualLeaveBalance(e, today)
+                leaveBalance: calculateAnnualLeaveBalance(e)
             })));
         }
     }, [isClient]);
@@ -141,9 +147,11 @@ export function EmployeesTable() {
                         عرض وإدارة جميع الموظفين في الشركة.
                     </p>
                 </div>
-                <Button size="sm" className="gap-1">
-                    <PlusCircle className="ml-2 h-4 w-4" />
-                    إضافة موظف
+                <Button size="sm" className="gap-1" asChild>
+                    <Link href="/dashboard/hr/employees/new">
+                        <PlusCircle className="ml-2 h-4 w-4" />
+                        إضافة موظف
+                    </Link>
                 </Button>
             </div>
             <div className='border rounded-lg'>
