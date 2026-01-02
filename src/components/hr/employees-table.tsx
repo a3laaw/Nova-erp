@@ -54,6 +54,7 @@ export const initialEmployees: Employee[] = [
         department: 'محاسبة',
         basicSalary: 950,
         housingAllowance: 300,
+        transportAllowance: 100,
         status: 'active',
         terminationDate: null,
         terminationReason: null,
