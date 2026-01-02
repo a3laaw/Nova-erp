@@ -88,7 +88,7 @@ export function GratuityCalculator() {
             } else {
                 gratuity = totalMonthlySalary * yearsOfService;
             }
-        } else { // 'termination'
+        } else { // 'termination' (by employer)
             gratuity = totalMonthlySalary * yearsOfService;
         }
     }
@@ -160,6 +160,11 @@ export function GratuityCalculator() {
                     <span>سنوات الخدمة المكتملة:</span>
                     <span className='font-bold'>{calculationResult.yearsOfService} سنة</span>
                 </div>
+                 {terminationReason === 'resignation' && calculationResult.yearsOfService < 3 && calculationResult.yearsOfService >= 1 && (
+                    <p className='text-xs text-amber-700 p-2 bg-amber-50 rounded-md'>
+                        ملاحظة: الموظف مستحق لنصف شهر راتب عن كل سنة خدمة لتقديم استقالته قبل إكمال 3 سنوات.
+                    </p>
+                 )}
                 <div className='flex justify-between'>
                     <span>الراتب الشهري المحتسب:</span>
                     <span className='font-mono'>{formatCurrency(calculationResult.totalMonthlySalary)}</span>
