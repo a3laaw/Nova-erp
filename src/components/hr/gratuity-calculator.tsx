@@ -41,7 +41,6 @@ const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
-    // As per previous logic, balance is capped at 45. We'll use this for payout calculation.
     const totalBalance = accrued + Math.min(carried, 15) - used;
     
     return Math.min(45, totalBalance);
@@ -154,11 +153,11 @@ export function GratuityCalculator() {
         {isClient && calculationResult && !calculationResult.error && selectedEmployee && (
           <Alert>
              <Landmark className="h-4 w-4" />
-            <AlertTitle>ملخص الحساب</AlertTitle>
+            <AlertTitle>ملخص الحساب (وفقاً للمادة 64 من قانون العمل الكويتي)</AlertTitle>
             <AlertDescription>
               <div className="mt-4 space-y-3">
                 <div className='flex justify-between'>
-                    <span>سنوات الخدمة الكاملة:</span>
+                    <span>سنوات الخدمة المكتملة:</span>
                     <span className='font-bold'>{calculationResult.yearsOfService} سنة</span>
                 </div>
                 <div className='flex justify-between'>
@@ -167,7 +166,7 @@ export function GratuityCalculator() {
                 </div>
                  <hr className='my-2' />
                 <div className='flex justify-between'>
-                    <span>مكافأة نهاية الخدمة:</span>
+                    <span>مكافأة نهاية الخدمة المستحقة:</span>
                     <span className='font-mono'>{formatCurrency(calculationResult.gratuity)}</span>
                 </div>
                 <div className='flex justify-between'>
@@ -206,7 +205,7 @@ export function GratuityCalculator() {
             <ShieldCheck className="h-4 w-4" />
             <AlertTitle>ملاحظة قانونية</AlertTitle>
             <AlertDescription>
-            هذا الحساب هو تقدير تقريبي ومبني على البيانات المدخلة. المحسوب وفقًا لقانون العمل الكويتي رقم 6 لسنة 2010. يجب مراجعة الحسابات النهائية من قبل قسم المحاسبة.
+            هذا الحساب هو تقدير تقريبي ومبني على البيانات المدخلة. المحسوب وفقًا لقانون العمل الكويتي رقم 6 لسنة 2010. لا تُستحق مكافأة نهاية الخدمة إذا كانت مدة الخدمة أقل من سنة واحدة. يجب مراجعة الحسابات النهائية من قبل قسم المحاسبة.
             </AlertDescription>
         </Alert>
 
