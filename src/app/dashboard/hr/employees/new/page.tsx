@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -27,11 +27,18 @@ import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function NewEmployeePage() {
     const router = useRouter();
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '',
@@ -110,6 +117,46 @@ export default function NewEmployeePage() {
         }
     };
 
+
+    if (!isClient) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent className="space-y-8">
+                   <div className="space-y-4">
+                        <Skeleton className="h-6 w-1/5" />
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                             <div className="md:col-span-1 flex flex-col items-center gap-2">
+                                <Skeleton className="h-32 w-32 rounded-full" />
+                                <Skeleton className="h-8 w-24" />
+                            </div>
+                            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Skeleton className="h-10" />
+                                <Skeleton className="h-10" />
+                                <Skeleton className="h-10" />
+                                <Skeleton className="h-10" />
+                            </div>
+                        </div>
+                   </div>
+                    <Separator />
+                     <div className="space-y-4">
+                        <Skeleton className="h-6 w-1/4" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           <Skeleton className="h-10" />
+                           <Skeleton className="h-10" />
+                           <Skeleton className="h-10" />
+                        </div>
+                    </div>
+                </CardContent>
+                 <CardFooter className="flex justify-end">
+                    <Skeleton className="h-10 w-28" />
+                </CardFooter>
+            </Card>
+        )
+    }
 
     return (
         <Card dir="rtl">
@@ -201,7 +248,7 @@ export default function NewEmployeePage() {
                             {formData.visaType !== 'kuwaiti' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti'} />
+                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti' && !!formData.visaType} />
                                 </div>
                             )}
                         </div>
@@ -260,7 +307,7 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
-                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v: Employee['contractType']) => handleSelectChange('contractType', v)}>
+                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v as 'permanent' | 'temporary' | 'subcontractor')}>
                                     <SelectTrigger id="contractType"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="permanent">دائم</SelectItem>
@@ -341,3 +388,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
