@@ -75,22 +75,26 @@ export function GratuityCalculator() {
 
     const yearsOfService = Math.floor((termDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
 
+    if (yearsOfService < 1) {
+        return {
+             error: 'لا تستحق مكافأة نهاية الخدمة لمدة خدمة أقل من سنة.'
+        };
+    }
+
     const totalMonthlySalary =
       (selectedEmployee.basicSalary || 0) +
       (selectedEmployee.housingAllowance || 0) +
       (selectedEmployee.transportAllowance || 0);
 
     let gratuity = 0;
-    if (yearsOfService >= 1) {
-        if (terminationReason === 'resignation') {
-            if (yearsOfService < 3) {
-                gratuity = totalMonthlySalary * 0.5 * yearsOfService;
-            } else {
-                gratuity = totalMonthlySalary * yearsOfService;
-            }
-        } else { // 'termination' (by employer)
+    if (terminationReason === 'resignation') {
+        if (yearsOfService < 3) {
+            gratuity = totalMonthlySalary * 0.5 * yearsOfService;
+        } else {
             gratuity = totalMonthlySalary * yearsOfService;
         }
+    } else { // 'termination' (by employer)
+        gratuity = totalMonthlySalary * yearsOfService;
     }
     
     const leaveBalance = calculateAnnualLeaveBalance(selectedEmployee);
@@ -160,7 +164,7 @@ export function GratuityCalculator() {
                     <span>سنوات الخدمة المكتملة:</span>
                     <span className='font-bold'>{calculationResult.yearsOfService} سنة</span>
                 </div>
-                 {terminationReason === 'resignation' && calculationResult.yearsOfService < 3 && calculationResult.yearsOfService >= 1 && (
+                 {terminationReason === 'resignation' && calculationResult.yearsOfService < 3 && (
                     <p className='text-xs text-amber-700 p-2 bg-amber-50 rounded-md'>
                         ملاحظة: الموظف مستحق لنصف شهر راتب عن كل سنة خدمة لتقديم استقالته قبل إكمال 3 سنوات.
                     </p>
