@@ -81,28 +81,25 @@ export function GratuityCalculator() {
         };
     }
 
-    const totalMonthlySalary =
-      (selectedEmployee.basicSalary || 0) +
-      (selectedEmployee.housingAllowance || 0) +
-      (selectedEmployee.transportAllowance || 0);
+    const basicSalary = selectedEmployee.basicSalary || 0;
 
     let gratuity = 0;
     if (terminationReason === 'resignation') {
       if (yearsOfService < 3) {
-        gratuity = totalMonthlySalary * 0.5 * yearsOfService;
+        gratuity = basicSalary * 0.5 * yearsOfService;
       } else {
-        gratuity = totalMonthlySalary * yearsOfService;
+        gratuity = basicSalary * yearsOfService;
       }
     } else { // 'termination' (by employer)
-      gratuity = totalMonthlySalary * yearsOfService;
+      gratuity = basicSalary * yearsOfService;
     }
     
     const leaveBalance = calculateAnnualLeaveBalance(selectedEmployee);
-    const leavePayout = (totalMonthlySalary / 30) * leaveBalance;
+    const leavePayout = (basicSalary / 30) * leaveBalance;
     
     const totalPayout = gratuity + leavePayout;
 
-    return { yearsOfService, totalMonthlySalary, gratuity, leaveBalance, leavePayout, totalPayout, error: null };
+    return { yearsOfService, basicSalary, gratuity, leaveBalance, leavePayout, totalPayout, error: null };
   }, [selectedEmployee, terminationDate, terminationReason]);
 
   return (
@@ -170,8 +167,8 @@ export function GratuityCalculator() {
                     </p>
                  )}
                 <div className='flex justify-between'>
-                    <span>الراتب الشهري المحتسب:</span>
-                    <span className='font-mono'>{formatCurrency(calculationResult.totalMonthlySalary)}</span>
+                    <span>الراتب الأساسي:</span>
+                    <span className='font-mono'>{formatCurrency(calculationResult.basicSalary)}</span>
                 </div>
                  <hr className='my-2' />
                 <div className='flex justify-between'>
@@ -214,7 +211,7 @@ export function GratuityCalculator() {
             <ShieldCheck className="h-4 w-4" />
             <AlertTitle>ملاحظة قانونية</AlertTitle>
             <AlertDescription>
-            هذا الحساب هو تقدير تقريبي ومبني على البيانات المدخلة. المحسوب وفقًا لقانون العمل الكويتي رقم 6 لسنة 2010. لا تُستحق مكافأة نهاية الخدمة إذا كانت مدة الخدمة أقل من سنة واحدة. يجب مراجعة الحسابات النهائية من قبل قسم المحاسبة.
+            هذا الحساب هو تقدير تقريبي ومبني على البيانات المدخلة وأساس الراتب الأساسي فقط دون البدلات. المحسوب وفقًا لقانون العمل الكويتي رقم 6 لسنة 2010. لا تُستحق مكافأة نهاية الخدمة إذا كانت مدة الخدمة أقل من سنة واحدة. يجب مراجعة الحسابات النهائية من قبل قسم المحاسبة.
             </AlertDescription>
         </Alert>
 
