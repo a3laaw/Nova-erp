@@ -123,8 +123,9 @@
         "annualLeaveAccrued": { "type": "number" },
         "annualLeaveUsed": { "type": "number" },
         "carriedLeaveDays": { "type": "number" },
-        "sickLeaveUsedThisYear": { "type": "number" },
-        "sickLeaveHalfPayUsed": { "type": "number" },
+        "sickLeaveUsed": { "type": "number" },
+        "emergencyLeaveUsed": { "type": "number" },
+        "maxEmergencyLeave": { "type": "number" },
         "lastLeaveResetDate": { "type": "string", "format": "date-time" }
       },
       "required": [

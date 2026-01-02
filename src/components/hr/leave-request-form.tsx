@@ -1,0 +1,127 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '../ui/textarea';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Upload } from 'lucide-react';
+import { initialEmployees } from './employees-table'; // Using mock employees for now
+
+interface LeaveRequestFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (request: any) => void;
+}
+
+type LeaveType = 'سنوية' | 'مرضية' | 'طارئة';
+
+export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormProps) {
+    const [employeeId, setEmployeeId] = useState('');
+    const [leaveType, setLeaveType] = useState<LeaveType | ''>('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [notes, setNotes] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        // Add validation logic here
+        onSave({ employeeId, leaveType, startDate, endDate, notes });
+        onClose();
+    }
+    
+    const days = startDate && endDate ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 3600 * 24)) + 1 : 0;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md" dir="rtl">
+        <form onSubmit={handleSubmit}>
+            <DialogHeader>
+                <DialogTitle>طلب إجازة جديد</DialogTitle>
+                <DialogDescription>
+                    قم بتعبئة النموذج لتقديم طلب إجازة جديد لأحد الموظفين.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="employee">الموظف</Label>
+                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId}>
+                        <SelectTrigger id="employee">
+                            <SelectValue placeholder="اختر الموظف..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {initialEmployees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id}>{emp.fullName}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="leaveType">نوع الإجازة</Label>
+                    <Select dir="rtl" value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)}>
+                        <SelectTrigger id="leaveType">
+                            <SelectValue placeholder="اختر نوع الإجازة..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="سنوية">سنوية</SelectItem>
+                            <SelectItem value="مرضية">مرضية</SelectItem>
+                            <SelectItem value="طارئة">طارئة</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="startDate">من تاريخ</Label>
+                        <Input id="startDate" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="endDate">إلى تاريخ</Label>
+                        <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    </div>
+                </div>
+                 {days > 0 && <Alert variant="default" className='bg-muted/50'><AlertDescription>مجموع الأيام: {days} يوم</AlertDescription></Alert>}
+                <div className="grid gap-2">
+                    <Label htmlFor="notes">ملاحظات</Label>
+                    <Textarea id="notes" placeholder={leaveType === 'طارئة' ? 'سبب الإجازة الطارئة (إلزامي)' : 'أدخل ملاحظاتك هنا...'} value={notes} onChange={e => setNotes(e.target.value)} />
+                </div>
+                {leaveType === 'مرضية' && (
+                    <div className="grid gap-2">
+                        <Label htmlFor="file-upload">تقرير طبي (إلزامي)</Label>
+                        <div className="flex items-center gap-2">
+                           <Button asChild variant="outline" className="flex-1">
+                             <label htmlFor="file-upload" className="cursor-pointer">
+                                <Upload className="ml-2 h-4 w-4" />
+                                {file ? file.name : 'اختر ملف'}
+                             </label>
+                           </Button>
+                           <Input id="file-upload" type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                        </div>
+                    </div>
+                )}
+            </div>
+            <DialogFooter>
+                <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+                <Button type="submit">تقديم الطلب</Button>
+            </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

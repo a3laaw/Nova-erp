@@ -23,7 +23,7 @@ import {
 
 
 // Mock data for now, will be replaced with Firestore data
-const initialEmployees: Employee[] = [
+export const initialEmployees: Employee[] = [
     { 
         id: 'emp-1',
         fullName: 'علياء العامري',
@@ -103,9 +103,10 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
-    // As per Kuwait law, max carry-over is often 30 days total if company policy allows, but the user requested 15 days can be carried.
-    // The total balance that can be used shouldn't exceed a certain limit, e.g., 45 (30 current + 15 carried). Let's use MIN(45, ...).
-    return Math.min(45, accrued + carried - used);
+    // Max carry-over is 15 days, total balance cannot exceed 45 (30 current + 15 carried).
+    const totalBalance = accrued + Math.min(carried, 15) - used;
+    
+    return Math.min(45, totalBalance);
 };
 
 

@@ -165,7 +165,8 @@ export type Employee = {
     annualLeaveAccrued?: number;
     annualLeaveUsed?: number;
     carriedLeaveDays?: number;
-    sickLeaveUsedThisYear?: number;
-    sickLeaveHalfPayUsed?: number;
+    sickLeaveUsed?: number;
+    emergencyLeaveUsed?: number;
+    maxEmergencyLeave?: number;
     lastLeaveResetDate?: string; // ISO String
 };
