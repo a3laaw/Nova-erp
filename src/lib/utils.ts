@@ -6,8 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-AE', {
+  return new Intl.NumberFormat('ar-KW', {
     style: 'currency',
-    currency: 'AED',
+    currency: 'KWD',
   }).format(amount);
 }
