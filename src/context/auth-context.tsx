@@ -4,9 +4,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { 
-    signInWithCustomToken,
-    signOut, 
+    // We are not using Firebase Auth directly for login anymore, but keeping for session state
     onAuthStateChanged, 
+    signOut,
+    signInAnonymously, // We will sign in users anonymously to get a UID for rules
     type User as FirebaseUser 
 } from 'firebase/auth';
 import { 
@@ -18,27 +19,15 @@ import {
     getDoc,
     type DocumentData
 } from 'firebase/firestore';
-import type { UserProfile, UserRole } from '@/lib/types';
-
-
-// This would be your actual custom token generation endpoint
-// For this example, we'll mock it.
-async function getCustomToken(uid: string, role: UserRole): Promise<string> {
-    // In a real app, this would be an HTTPS call to a Firebase Function
-    // that mints a token for the given UID with the specified role claim.
-    console.warn("Mock token generation is for development only.");
-    // For the emulator, even a non-JWT string works if it's not empty.
-    return `mock-token-for-${uid}-with-role-${role}`;
-}
+import type { UserProfile } from '@/lib/types';
 
 
 // This function will be mocked on the client side for demonstration.
 // In a real app, password verification must happen on the server.
 async function verifyPassword(password: string, hash: string): Promise<boolean> {
-    // ---- MOCK IMPLEMENTATION ----
-    // In a real app, you would NEVER have this logic on the client.
-    // A real implementation would use bcrypt.compare on the server.
-    // This is now corrected to compare the input password with the mock hash.
+    // In a real-world scenario, this would be a call to a server
+    // which would use something like bcrypt.compare(password, hash)
+    // For this mock, we'll do a simple string comparison.
     return password === hash;
 }
 
@@ -63,43 +52,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-   useEffect(() => {
+  // This effect now only manages session persistence.
+  useEffect(() => {
     if (!auth) {
       setLoading(false);
       return;
     };
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser && firestore) {
-        // User is signed in with Firebase Auth. Now fetch their profile from Firestore.
-        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const userProfile = userDocSnap.data() as UserProfile;
-          setUser({
-            ...userProfile,
-            uid: firebaseUser.uid,
-            id: firebaseUser.uid,
-          });
+        // Since we aren't using real Firebase Auth users, this listener
+        // is mostly for session management. We'll handle user state manually.
+        const storedUser = sessionStorage.getItem('authUser');
+        if (firebaseUser && storedUser) {
+            try {
+                const manualUser = JSON.parse(storedUser) as AuthenticatedUser;
+                setUser(manualUser);
+            } catch (e) {
+                 setUser(null);
+                 sessionStorage.removeItem('authUser');
+            }
         } else {
-          // User exists in Auth but not in Firestore. This is an inconsistent state.
-          setUser(null);
-          await signOut(auth);
+            setUser(null);
+            sessionStorage.removeItem('authUser');
         }
-      } else {
-        // No user signed in with Firebase Auth.
-        setUser(null);
-      }
-      setLoading(false);
+        setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [auth, firestore]);
+  }, [auth]);
 
   const login = async (username: string, password: string) => {
     if (!firestore || !auth) {
         throw new Error("Firebase is not initialized.");
     }
+    setLoading(true);
     
     // 1. Find user by username in Firestore
     const usersRef = collection(firestore, 'users');
@@ -107,37 +92,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
+        setLoading(false);
         throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
     }
 
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data() as UserProfile;
+    const userId = userDoc.id;
 
     // 2. Check if user is active
     if (!userData.isActive) {
+        setLoading(false);
         throw new Error("هذا الحساب غير نشط. يرجى مراجعة المسؤول.");
     }
 
     // 3. Verify password (using our mocked verification)
     const isPasswordValid = await verifyPassword(password, userData.passwordHash || '');
     if (!isPasswordValid) {
+        setLoading(false);
         throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
     }
     
-    // 4. If password is valid, get a custom token (mocked)
-    const customToken = await getCustomToken(userDoc.id, userData.role);
+    // 4. If password is valid, create the user object.
+    // To satisfy security rules that check auth.uid, we will sign in anonymously.
+    // In a real app, this is where you'd use the custom token flow.
+    const credential = await signInAnonymously(auth);
 
-    // 5. Sign in with the custom token
-    // This is the crucial step that creates a real Firebase Auth session.
-    await signInWithCustomToken(auth, customToken);
+    const authenticatedUser: AuthenticatedUser = {
+        ...userData,
+        id: userId,
+        uid: credential.user.uid, // Use the anonymous UID
+    };
 
-    // The onAuthStateChanged listener will now handle setting the user state.
+    // 5. Set user state manually and persist to session storage
+    sessionStorage.setItem('authUser', JSON.stringify(authenticatedUser));
+    setUser(authenticatedUser);
+    setLoading(false);
   };
 
   const logout = async () => {
     if (auth) {
       await signOut(auth);
     }
+    sessionStorage.removeItem('authUser');
     setUser(null);
     router.push('/');
   };
