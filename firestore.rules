@@ -10,10 +10,11 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
+      // In our mock auth, the UID is the same as the user's document ID
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Returns true if the user has the 'Admin' role in their custom claims.
+    // Returns true if the user has the 'Admin' role in their user document.
     function isAdmin() {
         return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
@@ -23,10 +24,12 @@ service cloud.firestore {
       // Admins can manage all users.
       // Users can read/update their own profile.
       allow read, update: if isOwner(userId) || isAdmin();
+      // Only admins can list, create, or delete users.
       allow list, create, delete: if isAdmin();
     }
     
     match /clients/{clientId} {
+      // Allow any authenticated user to manage clients for now.
       allow read, write: if isAuthenticated();
     }
 
