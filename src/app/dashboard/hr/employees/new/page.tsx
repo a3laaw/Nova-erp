@@ -91,7 +91,8 @@ export default function NewEmployeePage() {
             // --- Validation ---
             const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
             for (const field of requiredFields) {
-                if (!formData[field] || (typeof formData[field] === 'number' && Number(formData[field]) === 0)) {
+                // Check for null or undefined, but allow 0 for numbers.
+                if (formData[field] === undefined || formData[field] === null || formData[field] === '') {
                     toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
                     setIsLoading(false);
                     return;
@@ -146,6 +147,7 @@ export default function NewEmployeePage() {
             if (formData.salaryPaymentType) employeeData.salaryPaymentType = formData.salaryPaymentType; else employeeData.salaryPaymentType = null;
             if (formData.bankName) employeeData.bankName = formData.bankName; else employeeData.bankName = null;
             if (formData.iban) employeeData.iban = formData.iban; else employeeData.iban = null;
+            if(formData.profilePicture) employeeData.profilePicture = formData.profilePicture; else employeeData.profilePicture = null;
 
             // Set leave dates based on hire date
             if (employeeData.hireDate) {
@@ -427,7 +429,7 @@ export default function NewEmployeePage() {
                         </div>
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-end">
+                <CardFooter className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => router.back()} className="ml-2">
                     إلغاء
                   </Button>
