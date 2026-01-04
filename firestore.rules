@@ -26,7 +26,7 @@ service cloud.firestore {
       
       // Temporarily allow list for username lookup during the local auth flow.
       // In a production app with secure Cloud Functions, this would be `if false`.
-      allow list: if isAuthenticated();
+      allow list: if true;
     }
     
     match /clients/{clientId} {
