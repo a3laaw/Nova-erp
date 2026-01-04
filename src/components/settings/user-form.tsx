@@ -35,7 +35,8 @@ const roleTranslations: Record<UserRole, string> = {
     Engineer: 'مهندس',
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
-    HR: 'موارد بشرية'
+    HR: 'موارد بشرية',
+    Client: 'عميل',
 };
 
 
@@ -44,6 +45,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
   const [formData, setFormData] = useState<Partial<UserProfile>>({
       fullName: '',
       username: '',
+      email: '',
       role: 'Engineer',
       isActive: true,
   });
@@ -55,6 +57,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
             id: user.id,
             fullName: user.fullName,
             username: user.username,
+            email: user.email,
             role: user.role,
             isActive: user.isActive,
         });
@@ -62,6 +65,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
         setFormData({
             fullName: '',
             username: '',
+            email: '',
             role: 'Engineer',
             isActive: true,
         });
@@ -85,7 +89,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       // Basic validation
-      if (!formData.fullName || !formData.username || !formData.role) {
+      if (!formData.fullName || !formData.username || !formData.role || !formData.email) {
           alert('الرجاء تعبئة كل الحقول المطلوبة.');
           return;
       }
@@ -118,6 +122,12 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
                 اسم المستخدم
                 </Label>
                 <Input id="username" value={formData.username} onChange={handleInputChange} className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                البريد الإلكتروني
+                </Label>
+                <Input id="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="password" className="text-right">

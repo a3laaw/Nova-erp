@@ -5,13 +5,13 @@ export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR' 
 export type UserProfile = {
   id?: string;
   username: string;
+  email: string; // Added email
   passwordHash?: string;
   fullName: string;
   avatarUrl?: string;
   role: UserRole;
   isActive: boolean;
   createdAt?: any; // To support serverTimestamp
-  email?: string;
 };
 
 export type Client = {

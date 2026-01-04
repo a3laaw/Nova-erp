@@ -15,21 +15,18 @@ service cloud.firestore {
 
     // Path Rules
     match /users/{userId} {
-      // Temporarily allow unauthenticated list for login username lookup.
-      // In production, this should be handled by a server-side Cloud Function.
-      allow list: if true;
+      // Allow any authenticated user to get their own profile.
+      allow get: if isOwner(userId);
 
-      // An authenticated user can get their OWN profile if we knew their UID.
-      // But since we use anonymous auth, we can't enforce this rule effectively yet.
-      // Allow any authenticated user to get for now.
-      allow get: if isAuthenticated();
-
-      // Only Admins or the user themselves can update a profile.
-      // Since we can't verify roles securely yet without claims, we'll allow any authenticated user to update.
-      allow update: if isAuthenticated();
-      
-      // Allow user creation for sign-up flows (if any).
+      // Anyone can create a user (for sign-up).
       allow create: if true;
+      
+      // Only the user themselves can update their profile.
+      allow update: if isOwner(userId);
+      
+      // Temporarily allow list for username lookup during the local auth flow.
+      // In a production app with secure Cloud Functions, this would be `if false`.
+      allow list: if isAuthenticated();
     }
     
     match /clients/{clientId} {

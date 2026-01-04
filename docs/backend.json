@@ -10,6 +10,11 @@
           "type": "string",
           "description": "The user's username for login."
         },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address for authentication."
+        },
         "passwordHash": {
           "type": "string",
           "description": "The securely hashed password for the user."
@@ -41,6 +46,7 @@
       },
       "required": [
         "username",
+        "email",
         "role",
         "fullName",
         "isActive",
