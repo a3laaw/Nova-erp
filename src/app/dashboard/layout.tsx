@@ -8,7 +8,11 @@ import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
-function DashboardContent({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
 
@@ -74,18 +78,5 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </SidebarProvider>
-  );
-}
-
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <DashboardContent>
-      {children}
-    </DashboardContent>
   );
 }

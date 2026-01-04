@@ -11,23 +11,15 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
 
-function AppBody({ children }: { children: React.ReactNode }) {
+// This component now only handles HTML and body tags with language/direction.
+function RootHtml({ children }: { children: React.ReactNode }) {
   const { language, direction } = useLanguage();
-
-  // Set metadata dynamically
-  if (typeof document !== 'undefined') {
-    document.title = 'EmaratiScope';
-    const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.setAttribute('content', 'Engineering Consultancy Management');
-    }
-  }
-
 
   return (
     <html lang={language} dir={direction}>
       <head>
-        {/* We can place static head elements here, or dynamic ones inside a useEffect */}
+        <title>EmaratiScope</title>
+        <meta name="description" content="Engineering Consultancy Management" />
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
         {children}
@@ -47,7 +39,7 @@ export default function RootLayout({
     <LanguageProvider>
       <FirebaseClientProvider>
         <AuthProvider>
-          <AppBody>{children}</AppBody>
+            <RootHtml>{children}</RootHtml>
         </AuthProvider>
       </FirebaseClientProvider>
     </LanguageProvider>
