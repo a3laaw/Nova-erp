@@ -89,9 +89,9 @@ export default function NewEmployeePage() {
         
         try {
             // --- Validation ---
-            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'contractType', 'basicSalary', 'status'];
+            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
             for (const field of requiredFields) {
-                if (!formData[field]) {
+                if (!formData[field] || (typeof formData[field] === 'number' && Number(formData[field]) === 0)) {
                     toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
                     setIsLoading(false);
                     return;
