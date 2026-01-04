@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, type WithFieldValue } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -97,9 +97,10 @@ export default function NewEmployeePage() {
 
             const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
 
-            const employeeData: Omit<Employee, 'id'> = {
+            const employeeData: WithFieldValue<Omit<Employee, 'id'>> = {
                 ...formData,
                 fullName: formData.fullName || '',
+                nameEn: formData.nameEn || '',
                 mobile: formData.mobile || '',
                 civilId: formData.civilId || '',
                 department: formData.department || '',
