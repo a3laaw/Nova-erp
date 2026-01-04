@@ -18,11 +18,12 @@
           "type": "string",
           "description": "The user's role in the system.",
           "enum": [
-            "admin",
-            "secretary",
-            "accountant",
-            "engineer",
-            "hr"
+            "Admin",
+            "Secretary",
+            "Accountant",
+            "Engineer",
+            "HR",
+            "Client"
           ]
         },
         "fullName": {
@@ -41,9 +42,8 @@
       },
       "required": [
         "username",
-        "passwordHash",
         "role",
-        "fullName",
+"fullName",
         "isActive",
         "createdAt"
       ]
@@ -143,20 +143,14 @@
       },
       "required": [
         "fullName",
-        "nameEn",
-        "dob",
-        "gender",
         "civilId",
-        "visaType",
         "mobile",
         "department",
         "jobTitle",
-        "position",
         "hireDate",
         "contractType",
         "basicSalary",
         "status",
-        "lastVacationAccrualDate",
         "iban"
       ]
     }
