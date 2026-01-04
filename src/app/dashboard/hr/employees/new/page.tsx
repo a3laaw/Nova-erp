@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type WithFieldValue } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, type WithFieldValue, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -88,6 +88,12 @@ export default function NewEmployeePage() {
         setIsLoading(true);
         
         try {
+            // --- Validation ---
+            if (!formData.fullName || !formData.nameEn || !formData.civilId || !formData.mobile || !formData.department || !formData.jobTitle || !formData.hireDate) {
+                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء تعبئة جميع الحقول الأساسية المطلوبة.' });
+                 setIsLoading(false);
+                 return;
+            }
 
             if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الحساب الدولي (IBAN) مطلوب عند اختيار التحويل البنكي.' });
@@ -95,45 +101,61 @@ export default function NewEmployeePage() {
                 return;
             }
 
-            const hireDate = formData.hireDate ? new Date(formData.hireDate) : new Date();
+            // --- Data Sanitization & Preparation ---
+            const hireDate = new Date(formData.hireDate);
 
-            const employeeData: WithFieldValue<Omit<Employee, 'id'>> = {
-                ...formData,
-                fullName: formData.fullName || '',
-                nameEn: formData.nameEn || '',
-                mobile: formData.mobile || '',
-                civilId: formData.civilId || '',
-                department: formData.department || '',
-                jobTitle: formData.jobTitle || '',
+            const employeeData: DocumentData = {
+                // Required fields
+                fullName: formData.fullName,
+                nameEn: formData.nameEn,
+                civilId: formData.civilId,
+                mobile: formData.mobile,
+                department: formData.department,
+                jobTitle: formData.jobTitle,
+                hireDate: hireDate.toISOString(),
                 contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
-                housingAllowance: Number(formData.housingAllowance) || 0,
-                transportAllowance: Number(formData.transportAllowance) || 0,
-                dependents: Number(formData.dependents) || 0,
-                hireDate: hireDate.toISOString(),
+                status: 'active',
+                
+                // Optional fields (set to null if empty)
                 dob: formData.dob ? new Date(formData.dob).toISOString() : null,
+                gender: formData.gender || null,
+                maritalStatus: formData.maritalStatus || null,
+                dependents: Number(formData.dependents) || 0,
+                visaType: formData.visaType || null,
                 residencyExpiry: formData.residencyExpiry ? new Date(formData.residencyExpiry).toISOString() : null,
                 contractExpiry: formData.contractExpiry ? new Date(formData.contractExpiry).toISOString() : null,
+                emergencyContact: formData.emergencyContact || null,
+                email: formData.email || null,
+                position: formData.position || null,
+                housingAllowance: Number(formData.housingAllowance) || 0,
+                transportAllowance: Number(formData.transportAllowance) || 0,
+                salaryPaymentType: formData.salaryPaymentType || null,
+                bankName: formData.bankName || null,
+                iban: formData.iban || null,
+
+                // Default values for new employee
+                terminationDate: null,
+                terminationReason: null,
                 lastVacationAccrualDate: hireDate.toISOString(),
                 lastLeaveResetDate: hireDate.toISOString(),
-                createdAt: serverTimestamp(),
                 annualLeaveAccrued: 0,
                 annualLeaveUsed: 0,
                 carriedLeaveDays: 0,
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
-                maxEmergencyLeave: 5,
-                status: 'active',
-                terminationDate: null,
-                terminationReason: null,
+                maxEmergencyLeave: 5, // Default value
+                createdAt: serverTimestamp(),
             };
 
             await addDoc(collection(firestore, 'employees'), employeeData);
+
             toast({ title: 'نجاح', description: 'تم حفظ الموظف بنجاح.' });
             router.push('/dashboard/hr');
         } catch (error) {
             console.error("Error adding employee: ", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: (error as Error).message || 'لم يتم حفظ الموظف. الرجاء المحاولة مرة أخرى.' });
+            const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ الموظف. الرجاء المحاولة مرة أخرى.';
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
         } finally {
             setIsLoading(false);
         }
@@ -203,20 +225,20 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="fullName">الاسم بالعربية</Label>
+                                    <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
                                     <Input id="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="nameEn">الاسم بالإنجليزية</Label>
+                                    <Label htmlFor="nameEn">الاسم بالإنجليزية <span className="text-destructive">*</span></Label>
                                     <Input id="nameEn" value={formData.nameEn} onChange={handleInputChange} placeholder="e.g. Alyaa Alameri" dir="ltr" required />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="dob">تاريخ الميلاد</Label>
-                                    <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} required />
+                                    <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="gender">النوع</Label>
-                                    <Select dir="rtl" required value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v)}>
+                                    <Select dir="rtl" value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v)}>
                                         <SelectTrigger id="gender"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="male">ذكر</SelectItem>
@@ -251,7 +273,7 @@ export default function NewEmployeePage() {
                         <h3 className="font-semibold text-lg border-b pb-2">المعلومات القانونية والإقامة</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="civilId">الرقم المدني</Label>
+                                <Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label>
                                 <Input id="civilId" value={formData.civilId} onChange={handleInputChange} placeholder="12-digit number" dir="ltr" maxLength={12} required />
                             </div>
                             <div className="grid gap-2">
@@ -283,7 +305,7 @@ export default function NewEmployeePage() {
                         <h3 className="font-semibold text-lg border-b pb-2">معلومات الاتصال</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="mobile">رقم الجوال</Label>
+                                <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
                                 <Input id="mobile" dir="ltr" value={formData.mobile} onChange={handleInputChange} placeholder="+965 XXXX XXXX" required />
                             </div>
                             <div className="grid gap-2">
@@ -304,16 +326,16 @@ export default function NewEmployeePage() {
                         <h3 className="font-semibold text-lg border-b pb-2">معلومات التوظيف والعقد</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="department">القسم</Label>
+                                <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
                                 <Input id="department" value={formData.department} onChange={handleInputChange} placeholder="e.g., هندسة, محاسبة" required />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="jobTitle">الوظيفة</Label>
+                                <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
                                 <Input id="jobTitle" value={formData.jobTitle} onChange={handleInputChange} placeholder="e.g., مهندس مدني, محاسب عام" required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>
-                                <Select dir="rtl" required value={formData.position} onValueChange={(v) => handleSelectChange('position', v)}>
+                                <Select dir="rtl" value={formData.position} onValueChange={(v) => handleSelectChange('position', v)}>
                                     <SelectTrigger id="position"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="head">رئيس قسم</SelectItem>
@@ -324,12 +346,12 @@ export default function NewEmployeePage() {
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="hireDate">تاريخ التعيين</Label>
+                                <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
                                 <Input id="hireDate" type="date" value={formData.hireDate} onChange={handleInputChange} required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
-                                <Select dir="rtl" required value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v as 'permanent' | 'temporary' | 'subcontractor')}>
+                                <Select dir="rtl" value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v as 'permanent' | 'temporary' | 'subcontractor')}>
                                     <SelectTrigger id="contractType"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="permanent">دائم</SelectItem>
@@ -354,7 +376,7 @@ export default function NewEmployeePage() {
                         <h3 className="font-semibold text-lg border-b pb-2">الراتب والبنك</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="basicSalary">الراتب الأساسي</Label>
+                                <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
                                 <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary} onChange={handleInputChange} placeholder="0.000" required />
                             </div>
                             <div className="grid gap-2">
@@ -392,7 +414,7 @@ export default function NewEmployeePage() {
                                         </Select>
                                     </div>
                                     <div className="grid gap-2 md:col-span-2">
-                                        <Label htmlFor="iban">رقم الحساب الدولي (IBAN)</Label>
+                                        <Label htmlFor="iban">رقم الحساب الدولي (IBAN) <span className="text-destructive">*</span></Label>
                                         <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
                                     </div>
                                 </>
@@ -410,3 +432,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
