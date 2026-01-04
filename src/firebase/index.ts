@@ -3,6 +3,7 @@
 import { initializeApp, getApp, getApps, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, type Firestore } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -44,4 +45,4 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
 // We export the function to be called on demand, not the instances themselves.
 export { initializeFirebase };
 export * from './provider';
-export { useCollection } from 'react-firebase-hooks/firestore';
+export { useCollection };
