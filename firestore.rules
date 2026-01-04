@@ -9,8 +9,6 @@ service cloud.firestore {
     }
 
     function getUserRole() {
-      // Reads the 'role' claim from the authenticated user's token.
-      // This is set on the client after signing in with a custom token.
       return request.auth.token.role;
     }
 
@@ -36,11 +34,13 @@ service cloud.firestore {
 
     // Path Rules
     match /users/{userId} {
-      // Admins can manage any user.
-      // Any authenticated user can read their OWN profile to get their details.
-      allow read: if isAdmin() || isOwner(userId);
+      // Allow unauthenticated query for login check.
+      // NOTE: In production, this should be handled by a server-side function.
+      allow list: if true; 
+      // Admins can get any user. Any authenticated user can read their OWN profile.
+      allow get: if isAdmin() || isOwner(userId);
       allow write: if isAdmin();
-      // Allow user creation for login flow (unauthenticated write)
+      // Allow user creation for login flow
       allow create: if true; 
     }
     
