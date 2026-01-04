@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,11 +22,12 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { UserProfile, UserRole } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (user: Partial<UserProfile>, password?: string) => void;
+  onSave: (user: Partial<UserProfile>) => void;
   user?: UserProfile | null;
 }
 
@@ -36,11 +38,12 @@ const roleTranslations: Record<UserRole, string> = {
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
     HR: 'موارد بشرية',
-    Client: 'عميل',
+    Client: 'عميل'
 };
 
 
 export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
+  const { toast } = useToast();
   const isEditing = !!user;
   const [formData, setFormData] = useState<Partial<UserProfile>>({
       fullName: '',
@@ -49,7 +52,6 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
       role: 'Engineer',
       isActive: true,
   });
-  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (isEditing && user) {
@@ -70,7 +72,6 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
             isActive: true,
         });
     }
-    setPassword('');
   }, [user, isEditing, isOpen]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,16 +89,11 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Basic validation
       if (!formData.fullName || !formData.username || !formData.role || !formData.email) {
-          alert('الرجاء تعبئة كل الحقول المطلوبة.');
+          toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة كل الحقول المطلوبة.' });
           return;
       }
-      if (!isEditing && !password) {
-          alert('كلمة المرور مطلوبة للمستخدمين الجدد.');
-          return;
-      }
-      onSave(formData, password);
+      onSave(formData);
   }
 
   return (
@@ -107,7 +103,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
             <DialogHeader>
             <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}</DialogTitle>
             <DialogDescription>
-                {isEditing ? 'تعديل تفاصيل المستخدم الحالي.' : 'إضافة مستخدم جديد للنظام.'}
+                {isEditing ? 'تعديل تفاصيل المستخدم الحالي.' : 'إضافة مستخدم جديد للنظام مع كلمة مرور مؤقتة (123456).'}
             </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -115,25 +111,19 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
                 <Label htmlFor="fullName" className="text-right">
                 الاسم الكامل
                 </Label>
-                <Input id="fullName" value={formData.fullName} onChange={handleInputChange} className="col-span-3" />
+                <Input id="fullName" value={formData.fullName} onChange={handleInputChange} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="username" className="text-right">
                 اسم المستخدم
                 </Label>
-                <Input id="username" value={formData.username} onChange={handleInputChange} className="col-span-3" />
+                <Input id="username" value={formData.username} onChange={handleInputChange} className="col-span-3" required />
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email" className="text-right">
                 البريد الإلكتروني
                 </Label>
-                <Input id="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="password" className="text-right">
-                كلمة المرور
-                </Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={isEditing ? 'اتركه فارغاً لعدم التغيير' : '********'} className="col-span-3" />
+                <Input id="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" placeholder="user@example.com" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">

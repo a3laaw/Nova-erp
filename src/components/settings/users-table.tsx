@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,7 +35,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 
@@ -43,7 +44,8 @@ const roleTranslations: Record<UserRole, string> = {
     Engineer: 'مهندس',
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
-    HR: 'موارد بشرية'
+    HR: 'موارد بشرية',
+    Client: 'عميل'
 };
 
 export function UsersTable() {
@@ -55,28 +57,31 @@ export function UsersTable() {
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [userToDeactivate, setUserToDeactivate] = useState<UserProfile | null>(null);
+    const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
+
+    const fetchUsers = async () => {
+        if (!firestore) return;
+        setLoading(true);
+        try {
+            const usersCollection = collection(firestore, 'users');
+            const q = query(usersCollection, orderBy('createdAt', 'desc'));
+            const usersSnapshot = await getDocs(q);
+            const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+            setUsers(usersList);
+        } catch (error) {
+            console.error("Error fetching users: ", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المستخدمين.' });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            if (!firestore) return;
-            setLoading(true);
-            try {
-                const usersCollection = collection(firestore, 'users');
-                const usersSnapshot = await getDocs(usersCollection);
-                const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-                setUsers(usersList);
-            } catch (error) {
-                console.error("Error fetching users: ", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المستخدمين.' });
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchUsers();
-    }, [firestore, toast]);
+    }, [firestore]);
 
 
     const handleAddUser = () => {
@@ -89,38 +94,31 @@ export function UsersTable() {
         setIsFormOpen(true);
     }
     
-    const handleSaveUser = async (userData: Partial<UserProfile>, password?: string) => {
+    const handleSaveUser = async (userData: Partial<UserProfile>) => {
         if (!firestore) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'قاعدة البيانات غير متصلة.' });
             return;
         }
 
         try {
-            if (selectedUser) { // Editing existing user
+            if (selectedUser) { 
                 const userRef = doc(firestore, 'users', selectedUser.id!);
                 await updateDoc(userRef, {
                     fullName: userData.fullName,
                     username: userData.username,
+                    email: userData.email,
                     role: userData.role,
                     isActive: userData.isActive,
                 });
-                setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...userData } : u));
                 toast({ title: 'نجاح', description: 'تم تحديث بيانات المستخدم.' });
-            } else { // Creating new user
-                // This is a simplified version. In a real app, you'd use a Cloud Function
-                // to securely create the user and hash the password.
-                 if (!password) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'كلمة المرور مطلوبة للمستخدم الجديد.' });
-                    return;
-                }
-                const newUserDoc = await addDoc(collection(firestore, 'users'), {
+            } else { 
+                 await addDoc(collection(firestore, 'users'), {
                     ...userData,
                     createdAt: serverTimestamp(),
-                    passwordHash: 'mock_hashed_password', // Mocking password hash
-                });
-                setUsers([{ id: newUserDoc.id, ...userData, createdAt: new Date().toISOString() } as UserProfile, ...users]);
+                 });
                 toast({ title: 'نجاح', description: 'تم إنشاء المستخدم الجديد.' });
             }
+            fetchUsers(); // Re-fetch users to get the latest data
         } catch (error) {
              console.error("Error saving user:", error);
              toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ المستخدم.' });
@@ -134,21 +132,41 @@ export function UsersTable() {
         setUserToDeactivate(user);
         setIsAlertOpen(true);
     }
+
+    const handleDeleteClick = (user: UserProfile) => {
+        setUserToDelete(user);
+        setIsDeleteAlertOpen(true);
+    }
     
     const handleDeactivateConfirm = async () => {
         if (userToDeactivate && firestore) {
             try {
                 const userRef = doc(firestore, 'users', userToDeactivate.id!);
-                await updateDoc(userRef, { isActive: false });
-                setUsers(users.map(u => u.id === userToDeactivate.id ? { ...u, isActive: false } : u));
-                toast({ title: 'نجاح', description: 'تم إلغاء تنشيط المستخدم.' });
+                await updateDoc(userRef, { isActive: !userToDeactivate.isActive });
+                toast({ title: 'نجاح', description: `تم ${userToDeactivate.isActive ? 'إلغاء تنشيط' : 'إعادة تنشيط'} المستخدم.` });
+                fetchUsers();
             } catch (error) {
-                 console.error("Error deactivating user:", error);
-                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء تنشيط المستخدم.' });
+                 console.error("Error changing user status:", error);
+                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تغيير حالة المستخدم.' });
             }
         }
         setIsAlertOpen(false);
         setUserToDeactivate(null);
+    }
+
+    const handleDeleteConfirm = async () => {
+        if (userToDelete && firestore) {
+            try {
+                await deleteDoc(doc(firestore, 'users', userToDelete.id!));
+                toast({ title: 'نجاح', description: 'تم حذف المستخدم نهائياً.' });
+                fetchUsers();
+            } catch (error) {
+                 console.error("Error deleting user:", error);
+                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف المستخدم.' });
+            }
+        }
+        setIsDeleteAlertOpen(false);
+        setUserToDelete(null);
     }
 
 
@@ -201,33 +219,31 @@ export function UsersTable() {
                         </Badge>
                     </TableCell>
                     <TableCell>
-                       {currentUser?.role === 'Admin' && user.id !== currentUser.uid && <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                            aria-haspopup="true"
-                            size="icon"
-                            variant="ghost"
-                            >
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEditUser(user)}>تعديل</DropdownMenuItem>
-                            <DropdownMenuItem>إعادة تعيين كلمة المرور</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {user.isActive ? (
-                                <DropdownMenuItem onClick={() => handleDeactivateClick(user)} className="text-destructive focus:text-destructive focus:bg-red-50">
-                                    إلغاء التنشيط
+                       {currentUser?.role === 'Admin' && currentUser.uid !== user.id && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                aria-haspopup="true"
+                                size="icon"
+                                variant="ghost"
+                                >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => handleEditUser(user)}>تعديل</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeactivateClick(user)}>
+                                    {user.isActive ? 'إلغاء التنشيط' : 'إعادة التنشيط'}
                                 </DropdownMenuItem>
-                            ) : (
-                                <DropdownMenuItem onClick={() => { /* Implement reactivation */ }}>
-                                    إعادة التنشيط
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive focus:text-destructive focus:bg-red-50">
+                                    حذف نهائي
                                 </DropdownMenuItem>
-                            )}
-                        </DropdownMenuContent>
-                        </DropdownMenu>}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                       )}
                     </TableCell>
                     </TableRow>
                 ))}
@@ -240,15 +256,32 @@ export function UsersTable() {
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>هل أنت متأكد تماماً؟</AlertDialogTitle>
+                    <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيؤدي هذا الإجراء إلى إلغاء تنشيط حساب المستخدم. لا يزال بإمكانك إعادة تنشيطه لاحقًا.
+                        سيؤدي هذا الإجراء إلى {userToDeactivate?.isActive ? 'إلغاء تنشيط' : 'إعادة تنشيط'} حساب المستخدم.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeactivateConfirm} className='bg-destructive hover:bg-destructive/90'>
-                        نعم، قم بإلغاء التنشيط
+                    <AlertDialogAction onClick={handleDeactivateConfirm}>
+                        نعم، قم بالإجراء
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+            <AlertDialogContent dir="rtl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>تحذير: حذف نهائي!</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        هل أنت متأكد من حذف المستخدم "{userToDelete?.fullName}"؟ لا يمكن التراجع عن هذا الإجراء.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteConfirm} className='bg-destructive hover:bg-destructive/90'>
+                        نعم، أحذف المستخدم
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

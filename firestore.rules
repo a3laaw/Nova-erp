@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,34 +9,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Checks if the requesting user is the owner of the document
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
     // Path Rules
     match /users/{userId} {
-      // Allow any authenticated user to get their own profile.
-      allow get: if isOwner(userId);
-
-      // Anyone can create a user (for sign-up).
-      allow create: if true;
+      // Allow read/write only to the owner of the document or an Admin.
+      allow read, update: if isOwner(userId) || request.auth.token.role == 'Admin';
       
-      // Only the user themselves can update their profile.
-      allow update: if isOwner(userId);
+      // Allow Admins to list all users.
+      allow list: if isAuthenticated() && request.auth.token.role == 'Admin';
       
-      // Temporarily allow list for username lookup during the local auth flow.
-      // In a production app with secure Cloud Functions, this would be `if false`.
-      allow list: if true;
+      // Allow Admins to create or delete users.
+      allow create, delete: if isAuthenticated() && request.auth.token.role == 'Admin';
     }
     
     match /clients/{clientId} {
-      // For now, allow any authenticated user to manage clients.
       allow read, write: if isAuthenticated();
     }
 
     match /employees/{employeeId} {
-       // For now, allow any authenticated user to manage employees.
       allow read, write: if isAuthenticated();
     }
     

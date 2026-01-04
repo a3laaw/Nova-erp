@@ -1,17 +1,17 @@
 
-
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR' | 'Client';
 
 export type UserProfile = {
   id?: string;
+  uid?: string;
   username: string;
-  email: string; // Added email
+  email: string; 
   passwordHash?: string;
   fullName: string;
   avatarUrl?: string;
   role: UserRole;
   isActive: boolean;
-  createdAt?: any; // To support serverTimestamp
+  createdAt?: any; 
 };
 
 export type Client = {
@@ -153,7 +153,7 @@ export type InventoryItem = {
 
 export type Employee = {
     id: string;
-    fullName: string; // Will be used as nameAr
+    fullName: string; 
     nameEn?: string;
     dob?: string;
     gender?: 'male' | 'female';
@@ -190,5 +190,5 @@ iban?: string;
     emergencyLeaveUsed?: number;
     maxEmergencyLeave?: number;
     lastLeaveResetDate?: string; // ISO String
-    createdAt?: any; // To support serverTimestamp
+    createdAt?: any; 
 };
