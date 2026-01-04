@@ -8,6 +8,7 @@ service cloud.firestore {
     }
 
     function getUserRole() {
+      // Default to 'Client' role if user document doesn't exist or has no role
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
@@ -35,7 +36,9 @@ service cloud.firestore {
     }
 
     match /employees/{employeeId} {
-      allow read, write: if isAdmin() || isHR();
+      allow read: if isAdmin() || isHR() || isSecretary();
+      allow create: if isAdmin() || isHR() || isSecretary();
+      allow update, delete: if isAdmin() || isHR();
     }
   }
 }
