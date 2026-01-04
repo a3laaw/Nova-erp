@@ -5,6 +5,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
   
     // --- Helper Functions ---
+    // NOTE: These are temporarily bypassed by allowing all reads/writes.
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -18,30 +19,15 @@ service cloud.firestore {
     }
     
     function isHR() {
-      return isAuthenticated() && getUserData().role == 'HR';
+      return isAuthenticated() && getUserdData().role == 'HR';
     }
 
     // --- Path Rules ---
+    // WARNING: Rules are temporarily open for development with mock auth.
+    // Re-secure before production.
 
-    // Login: Any authenticated user (including anonymous) needs to be able to query the users collection
-    // to find their own document by username. This is a limited, secure read.
-    match /users/{userId} {
-      // Admins can manage all users.
-      allow read, write: if isAdmin();
-      
-      // Allow any authenticated user to read their own profile after login.
-      allow get: if isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    match /clients/{clientId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /employees/{employeeId} {
-      // Admins and HR can manage employees.
-      // Any authenticated user can read the list for now (e.g., for forms).
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isHR();
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
