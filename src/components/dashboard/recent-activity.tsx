@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { users, projects } from '@/lib/data';
+import { users } from '@/lib/data';
 
 const activities = [
   {

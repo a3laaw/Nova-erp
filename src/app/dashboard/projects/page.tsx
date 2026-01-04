@@ -99,7 +99,7 @@ export default function ProjectsPage() {
                     <div className='flex items-center gap-2'>
                         <Avatar className="h-8 w-8">
                             <AvatarImage src={leadEngineer?.avatarUrl} alt={leadEngineer?.fullName} />
-                            <AvatarFallback>{leadEngineer?.fullName.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{leadEngineer?.fullName?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span>{leadEngineer?.fullName}</span>
                     </div>

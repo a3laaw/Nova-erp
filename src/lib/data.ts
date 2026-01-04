@@ -1,10 +1,18 @@
-import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt } from './types';
+import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
 
-// Mock data is now only for non-user-related entities.
-// The single source of truth for users and employees is Firestore.
+// Mock user data for UI display purposes ONLY. Authentication is handled by Firestore.
+export const users: Partial<UserProfile>[] = [
+    { id: 'user-1', fullName: 'Ali Ahmed', avatarUrl: getUserAvatar('user-avatar-1') },
+    { id: 'user-2', fullName: 'Fatima Al-Mansoori', avatarUrl: getUserAvatar('user-avatar-2') },
+    { id: 'user-3', fullName: 'Yusuf Khan', avatarUrl: getUserAvatar('user-avatar-3') },
+    { id: 'user-4', fullName: 'Noor Al-Falahi', avatarUrl: getUserAvatar('user-avatar-4') },
+    { id: 'user-5', fullName: 'Hassan Ibrahim', avatarUrl: getUserAvatar('user-avatar-5') },
+    { id: 'user-6', fullName: 'Salama Al-Mazrouei', avatarUrl: getUserAvatar('user-avatar-6') },
+];
+
 
 export const clients: Client[] = [
   { id: 'client-1', name: 'Emaar Properties', contactPerson: 'Mohamed Alabbar', email: 'contact@emaar.ae', phone: '+971 4 123 4567', address: 'Dubai, UAE', totalVisits: 5, projectIds: ['proj-1', 'proj-3'] },
