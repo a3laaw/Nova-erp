@@ -91,8 +91,12 @@ export default function NewEmployeePage() {
             // --- Validation ---
             const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
             for (const field of requiredFields) {
-                // Check for null or undefined, but allow 0 for numbers.
-                if (formData[field] === undefined || formData[field] === null || formData[field] === '') {
+                const value = formData[field];
+                // Check for null, undefined, or empty string, but allow 0 for numbers.
+                if (value === undefined || value === null || value === '') {
+                     if (typeof value === 'number' && value === 0) {
+                        continue; // 0 is a valid value for numeric fields like salary
+                    }
                     toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
                     setIsLoading(false);
                     return;
