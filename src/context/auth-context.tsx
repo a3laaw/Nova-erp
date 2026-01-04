@@ -29,6 +29,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // This is a temporary, insecure password check for demonstration purposes.
 // In a real app, this would be a call to a secure backend function.
 async function verifyPassword(password: string, hash: string): Promise<boolean> {
+    // In a real app, you would use a library like bcrypt to compare the password with the hash.
+    // For this demo, we're doing a simple string comparison.
     return password === hash;
 }
 
@@ -42,46 +44,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // This effect handles session persistence
   useEffect(() => {
-    if (!auth) {
-        setLoading(false);
-        return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-            // If there's a Firebase user, try to load the full profile from session storage
-             const storedUser = sessionStorage.getItem('authUser');
-             if (storedUser) {
-                 const fullUser: AuthenticatedUser = JSON.parse(storedUser);
-                 // Simple check to see if the stored user matches the Firebase user
-                 if (fullUser.uid === firebaseUser.uid) {
-                    setUser(fullUser);
-                 } else {
-                     // Mismatch, clear session and log out
-                     await logout();
-                 }
-             } else {
-                // This case might happen if the page is refreshed and session is lost
-                // For this app, we'll log out to force a clean login
-                await logout();
-             }
-        } else {
-            setUser(null);
-        }
-        setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [auth]);
+    // This part is simplified. In a real app, you'd have a more robust session management.
+     const storedUser = sessionStorage.getItem('authUser');
+     if (storedUser) {
+         setUser(JSON.parse(storedUser));
+     }
+     setLoading(false);
+  }, []);
 
   const login = async (username: string, password: string) => {
-    if (!auth || !firestore) {
-      throw new Error('Firebase not initialized.');
-    }
     setLoading(true);
-
     try {
-        // 1. Find user in the mock data array
+        // 1. Find user in the local mock data array
         const userFromMock = mockUsers.find(u => u.username === username);
 
         if (!userFromMock) {
@@ -93,35 +67,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error("هذا الحساب غير نشط. يرجى مراجعة المسؤول.");
         }
 
-        // 3. "Verify" password (insecure, for demo only)
+        // 3. "Verify" password against the mock data
         const isPasswordValid = await verifyPassword(password, userFromMock.passwordHash || '');
         if (!isPasswordValid) {
             throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
         }
 
-        // 4. Sign in anonymously to get a UID
-        const userCredential = await signInAnonymously(auth);
-        const firebaseUser = userCredential.user;
-
-
-        // 5. Prepare the full user object
+        // 4. Prepare the full user object with a mock UID.
         const authenticatedUser: AuthenticatedUser = {
             ...userFromMock,
-            uid: firebaseUser.uid, // Use the real UID from anonymous sign-in
+            uid: userFromMock.id || `mock-uid-${userFromMock.username}`,
         };
         
-        // 6. Store user in session storage and set state
+        // 5. Store user in session storage and set state
         sessionStorage.setItem('authUser', JSON.stringify(authenticatedUser));
         setUser(authenticatedUser);
 
     } catch (error) {
         console.error("Login failed:", error);
-        // Ensure we log out from any partial anonymous session if something went wrong
-        await signOut(auth);
         sessionStorage.removeItem('authUser');
         setUser(null);
         if (error instanceof Error) {
-            throw error; // Re-throw the original error to be displayed on the UI
+            throw error;
         }
         throw new Error('An unexpected error occurred during login.');
     } finally {
@@ -132,9 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setLoading(true);
     sessionStorage.removeItem('authUser');
-    if (auth) {
-      await signOut(auth);
-    }
+    // We don't need to sign out from Firebase if we're not signed in.
     setUser(null);
     router.push('/');
     setLoading(false);
