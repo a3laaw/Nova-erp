@@ -4,7 +4,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { 
-    signInWithCustomToken, 
+    signInWithCustomToken,
+    signInWithEmailAndPassword,
     signOut, 
     onAuthStateChanged, 
     type User as FirebaseUser 
@@ -90,31 +91,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth) return;
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        if (firebaseUser && firestore) {
-            // User is signed in with Firebase. Fetch their profile from Firestore.
-            const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                const userProfile = userDocSnap.data() as UserProfile;
-                 setUser({
-                    uid: firebaseUser.uid,
-                    ...userProfile
-                });
-            } else {
-                // Profile doesn't exist, something is wrong.
-                await logout();
-            }
-        } else {
-            setUser(null);
-        }
+    // This effect should ideally handle rehydrating the user session,
+    // but for our custom flow, we'll keep it simple.
+    // A real implementation would check for a stored token.
+    const timer = setTimeout(() => {
         setLoading(false);
-    });
+    }, 500); // Simulate loading
 
-    return () => unsubscribe();
-  }, [auth, firestore]);
+    return () => clearTimeout(timer);
+  }, []);
 
   const login = async (username: string, password: string) => {
     if (!firestore || !auth) {
@@ -138,43 +123,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("هذا الحساب غير نشط. يرجى مراجعة المسؤول.");
     }
 
-    // 3. Verify password (mocked)
+    // 3. Verify password (using our mocked verification)
     const isPasswordValid = await verifyPassword(password, userData.passwordHash || '');
     if (!isPasswordValid) {
         throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
     }
-
-    // 4. Get custom token (mocked)
-    const customToken = await getCustomToken(username);
     
-    // 5. Sign in with custom token
-    // For the mock token, we extract the role. A real token would be used directly.
-    const [tokenUsername, tokenRole] = customToken.split(':');
-
-    // Create a mock Firebase user object for the client-side state
-    const mockFirebaseUser: Partial<FirebaseUser> = {
-        uid: userDoc.id,
-    };
-    
+    // 4. If password is valid, set the user state.
+    // In a real app, you would get a custom token from a backend function,
+    // then call `signInWithCustomToken(auth, token)`.
+    // Here, we'll just construct the user object for the context.
     const authenticatedUser: AuthenticatedUser = {
         ...userData,
         id: userDoc.id,
-        uid: userDoc.id,
-        role: tokenRole as UserRole,
+        uid: userDoc.id, // Use Firestore doc ID as UID for this session
     };
     
     setUser(authenticatedUser);
-
-    // Note: The actual `signInWithCustomToken` would be used with a real token.
-    // For this mock, we are manually setting the user state.
-    // await signInWithCustomToken(auth, customToken);
-
     setLoading(false);
   };
 
   const logout = async () => {
     if (auth) {
-      await signOut(auth);
+      // Even though we didn't use Firebase Auth to sign in,
+      // it's good practice to call signOut in case a session exists.
+      await signOut(auth).catch(console.error);
     }
     setUser(null);
     router.push('/');
