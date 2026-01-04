@@ -31,11 +31,10 @@ service cloud.firestore {
     }
 
     match /employees/{employeeId} {
-      // Allow any authenticated user to read/write for now.
-      // Refine this rule later for specific HR/Admin roles.
-      allow read, write: if isAuthenticated();
+      // Allow admins and HR to manage employees.
+      // Allow any authenticated user to read for now.
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'HR';
     }
   }
 }
-
-    

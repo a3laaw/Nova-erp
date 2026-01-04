@@ -163,5 +163,3 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
     </Dialog>
   );
 }
-
-    
