@@ -158,7 +158,6 @@ export function UsersTable() {
             setIsFormOpen(false);
             fetchUsersAndEmployees();
         } catch (error) {
-            console.error("Error saving user:", error);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل حفظ بيانات المستخدم.' });
         }
     };
