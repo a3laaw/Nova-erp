@@ -20,32 +20,31 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import type { User, UserRole } from '@/lib/types';
+import type { UserProfile, UserRole } from '@/lib/types';
 
 interface UserFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (user: User) => void;
-  user?: User | null;
+  onSave: (user: Partial<UserProfile>, password?: string) => void;
+  user?: UserProfile | null;
 }
 
-const roles: UserRole[] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'Client', 'HR'];
+const roles: UserRole[] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'];
 const roleTranslations: Record<UserRole, string> = {
     Admin: 'مدير',
     Engineer: 'مهندس',
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
-    Client: 'عميل',
     HR: 'موارد بشرية'
 };
 
 
 export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
   const isEditing = !!user;
-  const [formData, setFormData] = useState<Partial<User>>({
+  const [formData, setFormData] = useState<Partial<UserProfile>>({
       fullName: '',
       username: '',
-      role: undefined,
+      role: 'Engineer',
       isActive: true,
   });
   const [password, setPassword] = useState('');
@@ -63,11 +62,11 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
         setFormData({
             fullName: '',
             username: '',
-            role: undefined,
+            role: 'Engineer',
             isActive: true,
         });
-        setPassword('');
     }
+    setPassword('');
   }, [user, isEditing, isOpen]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,8 +93,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
           alert('كلمة المرور مطلوبة للمستخدمين الجدد.');
           return;
       }
-      // In a real app, you would handle password hashing here or on the server
-      onSave(formData as User);
+      onSave(formData, password);
   }
 
   return (

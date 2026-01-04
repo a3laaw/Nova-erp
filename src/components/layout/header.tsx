@@ -5,24 +5,37 @@ import { UserNav } from '@/components/layout/user-nav';
 import { Button } from '@/components/ui/button';
 import { Languages } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
+import type { AuthenticatedUser } from '@/context/auth-context';
 
 const getTitleFromPathname = (pathname: string, lang: 'ar' | 'en') => {
-    const baseKey = Object.keys(titles.ar).find(key => 
-        pathname.startsWith(key) && (key !== '/dashboard' || pathname === '/dashboard')
-    );
+    // Exact matches first
+    const exactMatch = titles[lang][pathname as keyof typeof titles.ar];
+    if (exactMatch) return exactMatch;
 
-    const dynamicMatch = pathname.match(/\/dashboard\/projects\/([a-zA-Z0-9-]+)/);
-    if (dynamicMatch && dynamicMatch[1]) {
-        return lang === 'ar' ? 'تفاصيل المشروع' : 'Project Details';
+    // Dynamic matches
+    const dynamicRoutes = [
+        { path: '/dashboard/projects/', title: { ar: 'تفاصيل المشروع', en: 'Project Details' } },
+        { path: '/dashboard/accounting/cash-receipts/new', title: { ar: 'سند قبض جديد', en: 'New Cash Receipt' } },
+        { path: '/dashboard/hr/employees/new', title: { ar: 'إضافة موظف جديد', en: 'New Employee' } },
+        { path: '/dashboard/hr/leave-requests', title: { ar: 'طلبات الإجازة', en: 'Leave Requests' } },
+    ];
+
+    for (const route of dynamicRoutes) {
+        if (pathname.startsWith(route.path)) {
+            return route.title[lang];
+        }
+    }
+    
+    // Fallback to parent section
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length > 1) {
+        const parentPath = `/${segments[0]}/${segments[1]}`;
+        const parentTitle = titles[lang][parentPath as keyof typeof titles.ar];
+        if (parentTitle) return parentTitle;
     }
 
-    const newCashReceiptMatch = pathname.match(/\/dashboard\/accounting\/cash-receipts\/new/);
-    if (newCashReceiptMatch) {
-        return lang === 'ar' ? 'سند قبض جديد' : 'New Cash Receipt';
-    }
 
-    const key = baseKey || '/dashboard';
-    return titles[lang][key as keyof typeof titles.ar] || (lang === 'ar' ? 'لوحة التحكم' : 'Dashboard');
+    return titles[lang]['/dashboard'];
 };
 
 const titles = {
@@ -48,8 +61,12 @@ const titles = {
     }
 };
 
+interface HeaderProps {
+    currentUser: AuthenticatedUser;
+    onLogout: () => void;
+}
 
-export function Header() {
+export function Header({ currentUser, onLogout }: HeaderProps) {
     const pathname = usePathname();
     const { language, toggleLanguage } = useLanguage();
     const title = getTitleFromPathname(pathname, language);
@@ -64,7 +81,7 @@ export function Header() {
                 <Button variant="outline" size="icon" onClick={toggleLanguage} aria-label="Toggle language">
                     <Languages className="h-4 w-4" />
                 </Button>
-                <UserNav />
+                <UserNav currentUser={currentUser} onLogout={onLogout} />
             </div>
         </header>
     );

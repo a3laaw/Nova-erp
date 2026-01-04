@@ -26,7 +26,7 @@ import { Logo } from './logo';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { users } from '@/lib/data';
+import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 
 const navItems = {
@@ -37,7 +37,7 @@ const navItems = {
     { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/accounting', label: 'المحاسبة', icon: Wallet, roles: ['Admin', 'Accountant'] },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
-    { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR'] },
+    { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
   ],
   en: [
       { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
@@ -46,23 +46,26 @@ const navItems = {
       { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
       { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet, roles: ['Admin', 'Accountant'] },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
-      { href: '/dashboard/hr', label: 'Human Resources', icon: HeartHandshake, roles: ['Admin', 'HR'] },
+      { href: '/dashboard/hr', label: 'Human Resources', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
   ]
 };
 
 const settingsItem = {
-    ar: { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings },
-    en: { href: '/dashboard/settings', label: 'Settings', icon: Settings }
+    ar: { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
+    en: { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Admin'] }
+}
+interface MainNavProps {
+    currentUser: AuthenticatedUser;
+    onLogout: () => void;
 }
 
-export function MainNav() {
+export function MainNav({ currentUser, onLogout }: MainNavProps) {
   const pathname = usePathname();
-  // In a real app, you'd get the current user from an auth context.
-  const currentUser = users[0]; // Mocking as Admin for now to show all items.
   const { language } = useLanguage();
   
-  const currentNavItems = navItems[language].filter(item => item.roles.includes(currentUser.role));
+  const currentNavItems = navItems[language].filter(item => currentUser.role && item.roles.includes(currentUser.role));
   const currentSettingsItem = settingsItem[language];
+  const canViewSettings = currentUser.role && currentSettingsItem.roles.includes(currentUser.role);
 
 
   return (
@@ -98,7 +101,7 @@ export function MainNav() {
       </SidebarContent>
       <SidebarFooter className="p-2">
         <SidebarMenu>
-             <SidebarMenuItem>
+             {canViewSettings && <SidebarMenuItem>
                 <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(currentSettingsItem.href)}
@@ -109,7 +112,7 @@ export function MainNav() {
                         <span>{currentSettingsItem.label}</span>
                     </Link>
                 </SidebarMenuButton>
-            </SidebarMenuItem>
+            </SidebarMenuItem>}
             <SidebarMenuItem>
               <div className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none transition-colors text-muted-foreground">
                   <Avatar className="h-9 w-9">
@@ -120,7 +123,7 @@ export function MainNav() {
                     <span className="font-semibold text-foreground">{currentUser.fullName}</span>
                     <span className="text-muted-foreground">{currentUser.email}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0">
+                  <Button variant="ghost" size="icon" className="mr-auto h-7 w-7 shrink-0" onClick={onLogout}>
                     <LogOut />
                   </Button>
                 </div>

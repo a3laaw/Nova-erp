@@ -12,21 +12,26 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
-import { users } from '@/lib/data';
 import { useState, useEffect } from 'react';
+import type { AuthenticatedUser } from '@/context/auth-context';
+import { Skeleton } from '../ui/skeleton';
 
-export function UserNav() {
+
+interface UserNavProps {
+    currentUser: AuthenticatedUser;
+    onLogout: () => void;
+}
+
+export function UserNav({ currentUser, onLogout }: UserNavProps) {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const currentUser = users.find(u => u.role === 'Admin') || users[0];
-
-  if (!isClient) {
+  if (!isClient || !currentUser) {
     return (
-      <div className="relative h-9 w-9 rounded-full bg-muted border animate-pulse"></div>
+      <Skeleton className="h-9 w-9 rounded-full" />
     );
   }
 
@@ -57,13 +62,13 @@ export function UserNav() {
           <DropdownMenuItem asChild>
             <Link href="/dashboard/settings">Billing</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
+          {currentUser.role === 'Admin' && <DropdownMenuItem asChild>
             <Link href="/dashboard/settings">Settings</Link>
-          </DropdownMenuItem>
+          </DropdownMenuItem>}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-            <Link href="/">Log out</Link>
+        <DropdownMenuItem onClick={onLogout}>
+            Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

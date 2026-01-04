@@ -1,14 +1,17 @@
 
 
-export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Client' | 'Secretary' | 'HR';
+export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 
-export type User = {
-  id: string;
+export type UserProfile = {
+  id?: string;
   username: string;
+  passwordHash?: string;
   fullName: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   role: UserRole;
   isActive: boolean;
+  createdAt?: any; // To support serverTimestamp
+  email?: string;
 };
 
 export type Client = {

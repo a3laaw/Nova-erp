@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -25,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type WithFieldValue, DocumentData } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -89,10 +88,13 @@ export default function NewEmployeePage() {
         
         try {
             // --- Validation ---
-            if (!formData.fullName || !formData.nameEn || !formData.civilId || !formData.mobile || !formData.department || !formData.jobTitle || !formData.hireDate) {
-                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء تعبئة جميع الحقول الأساسية المطلوبة.' });
-                 setIsLoading(false);
-                 return;
+            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate'];
+            for (const field of requiredFields) {
+                if (!formData[field]) {
+                    toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
+                    setIsLoading(false);
+                    return;
+                }
             }
 
             if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
@@ -102,51 +104,54 @@ export default function NewEmployeePage() {
             }
 
             // --- Data Sanitization & Preparation ---
-            const hireDate = new Date(formData.hireDate);
-
             const employeeData: DocumentData = {
-                // Required fields
+                // Required fields that are always present
                 fullName: formData.fullName,
                 nameEn: formData.nameEn,
                 civilId: formData.civilId,
                 mobile: formData.mobile,
                 department: formData.department,
                 jobTitle: formData.jobTitle,
-                hireDate: hireDate.toISOString(),
+                hireDate: formData.hireDate ? new Date(formData.hireDate).toISOString() : null,
                 contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
                 status: 'active',
-                
-                // Optional fields (set to null if empty)
-                dob: formData.dob ? new Date(formData.dob).toISOString() : null,
-                gender: formData.gender || null,
-                maritalStatus: formData.maritalStatus || null,
-                dependents: Number(formData.dependents) || 0,
-                visaType: formData.visaType || null,
-                residencyExpiry: formData.residencyExpiry ? new Date(formData.residencyExpiry).toISOString() : null,
-                contractExpiry: formData.contractExpiry ? new Date(formData.contractExpiry).toISOString() : null,
-                emergencyContact: formData.emergencyContact || null,
-                email: formData.email || null,
-                position: formData.position || null,
-                housingAllowance: Number(formData.housingAllowance) || 0,
-                transportAllowance: Number(formData.transportAllowance) || 0,
-                salaryPaymentType: formData.salaryPaymentType || null,
-                bankName: formData.bankName || null,
-                iban: formData.iban || null,
+                createdAt: serverTimestamp(),
 
                 // Default values for new employee
                 terminationDate: null,
                 terminationReason: null,
-                lastVacationAccrualDate: hireDate.toISOString(),
-                lastLeaveResetDate: hireDate.toISOString(),
                 annualLeaveAccrued: 0,
                 annualLeaveUsed: 0,
                 carriedLeaveDays: 0,
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
-                maxEmergencyLeave: 5, // Default value
-                createdAt: serverTimestamp(),
+                maxEmergencyLeave: 5,
             };
+
+            // Add optional fields only if they have a value
+            if (formData.dob) employeeData.dob = new Date(formData.dob).toISOString(); else employeeData.dob = null;
+            if (formData.gender) employeeData.gender = formData.gender; else employeeData.gender = null;
+            if (formData.maritalStatus) employeeData.maritalStatus = formData.maritalStatus; else employeeData.maritalStatus = null;
+            if (formData.dependents) employeeData.dependents = Number(formData.dependents); else employeeData.dependents = 0;
+            if (formData.visaType) employeeData.visaType = formData.visaType; else employeeData.visaType = null;
+            if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry).toISOString(); else employeeData.residencyExpiry = null;
+            if (formData.contractExpiry) employeeData.contractExpiry = new Date(formData.contractExpiry).toISOString(); else employeeData.contractExpiry = null;
+            if (formData.emergencyContact) employeeData.emergencyContact = formData.emergencyContact; else employeeData.emergencyContact = null;
+            if (formData.email) employeeData.email = formData.email; else employeeData.email = null;
+            if (formData.position) employeeData.position = formData.position; else employeeData.position = null;
+            if (formData.housingAllowance) employeeData.housingAllowance = Number(formData.housingAllowance); else employeeData.housingAllowance = 0;
+            if (formData.transportAllowance) employeeData.transportAllowance = Number(formData.transportAllowance); else employeeData.transportAllowance = 0;
+            if (formData.salaryPaymentType) employeeData.salaryPaymentType = formData.salaryPaymentType; else employeeData.salaryPaymentType = null;
+            if (formData.bankName) employeeData.bankName = formData.bankName; else employeeData.bankName = null;
+            if (formData.iban) employeeData.iban = formData.iban; else employeeData.iban = null;
+
+            // Set leave dates based on hire date
+            if (employeeData.hireDate) {
+                employeeData.lastVacationAccrualDate = employeeData.hireDate;
+                employeeData.lastLeaveResetDate = employeeData.hireDate;
+            }
+
 
             await addDoc(collection(firestore, 'employees'), employeeData);
 
@@ -154,7 +159,7 @@ export default function NewEmployeePage() {
             router.push('/dashboard/hr');
         } catch (error) {
             console.error("Error adding employee: ", error);
-            const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ الموظف. الرجاء المحاولة مرة أخرى.';
+            const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ الموظف. قد تكون هناك مشكلة في الصلاحيات أو اتصال الشبكة.';
             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
         } finally {
             setIsLoading(false);
@@ -432,5 +437,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
