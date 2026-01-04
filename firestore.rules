@@ -3,47 +3,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    function isAuthOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
+    // Helper Functions
     function isAuthenticated() {
       return request.auth != null;
     }
 
     function getUserRole() {
-      // Default to 'Client' role if user document doesn't exist or has no role
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      // In a real app with custom claims, this would be: request.auth.token.role
+      // As a fallback, we read from the user's public profile document.
+      // This requires that users can read their own profile.
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
+        return userDoc.data.role;
+      }
+      return 'Client'; // Default role if profile doesn't exist
     }
 
     function isAdmin() {
-      return getUserRole() == 'admin';
+      return getUserRole() == 'Admin';
     }
 
     function isSecretary() {
-        return getUserRole() == 'secretary';
+        return getUserRole() == 'Secretary';
     }
 
     function isHR() {
-        return getUserRole() == 'hr';
+        return getUserRole() == 'HR';
+    }
+    
+    function isEngineer() {
+        return getUserRole() == 'Engineer';
     }
 
+    // Path Rules
     match /users/{userId} {
-      // Admins can read any user profile.
-      // Any authenticated user can read their own profile. This is crucial for role checks.
-      allow read: if isAdmin() || (isAuthenticated() && isAuthOwner(userId));
+      // Any authenticated user can read ANY user profile. This is required for getUserRole() to work.
+      // In a more secure setup, you'd restrict this or use custom claims.
+      allow read: if isAuthenticated();
+      
       // Only Admins can create or update user profiles.
       allow write: if isAdmin();
     }
     
     match /clients/{clientId} {
+      // Admins and Secretaries can manage clients.
       allow read, write: if isAdmin() || isSecretary();
     }
 
     match /employees/{employeeId} {
-      allow read: if isAdmin() || isHR() || isSecretary();
-      allow create: if isAdmin() || isHR() || isSecretary();
+      // Admins, HR, and Secretaries can read and create employees.
+      allow read, create: if isAdmin() || isHR() || isSecretary();
+      // Only Admins and HR can update or delete employees.
       allow update, delete: if isAdmin() || isHR();
+    }
+    
+    // Default deny all other reads/writes
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }

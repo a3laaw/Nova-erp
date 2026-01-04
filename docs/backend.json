@@ -22,8 +22,7 @@
             "Secretary",
             "Accountant",
             "Engineer",
-            "HR",
-            "Client"
+            "HR"
           ]
         },
         "fullName": {
@@ -43,7 +42,7 @@
       "required": [
         "username",
         "role",
-"fullName",
+        "fullName",
         "isActive",
         "createdAt"
       ]
@@ -143,6 +142,7 @@
       },
       "required": [
         "fullName",
+        "nameEn",
         "civilId",
         "mobile",
         "department",
@@ -150,8 +150,7 @@
         "hireDate",
         "contractType",
         "basicSalary",
-        "status",
-        "iban"
+        "status"
       ]
     }
   },
