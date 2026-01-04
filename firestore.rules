@@ -6,6 +6,10 @@ service cloud.firestore {
     function isAuthOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
 
     function getUserRole() {
       // Default to 'Client' role if user document doesn't exist or has no role
@@ -25,9 +29,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Admins can read and write any user profile
-      // Users can only read their own profile
-      allow read: if isAdmin() || isAuthOwner(userId);
+      // Admins can read any user profile.
+      // Any authenticated user can read their own profile. This is crucial for role checks.
+      allow read: if isAdmin() || (isAuthenticated() && isAuthOwner(userId));
+      // Only Admins can create or update user profiles.
       allow write: if isAdmin();
     }
     
