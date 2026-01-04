@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -28,412 +29,409 @@ import { addDoc, collection, serverTimestamp, type DocumentData } from 'firebase
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// دالة مساعدة لتحويل التاريخ بأمان
+const safeDateToISO = (dateString: string | null | undefined): string | null => {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  return isNaN(date.getTime()) ? null : date.toISOString();
+};
 
 export default function NewEmployeePage() {
-    const router = useRouter();
-    const { firestore } = useFirebase();
-    const { toast } = useToast();
-    const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
-    const [formData, setFormData] = useState<Partial<Employee>>({
-        fullName: '',
-        nameEn: '',
-        dob: '',
-        gender: undefined,
-        maritalStatus: undefined,
-        dependents: 0,
-        civilId: '',
-        visaType: 'kuwaiti',
-        residencyExpiry: '',
-        contractExpiry: '',
-        mobile: '',
-        emergencyContact: '',
-        email: '',
-        department: '',
-        jobTitle: '',
-        position: undefined,
-        hireDate: '',
-        contractType: 'permanent',
-        basicSalary: 0,
-        housingAllowance: 0,
-        transportAllowance: 0,
-        salaryPaymentType: undefined,
-        bankName: '',
-        iban: '',
-        status: 'active',
-    });
+  const [formData, setFormData] = useState<Partial<Employee>>({
+    fullName: '',
+    nameEn: '',
+    dob: '',
+    gender: undefined,
+    maritalStatus: undefined,
+    dependents: 0,
+    civilId: '',
+    visaType: 'kuwaiti',
+    residencyExpiry: '',
+    contractExpiry: '',
+    mobile: '',
+    emergencyContact: '',
+    email: '',
+    department: '',
+    jobTitle: '',
+    position: undefined,
+    hireDate: '',
+    contractType: 'permanent',
+    basicSalary: 0,
+    housingAllowance: 0,
+    transportAllowance: 0,
+    salaryPaymentType: undefined,
+    bankName: '',
+    iban: '',
+    status: 'active',
+  });
 
-    const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
-    };
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
 
-    const handleSelectChange = (id: keyof Employee, value: any) => {
-        setFormData(prev => ({ ...prev, [id]: value }));
-    };
+  const handleSelectChange = (id: keyof Employee, value: any) => {
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات. الرجاء المحاولة مرة أخرى.' });
-            return;
-        }
-        setIsLoading(true);
-        
-        try {
-            // --- Validation ---
-            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate'];
-            for (const field of requiredFields) {
-                if (!formData[field]) {
-                    toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
-                    setIsLoading(false);
-                    return;
-                }
-            }
-
-            if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
-                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الحساب الدولي (IBAN) مطلوب عند اختيار التحويل البنكي.' });
-                setIsLoading(false);
-                return;
-            }
-
-            // --- Data Sanitization & Preparation ---
-            const employeeData: DocumentData = {
-                // Required fields that are always present
-                fullName: formData.fullName,
-                nameEn: formData.nameEn,
-                civilId: formData.civilId,
-                mobile: formData.mobile,
-                department: formData.department,
-                jobTitle: formData.jobTitle,
-                hireDate: formData.hireDate ? new Date(formData.hireDate).toISOString() : null,
-                contractType: formData.contractType || 'permanent',
-                basicSalary: Number(formData.basicSalary) || 0,
-                status: 'active',
-                createdAt: serverTimestamp(),
-
-                // Default values for new employee
-                terminationDate: null,
-                terminationReason: null,
-                annualLeaveAccrued: 0,
-                annualLeaveUsed: 0,
-                carriedLeaveDays: 0,
-                sickLeaveUsed: 0,
-                emergencyLeaveUsed: 0,
-                maxEmergencyLeave: 5,
-            };
-
-            // Add optional fields only if they have a value
-            if (formData.dob) employeeData.dob = new Date(formData.dob).toISOString(); else employeeData.dob = null;
-            if (formData.gender) employeeData.gender = formData.gender; else employeeData.gender = null;
-            if (formData.maritalStatus) employeeData.maritalStatus = formData.maritalStatus; else employeeData.maritalStatus = null;
-            if (formData.dependents) employeeData.dependents = Number(formData.dependents); else employeeData.dependents = 0;
-            if (formData.visaType) employeeData.visaType = formData.visaType; else employeeData.visaType = null;
-            if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry).toISOString(); else employeeData.residencyExpiry = null;
-            if (formData.contractExpiry) employeeData.contractExpiry = new Date(formData.contractExpiry).toISOString(); else employeeData.contractExpiry = null;
-            if (formData.emergencyContact) employeeData.emergencyContact = formData.emergencyContact; else employeeData.emergencyContact = null;
-            if (formData.email) employeeData.email = formData.email; else employeeData.email = null;
-            if (formData.position) employeeData.position = formData.position; else employeeData.position = null;
-            if (formData.housingAllowance) employeeData.housingAllowance = Number(formData.housingAllowance); else employeeData.housingAllowance = 0;
-            if (formData.transportAllowance) employeeData.transportAllowance = Number(formData.transportAllowance); else employeeData.transportAllowance = 0;
-            if (formData.salaryPaymentType) employeeData.salaryPaymentType = formData.salaryPaymentType; else employeeData.salaryPaymentType = null;
-            if (formData.bankName) employeeData.bankName = formData.bankName; else employeeData.bankName = null;
-            if (formData.iban) employeeData.iban = formData.iban; else employeeData.iban = null;
-
-            // Set leave dates based on hire date
-            if (employeeData.hireDate) {
-                employeeData.lastVacationAccrualDate = employeeData.hireDate;
-                employeeData.lastLeaveResetDate = employeeData.hireDate;
-            }
-
-
-            await addDoc(collection(firestore, 'employees'), employeeData);
-
-            toast({ title: 'نجاح', description: 'تم حفظ الموظف بنجاح.' });
-            router.push('/dashboard/hr');
-        } catch (error) {
-            console.error("Error adding employee: ", error);
-            const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ الموظف. قد تكون هناك مشكلة في الصلاحيات أو اتصال الشبكة.';
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-
-    if (!isClient) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-1/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <CardContent className="space-y-8">
-                   <div className="space-y-4">
-                        <Skeleton className="h-6 w-1/5" />
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-                             <div className="md:col-span-1 flex flex-col items-center gap-2">
-                                <Skeleton className="h-32 w-32 rounded-full" />
-                                <Skeleton className="h-8 w-24" />
-                            </div>
-                            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Skeleton className="h-10" />
-                                <Skeleton className="h-10" />
-                                <Skeleton className="h-10" />
-                                <Skeleton className="h-10" />
-                            </div>
-                        </div>
-                   </div>
-                    <Separator />
-                     <div className="space-y-4">
-                        <Skeleton className="h-6 w-1/4" />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                           <Skeleton className="h-10" />
-                           <Skeleton className="h-10" />
-                           <Skeleton className="h-10" />
-                        </div>
-                    </div>
-                </CardContent>
-                 <CardFooter className="flex justify-end">
-                    <Skeleton className="h-10 w-28" />
-                </CardFooter>
-            </Card>
-        )
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+      return;
     }
+    setIsLoading(true);
+    
+    try {
+      // --- التحقق من الحقول المطلوبة ---
+      const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate'];
+      for (const field of requiredFields) {
+        if (!formData[field]) {
+          toast({ variant: 'destructive', title: 'حقل مطلوب', description: `الرجاء تعبئة "${field}"` });
+          setIsLoading(false);
+          return;
+        }
+      }
 
+      // --- التحقق من صلاحية تاريخ التعيين ---
+      if (formData.hireDate && isNaN(new Date(formData.hireDate).getTime())) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'تاريخ التعيين غير صالح.' });
+        setIsLoading(false);
+        return;
+      }
+
+      if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
+        toast({ variant: 'destructive', title: 'IBAN مطلوب', description: 'يرجى إدخال رقم الحساب الدولي.' });
+        setIsLoading(false);
+        return;
+      }
+
+      // --- بناء كائن الموظف ---
+      const employeeData: DocumentData = {
+        fullName: formData.fullName,
+        nameEn: formData.nameEn,
+        civilId: formData.civilId,
+        mobile: formData.mobile,
+        department: formData.department,
+        jobTitle: formData.jobTitle,
+        hireDate: safeDateToISO(formData.hireDate),
+        contractType: formData.contractType || 'permanent',
+        basicSalary: Number(formData.basicSalary) || 0,
+        status: 'active',
+        createdAt: serverTimestamp(),
+
+        // الحقول الاختيارية
+        dob: safeDateToISO(formData.dob),
+        residencyExpiry: safeDateToISO(formData.residencyExpiry),
+        contractExpiry: safeDateToISO(formData.contractExpiry),
+        gender: formData.gender || null,
+        maritalStatus: formData.maritalStatus || null,
+        dependents: Number(formData.dependents) || 0,
+        visaType: formData.visaType || null,
+        emergencyContact: formData.emergencyContact || null,
+        email: formData.email || null,
+        position: formData.position || null,
+        housingAllowance: Number(formData.housingAllowance) || 0,
+        transportAllowance: Number(formData.transportAllowance) || 0,
+        salaryPaymentType: formData.salaryPaymentType || null,
+        bankName: formData.bankName || null,
+        iban: formData.iban || null,
+
+        // إعدادات الإجازات
+        terminationDate: null,
+        terminationReason: null,
+        annualLeaveAccrued: 0,
+        annualLeaveUsed: 0,
+        carriedLeaveDays: 0,
+        sickLeaveUsed: 0,
+        emergencyLeaveUsed: 0,
+        maxEmergencyLeave: 5,
+        lastVacationAccrualDate: safeDateToISO(formData.hireDate),
+        lastLeaveResetDate: safeDateToISO(formData.hireDate),
+      };
+
+      await addDoc(collection(firestore, 'employees'), employeeData);
+      toast({ title: 'نجاح', description: 'تم حفظ الموظف بنجاح.' });
+      router.push('/dashboard/hr');
+
+    } catch (error) {
+      console.error("Employee save error:", error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'خطأ في الحفظ', 
+        description: 'يرجى التأكد من صحة التواريخ ومحاولة مرة أخرى.' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isClient) {
     return (
-        <Card dir="rtl">
-            <form onSubmit={handleSubmit}>
-                <CardHeader>
-                    <CardTitle>إضافة موظف جديد</CardTitle>
-                    <CardDescription>
-                        قم بتعبئة جميع الحقول المطلوبة لإنشاء ملف موظف جديد في النظام.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                    {/* Personal Info */}
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-lg border-b pb-2">المعلومات الشخصية</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-                            <div className="md:col-span-1 flex flex-col items-center gap-2">
-                                <Avatar className='h-32 w-32'>
-                                    <AvatarImage src="" />
-                                    <AvatarFallback><Camera className='h-8 w-8 text-muted-foreground' /></AvatarFallback>
-                                </Avatar>
-                                <Button variant="outline" size="sm">رفع صورة شخصية</Button>
-                            </div>
-                            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
-                                    <Input id="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="nameEn">الاسم بالإنجليزية <span className="text-destructive">*</span></Label>
-                                    <Input id="nameEn" value={formData.nameEn} onChange={handleInputChange} placeholder="e.g. Alyaa Alameri" dir="ltr" required />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dob">تاريخ الميلاد</Label>
-                                    <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="gender">النوع</Label>
-                                    <Select dir="rtl" value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v)}>
-                                        <SelectTrigger id="gender"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="male">ذكر</SelectItem>
-                                            <SelectItem value="female">أنثى</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="maritalStatus">الحالة الاجتماعية</Label>
-                                    <Select dir="rtl" value={formData.maritalStatus} onValueChange={(v) => handleSelectChange('maritalStatus', v)}>
-                                        <SelectTrigger id="maritalStatus"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="single">أعزب</SelectItem>
-                                            <SelectItem value="married">متزوج</SelectItem>
-                                            <SelectItem value="divorced">مطلق</SelectItem>
-                                            <SelectItem value="widowed">أرمل</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dependents">عدد أفراد العائلة</Label>
-                                    <Input id="dependents" type="number" value={formData.dependents} onChange={handleInputChange} placeholder="0" />
-                                </div>
-                            </div>
-                        </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-8 w-1/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent className="space-y-8">
+           <div className="space-y-4">
+                <Skeleton className="h-6 w-1/5" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                     <div className="md:col-span-1 flex flex-col items-center gap-2">
+                        <Skeleton className="h-32 w-32 rounded-full" />
+                        <Skeleton className="h-8 w-24" />
                     </div>
-
-                    <Separator />
-
-                    {/* Legal & Residency */}
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-lg border-b pb-2">المعلومات القانونية والإقامة</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label>
-                                <Input id="civilId" value={formData.civilId} onChange={handleInputChange} placeholder="12-digit number" dir="ltr" maxLength={12} required />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="visaType">نوع الإقامة / التأشيرة</Label>
-                                <Select dir="rtl" value={formData.visaType} onValueChange={(v) => handleSelectChange('visaType', v)}>
-                                    <SelectTrigger id="visaType"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="kuwaiti">كويتي</SelectItem>
-                                        <SelectItem value="engineer">مهندس</SelectItem>
-                                        <SelectItem value="worker">عامل</SelectItem>
-                                        <SelectItem value="driver">سائق</SelectItem>
-                                        <SelectItem value="admin">إداري</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {formData.visaType !== 'kuwaiti' && (
-                                <div className="grid gap-2">
-                                    <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti'} />
-                                </div>
-                            )}
-                        </div>
+                    <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Skeleton className="h-10" />
+                        <Skeleton className="h-10" />
+                        <Skeleton className="h-10" />
+                        <Skeleton className="h-10" />
                     </div>
-
-                    <Separator />
-
-                    {/* Contact Info */}
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-lg border-b pb-2">معلومات الاتصال</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                                <Input id="mobile" dir="ltr" value={formData.mobile} onChange={handleInputChange} placeholder="+965 XXXX XXXX" required />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="emergencyContact">رقم طوارئ</Label>
-                                <Input id="emergencyContact" dir="ltr" value={formData.emergencyContact} onChange={handleInputChange} placeholder="+965 XXXX XXXX" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">البريد الإلكتروني</Label>
-                                <Input id="email" type="email" dir="ltr" value={formData.email} onChange={handleInputChange} placeholder="employee@example.com" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Employment Info */}
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-lg border-b pb-2">معلومات التوظيف والعقد</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Input id="department" value={formData.department} onChange={handleInputChange} placeholder="e.g., هندسة, محاسبة" required />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Input id="jobTitle" value={formData.jobTitle} onChange={handleInputChange} placeholder="e.g., مهندس مدني, محاسب عام" required />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="position">المنصب</Label>
-                                <Select dir="rtl" value={formData.position} onValueChange={(v) => handleSelectChange('position', v)}>
-                                    <SelectTrigger id="position"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="head">رئيس قسم</SelectItem>
-                                        <SelectItem value="employee">موظف</SelectItem>
-                                        <SelectItem value="assistant">مساعد</SelectItem>
-                                        <SelectItem value="contractor">متعاقد</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                                <Input id="hireDate" type="date" value={formData.hireDate} onChange={handleInputChange} required />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="contractType">نوع العقد</Label>
-                                <Select dir="rtl" value={formData.contractType} onValueChange={(v) => handleSelectChange('contractType', v as 'permanent' | 'temporary' | 'subcontractor')}>
-                                    <SelectTrigger id="contractType"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="permanent">دائم</SelectItem>
-                                        <SelectItem value="temporary">مؤقت</SelectItem>
-                                        <SelectItem value="subcontractor">متعهّد</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {(formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && (
-                                <div className="grid gap-2">
-                                    <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
-                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} required={formData.contractType !== 'permanent'} />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Salary & Bank */}
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-lg border-b pb-2">الراتب والبنك</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
-                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary} onChange={handleInputChange} placeholder="0.000" required />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="housingAllowance">بدل السكن</Label>
-                                <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance} onChange={handleInputChange} placeholder="0.000" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="transportAllowance">بدل النقل</Label>
-                                <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance} onChange={handleInputChange} placeholder="0.000" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="salaryPaymentType">نوع الراتب</Label>
-                                <Select dir="rtl" value={formData.salaryPaymentType} onValueChange={(v) => handleSelectChange('salaryPaymentType', v)}>
-                                    <SelectTrigger id="salaryPaymentType"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="transfer">تحويل بنكي</SelectItem>
-                                        <SelectItem value="cheque">شيك</SelectItem>
-                                        <SelectItem value="cash">كاش</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {formData.salaryPaymentType === 'transfer' && (
-                                <>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="bankName">اسم البنك</Label>
-                                        <Select dir="rtl" value={formData.bankName} onValueChange={(v) => handleSelectChange('bankName', v)}>
-                                            <SelectTrigger id="bankName"><SelectValue placeholder="اختر البنك..." /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="NBK">بنك الكويت الوطني</SelectItem>
-                                                <SelectItem value="KFH">بيت التمويل الكويتي</SelectItem>
-                                                <SelectItem value="GulfBank">بنك الخليج</SelectItem>
-                                                <SelectItem value="BurganBank">بنك برقان</SelectItem>
-                                                <SelectItem value="KIB">بنك الكويت الدولي</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid gap-2 md:col-span-2">
-                                        <Label htmlFor="iban">رقم الحساب الدولي (IBAN) <span className="text-destructive">*</span></Label>
-                                        <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </CardContent>
-                <CardFooter className="flex justify-end">
-                    <Button type="submit" disabled={isLoading}>
-                        <Save className="ml-2 h-4 w-4" />
-                        {isLoading ? 'جاري الحفظ...' : 'حفظ الموظف'}
-                    </Button>
-                </CardFooter>
-            </form>
-        </Card>
+                </div>
+           </div>
+            <Separator />
+             <div className="space-y-4">
+                <Skeleton className="h-6 w-1/4" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   <Skeleton className="h-10" />
+                   <Skeleton className="h-10" />
+                   <Skeleton className="h-10" />
+                </div>
+            </div>
+        </CardContent>
+         <CardFooter className="flex justify-end">
+            <Skeleton className="h-10 w-28" />
+        </CardFooter>
+      </Card>
     );
+  }
+
+  return (
+    <Card dir="rtl">
+      <form onSubmit={handleSubmit}>
+        <CardHeader>
+          <CardTitle>إضافة موظف جديد</CardTitle>
+          <CardDescription>
+            قم بتعبئة جميع الحقول المطلوبة لإنشاء ملف موظف جديد في النظام.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Personal Info */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">المعلومات الشخصية</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+              <div className="md:col-span-1 flex flex-col items-center gap-2">
+                <Avatar className='h-32 w-32'>
+                  <AvatarImage src="" />
+                  <AvatarFallback><Camera className='h-8 w-8 text-muted-foreground' /></AvatarFallback>
+                </Avatar>
+                <Button type="button" variant="outline" size="sm">رفع صورة شخصية</Button>
+              </div>
+              <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
+                  <Input id="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="nameEn">الاسم بالإنجليزية <span className="text-destructive">*</span></Label>
+                  <Input id="nameEn" value={formData.nameEn} onChange={handleInputChange} placeholder="e.g. Alyaa Alameri" dir="ltr" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="dob">تاريخ الميلاد</Label>
+                  <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label>
+                  <Input id="civilId" value={formData.civilId} onChange={handleInputChange} placeholder="12345678" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="gender">النوع</Label>
+                  <Select value={formData.gender ?? ''} onValueChange={(value) => handleSelectChange('gender', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر النوع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">ذكر</SelectItem>
+                      <SelectItem value="female">أنثى</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="maritalStatus">الحالة الاجتماعية</Label>
+                  <Select value={formData.maritalStatus ?? ''} onValueChange={(value) => handleSelectChange('maritalStatus', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الحالة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">أعزب</SelectItem>
+                      <SelectItem value="married">متزوج</SelectItem>
+                      <SelectItem value="divorced">مطلق</SelectItem>
+                      <SelectItem value="widowed">أرمل</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Employment Info */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">بيانات التوظيف</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
+                <Input id="department" value={formData.department} onChange={handleInputChange} placeholder="هندسة، محاسبة، ..." required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
+                <Input id="jobTitle" value={formData.jobTitle} onChange={handleInputChange} placeholder="مهندس معماري، محاسب، ..." required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="position">المنصب</Label>
+                <Select value={formData.position ?? ''} onValueChange={(value) => handleSelectChange('position', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر المنصب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="head">رئيس قسم</SelectItem>
+                    <SelectItem value="employee">موظف</SelectItem>
+                    <SelectItem value="assistant">مساعد</SelectItem>
+                    <SelectItem value="contractor">متعاقد</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
+                <Input id="hireDate" type="date" value={formData.hireDate} onChange={handleInputChange} required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="contractType">نوع العقد</Label>
+                <Select value={formData.contractType ?? 'permanent'} onValueChange={(value) => handleSelectChange('contractType', value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="permanent">دائم</SelectItem>
+                    <SelectItem value="temporary">مؤقت</SelectItem>
+                    <SelectItem value="subcontractor">متعهّد</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
+                <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Residency & Contact */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">الإقامة وبيانات الاتصال</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="visaType">نوع الإقامة</Label>
+                <Select value={formData.visaType ?? 'kuwaiti'} onValueChange={(value) => handleSelectChange('visaType', value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kuwaiti">كويتي</SelectItem>
+                    <SelectItem value="engineer">مهندس</SelectItem>
+                    <SelectItem value="worker">عامل</SelectItem>
+                    <SelectItem value="driver">سائق</SelectItem>
+                    <SelectItem value="admin">إداري</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
+                <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
+                <Input id="mobile" value={formData.mobile} onChange={handleInputChange} placeholder="965123456" required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="emergencyContact">رقم طوارئ</Label>
+                <Input id="emergencyContact" value={formData.emergencyContact} onChange={handleInputChange} placeholder="965987654" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">البريد الإلكتروني</Label>
+                <Input id="email" type="email" value={formData.email} onChange={handleInputChange} placeholder="email@example.com" dir="ltr" />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Salary Info */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">بيانات الراتب</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
+                <Input id="basicSalary" type="number" value={formData.basicSalary} onChange={handleInputChange} placeholder="400" required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="housingAllowance">بدل السكن</Label>
+                <Input id="housingAllowance" type="number" value={formData.housingAllowance} onChange={handleInputChange} placeholder="100" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="transportAllowance">بدل المواصلات</Label>
+                <Input id="transportAllowance" type="number" value={formData.transportAllowance} onChange={handleInputChange} placeholder="50" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="salaryPaymentType">نوع الراتب</Label>
+                <Select value={formData.salaryPaymentType ?? ''} onValueChange={(value) => handleSelectChange('salaryPaymentType', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر نوع الدفع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">كاش</SelectItem>
+                    <SelectItem value="cheque">شيك</SelectItem>
+                    <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formData.salaryPaymentType === 'transfer' && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="bankName">اسم البنك</Label>
+                    <Input id="bankName" value={formData.bankName} onChange={handleInputChange} placeholder="البنك الوطني" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="iban">IBAN <span className="text-destructive">*</span></Label>
+                    <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXX..." required />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2" dir="ltr">
+          <Button type="button" variant="outline" onClick={() => router.back()}>
+            إلغاء
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? 'جاري الحفظ...' : 'حفظ الموظف'}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
 }
