@@ -1,19 +1,10 @@
-import type { User, Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile } from './types';
+import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
 
-// This data is for frontend demonstration and placeholder purposes.
-// The actual user data for authentication is stored and managed in Firestore.
-export const users: UserProfile[] = [
-  { id: 'user-1', username: 'ali.ahmed', email: 'ali.ahmed@example.com', passwordHash: '123456', fullName: 'Ali Ahmed', avatarUrl: getUserAvatar('user-avatar-1'), role: 'Admin', isActive: true },
-  { id: 'user-2', username: 'fatima.almansoori', email: 'fatima.almansoori@example.com', passwordHash: '123456', fullName: 'Fatima Al-Mansoori', avatarUrl: getUserAvatar('user-avatar-2'), role: 'Engineer', isActive: true },
-  { id: 'user-3', username: 'yusuf.khan', email: 'yusuf.khan@example.com', passwordHash: '123456', fullName: 'Yusuf Khan', avatarUrl: getUserAvatar('user-avatar-3'), role: 'Accountant', isActive: true },
-  { id: 'user-4', username: 'noor.alfalahi', email: 'noor.alfalahi@example.com', passwordHash: '123456', fullName: 'Noor Al-Falahi', avatarUrl: getUserAvatar('user-avatar-4'), role: 'Client', isActive: true },
-  { id: 'user-5', username: 'hassan.ibrahim', email: 'hassan.ibrahim@example.com', passwordHash: '123456', fullName: 'Hassan Ibrahim', avatarUrl: getUserAvatar('user-avatar-5'), role: 'Engineer', isActive: true },
-  { id: 'user-6', username: 'salama.almazrouei', email: 'salama.almazrouei@example.com', passwordHash: '123456', fullName: 'Salama Al-Mazrouei', avatarUrl: getUserAvatar('user-avatar-6'), role: 'Secretary', isActive: true },
-  { id: 'user-7', username: 'badria.saleh', email: 'badria.saleh@example.com', passwordHash: '123456', fullName: 'Badria Saleh', avatarUrl: '', role: 'HR', isActive: true },
-];
+// Mock data is now only for non-user-related entities.
+// The single source of truth for users and employees is Firestore.
 
 export const clients: Client[] = [
   { id: 'client-1', name: 'Emaar Properties', contactPerson: 'Mohamed Alabbar', email: 'contact@emaar.ae', phone: '+971 4 123 4567', address: 'Dubai, UAE', totalVisits: 5, projectIds: ['proj-1', 'proj-3'] },
@@ -25,7 +16,7 @@ export const projects: Project[] = [
     id: 'proj-1',
     name: 'Downtown Dubai Villa',
     clientId: 'client-1',
-    leadEngineerId: 'user-2',
+    leadEngineerId: 'user-2', // This will need to match a UID from Firestore
     status: 'In Progress',
     startDate: '2023-10-01',
     endDate: '2024-12-31',
@@ -51,7 +42,7 @@ export const projects: Project[] = [
     id: 'proj-2',
     name: 'Yas Island Residential Tower',
     clientId: 'client-2',
-    leadEngineerId: 'user-5',
+    leadEngineerId: 'user-5', // This will need to match a UID from Firestore
     status: 'Planning',
     startDate: '2024-02-15',
     endDate: '2026-08-30',
@@ -71,7 +62,7 @@ export const projects: Project[] = [
     id: 'proj-3',
     name: 'Dubai Marina Kiosk',
     clientId: 'client-1',
-    leadEngineerId: 'user-2',
+    leadEngineerId: 'user-2', // This will need to match a UID from Firestore
     status: 'Completed',
     startDate: '2023-05-01',
     endDate: '2023-08-01',

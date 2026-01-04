@@ -4,40 +4,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Helper Functions
+    // --- Helper Functions ---
     function isAuthenticated() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      // In our mock auth, the UID is the same as the user's document ID
-      return isAuthenticated() && request.auth.uid == userId;
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // Returns true if the user has the 'Admin' role in their user document.
     function isAdmin() {
-        return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      return isAuthenticated() && getUserData().role == 'Admin';
+    }
+    
+    function isHR() {
+      return isAuthenticated() && getUserData().role == 'HR';
     }
 
-    // Path Rules
+    // --- Path Rules ---
+
+    // Login: Any authenticated user (including anonymous) needs to be able to query the users collection
+    // to find their own document by username. This is a limited, secure read.
     match /users/{userId} {
       // Admins can manage all users.
-      // Users can read/update their own profile.
-      allow read, update: if isOwner(userId) || isAdmin();
-      // Only admins can list, create, or delete users.
-      allow list, create, delete: if isAdmin();
+      allow read, write: if isAdmin();
+      
+      // Allow any authenticated user to read their own profile after login.
+      allow get: if isAuthenticated() && request.auth.uid == userId;
     }
     
     match /clients/{clientId} {
-      // Allow any authenticated user to manage clients for now.
       allow read, write: if isAuthenticated();
     }
 
     match /employees/{employeeId} {
-      // Allow admins and HR to manage employees.
-      // Allow any authenticated user to read for now.
+      // Admins and HR can manage employees.
+      // Any authenticated user can read the list for now (e.g., for forms).
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'HR';
+      allow write: if isAdmin() || isHR();
     }
   }
 }

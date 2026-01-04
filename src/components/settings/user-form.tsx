@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,143 +20,225 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import type { UserProfile, UserRole } from '@/lib/types';
+import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Info } from 'lucide-react';
+import { useFirebase } from '@/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+
 
 interface UserFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (user: Partial<UserProfile>) => void;
-  user?: UserProfile | null;
+  user: UserProfile | null;
+  employees: Employee[];
+  allUsers: UserProfile[];
 }
 
-const roles: UserRole[] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'];
-const roleTranslations: Record<UserRole, string> = {
+const roles: UserProfile['role'][] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'];
+const roleTranslations: Record<UserProfile['role'], string> = {
     Admin: 'مدير',
     Engineer: 'مهندس',
     Accountant: 'محاسب',
     Secretary: 'سكرتارية',
     HR: 'موارد بشرية',
-    Client: 'عميل'
+};
+
+const initialFormData: Partial<UserProfile> = {
+    employeeId: '',
+    username: '',
+    passwordHash: '',
+    role: 'Engineer',
 };
 
 
-export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
+export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }: UserFormProps) {
   const { toast } = useToast();
   const isEditing = !!user;
-  const [formData, setFormData] = useState<Partial<UserProfile>>({
-      fullName: '',
-      username: '',
-      email: '',
-      role: 'Engineer',
-      isActive: true,
-      passwordHash: '123456'
-  });
+
+  const [formData, setFormData] = useState<Partial<UserProfile>>(initialFormData);
+  const [password, setPassword] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+
+  // Filter out employees who are already linked to a user account
+  const availableEmployees = useMemo(() => {
+    const linkedEmployeeIds = new Set(allUsers.map(u => u.employeeId));
+    if (isEditing && user?.employeeId) {
+        // If editing, allow the currently linked employee to be in the list
+        linkedEmployeeIds.delete(user.employeeId);
+    }
+    return employees.filter(e => !linkedEmployeeIds.has(e.id));
+  }, [employees, allUsers, user, isEditing]);
+
 
   useEffect(() => {
-    if (isEditing && user) {
+    if (user && isEditing) {
         setFormData({
             id: user.id,
-            fullName: user.fullName,
+            employeeId: user.employeeId,
             username: user.username,
-            email: user.email,
             role: user.role,
-            isActive: user.isActive,
         });
+        setPassword(''); // Don't show password
     } else {
-        setFormData({
-            fullName: '',
-            username: '',
-            email: '',
-            role: 'Engineer',
-            isActive: true,
-            passwordHash: '123456'
-        });
+        setFormData(initialFormData);
+        setPassword('');
     }
   }, [user, isEditing, isOpen]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
-  }
+    if (id === 'username') {
+        // Basic username policy
+        const sanitizedValue = value.toLowerCase().replace(/[^a-z0-9._]/g, '');
+        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
+        checkUsername(sanitizedValue);
+    } else {
+       setFormData(prev => ({ ...prev, [id]: value }));
+    }
+  };
 
-  const handleRoleChange = (value: UserRole) => {
-      setFormData(prev => ({ ...prev, role: value}));
-  }
+  const checkUsername = useCallback((username: string) => {
+    if (!username) {
+        setUsernameError(null);
+        return;
+    }
+    const isTaken = allUsers.some(u => u.username === username && u.id !== user?.id);
+    if (isTaken) {
+        setUsernameError('اسم المستخدم هذا مستخدم بالفعل.');
+    } else {
+        setUsernameError(null);
+    }
+  }, [allUsers, user]);
 
-  const handleStatusChange = (checked: boolean) => {
-      setFormData(prev => ({ ...prev, isActive: checked}));
-  }
+
+  const handleSelectChange = (id: keyof UserProfile, value: any) => {
+      setFormData(prev => ({ ...prev, [id]: value }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!formData.fullName || !formData.username || !formData.role || !formData.email) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة كل الحقول المطلوبة.' });
+
+      // --- Validation ---
+      if (!formData.employeeId) {
+          toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار موظف لربط الحساب به.' });
           return;
       }
-      onSave(formData);
+      if (!formData.username || usernameError) {
+          toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال اسم مستخدم صالح وغير مكرر.' });
+          return;
+      }
+       if (!isEditing && (!password || password.length < 8)) {
+          toast({ variant: 'destructive', title: 'خطأ', description: 'كلمة المرور مطلوبة ويجب أن لا تقل عن 8 أحرف.' });
+          return;
+      }
+       if (isEditing && password && password.length < 8) {
+          toast({ variant: 'destructive', title: 'خطأ', description: 'كلمة المرور الجديدة يجب أن لا تقل عن 8 أحرف.' });
+          return;
+      }
+      
+      const dataToSave = { ...formData };
+      if (password) {
+        // In a real app, this would trigger a Firebase Function to hash the password.
+        // For this demo, we store it as is, but name the field passwordHash to show intent.
+        dataToSave.passwordHash = password;
+      }
+      
+      onSave(dataToSave);
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]" dir="rtl">
+      <DialogContent className="sm:max-w-md" dir="rtl">
         <form onSubmit={handleSubmit}>
             <DialogHeader>
-            <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}</DialogTitle>
-            <DialogDescription>
-                {isEditing ? 'تعديل تفاصيل المستخدم الحالي.' : 'إضافة مستخدم جديد للنظام مع كلمة مرور مؤقتة (123456).'}
-            </DialogDescription>
+                <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>
+                <DialogDescription>
+                    {isEditing 
+                        ? `تعديل حساب المستخدم المرتبط بالموظف.`
+                        : 'سيتم إنشاء حساب دخول جديد للموظف المختار. سيكون الحساب غير مفعل افتراضيًا.'
+                    }
+                </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="fullName" className="text-right">
-                الاسم الكامل
-                </Label>
-                <Input id="fullName" value={formData.fullName} onChange={handleInputChange} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="username" className="text-right">
-                اسم المستخدم
-                </Label>
-                <Input id="username" value={formData.username} onChange={handleInputChange} className="col-span-3" required />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                البريد الإلكتروني
-                </Label>
-                <Input id="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" placeholder="user@example.com" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="role" className="text-right">
-                الدور
-                </Label>
-                <Select dir="rtl" value={formData.role} onValueChange={handleRoleChange}>
-                    <SelectTrigger id="role" className="col-span-3">
-                        <SelectValue placeholder="اختر دوراً..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {roles.map(role => (
-                            <SelectItem key={role} value={role}>{roleTranslations[role]}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="isActive" className="text-right">
-                الحالة
-                </Label>
-                <div className='flex items-center gap-2 col-span-3'>
-                    <Switch id="isActive" checked={formData.isActive} onCheckedChange={handleStatusChange} />
-                    <span className='text-sm text-muted-foreground'>
-                        {formData.isActive ? 'فعال' : 'غير فعال'}
-                    </span>
+                <div className="grid gap-2">
+                    <Label htmlFor="employeeId">اختيار الموظف <span className="text-destructive">*</span></Label>
+                    <Select 
+                        dir="rtl" 
+                        value={formData.employeeId} 
+                        onValueChange={(v) => handleSelectChange('employeeId', v)}
+                        disabled={isEditing}
+                    >
+                        <SelectTrigger id="employeeId">
+                            <SelectValue placeholder="اختر موظفًا غير مرتبط بحساب..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {availableEmployees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id!}>
+                                    <span className="font-medium">{emp.fullName}</span>
+                                    <span className="text-muted-foreground text-xs ml-2">({emp.civilId})</span>
+                                </SelectItem>
+                            ))}
+                            {availableEmployees.length === 0 && !isEditing && <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون متاحون لإنشاء حسابات.</p>}
+                        </SelectContent>
+                    </Select>
                 </div>
-              </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="username">اسم المستخدم <span className="text-destructive">*</span></Label>
+                    <Input 
+                        id="username" 
+                        value={formData.username} 
+                        onChange={handleInputChange} 
+                        placeholder="english.letters.only" 
+                        dir="ltr" 
+                        required 
+                    />
+                    {usernameError && <p className="text-xs text-destructive">{usernameError}</p>}
+                     <p className="text-xs text-muted-foreground">
+                        سيتم إنشاء بريد إلكتروني داخلي: <span dir='ltr' className='font-mono'>{formData.username || '...'}@bmec-kw.local</span>
+                     </p>
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="password">
+                        {isEditing ? 'كلمة المرور الجديدة (اختياري)' : 'كلمة المرور المؤقتة'} <span className={!isEditing ? "text-destructive" : ""}>*</span>
+                    </Label>
+                    <Input 
+                        id="password" 
+                        type="password" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder={isEditing ? 'اتركه فارغًا لعدم التغيير' : '8 أحرف على الأقل'}
+                        required={!isEditing} 
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="role">الدور <span className="text-destructive">*</span></Label>
+                    <Select dir="rtl" value={formData.role} onValueChange={(v) => handleSelectChange('role', v as UserProfile['role'])}>
+                        <SelectTrigger id="role">
+                            <SelectValue placeholder="اختر دور المستخدم..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {roles.map(role => (
+                                <SelectItem key={role} value={role}>{roleTranslations[role]}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 {!isEditing && (
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>ملاحظة هامة</AlertTitle>
+                        <AlertDescription>
+                            سيتم إنشاء الحساب في حالة "غير مفعل". يجب عليك تفعيله يدويًا من قائمة الإجراءات بعد الحفظ ليتمكن المستخدم من تسجيل الدخول.
+                        </AlertDescription>
+                    </Alert>
+                )}
             </div>
             <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-            <Button type="submit">{isEditing ? 'حفظ التغييرات' : 'إنشاء مستخدم'}</Button>
+                <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+                <Button type="submit" disabled={!!usernameError}>{isEditing ? 'حفظ التغييرات' : 'إنشاء مستخدم'}</Button>
             </DialogFooter>
         </form>
       </DialogContent>

@@ -7,14 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import { UsersTable } from '@/components/settings/users-table';
 import { useAuth } from '@/context/auth-context';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Lock } from 'lucide-react';
 
 
 export default function SettingsPage() {
@@ -24,49 +20,25 @@ export default function SettingsPage() {
   return (
     <Card dir="rtl">
       <CardHeader>
-        <CardTitle>الإعدادات</CardTitle>
+        <CardTitle>إدارة المستخدمين</CardTitle>
         <CardDescription>
-          إدارة حسابك، الفريق، وإعدادات التطبيق.
+          إدارة حسابات دخول الموظفين وصلاحياتهم في النظام.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="users" dir='rtl'>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
-            <TabsTrigger value="users">المستخدمين</TabsTrigger>
-            <TabsTrigger value="billing">الفواتير</TabsTrigger>
-            <TabsTrigger value="notifications">الإشعارات</TabsTrigger>
-          </TabsList>
-          <TabsContent value="profile" className="mt-4">
-            <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">إعدادات الملف الشخصي</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    سيتم عرض نموذج إدارة الملف الشخصي للمستخدم هنا.
-                </p>
-            </div>
-          </TabsContent>
-          <TabsContent value="users" className="mt-4">
-            {currentUserRole === 'Admin' ? (
-                <UsersTable />
-            ) : (
-                <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                    <h3 className="mt-4 text-lg font-medium">الوصول مرفوض</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        فقط المدير (Admin) يمكنه عرض وإدارة المستخدمين.
-                    </p>
-                </div>
-            )}
-          </TabsContent>
-           <TabsContent value="billing" className="mt-4">
-            <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">معلومات الفواتير</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    إدارة اشتراكك وطرق الدفع.
-                </p>
-            </div>
-          </TabsContent>
-        </Tabs>
+        {currentUserRole === 'Admin' ? (
+            <UsersTable />
+        ) : (
+            <Alert variant="destructive">
+                <Lock className="h-4 w-4" />
+                <AlertTitle>الوصول مرفوض</AlertTitle>
+                <AlertDescription>
+                    هذه الصفحة متاحة للمدراء (Admin) فقط. لا تملك الصلاحية اللازمة لعرض أو إدارة المستخدمين.
+                </AlertDescription>
+            </Alert>
+        )}
       </CardContent>
     </Card>
   );
 }
+

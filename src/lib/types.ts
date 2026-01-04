@@ -1,18 +1,21 @@
 
 
-export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR' | 'Client';
+export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 
 export type UserProfile = {
   id?: string;
-  uid?: string;
-  username: string;
-  email: string; 
-  passwordHash?: string;
-  fullName: string;
-  avatarUrl?: string;
+  uid?: string; // Firebase Auth UID
+  username: string; // Unique, for login
+  email: string; // Auto-generated internal email
+  passwordHash: string; // Hashed password
+  employeeId: string; // Reference to 'employees' collection
   role: UserRole;
   isActive: boolean;
   createdAt?: any; 
+  activatedAt?: any;
+  createdBy?: string; // UID of the admin who created the user
+  avatarUrl?: string; // Optional, from employee record
+  fullName?:string; // Optional, from employee record
 };
 
 export type Client = {
@@ -51,7 +54,7 @@ export type TimelineEvent = {
 };
 
 export type DailyReport = {
-  id: string;
+  id:string;
   date: string;
   authorId: string;
   workCompleted: string;
@@ -193,5 +196,3 @@ iban?: string;
     lastLeaveResetDate?: string; // ISO String
     createdAt?: any; 
 };
-
-    

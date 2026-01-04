@@ -9,9 +9,8 @@ import {
   signInAnonymously,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import type { UserProfile } from '@/lib/types';
-import { users as mockUsers } from '@/lib/data';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import type { Employee, UserProfile } from '@/lib/types';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
 export interface AuthenticatedUser extends UserProfile {
   uid: string;
@@ -54,32 +53,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (username: string, password: string) => {
     setLoading(true);
+    if (!firestore) {
+        throw new Error("Firestore is not initialized.");
+    }
     try {
-        // 1. Find user in the local mock data array
-        const userFromMock = mockUsers.find(u => u.username === username);
+        // 1. Find user in the Firestore 'users' collection
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('username', '==', username));
+        const querySnapshot = await getDocs(q);
 
-        if (!userFromMock) {
+        if (querySnapshot.empty) {
             throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
         }
 
+        const userDoc = querySnapshot.docs[0];
+        const userProfile = { id: userDoc.id, ...userDoc.data() } as UserProfile;
+
         // 2. Check if user is active
-        if (!userFromMock.isActive) {
+        if (!userProfile.isActive) {
             throw new Error("هذا الحساب غير نشط. يرجى مراجعة المسؤول.");
         }
-
-        // 3. "Verify" password against the mock data
-        const isPasswordValid = await verifyPassword(password, userFromMock.passwordHash || '');
+        
+        // 3. "Verify" password 
+        const isPasswordValid = await verifyPassword(password, userProfile.passwordHash || '');
         if (!isPasswordValid) {
             throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
         }
 
-        // 4. Prepare the full user object with a mock UID.
+        // 4. Fetch linked employee data to get avatar and full name
+        let employeeData: Partial<Employee> = {};
+        if (userProfile.employeeId) {
+            const employeeRef = doc(firestore, "employees", userProfile.employeeId);
+            const employeeSnap = await getDoc(employeeRef);
+            if (employeeSnap.exists()) {
+                const emp = employeeSnap.data();
+                employeeData.fullName = emp.fullName;
+                employeeData.profilePicture = emp.profilePicture; 
+            }
+        }
+        
+        // 5. Prepare the full user object with a mock UID and employee details.
         const authenticatedUser: AuthenticatedUser = {
-            ...userFromMock,
-            uid: userFromMock.id || `mock-uid-${userFromMock.username}`,
+            ...userProfile,
+            uid: userProfile.id || `mock-uid-${userProfile.username}`,
+            fullName: employeeData.fullName || userProfile.username,
+            avatarUrl: employeeData.profilePicture
         };
         
-        // 5. Store user in session storage and set state
+        // 6. Store user in session storage and set state
         sessionStorage.setItem('authUser', JSON.stringify(authenticatedUser));
         setUser(authenticatedUser);
 
@@ -99,7 +120,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setLoading(true);
     sessionStorage.removeItem('authUser');
-    // We don't need to sign out from Firebase if we're not signed in.
     setUser(null);
     router.push('/');
     setLoading(false);

@@ -3,54 +3,59 @@
   "entities": {
     "UserProfile": {
       "title": "User Profile",
-      "description": "Represents a user profile in the system.",
+      "description": "Represents a user's login account in the system.",
       "type": "object",
       "properties": {
         "username": {
           "type": "string",
-          "description": "The user's username for login."
+          "description": "The user's unique username for login."
         },
         "email": {
           "type": "string",
           "format": "email",
-          "description": "The user's email address for authentication."
+          "description": "Auto-generated internal email address (e.g., username@bmec-kw.local)."
         },
         "passwordHash": {
           "type": "string",
-          "description": "The securely hashed password for the user."
+          "description": "The securely hashed password for the user. Hashing should be done server-side."
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "A reference to the corresponding document ID in the 'employees' collection."
         },
         "role": {
           "type": "string",
           "description": "The user's role in the system.",
-          "enum": [
-            "Admin",
-            "Secretary",
-            "Accountant",
-            "Engineer",
-            "HR"
-          ]
-        },
-        "fullName": {
-          "type": "string",
-          "description": "The user's full name."
+          "enum": ["Admin", "Secretary", "Accountant", "Engineer", "HR"]
         },
         "isActive": {
           "type": "boolean",
-          "description": "Whether the user's account is active."
+          "description": "Whether the user's account is active and can log in."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "The timestamp when the user was created."
+          "description": "The timestamp when the user account was created."
+        },
+        "activatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the user account was last activated."
+        },
+        "createdBy": {
+            "type": "string",
+            "description": "The user ID of the admin who created this account."
         }
       },
       "required": [
         "username",
         "email",
+        "passwordHash",
+        "employeeId",
         "role",
-        "fullName",
         "isActive",
-        "createdAt"
+        "createdAt",
+        "createdBy"
       ]
     },
     "Client": {
@@ -162,7 +167,7 @@
   },
   "auth": {
     "providers": [
-      "google.com"
+      "anonymous"
     ]
   },
   "firestore": {
@@ -170,7 +175,7 @@
       "schema": {
         "$ref": "#/entities/UserProfile"
       },
-      "description": "Stores user profile information."
+      "description": "Stores user login accounts, linked to employees."
     },
     "/clients/{clientId}": {
       "schema": {
@@ -184,5 +189,3 @@
     }
   }
 }
-
-    
