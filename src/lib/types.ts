@@ -1,4 +1,5 @@
 
+
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR' | 'Client';
 
 export type UserProfile = {
@@ -192,3 +193,5 @@ iban?: string;
     lastLeaveResetDate?: string; // ISO String
     createdAt?: any; 
 };
+
+    

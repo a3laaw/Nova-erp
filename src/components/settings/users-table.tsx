@@ -80,7 +80,9 @@ export function UsersTable() {
     };
 
     useEffect(() => {
-        fetchUsers();
+        if(firestore) {
+            fetchUsers();
+        }
     }, [firestore]);
 
 
@@ -289,3 +291,5 @@ export function UsersTable() {
     </>
   );
 }
+
+    

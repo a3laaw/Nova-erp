@@ -51,6 +51,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
       email: '',
       role: 'Engineer',
       isActive: true,
+      passwordHash: '123456'
   });
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
             email: '',
             role: 'Engineer',
             isActive: true,
+            passwordHash: '123456'
         });
     }
   }, [user, isEditing, isOpen]);
@@ -161,3 +163,5 @@ export function UserForm({ isOpen, onClose, onSave, user }: UserFormProps) {
     </Dialog>
   );
 }
+
+    

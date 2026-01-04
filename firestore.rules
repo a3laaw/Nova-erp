@@ -13,16 +13,17 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Returns true if the user has the 'Admin' role in their custom claims.
+    function isAdmin() {
+        return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
     // Path Rules
     match /users/{userId} {
-      // Allow read/write only to the owner of the document or an Admin.
-      allow read, update: if isOwner(userId) || request.auth.token.role == 'Admin';
-      
-      // Allow Admins to list all users.
-      allow list: if isAuthenticated() && request.auth.token.role == 'Admin';
-      
-      // Allow Admins to create or delete users.
-      allow create, delete: if isAuthenticated() && request.auth.token.role == 'Admin';
+      // Admins can manage all users.
+      // Users can read/update their own profile.
+      allow read, update: if isOwner(userId) || isAdmin();
+      allow list, create, delete: if isAdmin();
     }
     
     match /clients/{clientId} {
@@ -30,12 +31,11 @@ service cloud.firestore {
     }
 
     match /employees/{employeeId} {
+      // Allow any authenticated user to read/write for now.
+      // Refine this rule later for specific HR/Admin roles.
       allow read, write: if isAuthenticated();
-    }
-    
-    // Default deny all other reads/writes for security.
-    match /{path=**} {
-      allow read, write: if false;
     }
   }
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Card,
@@ -21,37 +22,46 @@ export default function SettingsPage() {
   const currentUserRole = user?.role;
 
   return (
-    <Card>
+    <Card dir="rtl">
       <CardHeader>
-        <CardTitle>Settings</CardTitle>
+        <CardTitle>الإعدادات</CardTitle>
         <CardDescription>
-          Manage your account, team, and application settings.
+          إدارة حسابك، الفريق، وإعدادات التطبيق.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="profile" dir='rtl'>
+        <Tabs defaultValue="users" dir='rtl'>
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            {currentUserRole === 'Admin' && <TabsTrigger value="users">المستخدمين</TabsTrigger>}
-            <TabsTrigger value="billing">Billing</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
+            <TabsTrigger value="users">المستخدمين</TabsTrigger>
+            <TabsTrigger value="billing">الفواتير</TabsTrigger>
+            <TabsTrigger value="notifications">الإشعارات</TabsTrigger>
           </TabsList>
           <TabsContent value="profile" className="mt-4">
             <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">Profile Settings</h3>
+                <h3 className="mt-4 text-lg font-medium">إعدادات الملف الشخصي</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                    User profile management form will be here.
+                    سيتم عرض نموذج إدارة الملف الشخصي للمستخدم هنا.
                 </p>
             </div>
           </TabsContent>
-           {currentUserRole === 'Admin' && <TabsContent value="users" className="mt-4">
-            <UsersTable />
-          </TabsContent>}
+          <TabsContent value="users" className="mt-4">
+            {currentUserRole === 'Admin' ? (
+                <UsersTable />
+            ) : (
+                <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                    <h3 className="mt-4 text-lg font-medium">الوصول مرفوض</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        فقط المدير (Admin) يمكنه عرض وإدارة المستخدمين.
+                    </p>
+                </div>
+            )}
+          </TabsContent>
            <TabsContent value="billing" className="mt-4">
             <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">Billing Information</h3>
+                <h3 className="mt-4 text-lg font-medium">معلومات الفواتير</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                    Manage your subscription and payment methods.
+                    إدارة اشتراكك وطرق الدفع.
                 </p>
             </div>
           </TabsContent>
@@ -60,3 +70,5 @@ export default function SettingsPage() {
     </Card>
   );
 }
+
+    
