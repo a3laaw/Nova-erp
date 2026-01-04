@@ -1,6 +1,6 @@
 
 
-export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
+export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR' | 'Client';
 
 export type UserProfile = {
   id?: string;
@@ -171,7 +171,7 @@ export type Employee = {
     salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
     bankName?: string;
     accountNumber?: string;
-    iban?: string;
+iban?: string;
     profilePicture?: string;
     hireDate: string; // ISO String
     terminationDate: string | null;
