@@ -89,7 +89,7 @@ export default function NewEmployeePage() {
         
         try {
             // --- Validation ---
-            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate'];
+            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'contractType', 'basicSalary', 'status'];
             for (const field of requiredFields) {
                 if (!formData[field]) {
                     toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
