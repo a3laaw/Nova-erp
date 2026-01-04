@@ -26,29 +26,9 @@ import type { UserProfile, UserRole } from '@/lib/types';
 async function getCustomToken(uid: string, role: UserRole): Promise<string> {
     // In a real app, this would be an HTTPS call to a Firebase Function
     // that mints a token for the given UID with the specified role claim.
-    // e.g., const response = await fetch('https://your-cloud-function-url/generateToken', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ uid, role }),
-    // });
-    // const { token } = await response.json();
-    // return token;
-    
-    // ---- MOCK IMPLEMENTATION ----
-    // This is a placeholder to simulate fetching a custom token.
-    // In a real scenario, never generate tokens on the client.
     console.warn("Mock token generation is for development only.");
-    
-    // We'll use a simple, insecure "token" format for the mock.
-    // A real token is a long, signed JWT.
-    // This is NOT a real token, but it allows signInWithCustomToken to work with the emulator.
-    const mockPayload = JSON.stringify({ uid, claims: { role } });
-    
-    // In a real scenario, you'd return a real JWT from your server.
     // For the emulator, even a non-JWT string works if it's not empty.
-    // We return the payload to have some identifiable data, but it's not used by the client.
-    // The IMPORTANT part is that the server would create this with the Admin SDK.
-    return `mock-token-for-${uid}`;
+    return `mock-token-for-${uid}-with-role-${role}`;
 }
 
 
@@ -57,9 +37,9 @@ async function getCustomToken(uid: string, role: UserRole): Promise<string> {
 async function verifyPassword(password: string, hash: string): Promise<boolean> {
     // ---- MOCK IMPLEMENTATION ----
     // In a real app, you would NEVER have this logic on the client.
-    // This is just to complete the login flow for the example.
     // A real implementation would use bcrypt.compare on the server.
-    return password === '123456'; // Using a simple mock password for all users
+    // This is now corrected to compare the input password with the mock hash.
+    return password === hash;
 }
 
 

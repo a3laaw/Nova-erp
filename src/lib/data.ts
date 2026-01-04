@@ -1,16 +1,16 @@
-import type { User, Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt } from './types';
+import type { User, Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
 
-export const users: User[] = [
-  { id: 'user-1', username: 'ali.ahmed', fullName: 'Ali Ahmed', email: 'ali.ahmed@example.com', avatarUrl: getUserAvatar('user-avatar-1'), role: 'Admin', isActive: true },
-  { id: 'user-2', username: 'fatima.almansoori', fullName: 'Fatima Al-Mansoori', email: 'fatima.almansoori@example.com', avatarUrl: getUserAvatar('user-avatar-2'), role: 'Engineer', isActive: true },
-  { id: 'user-3', username: 'yusuf.khan', fullName: 'Yusuf Khan', email: 'yusuf.khan@example.com', avatarUrl: getUserAvatar('user-avatar-3'), role: 'Accountant', isActive: true },
-  { id: 'user-4', username: 'noor.alfalahi', fullName: 'Noor Al-Falahi', email: 'noor.alfalahi@example.com', avatarUrl: getUserAvatar('user-avatar-4'), role: 'Client', isActive: true },
-  { id: 'user-5', username: 'hassan.ibrahim', fullName: 'Hassan Ibrahim', email: 'hassan.ibrahim@example.com', avatarUrl: getUserAvatar('user-avatar-5'), role: 'Engineer', isActive: true },
-  { id: 'user-6', username: 'salama.almazrouei', fullName: 'Salama Al-Mazrouei', email: 'salama.almazrouei@example.com', avatarUrl: getUserAvatar('user-avatar-6'), role: 'Secretary', isActive: true },
-  { id: 'user-7', username: 'badria.saleh', fullName: 'Badria Saleh', email: 'badria.saleh@example.com', avatarUrl: '', role: 'HR', isActive: true },
+export const users: UserProfile[] = [
+  { id: 'user-1', username: 'ali.ahmed', passwordHash: '123456', fullName: 'Ali Ahmed', email: 'ali.ahmed@example.com', avatarUrl: getUserAvatar('user-avatar-1'), role: 'Admin', isActive: true },
+  { id: 'user-2', username: 'fatima.almansoori', passwordHash: '123456', fullName: 'Fatima Al-Mansoori', email: 'fatima.almansoori@example.com', avatarUrl: getUserAvatar('user-avatar-2'), role: 'Engineer', isActive: true },
+  { id: 'user-3', username: 'yusuf.khan', passwordHash: '123456', fullName: 'Yusuf Khan', email: 'yusuf.khan@example.com', avatarUrl: getUserAvatar('user-avatar-3'), role: 'Accountant', isActive: true },
+  { id: 'user-4', username: 'noor.alfalahi', passwordHash: '123456', fullName: 'Noor Al-Falahi', email: 'noor.alfalahi@example.com', avatarUrl: getUserAvatar('user-avatar-4'), role: 'Client', isActive: true },
+  { id: 'user-5', username: 'hassan.ibrahim', passwordHash: '123456', fullName: 'Hassan Ibrahim', email: 'hassan.ibrahim@example.com', avatarUrl: getUserAvatar('user-avatar-5'), role: 'Engineer', isActive: true },
+  { id: 'user-6', username: 'salama.almazrouei', passwordHash: '123456', fullName: 'Salama Al-Mazrouei', email: 'salama.almazrouei@example.com', avatarUrl: getUserAvatar('user-avatar-6'), role: 'Secretary', isActive: true },
+  { id: 'user-7', username: 'badria.saleh', passwordHash: '123456', fullName: 'Badria Saleh', email: 'badria.saleh@example.com', avatarUrl: '', role: 'HR', isActive: true },
 ];
 
 export const clients: Client[] = [
