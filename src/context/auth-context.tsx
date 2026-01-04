@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { 
     signInWithCustomToken,
-    signInWithEmailAndPassword,
     signOut, 
     onAuthStateChanged, 
     type User as FirebaseUser 
@@ -24,12 +23,13 @@ import type { UserProfile, UserRole } from '@/lib/types';
 
 // This would be your actual custom token generation endpoint
 // For this example, we'll mock it.
-async function getCustomToken(username: string): Promise<string> {
+async function getCustomToken(uid: string, role: UserRole): Promise<string> {
     // In a real app, this would be an HTTPS call to a Firebase Function
-    // e.g., const response = await fetch('https://your-cloud-function-url/generateCustomToken', {
+    // that mints a token for the given UID with the specified role claim.
+    // e.g., const response = await fetch('https://your-cloud-function-url/generateToken', {
     //   method: 'POST',
     //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ username }),
+    //   body: JSON.stringify({ uid, role }),
     // });
     // const { token } = await response.json();
     // return token;
@@ -39,23 +39,16 @@ async function getCustomToken(username: string): Promise<string> {
     // In a real scenario, never generate tokens on the client.
     console.warn("Mock token generation is for development only.");
     
-    // We'll use a simple, insecure "token" format: username:role for the mock.
-    // In a real app, this would be a signed JWT from your server.
-    const MOCK_USERS: Record<string, { role: UserRole }> = {
-        'ali.ahmed': { role: 'Admin' },
-        'fatima.almansoori': { role: 'Engineer' },
-        'yusuf.khan': { role: 'Accountant' },
-        'hassan.ibrahim': { role: 'Engineer' },
-        'salama.almazrouei': { role: 'Secretary' },
-        'badria.saleh': { role: 'HR'},
-    };
-
-    const userInfo = MOCK_USERS[username];
-    if (!userInfo) {
-        throw new Error("Invalid mock user for token generation.");
-    }
+    // We'll use a simple, insecure "token" format for the mock.
+    // A real token is a long, signed JWT.
+    // This is NOT a real token, but it allows signInWithCustomToken to work with the emulator.
+    const mockPayload = JSON.stringify({ uid, claims: { role } });
     
-    return `${username}:${userInfo.role}`;
+    // In a real scenario, you'd return a real JWT from your server.
+    // For the emulator, even a non-JWT string works if it's not empty.
+    // We return the payload to have some identifiable data, but it's not used by the client.
+    // The IMPORTANT part is that the server would create this with the Admin SDK.
+    return `mock-token-for-${uid}`;
 }
 
 
@@ -90,16 +83,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // This effect should ideally handle rehydrating the user session,
-    // but for our custom flow, we'll keep it simple.
-    // A real implementation would check for a stored token.
-    const timer = setTimeout(() => {
-        setLoading(false);
-    }, 500); // Simulate loading
+   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    };
 
-    return () => clearTimeout(timer);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser && firestore) {
+        // User is signed in with Firebase Auth. Now fetch their profile from Firestore.
+        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userProfile = userDocSnap.data() as UserProfile;
+          setUser({
+            ...userProfile,
+            uid: firebaseUser.uid,
+            id: firebaseUser.uid,
+          });
+        } else {
+          // User exists in Auth but not in Firestore. This is an inconsistent state.
+          setUser(null);
+          await signOut(auth);
+        }
+      } else {
+        // No user signed in with Firebase Auth.
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth, firestore]);
 
   const login = async (username: string, password: string) => {
     if (!firestore || !auth) {
@@ -129,25 +144,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
     }
     
-    // 4. If password is valid, set the user state.
-    // In a real app, you would get a custom token from a backend function,
-    // then call `signInWithCustomToken(auth, token)`.
-    // Here, we'll just construct the user object for the context.
-    const authenticatedUser: AuthenticatedUser = {
-        ...userData,
-        id: userDoc.id,
-        uid: userDoc.id, // Use Firestore doc ID as UID for this session
-    };
-    
-    setUser(authenticatedUser);
-    setLoading(false);
+    // 4. If password is valid, get a custom token (mocked)
+    const customToken = await getCustomToken(userDoc.id, userData.role);
+
+    // 5. Sign in with the custom token
+    // This is the crucial step that creates a real Firebase Auth session.
+    await signInWithCustomToken(auth, customToken);
+
+    // The onAuthStateChanged listener will now handle setting the user state.
   };
 
   const logout = async () => {
     if (auth) {
-      // Even though we didn't use Firebase Auth to sign in,
-      // it's good practice to call signOut in case a session exists.
-      await signOut(auth).catch(console.error);
+      await signOut(auth);
     }
     setUser(null);
     router.push('/');
