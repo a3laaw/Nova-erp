@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import type { Employee, UserProfile } from '@/lib/types';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+
 
 export interface AuthenticatedUser extends UserProfile {
   uid: string;
@@ -19,42 +21,87 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// A mock user to bypass login for now
-const MOCK_ADMIN_USER: AuthenticatedUser = {
-  id: 'admin-user-mock',
-  uid: 'admin-user-mock',
-  username: 'admin.mock',
-  email: 'admin.mock@bmec-kw.local',
-  role: 'Admin',
-  isActive: true,
-  fullName: 'Admin User (Mock)',
-  employeeId: 'mock-employee-id',
-  passwordHash: 'mock',
-};
-
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
+  const { auth, firestore } = useFirebase();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // This effect now bypasses login and sets a mock admin user.
+  
   useEffect(() => {
-    setUser(MOCK_ADMIN_USER);
-    setLoading(false);
-  }, []);
+    if (!auth || !firestore) {
+      // Firebase services might not be available yet.
+      // The effect will re-run when they are.
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in, get their profile from Firestore.
+        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const userProfile = userDoc.data() as UserProfile;
+          
+          if (!userProfile.isActive) {
+            // If user is not active, sign them out and prevent login.
+            await signOut(auth);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
+          // Get linked employee data
+          const employeeDocRef = doc(firestore, 'employees', userProfile.employeeId);
+          const employeeDoc = await getDoc(employeeDocRef);
+          
+          setUser({
+            ...userProfile,
+            id: userDoc.id,
+            uid: firebaseUser.uid,
+            fullName: employeeDoc.exists() ? employeeDoc.data().fullName : userProfile.username,
+            avatarUrl: employeeDoc.exists() ? employeeDoc.data().profilePicture : undefined,
+          });
+        } else {
+          // User exists in Auth, but not in Firestore. This is an invalid state.
+          await signOut(auth);
+          setUser(null);
+        }
+      } else {
+        // User is signed out
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth, firestore]);
 
   const login = async (username: string, password: string) => {
-    // Login function is disabled for now.
-    console.log("Login is temporarily disabled.");
-    setUser(MOCK_ADMIN_USER);
-    router.push('/dashboard');
+    if (!firestore || !auth) {
+        throw new Error("Authentication service is not ready.");
+    }
+
+    // 1. Find user in Firestore by username
+    const usersRef = collection(firestore, 'users');
+    const q = query(usersRef, where('username', '==', username), where('isActive', '==', true));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        throw new Error("User not found or account is not active.");
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data() as UserProfile;
+
+    // 2. Use the email from Firestore to sign in with Firebase Auth
+    await signInWithEmailAndPassword(auth, userData.email, password);
+
+    // The onAuthStateChanged listener will handle setting the user state.
   };
 
   const logout = async () => {
-    // Logout function is disabled for now.
-    console.log("Logout is temporarily disabled.");
-    // To prevent being locked out, we just refresh the page which will log back in.
+    if (!auth) return;
+    await signOut(auth);
     router.push('/');
   };
 

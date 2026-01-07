@@ -4,11 +4,64 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // WARNING: These rules are temporarily open for development purposes.
-    // They allow anyone to read and write to the database.
-    // TODO: Re-implement proper security rules before deploying to production.
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'Admin';
+    }
+    
+    function isHR() {
+      return isAuthenticated() && getUserData().role == 'HR';
+    }
+    
+    function isSecretary() {
+      return isAuthenticated() && getUserData().role == 'Secretary';
+    }
+    
+    function isAccountant() {
+        return isAuthenticated() && getUserData().role == 'Accountant';
+    }
+    
+    function isEngineer() {
+        return isAuthenticated() && getUserData().role == 'Engineer';
+    }
+
+    // Collection: users
+    match /users/{userId} {
+      // Admins can read, create, and update any user.
+      allow read, create, update: if isAdmin();
+      // Users can read their own profile.
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      // Users cannot delete their own accounts or others'.
+      allow delete: if false;
+    }
+    
+    // Collection: employees
+    match /employees/{employeeId} {
+      // Admins and HR can do everything.
+      allow read, write: if isAdmin() || isHR();
+      // Any authenticated user can read employee data (e.g., to see names).
+      allow get: if isAuthenticated();
+    }
+    
+    // Collection: clients
+    match /clients/{clientId} {
+      // Admins and secretaries can manage clients.
+      allow read, write: if isAdmin() || isSecretary();
+       // Engineers can read client data.
+      allow get: if isEngineer();
+    }
+    
+    // Default deny for all other collections unless specified.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

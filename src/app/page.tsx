@@ -37,7 +37,11 @@ export default function LoginPage() {
       });
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'فشل تسجيل الدخول. يرجى التحقق من اسم المستخدم وكلمة المرور.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'not-found') {
+        setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
+      } else {
+        setError(err.message || 'فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      }
     } finally {
       setIsLoading(false);
     }

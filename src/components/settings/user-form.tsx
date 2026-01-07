@@ -148,6 +148,14 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       
       onSave(dataToSave);
   }
+  
+  const currentEmployeeSelection = useMemo(() => {
+    if (isEditing && user) {
+        const linkedEmployee = employees.find(e => e.id === user.employeeId);
+        if (linkedEmployee) return [linkedEmployee, ...availableEmployees];
+    }
+    return availableEmployees;
+  }, [isEditing, user, employees, availableEmployees]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -175,13 +183,13 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                             <SelectValue placeholder="اختر موظفًا غير مرتبط بحساب..." />
                         </SelectTrigger>
                         <SelectContent>
-                            {availableEmployees.map(emp => (
+                            {currentEmployeeSelection.map(emp => (
                                 <SelectItem key={emp.id} value={emp.id!}>
                                     <span className="font-medium">{emp.fullName}</span>
                                     <span className="text-muted-foreground text-xs ml-2">({emp.civilId})</span>
                                 </SelectItem>
                             ))}
-                            {availableEmployees.length === 0 && !isEditing && <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون متاحون لإنشاء حسابات.</p>}
+                            {currentEmployeeSelection.length === 0 && !isEditing && <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون متاحون لإنشاء حسابات.</p>}
                         </SelectContent>
                     </Select>
                 </div>
