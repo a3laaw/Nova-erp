@@ -5,7 +5,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
   
     // --- Helper Functions ---
-    // NOTE: These are temporarily bypassed by allowing all reads/writes.
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -19,15 +18,35 @@ service cloud.firestore {
     }
     
     function isHR() {
-      return isAuthenticated() && getUserdData().role == 'HR';
+      return isAuthenticated() && getUserData().role == 'HR';
     }
 
     // --- Path Rules ---
-    // WARNING: Rules are temporarily open for development with mock auth.
-    // Re-secure before production.
 
+    match /users/{userId} {
+      // Admins can read/write all user profiles.
+      // Users can only read/update their own profile.
+      allow read, write: if isAdmin();
+      allow read, update: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /employees/{employeeId} {
+      // Admins and HR can manage all employee records.
+      // Employees can read their own record.
+      allow read, write: if isAdmin() || isHR();
+      allow read: if isAuthenticated() && getUserData().employeeId == employeeId;
+    }
+
+    match /clients/{clientId} {
+      // Admins and Secretaries can manage clients.
+      // Engineers can read client data.
+      allow read, write: if isAdmin() || (isAuthenticated() && getUserData().role == 'Secretary');
+      allow read: if isAuthenticated() && getUserData().role == 'Engineer';
+    }
+
+    // Default deny all other paths
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
