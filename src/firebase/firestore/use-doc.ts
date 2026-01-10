@@ -18,7 +18,7 @@ export function useDoc(path: string | undefined, options?: UseDocumentOptions) {
       return undefined;
     }
     return doc(firestore, path) as DocumentReference<DocumentData, DocumentData>;
-  }, [firestore, path]);
+  }, [firestore, path]); // <-- This was the missing dependency
   
   const [snapshot, loading, error] = useFirebaseHooksDocument(docRef, { ...options, firestore });
 
