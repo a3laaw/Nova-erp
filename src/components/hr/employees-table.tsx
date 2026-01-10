@@ -167,6 +167,8 @@ export function EmployeesTable() {
                 title: 'نجاح',
                 description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.`
             });
+            setEmployeeToTerminate(null);
+            setTerminationReason('');
             
         } catch (err) {
             console.error(err);
@@ -177,9 +179,6 @@ export function EmployeesTable() {
             });
         } finally {
             setIsTerminating(false);
-            setEmployeeToTerminate(null);
-            setNoticeStartDate(new Date().toISOString().split('T')[0]);
-            setTerminationReason('');
         }
     };
     
@@ -216,6 +215,7 @@ export function EmployeesTable() {
                 title: 'نجاح',
                 description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.`
             });
+            setEmployeeToRehire(null);
         } catch (err) {
             console.error(err);
              toast({
@@ -225,7 +225,6 @@ export function EmployeesTable() {
             });
         } finally {
             setIsRehiring(false);
-            setEmployeeToRehire(null);
         }
     };
 
@@ -383,7 +382,7 @@ export function EmployeesTable() {
                         </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setEmployeeToTerminate(null)} disabled={isTerminating}>إلغاء</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating} className='bg-destructive hover:bg-destructive/90'>
                             {isTerminating ? 'جاري الحفظ...' : 'تأكيد إنهاء الخدمة'}
                         </AlertDialogAction>
@@ -431,7 +430,7 @@ export function EmployeesTable() {
                         </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setEmployeeToRehire(null)} disabled={isRehiring}>إلغاء</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isRehiring}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
                             {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
                         </AlertDialogAction>
