@@ -1,7 +1,6 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc } from 'firebase/firestore';
 import { useDoc } from '@/firebase';
 import type { Employee } from '@/lib/types';
 import {
@@ -63,7 +62,8 @@ export default function EmployeeProfilePage() {
   const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  const [snapshot, loading, error] = useDoc(id ? `employees/${id}` : undefined);
+  const docPath = useMemo(() => (id ? `employees/${id}` : undefined), [id]);
+  const [snapshot, loading, error] = useDoc(docPath);
 
   const employee = snapshot?.data() as Employee | undefined;
 
