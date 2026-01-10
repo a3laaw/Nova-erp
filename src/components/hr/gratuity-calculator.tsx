@@ -32,6 +32,7 @@ type TerminationReason = 'resignation' | 'termination';
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     if (!employee || !employee.hireDate) return 0;
     const hireDate = new Date(employee.hireDate);
+    // Use a client-side safe date
     const today = new Date();
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
@@ -53,7 +54,7 @@ export function GratuityCalculator() {
   const { firestore } = useFirebase();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
-  const [terminationDate, setTerminationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [terminationDate, setTerminationDate] = useState<string>('');
   const [terminationReason, setTerminationReason] = useState<TerminationReason | null>(null);
   const [isClient, setIsClient] = useState(false);
 
@@ -63,6 +64,7 @@ export function GratuityCalculator() {
 
   useEffect(() => {
     setIsClient(true);
+    setTerminationDate(new Date().toISOString().split('T')[0]);
     if (value) {
         setEmployees(value.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
     }
@@ -112,6 +114,10 @@ export function GratuityCalculator() {
 
     return { yearsOfService, basicSalary, gratuity, leaveBalance, leavePayout, totalPayout, error: null };
   }, [selectedEmployee, terminationDate, terminationReason]);
+  
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <Card dir="rtl">
@@ -163,7 +169,7 @@ export function GratuityCalculator() {
           </div>
         </div>
 
-        {isClient && calculationResult && !calculationResult.error && selectedEmployee && (
+        {calculationResult && !calculationResult.error && selectedEmployee && (
           <Alert>
              <Landmark className="h-4 w-4" />
             <AlertTitle>ملخص الحساب (وفقاً للمادة 64 من قانون العمل الكويتي)</AlertTitle>
