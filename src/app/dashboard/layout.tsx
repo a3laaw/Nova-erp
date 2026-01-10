@@ -1,75 +1,43 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React from 'react';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
-import { useAuth } from '@/context/auth-context';
-import { Skeleton } from '@/components/ui/skeleton';
+import type { AuthenticatedUser } from '@/context/auth-context';
+
+// Mock user with Admin role to ensure all features are accessible
+const mockUser: AuthenticatedUser = {
+  uid: 'mock-admin-uid',
+  username: 'admin.user',
+  email: 'admin@bmec-kw.local',
+  role: 'Admin',
+  isActive: true,
+  employeeId: 'emp-admin',
+  fullName: 'المدير العام',
+  avatarUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080'
+};
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading, logout } = useAuth();
-  const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/');
-    }
-  }, [user, loading, router]);
-
-  if (loading || !user) {
-    return (
-       <div className="flex min-h-screen">
-          <div className='p-2 hidden md:block border-r' style={{width: '16rem'}}>
-            <div className='flex flex-col h-full'>
-              <div className='p-2 flex flex-col gap-2'>
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className='p-2 flex-1'>
-                <div className='flex flex-col gap-1'>
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              </div>
-              <div className='p-2'>
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-12 w-full mt-2" />
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col w-full">
-            <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-                <Skeleton className="h-7 w-7 md:hidden" />
-                <Skeleton className="h-6 w-32" />
-                <div className='ml-auto flex items-center gap-2'>
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                </div>
-            </header>
-            <main className="flex-1 p-4 md:p-6 lg:p-8">
-               <Skeleton className="h-full w-full" />
-            </main>
-          </div>
-        </div>
-    );
-  }
-
+  const handleLogout = () => {
+    // In a real app, this would clear session, etc.
+    // For now, it does nothing as there is no login.
+    console.log("Logout action triggered.");
+  };
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
         <Sidebar>
-          <MainNav currentUser={user} onLogout={logout} />
+          <MainNav currentUser={mockUser} onLogout={handleLogout} />
         </Sidebar>
         <div className="flex flex-col w-full">
-          <Header currentUser={user} onLogout={logout} />
+          <Header currentUser={mockUser} onLogout={handleLogout} />
           <SidebarInset>
             <main className="flex-1 p-4 md:p-6 lg:p-8">
               {children}

@@ -8,15 +8,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { UsersTable } from '@/components/settings/users-table';
-import { useAuth } from '@/context/auth-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Lock } from 'lucide-react';
-
 
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const currentUserRole = user?.role;
-
+  // Since authentication is removed, we assume an Admin is viewing this page.
+  // The UsersTable component can be displayed directly.
   return (
     <Card dir="rtl">
       <CardHeader>
@@ -26,19 +21,8 @@ export default function SettingsPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {currentUserRole === 'Admin' ? (
-            <UsersTable />
-        ) : (
-            <Alert variant="destructive">
-                <Lock className="h-4 w-4" />
-                <AlertTitle>الوصول مرفوض</AlertTitle>
-                <AlertDescription>
-                    هذه الصفحة متاحة للمدراء (Admin) فقط. لا تملك الصلاحية اللازمة لعرض أو إدارة المستخدمين.
-                </AlertDescription>
-            </Alert>
-        )}
+        <UsersTable />
       </CardContent>
     </Card>
   );
 }
-
