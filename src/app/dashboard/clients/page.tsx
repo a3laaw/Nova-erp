@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -60,8 +60,10 @@ export default function ClientsPage() {
   const { firestore } = useFirebase();
   const [clients, setClients] = useState<Client[]>([]);
 
-  const clientsCollection = firestore ? collection(firestore, 'clients') : null;
-  const clientsQuery = clientsCollection ? query(clientsCollection, orderBy('createdAt', 'desc')) : null;
+  const clientsQuery = useMemo(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'clients'), orderBy('createdAt', 'desc'));
+  }, [firestore]);
 
   const [value, loading, error] = useCollection(clientsQuery);
 

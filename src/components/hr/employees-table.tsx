@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Table,
@@ -93,8 +93,10 @@ export function EmployeesTable() {
     const [newHireDate, setNewHireDate] = useState(new Date().toISOString().split('T')[0]);
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
 
-    const employeesCollection = firestore ? collection(firestore, 'employees') : null;
-    const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('createdAt', 'desc')) : null;
+    const employeesQuery = useMemo(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'employees'), orderBy('createdAt', 'desc'));
+    }, [firestore]);
 
     const [value, loading, error] = useCollection(employeesQuery);
 
@@ -167,8 +169,6 @@ export function EmployeesTable() {
                 title: 'نجاح',
                 description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.`
             });
-            setEmployeeToTerminate(null);
-            setTerminationReason('');
             
         } catch (err) {
             console.error(err);
@@ -179,6 +179,8 @@ export function EmployeesTable() {
             });
         } finally {
             setIsTerminating(false);
+            setEmployeeToTerminate(null);
+            setTerminationReason('');
         }
     };
     
@@ -215,7 +217,6 @@ export function EmployeesTable() {
                 title: 'نجاح',
                 description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.`
             });
-            setEmployeeToRehire(null);
         } catch (err) {
             console.error(err);
              toast({
@@ -225,6 +226,7 @@ export function EmployeesTable() {
             });
         } finally {
             setIsRehiring(false);
+            setEmployeeToRehire(null);
         }
     };
 
