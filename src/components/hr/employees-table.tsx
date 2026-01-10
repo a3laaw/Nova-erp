@@ -40,6 +40,8 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { addMonths, format } from 'date-fns';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Checkbox } from '../ui/checkbox';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -85,6 +87,9 @@ export function EmployeesTable() {
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
 
     const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
+    const [rehireType, setRehireType] = useState<'continue' | 'new'>('continue');
+    const [newHireDate, setNewHireDate] = useState(new Date().toISOString().split('T')[0]);
+    const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
 
     const employeesCollection = firestore ? collection(firestore, 'employees') : null;
     const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('createdAt', 'desc')) : null;
@@ -126,6 +131,9 @@ export function EmployeesTable() {
     };
     
     const handleRehireClick = (employee: Employee) => {
+        setRehireType('continue');
+        setResetLeaveBalance(false);
+        setNewHireDate(new Date().toISOString().split('T')[0]);
         setEmployeeToRehire(employee);
     };
 
@@ -173,13 +181,29 @@ export function EmployeesTable() {
 
         const employeeRef = doc(firestore, 'employees', employeeToRehire.id);
         
+        const updateData: DocumentData = {
+            status: 'active',
+            noticeStartDate: null,
+            terminationDate: null,
+            terminationReason: null,
+        };
+
+        if (rehireType === 'new') {
+            updateData.hireDate = new Date(newHireDate).toISOString();
+        }
+
+        if (resetLeaveBalance) {
+            updateData.annualLeaveAccrued = 0;
+            updateData.annualLeaveUsed = 0;
+            updateData.carriedLeaveDays = 0;
+            updateData.sickLeaveUsed = 0;
+            updateData.emergencyLeaveUsed = 0;
+            updateData.lastLeaveResetDate = new Date(newHireDate).toISOString();
+            updateData.lastVacationAccrualDate = new Date(newHireDate).toISOString();
+        }
+
         try {
-            await updateDoc(employeeRef, {
-                status: 'active',
-                noticeStartDate: null,
-                terminationDate: null,
-                terminationReason: null,
-            });
+            await updateDoc(employeeRef, updateData);
              toast({
                 title: 'نجاح',
                 description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.`
@@ -359,11 +383,43 @@ export function EmployeesTable() {
             <AlertDialog open={!!employeeToRehire} onOpenChange={(open) => !open && setEmployeeToRehire(null)}>
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>إعادة خدمة الموظف</AlertDialogTitle>
+                        <AlertDialogTitle>إعادة خدمة الموظف: {employeeToRehire?.fullName}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            هل أنت متأكد من رغبتك في إعادة خدمة الموظف "{employeeToRehire?.fullName}"؟ سيتم تفعيل الموظف مرة أخرى.
+                            اختر الخيارات المناسبة لإعادة خدمة الموظف.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid gap-2">
+                            <Label>نوع إعادة الخدمة</Label>
+                            <RadioGroup value={rehireType} onValueChange={(v) => setRehireType(v as any)} className='flex gap-4'>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="continue" id="continue" />
+                                    <Label htmlFor="continue">استمرار الخدمة السابقة</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="new" id="new" />
+                                    <Label htmlFor="new">اعتباره تعيين جديد</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+
+                        {rehireType === 'new' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="newHireDate">تاريخ التعيين الجديد</Label>
+                                <Input
+                                    id="newHireDate"
+                                    type="date"
+                                    value={newHireDate}
+                                    onChange={(e) => setNewHireDate(e.target.value)}
+                                />
+                            </div>
+                        )}
+                        
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="resetLeave" checked={resetLeaveBalance} onCheckedChange={(checked) => setResetLeaveBalance(checked as boolean)} />
+                            <Label htmlFor="resetLeave">تصفير رصيد الإجازات السابق</Label>
+                        </div>
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel onClick={() => setEmployeeToRehire(null)}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleRehireConfirm} className='bg-green-600 hover:bg-green-700'>
