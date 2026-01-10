@@ -82,6 +82,8 @@ export function EmployeesTable() {
     const [terminationDate, setTerminationDate] = useState(new Date().toISOString().split('T')[0]);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
 
+    const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
+
 
     const employeesCollection = firestore ? collection(firestore, 'employees') : null;
     const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('createdAt', 'desc')) : null;
@@ -103,6 +105,10 @@ export function EmployeesTable() {
 
     const handleTerminateClick = (employee: Employee) => {
         setEmployeeToTerminate(employee);
+    };
+    
+    const handleRehireClick = (employee: Employee) => {
+        setEmployeeToRehire(employee);
     };
 
     const handleTerminationConfirm = async () => {
@@ -139,6 +145,33 @@ export function EmployeesTable() {
                 variant: 'destructive',
                 title: 'خطأ في الحفظ',
                 description: 'لم يتم إنهاء خدمة الموظف. الرجاء المحاولة مرة أخرى.'
+            });
+        }
+    };
+    
+    const handleRehireConfirm = async () => {
+        if (!employeeToRehire || !firestore) return;
+
+        const employeeRef = doc(firestore, 'employees', employeeToRehire.id);
+        
+        try {
+            await updateDoc(employeeRef, {
+                status: 'active',
+                terminationDate: null,
+                terminationReason: null,
+                // Consider if hireDate should be updated or if a new 'rehireDate' field is needed
+            });
+             toast({
+                title: 'نجاح',
+                description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.`
+            });
+            setEmployeeToRehire(null);
+        } catch (err) {
+            console.error(err);
+             toast({
+                variant: 'destructive',
+                title: 'خطأ في الحفظ',
+                description: 'لم تتم إعادة خدمة الموظف. الرجاء المحاولة مرة أخرى.'
             });
         }
     };
@@ -242,7 +275,9 @@ export function EmployeesTable() {
                                         إنهاء الخدمة
                                     </DropdownMenuItem>
                                 ) : (
-                                    <DropdownMenuItem disabled>تم إنهاء الخدمة</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
+                                        إعادة خدمة
+                                    </DropdownMenuItem>
                                 )}
                             </DropdownMenuContent>
                             </DropdownMenu>
@@ -287,6 +322,22 @@ export function EmployeesTable() {
                         <AlertDialogCancel onClick={() => setEmployeeToTerminate(null)}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleTerminationConfirm} className='bg-destructive hover:bg-destructive/90'>
                             تأكيد إنهاء الخدمة
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={!!employeeToRehire} onOpenChange={(open) => !open && setEmployeeToRehire(null)}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>إعادة خدمة الموظف</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            هل أنت متأكد من رغبتك في إعادة خدمة الموظف "{employeeToRehire?.fullName}"؟ سيتم تفعيل الموظف مرة أخرى.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setEmployeeToRehire(null)}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRehireConfirm} className='bg-green-600 hover:bg-green-700'>
+                            تأكيد إعادة الخدمة
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
