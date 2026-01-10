@@ -162,6 +162,26 @@
         "basicSalary",
         "status"
       ]
+    },
+    "LeaveRequest": {
+        "title": "Leave Request",
+        "description": "Represents a leave request submitted by an employee.",
+        "type": "object",
+        "properties": {
+            "employeeId": { "type": "string", "description": "ID of the employee requesting leave." },
+            "employeeName": { "type": "string", "description": "Full name of the employee." },
+            "leaveType": { "type": "string", "enum": ["Annual", "Sick", "Emergency", "Unpaid"] },
+            "startDate": { "type": "string", "format": "date-time" },
+            "endDate": { "type": "string", "format": "date-time" },
+            "days": { "type": "number", "description": "Total number of leave days." },
+            "notes": { "type": "string", "description": "Reason or notes for the leave." },
+            "attachmentUrl": { "type": "string", "format": "uri", "description": "URL to a medical report or other document." },
+            "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The current status of the leave request." },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "approvedBy": { "type": "string", "description": "UID of the user who approved/rejected the request." },
+            "approvedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
     }
   },
   "auth": {
@@ -185,6 +205,10 @@
     "/employees/{employeeId}": {
         "schema": { "$ref": "#/entities/Employee" },
         "description": "Stores HR information about company employees."
+    },
+    "/leaveRequests/{leaveRequestId}": {
+        "schema": { "$ref": "#/entities/LeaveRequest" },
+        "description": "Stores all employee leave requests."
     }
   }
 }

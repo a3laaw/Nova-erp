@@ -23,21 +23,21 @@ import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Upload } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import type { Employee } from '@/lib/types';
-
+import { useToast } from '@/hooks/use-toast';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (request: any) => void;
 }
 
-type LeaveType = 'سنوية' | 'مرضية' | 'طارئة';
+type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
 
-export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormProps) {
+export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const [employees, setEmployees] = useState<Employee[]>([]);
     
     const employeesQuery = useMemo(() => {
@@ -53,19 +53,72 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
         }
     }, [value]);
 
-
     const [employeeId, setEmployeeId] = useState('');
     const [leaveType, setLeaveType] = useState<LeaveType | ''>('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [notes, setNotes] = useState('');
     const [file, setFile] = useState<File | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const resetForm = () => {
+        setEmployeeId('');
+        setLeaveType('');
+        setStartDate('');
+        setEndDate('');
+        setNotes('');
+        setFile(null);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Add validation logic here
-        onSave({ employeeId, leaveType, startDate, endDate, notes });
-        onClose();
+        if (!firestore) return;
+        
+        const days = startDate && endDate ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 3600 * 24)) + 1 : 0;
+        
+        // --- Validation ---
+        if (!employeeId || !leaveType || !startDate || !endDate) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
+            return;
+        }
+        if (days <= 0) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.' });
+            return;
+        }
+        if (leaveType === 'Sick' && !file) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إرفاق التقرير الطبي للإجازة المرضية.' });
+            return;
+        }
+        
+        setIsSaving(true);
+        try {
+            const selectedEmployee = employees.find(emp => emp.id === employeeId);
+            
+            // In a real app, you would upload the file to Firebase Storage first and get the URL
+            // For now, we will skip this step.
+            
+            await addDoc(collection(firestore, 'leaveRequests'), {
+                employeeId: employeeId,
+                employeeName: selectedEmployee?.fullName || 'N/A',
+                leaveType: leaveType,
+                startDate: new Date(startDate).toISOString(),
+                endDate: new Date(endDate).toISOString(),
+                days: days,
+                notes: notes,
+                attachmentUrl: null, // Placeholder for file URL
+                status: 'pending',
+                createdAt: serverTimestamp(),
+            });
+
+            toast({ title: 'نجاح', description: 'تم تقديم طلب الإجازة بنجاح.' });
+            resetForm();
+            onClose();
+        } catch (err) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تقديم الطلب. الرجاء المحاولة مرة أخرى.' });
+        } finally {
+            setIsSaving(false);
+        }
     }
     
     const days = startDate && endDate ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 3600 * 24)) + 1 : 0;
@@ -82,50 +135,52 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                    <Label htmlFor="employee">الموظف</Label>
-                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId}>
+                    <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
+                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} required>
                         <SelectTrigger id="employee" disabled={loading}>
                             <SelectValue placeholder={loading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
-                            {!loading && employees.length === 0 && (
+                            {!loading && employees.length === 0 ? (
                                 <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون نشطون حالياً.</p>
+                            ) : (
+                                employees.map(emp => (
+                                    <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
+                                ))
                             )}
-                            {employees.map(emp => (
-                                <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
-                            ))}
                         </SelectContent>
                     </Select>
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="leaveType">نوع الإجازة</Label>
-                    <Select dir="rtl" value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)}>
+                    <Label htmlFor="leaveType">نوع الإجازة <span className="text-destructive">*</span></Label>
+                    <Select dir="rtl" value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)} required>
                         <SelectTrigger id="leaveType">
                             <SelectValue placeholder="اختر نوع الإجازة..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="سنوية">سنوية</SelectItem>
-                            <SelectItem value="مرضية">مرضية</SelectItem>
-                            <SelectItem value="طارئة">طارئة</SelectItem>
+                            <SelectItem value="Annual">سنوية</SelectItem>
+                            <SelectItem value="Sick">مرضية</SelectItem>
+                            <SelectItem value="Emergency">طارئة</SelectItem>
+                            <SelectItem value="Unpaid">بدون راتب</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="startDate">من تاريخ</Label>
-                        <Input id="startDate" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                        <Label htmlFor="startDate">من تاريخ <span className="text-destructive">*</span></Label>
+                        <Input id="startDate" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="endDate">إلى تاريخ</Label>
-                        <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                        <Label htmlFor="endDate">إلى تاريخ <span className="text-destructive">*</span></Label>
+                        <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
                     </div>
                 </div>
                  {days > 0 && <Alert variant="default" className='bg-muted/50'><AlertDescription>مجموع الأيام: {days} يوم</AlertDescription></Alert>}
                 <div className="grid gap-2">
                     <Label htmlFor="notes">ملاحظات</Label>
-                    <Textarea id="notes" placeholder={leaveType === 'طارئة' ? 'سبب الإجازة الطارئة (إلزامي)' : 'أدخل ملاحظاتك هنا...'} value={notes} onChange={e => setNotes(e.target.value)} />
+                    <Textarea id="notes" placeholder={leaveType === 'Emergency' ? 'سبب الإجازة الطارئة (إلزامي)' : 'أدخل ملاحظاتك هنا...'} value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
-                {leaveType === 'مرضية' && (
+                {leaveType === 'Sick' && (
                     <div className="grid gap-2">
                         <Label htmlFor="file-upload">تقرير طبي (إلزامي)</Label>
                         <div className="flex items-center gap-2">
@@ -141,11 +196,14 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
                 )}
             </div>
             <DialogFooter>
-                <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-                <Button type="submit">تقديم الطلب</Button>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'جاري الحفظ...' : 'تقديم الطلب'}
+                </Button>
             </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
+ 
