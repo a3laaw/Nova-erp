@@ -26,15 +26,18 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   if (process.env.NODE_ENV === 'development') {
     if (process.env.NEXT_PUBLIC_EMULATOR_HOST) {
         try {
-            // Check if emulators are already connected
-            if (!(auth as any).emulatorConfig) {
+            // Check if emulators are already connected to prevent errors on hot-reloads
+            const authEmulatorConnected = (auth as any).emulatorConfig;
+            if (!authEmulatorConnected) {
                 connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST}:9099`, { disableWarnings: true });
             }
-            if (!(firestore as any)._settings.host) {
+            
+            const firestoreEmulatorConnected = (firestore as any)._settings.host.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST);
+            if (!firestoreEmulatorConnected) {
                  connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST, 8080);
             }
         } catch (e) {
-            // console.error('Error connecting to Firebase emulators:', e);
+            // Errors can happen on hot-reloads, we can safely ignore them.
         }
     }
   }
