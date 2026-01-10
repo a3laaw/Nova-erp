@@ -26,66 +26,7 @@ import {
 
 
 // Mock data for now, will be replaced with Firestore data
-export const initialEmployees: Employee[] = [
-    { 
-        id: 'emp-1',
-        fullName: 'علياء العامري',
-        civilId: '123456789012',
-        mobile: '0501112222',
-        hireDate: '2022-08-15T00:00:00.000Z',
-        contractType: 'permanent',
-        department: 'هندسة',
-        basicSalary: 1200,
-        housingAllowance: 400,
-        transportAllowance: 100,
-        status: 'active',
-        terminationDate: null,
-        terminationReason: null,
-        lastVacationAccrualDate: new Date().toISOString(),
-        annualLeaveAccrued: 30,
-        annualLeaveUsed: 10,
-        carriedLeaveDays: 5,
-    },
-    { 
-        id: 'emp-2',
-        fullName: 'خالد المصري',
-        civilId: '987654321098',
-        mobile: '0553334444',
-        hireDate: '2023-01-20T00:00:00.000Z',
-        contractType: 'permanent',
-        department: 'محاسبة',
-        basicSalary: 950,
-        housingAllowance: 300,
-        transportAllowance: 100,
-        status: 'active',
-        terminationDate: null,
-        terminationReason: null,
-        lastVacationAccrualDate: new Date().toISOString(),
-        annualLeaveAccrued: 30,
-        annualLeaveUsed: 5,
-        carriedLeaveDays: 0,
-    },
-    { 
-        id: 'emp-3',
-        fullName: 'سارة عبدالله',
-        civilId: '112233445566',
-        mobile: '0567778888',
-        // Hired less than a year ago
-        hireDate: new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString(),
-        contractType: 'permanent',
-        department: 'سكرتارية',
-        basicSalary: 700,
-        housingAllowance: 0,
-        transportAllowance: 50,
-        status: 'active',
-        terminationDate: null,
-        terminationReason: null,
-        lastVacationAccrualDate: new Date().toISOString(),
-        annualLeaveAccrued: 0,
-        annualLeaveUsed: 0,
-        carriedLeaveDays: 0,
-    }
-];
+export const initialEmployees: Employee[] = [];
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -210,6 +151,13 @@ export function EmployeesTable() {
                         </TableCell>
                         </TableRow>
                     ))}
+                    {!employees || employees.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                                لا يوجد موظفون حالياً. قم بإضافة موظف جديد.
+                            </TableCell>
+                        </TableRow>
+                    )}
                 </TableBody>
                 </Table>
             </div>
