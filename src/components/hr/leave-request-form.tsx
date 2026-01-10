@@ -89,7 +89,6 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
                             {employees.map(emp => (
                                 <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
                             ))}
-                            {error && <p className='text-xs text-destructive p-2'>فشل جلب الموظفين</p>}
                         </SelectContent>
                     </Select>
                 </div>
