@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,8 +40,10 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
     const { firestore } = useFirebase();
     const [employees, setEmployees] = useState<Employee[]>([]);
     
-    const employeesCollection = firestore ? collection(firestore, 'employees') : null;
-    const employeesQuery = employeesCollection ? query(employeesCollection, where('status', '==', 'active'), orderBy('fullName')) : null;
+    const employeesQuery = useMemo(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
+    }, [firestore]);
 
     const [value, loading, error] = useCollection(employeesQuery);
 
@@ -86,6 +88,9 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
                             <SelectValue placeholder={loading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
+                            {!loading && employees.length === 0 && (
+                                <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون نشطون حالياً.</p>
+                            )}
                             {employees.map(emp => (
                                 <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
                             ))}
