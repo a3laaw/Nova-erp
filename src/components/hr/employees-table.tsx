@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { addMonths, format } from 'date-fns';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -79,11 +80,11 @@ export function EmployeesTable() {
     const [employees, setEmployees] = useState<(Employee & { leaveBalance: number | null })[]>([]);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
-    const [terminationDate, setTerminationDate] = useState(new Date().toISOString().split('T')[0]);
+    const [noticeStartDate, setNoticeStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [terminationDate, setTerminationDate] = useState('');
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
 
     const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
-
 
     const employeesCollection = firestore ? collection(firestore, 'employees') : null;
     const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('createdAt', 'desc')) : null;
@@ -103,7 +104,16 @@ export function EmployeesTable() {
         }
     }, [value]);
 
+    useEffect(() => {
+        if (noticeStartDate) {
+            const noticeDate = new Date(noticeStartDate);
+            const termDate = addMonths(noticeDate, 3);
+            setTerminationDate(format(termDate, 'yyyy-MM-dd'));
+        }
+    }, [noticeStartDate]);
+
     const handleTerminateClick = (employee: Employee) => {
+        setNoticeStartDate(new Date().toISOString().split('T')[0]);
         setEmployeeToTerminate(employee);
     };
     
@@ -112,11 +122,11 @@ export function EmployeesTable() {
     };
 
     const handleTerminationConfirm = async () => {
-        if (!employeeToTerminate || !firestore || !terminationReason || !terminationDate) {
+        if (!employeeToTerminate || !firestore || !terminationReason || !noticeStartDate) {
             toast({
                 variant: 'destructive',
                 title: 'خطأ',
-                description: 'الرجاء تعبئة تاريخ وسبب إنهاء الخدمة.'
+                description: 'الرجاء تعبئة تاريخ بدء الإنذار وسبب إنهاء الخدمة.'
             });
             return;
         }
@@ -126,6 +136,7 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'terminated',
+                noticeStartDate: new Date(noticeStartDate).toISOString(),
                 terminationDate: new Date(terminationDate).toISOString(),
                 terminationReason: terminationReason
             });
@@ -136,7 +147,7 @@ export function EmployeesTable() {
             });
             
             setEmployeeToTerminate(null); // Close the dialog
-            setTerminationDate(new Date().toISOString().split('T')[0]);
+            setNoticeStartDate(new Date().toISOString().split('T')[0]);
             setTerminationReason('');
             // The table will re-render automatically due to the listener
         } catch (err) {
@@ -157,9 +168,9 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'active',
+                noticeStartDate: null,
                 terminationDate: null,
                 terminationReason: null,
-                // Consider if hireDate should be updated or if a new 'rehireDate' field is needed
             });
              toast({
                 title: 'نجاح',
@@ -292,19 +303,10 @@ export function EmployeesTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
-                            هل أنت متأكد من رغبتك في إنهاء خدمة الموظف "{employeeToTerminate?.fullName}"؟ هذا الإجراء لا يمكن التراجع عنه.
+                            أدخل تاريخ بدء فترة الإنذار. سيتم حساب تاريخ انتهاء الخدمة الفعلي تلقائيًا بعد 3 أشهر.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-4 py-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="terminationDate">تاريخ إنهاء الخدمة</Label>
-                            <Input
-                                id="terminationDate"
-                                type="date"
-                                value={terminationDate}
-                                onChange={(e) => setTerminationDate(e.target.value)}
-                            />
-                        </div>
                         <div className="grid gap-2">
                              <Label htmlFor="terminationReason">سبب إنهاء الخدمة</Label>
                              <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v as any)}>
@@ -316,6 +318,26 @@ export function EmployeesTable() {
                                     <SelectItem value="termination">إنهاء من صاحب العمل</SelectItem>
                                 </SelectContent>
                             </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="noticeStartDate">تاريخ تقديم الاستقالة / بدء الإنذار</Label>
+                            <Input
+                                id="noticeStartDate"
+                                type="date"
+                                value={noticeStartDate}
+                                onChange={(e) => setNoticeStartDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="terminationDate">تاريخ إنهاء الخدمة الفعلي (بعد 3 أشهر)</Label>
+                            <Input
+                                id="terminationDate"
+                                type="date"
+                                value={terminationDate}
+                                readOnly
+                                disabled
+                                className="bg-muted"
+                            />
                         </div>
                     </div>
                     <AlertDialogFooter>

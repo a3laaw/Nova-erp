@@ -173,9 +173,10 @@ export type Employee = {
     salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
     bankName?: string;
     accountNumber?: string;
-iban?: string;
+    iban?: string;
     profilePicture?: string;
     hireDate: string; // ISO String
+    noticeStartDate: string | null; // Date when notice is given
     terminationDate: string | null;
     terminationReason: 'resignation' | 'termination' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor';
