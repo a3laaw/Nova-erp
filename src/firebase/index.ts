@@ -32,7 +32,7 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
                 connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST}:9099`, { disableWarnings: true });
             }
             
-            const firestoreEmulatorConnected = (firestore as any)._settings.host.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST);
+            const firestoreEmulatorConnected = (firestore as any)._settings?.host?.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST);
             if (!firestoreEmulatorConnected) {
                  connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST, 8080);
             }
