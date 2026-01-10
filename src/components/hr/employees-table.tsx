@@ -1,5 +1,3 @@
-
-
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -23,10 +21,10 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-
-
-// Mock data for now, will be replaced with Firestore data
-export const initialEmployees: Employee[] = [];
+import { useFirebase } from '@/firebase';
+import { collection, query, orderBy, type DocumentData } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -41,6 +39,7 @@ const statusColors: Record<Employee['status'], string> = {
 };
 
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
+    if (!employee.hireDate) return 0;
     const hireDate = new Date(employee.hireDate);
     // Use a client-side safe date
     const today = new Date();
@@ -57,26 +56,30 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     // Max carry-over is 15 days, total balance cannot exceed 45 (30 current + 15 carried).
     const totalBalance = accrued + Math.min(carried, 15) - used;
     
-    return Math.max(0, Math.min(45, totalBalance));
+    return Math.max(0, Math.min(45, Math.floor(totalBalance)));
 };
 
 export function EmployeesTable() {
-    const [employees, setEmployees] = useState(initialEmployees.map(e => ({...e, leaveBalance: null as number | null })));
-    const [isClient, setIsClient] = useState(false);
+    const { firestore } = useFirebase();
+    const [employees, setEmployees] = useState<(Employee & { leaveBalance: number | null })[]>([]);
+
+    const employeesCollection = firestore ? collection(firestore, 'employees') : null;
+    const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('createdAt', 'desc')) : null;
+
+    const [value, loading, error] = useCollection(employeesQuery);
 
     useEffect(() => {
-        // This ensures the component has mounted on the client
-        setIsClient(true);
-    }, []);
-
-    useEffect(() => {
-        if (isClient) {
-            setEmployees(initialEmployees.map(e => ({
-                ...e,
-                leaveBalance: calculateAnnualLeaveBalance(e)
-            })));
+        if (value) {
+            const employeesData = value.docs.map(doc => {
+                const data = { id: doc.id, ...doc.data() } as Employee;
+                return {
+                    ...data,
+                    leaveBalance: calculateAnnualLeaveBalance(data)
+                }
+            });
+            setEmployees(employeesData);
         }
-    }, [isClient]);
+    }, [value]);
 
 
     return (
@@ -110,6 +113,29 @@ export function EmployeesTable() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
+                    {loading && (
+                        Array.from({ length: 3 }).map((_, i) => (
+                           <TableRow key={`skel-${i}`}>
+                                <TableCell colSpan={6}>
+                                    <Skeleton className="h-8 w-full" />
+                                </TableCell>
+                           </TableRow>
+                        ))
+                    )}
+                    {error && (
+                         <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center text-destructive">
+                                حدث خطأ أثناء جلب البيانات.
+                            </TableCell>
+                        </TableRow>
+                    )}
+                    {!loading && employees.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                                لا يوجد موظفون حالياً. قم بإضافة موظف جديد.
+                            </TableCell>
+                        </TableRow>
+                    )}
                     {employees.map((employee) => (
                         <TableRow key={employee.id}>
                         <TableCell className="font-medium">
@@ -117,9 +143,9 @@ export function EmployeesTable() {
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>
-                        <TableCell>{new Date(employee.hireDate).toLocaleDateString('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric' })}</TableCell>
+                        <TableCell>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</TableCell>
                         <TableCell className='font-medium'>
-                            {isClient && employee.leaveBalance !== null ? `${employee.leaveBalance} يوم` : '...'}
+                            {employee.leaveBalance !== null ? `${employee.leaveBalance} يوم` : '...'}
                         </TableCell>
                         <TableCell>
                             <Badge variant={'outline'} className={statusColors[employee.status]}>
@@ -151,13 +177,6 @@ export function EmployeesTable() {
                         </TableCell>
                         </TableRow>
                     ))}
-                    {!employees || employees.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">
-                                لا يوجد موظفون حالياً. قم بإضافة موظف جديد.
-                            </TableCell>
-                        </TableRow>
-                    )}
                 </TableBody>
                 </Table>
             </div>

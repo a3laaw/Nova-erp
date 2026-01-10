@@ -19,16 +19,18 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { initialEmployees } from './employees-table';
 import type { Employee } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { useFirebase } from '@/firebase';
+import { useCollection } from 'react-firebase-hooks/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 
 type TerminationReason = 'resignation' | 'termination';
 
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
-    if (!employee) return 0;
+    if (!employee || !employee.hireDate) return 0;
     const hireDate = new Date(employee.hireDate);
     const today = new Date();
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
@@ -43,23 +45,32 @@ const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
 
     const totalBalance = accrued + Math.min(carried, 15) - used;
     
-    return Math.min(45, totalBalance);
+    return Math.floor(Math.min(45, totalBalance));
 };
 
 
 export function GratuityCalculator() {
+  const { firestore } = useFirebase();
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [terminationDate, setTerminationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [terminationReason, setTerminationReason] = useState<TerminationReason | null>(null);
   const [isClient, setIsClient] = useState(false);
 
+  const employeesCollection = firestore ? collection(firestore, 'employees') : null;
+  const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('fullName')) : null;
+  const [value, loading, error] = useCollection(employeesQuery);
+
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    if (value) {
+        setEmployees(value.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+    }
+  }, [value]);
 
   const selectedEmployee = useMemo(() => {
-    return initialEmployees.find((emp) => emp.id === selectedEmployeeId) || null;
-  }, [selectedEmployeeId]);
+    return employees.find((emp) => emp.id === selectedEmployeeId) || null;
+  }, [selectedEmployeeId, employees]);
 
   const calculationResult = useMemo(() => {
     if (!selectedEmployee || !terminationDate || !terminationReason) {
@@ -115,15 +126,16 @@ export function GratuityCalculator() {
           <div className="space-y-2">
             <Label htmlFor="employee">اختر الموظف</Label>
             <Select onValueChange={setSelectedEmployeeId} dir="rtl">
-              <SelectTrigger id="employee">
-                <SelectValue placeholder="قائمة الموظفين..." />
+              <SelectTrigger id="employee" disabled={loading}>
+                <SelectValue placeholder={loading ? "جاري تحميل الموظفين..." : "قائمة الموظفين..."} />
               </SelectTrigger>
               <SelectContent>
-                {initialEmployees.map((emp) => (
+                {employees.map((emp) => (
                   <SelectItem key={emp.id} value={emp.id}>
                     {emp.fullName}
                   </SelectItem>
                 ))}
+                {error && <p className="p-2 text-xs text-destructive">فشل تحميل الموظفين</p>}
               </SelectContent>
             </Select>
           </div>
