@@ -41,7 +41,6 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
     const [employees, setEmployees] = useState<Employee[]>([]);
     
     const employeesCollection = firestore ? collection(firestore, 'employees') : null;
-    // Query for active employees only
     const employeesQuery = employeesCollection ? query(employeesCollection, where('status', '==', 'active'), orderBy('fullName')) : null;
 
     const [value, loading, error] = useCollection(employeesQuery);
