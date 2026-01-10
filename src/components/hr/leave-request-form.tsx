@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,11 @@ import {
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Upload } from 'lucide-react';
-import { initialEmployees } from './employees-table'; // Using mock employees for now
+import { useFirebase } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
+import type { Employee } from '@/lib/types';
+
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -33,6 +37,22 @@ interface LeaveRequestFormProps {
 type LeaveType = 'سنوية' | 'مرضية' | 'طارئة';
 
 export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormProps) {
+    const { firestore } = useFirebase();
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    
+    const employeesCollection = firestore ? collection(firestore, 'employees') : null;
+    // Query for active employees only
+    const employeesQuery = employeesCollection ? query(employeesCollection, where('status', '==', 'active'), orderBy('fullName')) : null;
+
+    const [value, loading, error] = useCollection(employeesQuery);
+
+    useEffect(() => {
+        if (value) {
+            setEmployees(value.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+        }
+    }, [value]);
+
+
     const [employeeId, setEmployeeId] = useState('');
     const [leaveType, setLeaveType] = useState<LeaveType | ''>('');
     const [startDate, setStartDate] = useState('');
@@ -63,13 +83,14 @@ export function LeaveRequestForm({ isOpen, onClose, onSave }: LeaveRequestFormPr
                 <div className="grid gap-2">
                     <Label htmlFor="employee">الموظف</Label>
                     <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId}>
-                        <SelectTrigger id="employee">
-                            <SelectValue placeholder="اختر الموظف..." />
+                        <SelectTrigger id="employee" disabled={loading}>
+                            <SelectValue placeholder={loading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
-                            {initialEmployees.map(emp => (
-                                <SelectItem key={emp.id} value={emp.id}>{emp.fullName}</SelectItem>
+                            {employees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
                             ))}
+                            {error && <p className='text-xs text-destructive p-2'>فشل جلب الموظفين</p>}
                         </SelectContent>
                     </Select>
                 </div>
