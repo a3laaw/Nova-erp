@@ -78,7 +78,22 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
 export function EmployeesTable() {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [employees, setEmployees] = useState<(Employee & { leaveBalance: number | null })[]>([]);
+
+    const employeesQuery = useMemo(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'employees'), orderBy('createdAt', 'desc'));
+    }, [firestore]);
+
+    const [snapshot, loading, error] = useCollection(employeesQuery);
+
+    const employees = useMemo(() => {
+        if (!snapshot) return [];
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            leaveBalance: calculateAnnualLeaveBalance(doc.data() as Employee)
+        } as Employee & { leaveBalance: number }));
+    }, [snapshot]);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
@@ -91,37 +106,6 @@ export function EmployeesTable() {
     const [rehireType, setRehireType] = useState<'continue' | 'new'>('continue');
     const [newHireDate, setNewHireDate] = useState(new Date().toISOString().split('T')[0]);
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
-
-    const employeesQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'employees'), orderBy('createdAt', 'desc'));
-    }, [firestore]);
-
-    const [value, loading, error] = useCollection(employeesQuery);
-
-     useEffect(() => {
-        if (value) {
-            const employeesData = value.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                leaveBalance: null // Initialize with null
-            } as Employee & { leaveBalance: null }));
-            setEmployees(employeesData);
-        }
-    }, [value]);
-
-    useEffect(() => {
-        // Calculate leave balance on the client side after the initial render
-        const timer = setTimeout(() => {
-            setEmployees(prevEmployees =>
-                prevEmployees.map(emp => ({
-                    ...emp,
-                    leaveBalance: calculateAnnualLeaveBalance(emp)
-                }))
-            );
-        }, 0);
-        return () => clearTimeout(timer);
-    }, [value]); // Rerun when firestore data changes
 
     useEffect(() => {
         if (noticeStartDate) {

@@ -78,13 +78,13 @@ export default function LeaveRequestsPage() {
         );
     }, [firestore, filter]);
 
-    const [value, loading, error] = useCollection(requestsQuery);
+    const [snapshot, loading, error] = useCollection(requestsQuery);
 
     useEffect(() => {
-        if (value) {
-            setRequests(value.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
+        if (snapshot) {
+            setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
         }
-    }, [value]);
+    }, [snapshot]);
 
     const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected') => {
         if (!firestore) return;

@@ -38,20 +38,18 @@ type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
 export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [employees, setEmployees] = useState<Employee[]>([]);
     
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
     }, [firestore]);
 
-    const [value, loading, error] = useCollection(employeesQuery);
+    const [snapshot, loading, error] = useCollection(employeesQuery);
 
-    useEffect(() => {
-        if (value) {
-            setEmployees(value.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
-        }
-    }, [value]);
+    const employees = useMemo(() => {
+        if (!snapshot) return [];
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+    }, [snapshot]);
 
     const [employeeId, setEmployeeId] = useState('');
     const [leaveType, setLeaveType] = useState<LeaveType | ''>('');
