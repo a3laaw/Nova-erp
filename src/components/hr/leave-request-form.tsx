@@ -27,6 +27,7 @@ import { collection, query, where, orderBy, addDoc, serverTimestamp } from 'fire
 import { useCollection } from 'react-firebase-hooks/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { differenceInCalendarDays } from 'date-fns';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -61,6 +62,16 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const [file, setFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
+    const days = useMemo(() => {
+        if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (start > end) return -1;
+            return differenceInCalendarDays(end, start) + 1;
+        }
+        return 0;
+    }, [startDate, endDate]);
+
     const resetForm = () => {
         setEmployeeId('');
         setLeaveType('');
@@ -73,8 +84,6 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!firestore) return;
-        
-        const days = startDate && endDate ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 3600 * 24)) + 1 : 0;
         
         // --- Validation ---
         if (!employeeId || !leaveType || !startDate || !endDate) {
@@ -120,8 +129,6 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             setIsSaving(false);
         }
     }
-    
-    const days = startDate && endDate ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 3600 * 24)) + 1 : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -141,6 +148,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                             <SelectValue placeholder={loading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
+                            {loading && <p className="p-2 text-xs text-muted-foreground">جاري تحميل الموظفين...</p>}
                             {!loading && employees.length === 0 ? (
                                 <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون نشطون حالياً.</p>
                             ) : (
@@ -148,6 +156,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                                     <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
                                 ))
                             )}
+                             {error && <p className="p-2 text-xs text-destructive">فشل تحميل الموظفين</p>}
                         </SelectContent>
                     </Select>
                 </div>
@@ -206,4 +215,3 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     </Dialog>
   );
 }
- 
