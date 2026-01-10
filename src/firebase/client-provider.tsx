@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useMemo } from 'react';
 import { FirebaseProvider } from './provider';
 import { initializeFirebase } from './index';
 import type { FirebaseApp } from 'firebase/app';
@@ -13,24 +13,25 @@ interface FirebaseServices {
   firestore: Firestore;
 }
 
+let firebaseServices: FirebaseServices | null = null;
+
 export function FirebaseClientProvider({ children }: { children: ReactNode }) {
-  const [firebaseServices, setFirebaseServices] = useState<FirebaseServices | null>(null);
+  const [services, setServices] = useState<FirebaseServices | null>(firebaseServices);
 
   useEffect(() => {
-    // This ensures that Firebase is initialized only on the client side
-    // and only once.
     if (!firebaseServices) {
-      setFirebaseServices(initializeFirebase());
+      firebaseServices = initializeFirebase();
+      setServices(firebaseServices);
     }
-  }, [firebaseServices]);
+  }, []);
 
-  if (!firebaseServices) {
+  if (!services) {
     // You can render a loading spinner here if needed
     return null;
   }
   
   return (
-    <FirebaseProvider value={firebaseServices}>
+    <FirebaseProvider value={services}>
       {children}
     </FirebaseProvider>
   );

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -57,21 +57,14 @@ const statusColors: Record<ClientStatus, string> = {
 export default function ClientsPage() {
   const { language } = useLanguage();
   const firestore = useFirestore();
-  const [clients, setClients] = useState<Client[]>([]);
 
   const clientsQuery = useMemo(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'clients'), orderBy('createdAt', 'desc'));
   }, [firestore]);
 
-  const [value, loading, error] = useCollection(clientsQuery);
-
-  useEffect(() => {
-    if (value) {
-      const clientsData = value.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-      setClients(clientsData);
-    }
-  }, [value]);
+  const [snapshot, loading, error] = useCollection(clientsQuery);
+  const clients = useMemo(() => snapshot?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)) || [], [snapshot]);
 
   const handleStatusChange = async (clientId: string, newStatus: ClientStatus) => {
     if (!firestore) return;
