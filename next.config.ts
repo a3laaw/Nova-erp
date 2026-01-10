@@ -30,14 +30,15 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    allowedDevOrigins: [
-        "http://localhost:3000",
-        "https://*.cloudworkstations.dev",
-        "https://*.firebase.studio",
-        "https://*.web.app",
-        "https://*.firebaseapp.com"
-    ]
-  }
+    // allowedDevOrigins is now a top-level property
+  },
+  allowedDevOrigins: [
+      "http://localhost:3000",
+      "https://*.cloudworkstations.dev",
+      "https://*.firebase.studio",
+      "https://*.web.app",
+      "https://*.firebaseapp.com"
+  ]
 };
 
 export default nextConfig;
