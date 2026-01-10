@@ -82,11 +82,13 @@ export function EmployeesTable() {
     const [employees, setEmployees] = useState<(Employee & { leaveBalance: number | null })[]>([]);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
+    const [isTerminating, setIsTerminating] = useState(false);
     const [noticeStartDate, setNoticeStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [terminationDate, setTerminationDate] = useState('');
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
 
     const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
+    const [isRehiring, setIsRehiring] = useState(false);
     const [rehireType, setRehireType] = useState<'continue' | 'new'>('continue');
     const [newHireDate, setNewHireDate] = useState(new Date().toISOString().split('T')[0]);
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
@@ -109,12 +111,15 @@ export function EmployeesTable() {
 
     useEffect(() => {
         // Calculate leave balance on the client side after the initial render
-        setEmployees(prevEmployees =>
-            prevEmployees.map(emp => ({
-                ...emp,
-                leaveBalance: calculateAnnualLeaveBalance(emp)
-            }))
-        );
+        const timer = setTimeout(() => {
+            setEmployees(prevEmployees =>
+                prevEmployees.map(emp => ({
+                    ...emp,
+                    leaveBalance: calculateAnnualLeaveBalance(emp)
+                }))
+            );
+        }, 0);
+        return () => clearTimeout(timer);
     }, [value]); // Rerun when firestore data changes
 
     useEffect(() => {
@@ -147,6 +152,7 @@ export function EmployeesTable() {
             return;
         }
 
+        setIsTerminating(true);
         const employeeRef = doc(firestore, 'employees', employeeToTerminate.id);
 
         try {
@@ -162,10 +168,6 @@ export function EmployeesTable() {
                 description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.`
             });
             
-            setEmployeeToTerminate(null); // Close the dialog
-            setNoticeStartDate(new Date().toISOString().split('T')[0]);
-            setTerminationReason('');
-            // The table will re-render automatically due to the listener
         } catch (err) {
             console.error(err);
             toast({
@@ -173,12 +175,18 @@ export function EmployeesTable() {
                 title: 'خطأ في الحفظ',
                 description: 'لم يتم إنهاء خدمة الموظف. الرجاء المحاولة مرة أخرى.'
             });
+        } finally {
+            setIsTerminating(false);
+            setEmployeeToTerminate(null);
+            setNoticeStartDate(new Date().toISOString().split('T')[0]);
+            setTerminationReason('');
         }
     };
     
     const handleRehireConfirm = async () => {
         if (!employeeToRehire || !firestore) return;
 
+        setIsRehiring(true);
         const employeeRef = doc(firestore, 'employees', employeeToRehire.id);
         
         const updateData: DocumentData = {
@@ -208,7 +216,6 @@ export function EmployeesTable() {
                 title: 'نجاح',
                 description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.`
             });
-            setEmployeeToRehire(null);
         } catch (err) {
             console.error(err);
              toast({
@@ -216,6 +223,9 @@ export function EmployeesTable() {
                 title: 'خطأ في الحفظ',
                 description: 'لم تتم إعادة خدمة الموظف. الرجاء المحاولة مرة أخرى.'
             });
+        } finally {
+            setIsRehiring(false);
+            setEmployeeToRehire(null);
         }
     };
 
@@ -373,9 +383,9 @@ export function EmployeesTable() {
                         </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setEmployeeToTerminate(null)}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleTerminationConfirm} className='bg-destructive hover:bg-destructive/90'>
-                            تأكيد إنهاء الخدمة
+                        <AlertDialogCancel onClick={() => setEmployeeToTerminate(null)} disabled={isTerminating}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating} className='bg-destructive hover:bg-destructive/90'>
+                            {isTerminating ? 'جاري الحفظ...' : 'تأكيد إنهاء الخدمة'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -421,9 +431,9 @@ export function EmployeesTable() {
                         </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setEmployeeToRehire(null)}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRehireConfirm} className='bg-green-600 hover:bg-green-700'>
-                            تأكيد إعادة الخدمة
+                        <AlertDialogCancel onClick={() => setEmployeeToRehire(null)} disabled={isRehiring}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
+                            {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
