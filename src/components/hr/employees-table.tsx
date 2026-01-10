@@ -22,9 +22,23 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, type DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, type DocumentData, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from '@/hooks/use-toast';
+import { Label } from '../ui/label';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -61,7 +75,13 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
 
 export function EmployeesTable() {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const [employees, setEmployees] = useState<(Employee & { leaveBalance: number | null })[]>([]);
+
+    const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
+    const [terminationDate, setTerminationDate] = useState(new Date().toISOString().split('T')[0]);
+    const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
+
 
     const employeesCollection = firestore ? collection(firestore, 'employees') : null;
     const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('createdAt', 'desc')) : null;
@@ -80,6 +100,48 @@ export function EmployeesTable() {
             setEmployees(employeesData);
         }
     }, [value]);
+
+    const handleTerminateClick = (employee: Employee) => {
+        setEmployeeToTerminate(employee);
+    };
+
+    const handleTerminationConfirm = async () => {
+        if (!employeeToTerminate || !firestore || !terminationReason || !terminationDate) {
+            toast({
+                variant: 'destructive',
+                title: 'خطأ',
+                description: 'الرجاء تعبئة تاريخ وسبب إنهاء الخدمة.'
+            });
+            return;
+        }
+
+        const employeeRef = doc(firestore, 'employees', employeeToTerminate.id);
+
+        try {
+            await updateDoc(employeeRef, {
+                status: 'terminated',
+                terminationDate: new Date(terminationDate).toISOString(),
+                terminationReason: terminationReason
+            });
+
+            toast({
+                title: 'نجاح',
+                description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.`
+            });
+            
+            setEmployeeToTerminate(null); // Close the dialog
+            setTerminationDate(new Date().toISOString().split('T')[0]);
+            setTerminationReason('');
+            // The table will re-render automatically due to the listener
+        } catch (err) {
+            console.error(err);
+            toast({
+                variant: 'destructive',
+                title: 'خطأ في الحفظ',
+                description: 'لم يتم إنهاء خدمة الموظف. الرجاء المحاولة مرة أخرى.'
+            });
+        }
+    };
 
 
     return (
@@ -137,7 +199,7 @@ export function EmployeesTable() {
                         </TableRow>
                     )}
                     {employees.map((employee) => (
-                        <TableRow key={employee.id}>
+                        <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
                         <TableCell className="font-medium">
                             {employee.fullName}
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
@@ -164,14 +226,24 @@ export function EmployeesTable() {
                                 <span className="sr-only">Toggle menu</span>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" dir="rtl">
                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem>عرض الملف الشخصي</DropdownMenuItem>
-                                <DropdownMenuItem>تعديل</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-red-50">
-                                    إنهاء الخدمة
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
                                 </DropdownMenuItem>
+                                {employee.status !== 'terminated' && (
+                                     <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
+                                    </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                {employee.status !== 'terminated' ? (
+                                    <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
+                                        إنهاء الخدمة
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem disabled>تم إنهاء الخدمة</DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
@@ -180,6 +252,45 @@ export function EmployeesTable() {
                 </TableBody>
                 </Table>
             </div>
+             <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            هل أنت متأكد من رغبتك في إنهاء خدمة الموظف "{employeeToTerminate?.fullName}"؟ هذا الإجراء لا يمكن التراجع عنه.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="terminationDate">تاريخ إنهاء الخدمة</Label>
+                            <Input
+                                id="terminationDate"
+                                type="date"
+                                value={terminationDate}
+                                onChange={(e) => setTerminationDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                             <Label htmlFor="terminationReason">سبب إنهاء الخدمة</Label>
+                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v as any)}>
+                                <SelectTrigger id="terminationReason">
+                                    <SelectValue placeholder="اختر السبب..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="resignation">استقالة</SelectItem>
+                                    <SelectItem value="termination">إنهاء من صاحب العمل</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setEmployeeToTerminate(null)}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleTerminationConfirm} className='bg-destructive hover:bg-destructive/90'>
+                            تأكيد إنهاء الخدمة
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

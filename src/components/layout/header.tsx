@@ -17,11 +17,15 @@ const getTitleFromPathname = (pathname: string, lang: 'ar' | 'en') => {
         { path: '/dashboard/projects/', title: { ar: 'تفاصيل المشروع', en: 'Project Details' } },
         { path: '/dashboard/accounting/cash-receipts/new', title: { ar: 'سند قبض جديد', en: 'New Cash Receipt' } },
         { path: '/dashboard/hr/employees/new', title: { ar: 'إضافة موظف جديد', en: 'New Employee' } },
+        { path: '/dashboard/hr/employees/[id]/edit', title: { ar: 'تعديل بيانات الموظف', en: 'Edit Employee' } },
+        { path: '/dashboard/hr/employees/[id]', title: { ar: 'الملف الشخصي للموظف', en: 'Employee Profile' } },
         { path: '/dashboard/hr/leave-requests', title: { ar: 'طلبات الإجازة', en: 'Leave Requests' } },
     ];
 
     for (const route of dynamicRoutes) {
-        if (pathname.startsWith(route.path)) {
+         // Replace [id] with a regex pattern to match any value
+        const pattern = new RegExp(`^${route.path.replace(/\[id\]/, '[^/]+')}$`);
+        if (pattern.test(pathname)) {
             return route.title[lang];
         }
     }
