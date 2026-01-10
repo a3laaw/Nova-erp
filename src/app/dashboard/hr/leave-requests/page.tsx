@@ -30,7 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface LeaveRequest extends DocumentData {
     id: string;
     employeeName: string;
-    leaveType: 'Annual' | 'Sick' | 'Emergency';
+    leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
     startDate: string;
     endDate: string;
     days: number;
@@ -53,11 +53,13 @@ const typeColors: Record<LeaveRequest['leaveType'], string> = {
     'Annual': 'bg-blue-100 text-blue-800 border-blue-200',
     'Sick': 'bg-purple-100 text-purple-800 border-purple-200',
     'Emergency': 'bg-orange-100 text-orange-800 border-orange-200',
+    'Unpaid': 'bg-gray-100 text-gray-800 border-gray-200',
 };
 const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
     'Annual': 'سنوية',
     'Sick': 'مرضية',
     'Emergency': 'طارئة',
+    'Unpaid': 'بدون راتب',
 };
 
 
@@ -110,11 +112,18 @@ export default function LeaveRequestsPage() {
 
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ar-KW', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    });
+    if (!dateString) return '-';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '-';
+        return new Intl.DateTimeFormat('ar-KW', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }).format(date);
+    } catch (e) {
+        return '-';
+    }
   }
 
   return (
