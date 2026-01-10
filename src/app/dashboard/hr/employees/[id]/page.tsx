@@ -1,9 +1,8 @@
 'use client';
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDocument } from 'react-firebase-hooks/firestore';
 import { doc } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
+import { useDoc } from '@/firebase';
 import type { Employee } from '@/lib/types';
 import {
   Card,
@@ -62,11 +61,9 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 export default function EmployeeProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const { firestore } = useFirebase();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  const employeeRef = id ? doc(firestore!, 'employees', id) : null;
-  const [snapshot, loading, error] = useDocument(employeeRef);
+  const [snapshot, loading, error] = useDoc(id ? `employees/${id}` : undefined);
 
   const employee = snapshot?.data() as Employee | undefined;
 

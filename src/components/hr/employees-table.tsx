@@ -21,9 +21,8 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useFirebase } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, type DocumentData, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     AlertDialog,
@@ -77,7 +76,7 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
 };
 
 export function EmployeesTable() {
-    const { firestore } = useFirebase();
+    const firestore = useFirestore();
     const { toast } = useToast();
     const [employees, setEmployees] = useState<(Employee & { leaveBalance: number | null })[]>([]);
 

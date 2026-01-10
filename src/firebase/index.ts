@@ -3,7 +3,6 @@
 import { initializeApp, getApp, getApps, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, type Firestore } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -26,14 +25,13 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   if (process.env.NODE_ENV === 'development') {
     if (process.env.NEXT_PUBLIC_EMULATOR_HOST) {
         try {
-            // Check if emulators are already connected to prevent errors on hot-reloads
             const authEmulatorConnected = (auth as any).emulatorConfig;
             if (!authEmulatorConnected) {
                 connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST}:9099`, { disableWarnings: true });
             }
             
-            const firestoreEmulatorConnected = (firestore as any)._settings?.host?.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST);
-            if (!firestoreEmulatorConnected) {
+            const firestoreSettings = (firestore as any)._settings;
+            if (firestoreSettings && typeof firestoreSettings.host !== 'string' || !firestoreSettings.host.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST)) {
                  connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST, 8080);
             }
         } catch (e) {
@@ -45,7 +43,7 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   return { app, auth, firestore };
 }
 
-// We export the function to be called on demand, not the instances themselves.
 export { initializeFirebase };
 export * from './provider';
-export { useCollection };
+export * from './firestore/use-collection';
+export * from './firestore/use-doc';

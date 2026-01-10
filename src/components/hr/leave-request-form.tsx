@@ -22,9 +22,8 @@ import {
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Upload } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { differenceInCalendarDays } from 'date-fns';
@@ -37,7 +36,7 @@ interface LeaveRequestFormProps {
 type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
 
 export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
-    const { firestore } = useFirebase();
+    const firestore = useFirestore();
     const { toast } = useToast();
     const [employees, setEmployees] = useState<Employee[]>([]);
     
@@ -185,6 +184,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                     </div>
                 </div>
                  {days > 0 && <Alert variant="default" className='bg-muted/50'><AlertDescription>مجموع الأيام: {days} يوم</AlertDescription></Alert>}
+                 {days < 0 && <Alert variant="destructive"><AlertDescription>تاريخ النهاية يجب أن يكون بعد تاريخ البداية.</AlertDescription></Alert>}
                 <div className="grid gap-2">
                     <Label htmlFor="notes">ملاحظات</Label>
                     <Textarea id="notes" placeholder={leaveType === 'Emergency' ? 'سبب الإجازة الطارئة (إلزامي)' : 'أدخل ملاحظاتك هنا...'} value={notes} onChange={e => setNotes(e.target.value)} />

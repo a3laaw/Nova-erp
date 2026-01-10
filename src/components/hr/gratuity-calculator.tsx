@@ -23,8 +23,7 @@ import type { Employee } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useFirebase } from '@/firebase';
-import { useCollection } from 'react-firebase-hooks/firestore';
+import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 
 type TerminationReason = 'resignation' | 'termination';
@@ -51,15 +50,18 @@ const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
 
 
 export function GratuityCalculator() {
-  const { firestore } = useFirebase();
+  const firestore = useFirestore();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [terminationDate, setTerminationDate] = useState<string>('');
   const [terminationReason, setTerminationReason] = useState<TerminationReason | null>(null);
   const [isClient, setIsClient] = useState(false);
 
-  const employeesCollection = firestore ? collection(firestore, 'employees') : null;
-  const employeesQuery = employeesCollection ? query(employeesCollection, orderBy('fullName')) : null;
+  const employeesQuery = useMemo(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'employees'), orderBy('fullName'))
+  }, [firestore]);
+
   const [value, loading, error] = useCollection(employeesQuery);
 
   useEffect(() => {

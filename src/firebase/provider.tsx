@@ -31,6 +31,15 @@ export function useFirebase() {
   return context;
 }
 
+
+export function useFirebaseApp() {
+    const context = useContext(FirebaseContext);
+    if (context === undefined) {
+        throw new Error('useFirebaseApp must be used within a FirebaseProvider');
+    }
+    return context.app;
+}
+
 export function useAuth() {
   const context = useContext(FirebaseContext);
   if (context === undefined) {

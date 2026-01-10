@@ -20,9 +20,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
-import { useFirebase } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, where, doc, updateDoc, serverTimestamp, type DocumentData } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -64,7 +63,7 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
 
 
 export default function LeaveRequestsPage() {
-    const { firestore } = useFirebase();
+    const firestore = useFirestore();
     const { toast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
