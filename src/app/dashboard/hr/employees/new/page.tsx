@@ -28,6 +28,7 @@ import { useFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 export default function NewEmployeePage() {
@@ -45,8 +46,6 @@ export default function NewEmployeePage() {
         nameEn: '',
         dob: '',
         gender: undefined,
-        maritalStatus: undefined,
-        dependents: 0,
         civilId: '',
         visaType: 'kuwaiti',
         residencyExpiry: '',
@@ -68,6 +67,8 @@ export default function NewEmployeePage() {
         status: 'active',
     });
 
+    const [includeHousing, setIncludeHousing] = useState(false);
+    const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,19 +93,13 @@ export default function NewEmployeePage() {
             const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
              for (const field of requiredFields) {
                 const value = formData[field];
-                if (value === undefined || value === null || value === '') {
-                    // Check for 0 is not needed anymore as 0 is a valid value for numeric fields
-                     if (typeof value === 'number' && value === 0 && field === 'basicSalary') {
-                        // Allow 0 for basic salary
-                    } else if (!value) {
-                         toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
-                         setIsLoading(false);
-                         return;
-                    }
+                if (value === undefined || value === null || (typeof value !== 'number' && value === '')) {
+                    toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
+                    setIsLoading(false);
+                    return;
                 }
             }
 
-            // More robust date validation
             const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'];
             for (const field of dateFields) {
                 const dateValue = formData[field];
@@ -124,7 +119,6 @@ export default function NewEmployeePage() {
 
             // --- Data Sanitization & Preparation ---
             const employeeData: DocumentData = {
-                // Required fields that are always present
                 fullName: formData.fullName,
                 nameEn: formData.nameEn,
                 civilId: formData.civilId,
@@ -136,8 +130,6 @@ export default function NewEmployeePage() {
                 basicSalary: Number(formData.basicSalary) || 0,
                 status: 'active',
                 createdAt: serverTimestamp(),
-
-                // Default values for new employee
                 terminationDate: null,
                 terminationReason: null,
                 annualLeaveAccrued: 0,
@@ -153,16 +145,24 @@ export default function NewEmployeePage() {
             // Add optional fields only if they have a valid value
             if (formData.dob) employeeData.dob = new Date(formData.dob).toISOString();
             if (formData.gender) employeeData.gender = formData.gender;
-            if (formData.maritalStatus) employeeData.maritalStatus = formData.maritalStatus;
-            if (formData.dependents) employeeData.dependents = Number(formData.dependents);
             if (formData.visaType) employeeData.visaType = formData.visaType;
             if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry).toISOString();
-            if (formData.contractExpiry) employeeData.contractExpiry = new Date(formData.contractExpiry).toISOString();
+            
+            // Handle conditional contract expiry
+            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && formData.contractExpiry) {
+                employeeData.contractExpiry = new Date(formData.contractExpiry).toISOString();
+            } else {
+                employeeData.contractExpiry = null;
+            }
+
             if (formData.emergencyContact) employeeData.emergencyContact = formData.emergencyContact;
             if (formData.email) employeeData.email = formData.email;
             if (formData.position) employeeData.position = formData.position;
-            if (formData.housingAllowance) employeeData.housingAllowance = Number(formData.housingAllowance);
-            if (formData.transportAllowance) employeeData.transportAllowance = Number(formData.transportAllowance);
+
+            // Handle conditional allowances
+            employeeData.housingAllowance = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
+            employeeData.transportAllowance = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
+
             if (formData.salaryPaymentType) employeeData.salaryPaymentType = formData.salaryPaymentType;
             if (formData.bankName) employeeData.bankName = formData.bankName;
             if (formData.iban) employeeData.iban = formData.iban;
@@ -266,22 +266,6 @@ export default function NewEmployeePage() {
                                             <SelectItem value="female">أنثى</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="maritalStatus">الحالة الاجتماعية</Label>
-                                    <Select dir="rtl" value={formData.maritalStatus} onValueChange={(v) => handleSelectChange('maritalStatus', v)}>
-                                        <SelectTrigger id="maritalStatus"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="single">أعزب</SelectItem>
-                                            <SelectItem value="married">متزوج</SelectItem>
-                                            <SelectItem value="divorced">مطلق</SelectItem>
-                                            <SelectItem value="widowed">أرمل</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dependents">عدد أفراد العائلة</Label>
-                                    <Input id="dependents" type="number" value={formData.dependents} onChange={handleInputChange} placeholder="0" />
                                 </div>
                             </div>
                         </div>
@@ -395,51 +379,74 @@ export default function NewEmployeePage() {
                     {/* Salary & Bank */}
                     <div className="space-y-4">
                         <h3 className="font-semibold text-lg border-b pb-2">الراتب والبنك</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="grid gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                            <div className="grid gap-2 md:col-span-3">
                                 <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
                                 <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary} onChange={handleInputChange} placeholder="0.000" required />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="housingAllowance">بدل السكن</Label>
-                                <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance} onChange={handleInputChange} placeholder="0.000" />
+
+                            <div className="items-center flex space-x-2 space-y-2">
+                                <Checkbox id="includeHousing" checked={includeHousing} onCheckedChange={(checked) => setIncludeHousing(checked as boolean)} />
+                                <label htmlFor="includeHousing" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    تضمين بدل السكن
+                                </label>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="transportAllowance">بدل النقل</Label>
-                                <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance} onChange={handleInputChange} placeholder="0.000" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="salaryPaymentType">نوع الراتب</Label>
-                                <Select dir="rtl" value={formData.salaryPaymentType} onValueChange={(v) => handleSelectChange('salaryPaymentType', v)}>
-                                    <SelectTrigger id="salaryPaymentType"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="transfer">تحويل بنكي</SelectItem>
-                                        <SelectItem value="cheque">شيك</SelectItem>
-                                        <SelectItem value="cash">كاش</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {formData.salaryPaymentType === 'transfer' && (
-                                <>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="bankName">اسم البنك</Label>
-                                        <Select dir="rtl" value={formData.bankName} onValueChange={(v) => handleSelectChange('bankName', v)}>
-                                            <SelectTrigger id="bankName"><SelectValue placeholder="اختر البنك..." /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="NBK">بنك الكويت الوطني</SelectItem>
-                                                <SelectItem value="KFH">بيت التمويل الكويتي</SelectItem>
-                                                <SelectItem value="GulfBank">بنك الخليج</SelectItem>
-                                                <SelectItem value="BurganBank">بنك برقان</SelectItem>
-                                                <SelectItem value="KIB">بنك الكويت الدولي</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid gap-2 md:col-span-2">
-                                        <Label htmlFor="iban">رقم الحساب الدولي (IBAN) <span className="text-destructive">*</span></Label>
-                                        <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
-                                    </div>
-                                </>
+                            
+                            {includeHousing && (
+                                <div className="grid gap-2 md:col-span-2">
+                                    <Label htmlFor="housingAllowance">قيمة بدل السكن</Label>
+                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance} onChange={handleInputChange} placeholder="0.000" />
+                                </div>
                             )}
+
+                            <div className="items-center flex space-x-2 space-y-2 mt-4 md:mt-0">
+                                <Checkbox id="includeTransport" checked={includeTransport} onCheckedChange={(checked) => setIncludeTransport(checked as boolean)} />
+                                <label htmlFor="includeTransport" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    تضمين بدل النقل
+                                </label>
+                            </div>
+                            
+                            {includeTransport && (
+                                <div className="grid gap-2 md:col-span-2">
+                                    <Label htmlFor="transportAllowance">قيمة بدل النقل</Label>
+                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance} onChange={handleInputChange} placeholder="0.000" />
+                                </div>
+                            )}
+                            
+                            <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="salaryPaymentType">نوع الراتب</Label>
+                                    <Select dir="rtl" value={formData.salaryPaymentType} onValueChange={(v) => handleSelectChange('salaryPaymentType', v)}>
+                                        <SelectTrigger id="salaryPaymentType"><SelectValue placeholder="اختر..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                                            <SelectItem value="cheque">شيك</SelectItem>
+                                            <SelectItem value="cash">كاش</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {formData.salaryPaymentType === 'transfer' && (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="bankName">اسم البنك</Label>
+                                            <Select dir="rtl" value={formData.bankName} onValueChange={(v) => handleSelectChange('bankName', v)}>
+                                                <SelectTrigger id="bankName"><SelectValue placeholder="اختر البنك..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="NBK">بنك الكويت الوطني</SelectItem>
+                                                    <SelectItem value="KFH">بيت التمويل الكويتي</SelectItem>
+                                                    <SelectItem value="GulfBank">بنك الخليج</SelectItem>
+                                                    <SelectItem value="BurganBank">بنك برقان</SelectItem>
+                                                    <SelectItem value="KIB">بنك الكويت الدولي</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="iban">رقم الحساب الدولي (IBAN) <span className="text-destructive">*</span></Label>
+                                            <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </CardContent>

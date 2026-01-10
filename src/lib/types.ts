@@ -161,8 +161,6 @@ export type Employee = {
     nameEn?: string;
     dob?: string;
     gender?: 'male' | 'female';
-    maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
-    dependents?: number;
     civilId: string;
     visaType?: 'worker' | 'engineer' | 'driver' | 'admin' | 'kuwaiti';
     residencyExpiry?: string;

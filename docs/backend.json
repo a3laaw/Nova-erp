@@ -117,8 +117,6 @@
         "nameEn": { "type": "string", "description": "Employee's name in English." },
         "dob": { "type": "string", "format": "date", "description": "Date of birth." },
         "gender": { "type": "string", "enum": ["male", "female"] },
-        "maritalStatus": { "type": "string", "enum": ["single", "married", "divorced", "widowed", null] },
-        "dependents": { "type": "number" },
         "civilId": { "type": "string" },
         "visaType": { "type": "string", "enum": ["worker", "engineer", "driver", "admin", "kuwaiti"] },
         "residencyExpiry": { "type": "string", "format": "date" },
