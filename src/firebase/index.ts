@@ -30,8 +30,9 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
                 connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST}:9099`, { disableWarnings: true });
             }
             
-            const firestoreSettings = (firestore as any)._settings;
-            if (firestoreSettings && typeof firestoreSettings.host !== 'string' || !firestoreSettings.host.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST)) {
+            // A more robust check to see if the firestore instance is already connected to the emulator
+            const firestoreEmulatorHost = (firestore.toJSON() as any).settings?.host;
+            if (!firestoreEmulatorHost || !firestoreEmulatorHost.includes(process.env.NEXT_PUBLIC_EMULATOR_HOST)) {
                  connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST, 8080);
             }
         } catch (e) {
