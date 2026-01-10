@@ -11,8 +11,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
 
-// This component now only handles HTML and body tags with language/direction.
-function RootHtml({ children }: { children: React.ReactNode }) {
+// This component wraps the main content and applies language settings
+function AppContent({ children }: { children: React.ReactNode }) {
   const { language, direction } = useLanguage();
 
   return (
@@ -22,13 +22,16 @@ function RootHtml({ children }: { children: React.ReactNode }) {
         <meta name="description" content="Engineering Consultancy Management" />
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
-        {children}
-        <Toaster />
+        <FirebaseClientProvider>
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );
 }
-
 
 export default function RootLayout({
   children,
@@ -37,11 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <LanguageProvider>
-      <FirebaseClientProvider>
-        <AuthProvider>
-            <RootHtml>{children}</RootHtml>
-        </AuthProvider>
-      </FirebaseClientProvider>
+      <AppContent>{children}</AppContent>
     </LanguageProvider>
   );
 }
