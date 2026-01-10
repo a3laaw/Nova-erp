@@ -91,18 +91,26 @@ export function EmployeesTable() {
 
     const [value, loading, error] = useCollection(employeesQuery);
 
-    useEffect(() => {
+     useEffect(() => {
         if (value) {
-            const employeesData = value.docs.map(doc => {
-                const data = { id: doc.id, ...doc.data() } as Employee;
-                return {
-                    ...data,
-                    leaveBalance: calculateAnnualLeaveBalance(data)
-                }
-            });
+            const employeesData = value.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                leaveBalance: null // Initialize with null
+            } as Employee & { leaveBalance: null }));
             setEmployees(employeesData);
         }
     }, [value]);
+
+    useEffect(() => {
+        // Calculate leave balance on the client side after the initial render
+        setEmployees(prevEmployees =>
+            prevEmployees.map(emp => ({
+                ...emp,
+                leaveBalance: calculateAnnualLeaveBalance(emp)
+            }))
+        );
+    }, [value]); // Rerun when firestore data changes
 
     useEffect(() => {
         if (noticeStartDate) {
