@@ -40,10 +40,10 @@ export function useFirebaseApp() {
     return context.app;
 }
 
-export function useAuth() {
+export function useAuthContext() {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within a FirebaseProvider');
+    throw new Error('useAuthContext must be used within a FirebaseProvider');
   }
   return context.auth;
 }
