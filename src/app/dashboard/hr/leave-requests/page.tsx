@@ -21,12 +21,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 
-const mockRequests = [
-    { id: 'lr-1', employeeName: 'علياء العامري', type: 'سنوية', startDate: '2024-08-01', endDate: '2024-08-10', days: 10, status: 'معلقة' },
-    { id: 'lr-2', employeeName: 'خالد المصري', type: 'مرضية', startDate: '2024-07-22', endDate: '2024-07-22', days: 1, status: 'مقبولة' },
-    { id: 'lr-3', employeeName: 'سارة عبدالله', type: 'طارئة', startDate: '2024-07-25', endDate: '2024-07-25', days: 1, status: 'مرفوضة' },
-];
-
 const statusColors: Record<string, string> = {
     'معلقة': 'bg-yellow-100 text-yellow-800 border-yellow-200',
     'مقبولة': 'bg-green-100 text-green-800 border-green-200',
@@ -82,20 +76,11 @@ export default function LeaveRequestsPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {mockRequests.map(req => (
-                            <TableRow key={req.id}>
-                                <TableCell className='font-medium'>{req.employeeName}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={typeColors[req.type]}>{req.type}</Badge>
-                                </TableCell>
-                                <TableCell>{formatDate(req.startDate)}</TableCell>
-                                <TableCell>{formatDate(req.endDate)}</TableCell>
-                                <TableCell>{req.days}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={statusColors[req.status]}>{req.status}</Badge>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                                لا توجد طلبات إجازة حالياً.
+                            </TableCell>
+                        </TableRow>
                     </TableBody>
                 </Table>
             </div>
