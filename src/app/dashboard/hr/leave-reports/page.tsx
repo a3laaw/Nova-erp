@@ -24,7 +24,7 @@ import { useFirestore } from '@/firebase';
 import { collection, query, getDocs, Timestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { LeaveRequest } from '@/lib/types';
+import type { LeaveRequest, Employee } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -69,10 +69,12 @@ export default function LeaveReportsPage() {
     const { toast } = useToast();
     const [isFetching, setIsFetching] = useState(true);
     const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     
     const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [statusFilter, setStatusFilter] = useState<'all' | LeaveRequest['status']>('all');
+    const [employeeFilter, setEmployeeFilter] = useState<'all' | string>('all');
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Fetch all data once on component mount
@@ -82,12 +84,19 @@ export default function LeaveReportsPage() {
         const fetchAllData = async () => {
             setIsFetching(true);
             try {
-                const q = query(collection(firestore, 'leaveRequests'));
-                const querySnapshot = await getDocs(q);
-                const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-                setAllRequests(data);
+                const requestsQuery = query(collection(firestore, 'leaveRequests'));
+                const requestsSnapshot = await getDocs(requestsQuery);
+                const requestsData = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+                setAllRequests(requestsData);
+
+                const employeesQuery = query(collection(firestore, 'employees'));
+                const employeesSnapshot = await getDocs(employeesQuery);
+                const employeesData = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                employeesData.sort((a,b) => a.fullName.localeCompare(b.fullName));
+                setEmployees(employeesData);
+
             } catch (error) {
-                 console.error("Error fetching all leave requests: ", error);
+                 console.error("Error fetching initial data: ", error);
                  toast({ variant: 'destructive', title: 'خطأ في الاستعلام', description: 'فشل في جلب البيانات الأولية من قاعدة البيانات.' });
             } finally {
                 setIsFetching(false);
@@ -101,19 +110,32 @@ export default function LeaveReportsPage() {
     const reportData = useMemo(() => {
         if (isInitialLoad) return [];
 
-        const start = parseISO(dateFrom);
-        start.setHours(0, 0, 0, 0);
+        let start: Date, end: Date;
+        try {
+            start = parseISO(dateFrom);
+            start.setHours(0, 0, 0, 0);
 
-        const end = parseISO(dateTo);
-        end.setHours(23, 59, 59, 999);
+            end = parseISO(dateTo);
+            end.setHours(23, 59, 59, 999);
+            if (start > end) return [];
+        } catch (e) {
+            return [];
+        }
         
         const filteredData = allRequests.filter(req => {
-            const reqDate = req.startDate instanceof Timestamp ? req.startDate.toDate() : new Date(req.startDate);
+            let reqDate: Date;
+            try {
+                 reqDate = req.startDate instanceof Timestamp ? req.startDate.toDate() : new Date(req.startDate);
+                 if(isNaN(reqDate.getTime())) return false;
+            } catch(e) {
+                return false;
+            }
             
             const isDateInRange = reqDate >= start && reqDate <= end;
             const isStatusMatch = statusFilter === 'all' || req.status === statusFilter;
+            const isEmployeeMatch = employeeFilter === 'all' || req.employeeId === employeeFilter;
 
-            return isDateInRange && isStatusMatch;
+            return isDateInRange && isStatusMatch && isEmployeeMatch;
         });
 
         // Client-side sorting
@@ -124,7 +146,7 @@ export default function LeaveReportsPage() {
         });
 
         return filteredData;
-    }, [allRequests, dateFrom, dateTo, statusFilter, isInitialLoad]);
+    }, [allRequests, dateFrom, dateTo, statusFilter, employeeFilter, isInitialLoad]);
     
     const totalDays = useMemo(() => {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
@@ -178,6 +200,20 @@ export default function LeaveReportsPage() {
                             />
                         </div>
                         <div className="grid gap-2">
+                            <Label htmlFor="employeeFilter">الموظف</Label>
+                             <Select dir="rtl" value={employeeFilter} onValueChange={(v) => setEmployeeFilter(v as any)}>
+                                <SelectTrigger id="employeeFilter">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">كل الموظفين</SelectItem>
+                                    {employees.map(emp => (
+                                        <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
                             <Label htmlFor="statusFilter">حالة الطلب</Label>
                              <Select dir="rtl" value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
                                 <SelectTrigger id="statusFilter">
@@ -191,7 +227,6 @@ export default function LeaveReportsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                         <div className="hidden lg:block"></div> {/* Spacer */}
                         <Button onClick={() => {
                             if (reportData.length === 0 && !isFetching) {
                                 toast({ title: 'لا توجد نتائج', description: 'لم يتم العثور على طلبات إجازة تطابق معايير البحث.' });
@@ -276,3 +311,4 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
+
