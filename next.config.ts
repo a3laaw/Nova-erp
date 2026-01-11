@@ -22,18 +22,19 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https',
+        protocol: 'https'
+        ,
         hostname: 'picsum.photos',
         port: '',
         pathname: '/**',
       },
     ],
   },
-  experimental: {
-    // This is required to allow the Next.js dev server to accept requests from the
-    // Firebase Studio environment.
-    allowedDevOrigins: [
-      'https://*.cloudworkstations.dev',
+  // This is required to allow the Next.js dev server to accept requests from the
+  // Firebase Studio environment.
+  devServer: {
+    allowedHosts: [
+      '*.cloudworkstations.dev',
     ],
   },
 };
