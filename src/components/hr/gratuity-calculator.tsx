@@ -66,14 +66,16 @@ export function GratuityCalculator() {
     const fetchEmployees = async () => {
         setEmployeesLoading(true);
         try {
-            // Fetch only active or terminated employees who might need calculation
-            const q = query(collection(firestore, 'employees'), where('status', 'in', ['active', 'terminated']), orderBy('fullName'));
+            // Fetch all employees ordered by name
+            const q = query(collection(firestore, 'employees'), orderBy('fullName'));
             const querySnapshot = await getDocs(q);
             const fetchedEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
                 fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
             });
-            setEmployees(fetchedEmployees);
+            // Filter on the client side
+            const filteredEmployees = fetchedEmployees.filter(emp => emp.status === 'active' || emp.status === 'terminated');
+            setEmployees(filteredEmployees);
         } catch(e) {
             console.error(e);
         } finally {
