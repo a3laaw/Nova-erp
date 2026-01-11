@@ -140,9 +140,9 @@ export default function LeaveReportsPage() {
             </CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="bg-muted/50 p-4 rounded-lg space-y-4 mb-6 print:hidden">
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end'>
-                    <div className="grid gap-2">
+            <div className="bg-muted/50 p-4 rounded-lg mb-6 print:hidden">
+                <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end'>
+                    <div className="grid gap-2 col-span-2 sm:col-span-1">
                         <Label htmlFor="dateFrom">من تاريخ</Label>
                         <Input 
                             id="dateFrom"
@@ -151,7 +151,7 @@ export default function LeaveReportsPage() {
                             onChange={(e) => setDateFrom(e.target.value)}
                         />
                     </div>
-                     <div className="grid gap-2">
+                     <div className="grid gap-2 col-span-2 sm:col-span-1">
                         <Label htmlFor="dateTo">إلى تاريخ</Label>
                         <Input 
                             id="dateTo"
@@ -160,7 +160,7 @@ export default function LeaveReportsPage() {
                             onChange={(e) => setDateTo(e.target.value)}
                         />
                     </div>
-                    <div className="grid gap-2">
+                    <div className="grid gap-2 col-span-2 sm:col-span-1">
                         <Label htmlFor="statusFilter">حالة الطلب</Label>
                          <Select dir="rtl" value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
                             <SelectTrigger id="statusFilter">
@@ -174,7 +174,7 @@ export default function LeaveReportsPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={handleGenerateReport} disabled={loading}>
+                    <Button onClick={handleGenerateReport} disabled={loading} className="col-span-2 lg:col-span-1">
                         {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}
                         {loading ? 'جاري البحث...' : 'توليد التقرير'}
                     </Button>
@@ -253,3 +253,4 @@ export default function LeaveReportsPage() {
     </Card>
   );
 }
+
