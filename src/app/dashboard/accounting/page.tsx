@@ -71,8 +71,8 @@ export default function AccountingPage() {
                             <TableRow key={invoice.id}>
                                 <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                                 <TableCell>{client?.name}</TableCell>
-                                <TableCell>{new Date(invoice.issueDate).toLocaleDateString('ar-AE')}</TableCell>
-                                <TableCell>{new Date(invoice.dueDate).toLocaleDateString('ar-AE')}</TableCell>
+                                <TableCell>{new Date(invoice.issueDate).toLocaleDateString('en-GB')}</TableCell>
+                                <TableCell>{new Date(invoice.dueDate).toLocaleDateString('en-GB')}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={cn(statusStyles[invoice.status])}>{invoice.status}</Badge>
                                 </TableCell>

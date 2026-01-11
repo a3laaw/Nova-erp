@@ -138,7 +138,7 @@ export default function LeaveReportsPage() {
         try {
             const d = typeof date === 'string' ? new Date(date) : date.toDate();
             if (isNaN(d.getTime())) return '-';
-            return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
         } catch (e) { return '-'; }
     }
     
@@ -162,7 +162,7 @@ export default function LeaveReportsPage() {
             <CardContent>
                 <div className="bg-muted/50 p-4 rounded-lg mb-6 print:hidden">
                     <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end'>
-                        <div className="grid gap-2 col-span-2 sm:col-span-1">
+                        <div className="grid gap-2">
                             <Label htmlFor="dateFrom">من تاريخ</Label>
                             <Input 
                                 id="dateFrom"
@@ -171,7 +171,7 @@ export default function LeaveReportsPage() {
                                 onChange={(e) => setDateFrom(e.target.value)}
                             />
                         </div>
-                         <div className="grid gap-2 col-span-2 sm:col-span-1">
+                         <div className="grid gap-2">
                             <Label htmlFor="dateTo">إلى تاريخ</Label>
                             <Input 
                                 id="dateTo"
@@ -180,7 +180,7 @@ export default function LeaveReportsPage() {
                                 onChange={(e) => setDateTo(e.target.value)}
                             />
                         </div>
-                        <div className="grid gap-2 col-span-2 sm:col-span-1">
+                        <div className="grid gap-2">
                             <Label htmlFor="statusFilter">حالة الطلب</Label>
                              <Select dir="rtl" value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
                                 <SelectTrigger id="statusFilter">

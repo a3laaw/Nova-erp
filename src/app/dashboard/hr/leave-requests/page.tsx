@@ -241,7 +241,7 @@ export default function LeaveRequestsPage() {
         
         if (isNaN(d.getTime())) return '-';
 
-        return new Intl.DateTimeFormat('ar-KW', {
+        return new Intl.DateTimeFormat('en-GB', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
@@ -323,10 +323,8 @@ export default function LeaveRequestsPage() {
                                 </TableCell>
                                 <TableCell>{formatDate(req.startDate)}</TableCell>
                                 <TableCell>{formatDate(req.endDate)}</TableCell>
-                                <TableCell>
-                                    <span className="font-medium">
-                                        {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
-                                    </span>
+                                <TableCell className="font-medium">
+                                  {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-1">
