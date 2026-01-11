@@ -149,7 +149,7 @@ export default function LeaveReportsPage() {
         </CardHeader>
         <CardContent>
             <div className="bg-muted/50 p-4 rounded-lg space-y-4 mb-6 print:hidden">
-                <div className='grid grid-cols-1 md:grid-cols-4 gap-4 items-end'>
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end'>
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">من تاريخ</Label>
                          <Popover>
@@ -165,7 +165,7 @@ export default function LeaveReportsPage() {
                                 {dateFrom ? format(dateFrom, "dd/MM/yyyy") : <span>اختر تاريخ</span>}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
+                            <PopoverContent className="w-auto p-0" align="start">
                                 <Calendar
                                 mode="single"
                                 selected={dateFrom}
@@ -190,7 +190,7 @@ export default function LeaveReportsPage() {
                                 {dateTo ? format(dateTo, "dd/MM/yyyy") : <span>اختر تاريخ</span>}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
+                            <PopoverContent className="w-auto p-0" align="start">
                                 <Calendar
                                 mode="single"
                                 selected={dateTo}
@@ -283,9 +283,8 @@ export default function LeaveReportsPage() {
                     </TableBody>
                     <TableFooter>
                         <TableRow>
-                            <TableCell colSpan={4} className="font-bold">الإجمالي</TableCell>
+                            <TableCell colSpan={5} className="font-bold">الإجمالي</TableCell>
                             <TableCell className="font-bold">{totalDays} يوم عمل</TableCell>
-                            <TableCell></TableCell>
                         </TableRow>
                     </TableFooter>
                 </Table>
@@ -294,4 +293,3 @@ export default function LeaveReportsPage() {
     </Card>
   );
 }
-
