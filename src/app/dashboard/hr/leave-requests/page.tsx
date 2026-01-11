@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, PlusCircle, X } from 'lucide-react';
+import { Check, PlusCircle, X, Pencil } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -29,12 +29,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface LeaveRequest extends DocumentData {
     id: string;
+    employeeId: string;
     employeeName: string;
     leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
     startDate: string;
     endDate: string;
     days: number;
     workingDays?: number;
+    notes?: string;
     status: 'pending' | 'approved' | 'rejected';
     createdAt: { seconds: number, nanoseconds: number };
 }
@@ -69,11 +71,11 @@ export default function LeaveRequestsPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
     const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
-        // Removed orderBy to avoid composite index requirement. Sorting will be done on the client.
         return query(
             collection(firestore, 'leaveRequests'), 
             where('status', '==', filter)
@@ -85,12 +87,7 @@ export default function LeaveRequestsPage() {
     const requests = useMemo(() => {
         if (!snapshot) return [];
         const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-        // Sort client-side
-        reqs.sort((a, b) => {
-            const dateA = a.createdAt?.seconds ?? 0;
-            const dateB = b.createdAt?.seconds ?? 0;
-            return dateB - dateA; // Sort descending
-        });
+        reqs.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
         return reqs;
     }, [snapshot]);
 
@@ -116,6 +113,21 @@ export default function LeaveRequestsPage() {
                 description: 'فشل تحديث حالة الطلب.'
             });
         }
+    };
+    
+    const handleNewRequestClick = () => {
+        setEditingRequest(null);
+        setIsFormOpen(true);
+    };
+
+    const handleEditRequestClick = (request: LeaveRequest) => {
+        setEditingRequest(request);
+        setIsFormOpen(true);
+    };
+
+    const handleCloseForm = () => {
+        setIsFormOpen(false);
+        setEditingRequest(null); // Ensure editing state is cleared on close
     };
 
 
@@ -145,7 +157,7 @@ export default function LeaveRequestsPage() {
                     إدارة طلبات الإجازات المقدمة من الموظفين.
                     </CardDescription>
                 </div>
-                <Button onClick={() => setIsFormOpen(true)}>
+                <Button onClick={handleNewRequestClick}>
                     <PlusCircle className="ml-2 h-4 w-4" />
                     طلب إجازة جديد
                 </Button>
@@ -220,6 +232,9 @@ export default function LeaveRequestsPage() {
                                 {filter === 'pending' && (
                                     <TableCell>
                                         <div className='flex gap-2'>
+                                             <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
                                             <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved')}>
                                                 <Check className="h-4 w-4" />
                                             </Button>
@@ -238,7 +253,8 @@ export default function LeaveRequestsPage() {
       </Card>
       <LeaveRequestForm 
         isOpen={isFormOpen} 
-        onClose={() => setIsFormOpen(false)} 
+        onClose={handleCloseForm}
+        requestToEdit={editingRequest}
       />
     </>
   );

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -23,10 +24,10 @@ import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, orderBy, addDoc, serverTimestamp, getDocs, type DocumentData } from 'firebase/firestore';
-import type { Employee } from '@/lib/types';
+import { collection, query, where, addDoc, updateDoc, doc, serverTimestamp, getDocs, type DocumentData } from 'firebase/firestore';
+import type { Employee, LeaveRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -34,12 +35,13 @@ import { Skeleton } from '../ui/skeleton';
 interface LeaveRequestFormProps {
   isOpen: boolean;
   onClose: () => void;
+  requestToEdit?: LeaveRequest | null;
 }
 
 type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
 
 
-export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
+export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveRequestFormProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
@@ -53,21 +55,18 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const [notes, setNotes] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    const isEditing = !!requestToEdit;
 
     useEffect(() => {
         const fetchEmployees = async () => {
-            if (!firestore || !isOpen) return;
+            if (!firestore) return;
             setEmployeesLoading(true);
             try {
-                // Simplified query to avoid composite index requirement.
-                // We will sort the employees on the client-side.
                 const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEmployees = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                
-                // Sort employees by name on the client
                 fetchedEmployees.sort((a, b) => a.fullName.localeCompare(b.fullName));
-                
                 setEmployees(fetchedEmployees);
             } catch (error) {
                 console.error("Failed to fetch employees:", error);
@@ -82,6 +81,29 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         }
     }, [firestore, isOpen, toast]);
     
+    const resetForm = useCallback(() => {
+        setEmployeeId('');
+        setLeaveType('');
+        setStartDate('');
+        setEndDate('');
+        setNotes('');
+        setFile(null);
+    }, []);
+    
+    // Pre-fill form if editing
+    useEffect(() => {
+        if (isEditing && requestToEdit) {
+            setEmployeeId(requestToEdit.employeeId);
+            setLeaveType(requestToEdit.leaveType);
+            setStartDate(format(new Date(requestToEdit.startDate), 'yyyy-MM-dd'));
+            setEndDate(format(new Date(requestToEdit.endDate), 'yyyy-MM-dd'));
+            setNotes(requestToEdit.notes || '');
+        } else {
+            resetForm();
+        }
+    }, [requestToEdit, isEditing, resetForm, isOpen]);
+
+
     const { workingDays, loading: calculating, error: calcError } = useLeaveCalculator(startDate, endDate);
 
     const selectedEmployee = useMemo(() => {
@@ -93,8 +115,10 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         const accrued = selectedEmployee.annualLeaveAccrued || 0;
         const used = selectedEmployee.annualLeaveUsed || 0;
         const carried = selectedEmployee.carriedLeaveDays || 0;
-        return (accrued + carried) - used;
-    }, [selectedEmployee]);
+        // If editing, we should not deduct the days from the request being edited from the current balance
+        const daysToExclude = isEditing && requestToEdit?.status === 'approved' && requestToEdit?.workingDays ? requestToEdit.workingDays : 0;
+        return (accrued + carried) - (used - daysToExclude);
+    }, [selectedEmployee, isEditing, requestToEdit]);
 
     const remainingBalance = currentBalance - workingDays;
 
@@ -108,22 +132,6 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         return 0;
     }, [startDate, endDate]);
 
-    const resetForm = useCallback(() => {
-        setEmployeeId('');
-        setLeaveType('');
-        setStartDate('');
-        setEndDate('');
-        setNotes('');
-        setFile(null);
-    }, []);
-
-    useEffect(() => {
-        // Reset form when dialog is closed
-        if (!isOpen) {
-            resetForm();
-        }
-    }, [isOpen, resetForm]);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!firestore || !selectedEmployee) return;
@@ -136,7 +144,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.' });
             return;
         }
-        if (leaveType === 'Sick' && !file) {
+        if (leaveType === 'Sick' && !file && !isEditing) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إرفاق التقرير الطبي للإجازة المرضية.' });
             return;
         }
@@ -147,10 +155,8 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         
         setIsSaving(true);
         try {
-            
             // In a real app, you would upload the file to Firebase Storage first and get the URL
-            
-            await addDoc(collection(firestore, 'leaveRequests'), {
+            const dataToSave = {
                 employeeId: employeeId,
                 employeeName: selectedEmployee.fullName,
                 leaveType: leaveType,
@@ -160,15 +166,28 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                 workingDays: workingDays,
                 notes: notes,
                 attachmentUrl: null, // Placeholder for file URL
-                status: 'pending',
-                createdAt: serverTimestamp(),
-            });
+            };
 
-            toast({ title: 'نجاح', description: 'تم تقديم طلب الإجازة بنجاح.' });
+            if (isEditing && requestToEdit) {
+                 const requestRef = doc(firestore, 'leaveRequests', requestToEdit.id);
+                 await updateDoc(requestRef, {
+                    ...dataToSave,
+                    status: 'pending', // Reset status to pending on edit
+                 });
+                 toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
+            } else {
+                await addDoc(collection(firestore, 'leaveRequests'), {
+                    ...dataToSave,
+                    status: 'pending',
+                    createdAt: serverTimestamp(),
+                });
+                toast({ title: 'نجاح', description: 'تم تقديم طلب الإجازة بنجاح.' });
+            }
+
             onClose();
         } catch (err) {
             console.error(err);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تقديم الطلب. الرجاء المحاولة مرة أخرى.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: `فشل ${isEditing ? 'تعديل' : 'تقديم'} الطلب. الرجاء المحاولة مرة أخرى.` });
         } finally {
             setIsSaving(false);
         }
@@ -179,16 +198,16 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
       <DialogContent className="sm:max-w-lg" dir="rtl">
         <form onSubmit={handleSubmit}>
             <DialogHeader>
-                <DialogTitle>طلب إجازة جديد</DialogTitle>
+                <DialogTitle>{isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}</DialogTitle>
                 <DialogDescription>
-                    قم بتعبئة النموذج لتقديم طلب إجازة جديد لأحد الموظفين.
+                    {isEditing ? `تعديل الطلب الخاص بالموظف: ${requestToEdit?.employeeName}` : 'قم بتعبئة النموذج لتقديم طلب إجازة جديد لأحد الموظفين.'}
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                     <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
-                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} required>
-                        <SelectTrigger id="employee" disabled={employeesLoading}>
+                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} required disabled={isEditing}>
+                        <SelectTrigger id="employee" disabled={employeesLoading || isEditing}>
                             <SelectValue placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
@@ -272,7 +291,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                 </div>
                 {leaveType === 'Sick' && (
                     <div className="grid gap-2">
-                        <Label htmlFor="file-upload">تقرير طبي (إلزامي)</Label>
+                        <Label htmlFor="file-upload">تقرير طبي {isEditing ? '(اختياري عند التعديل)' : '(إلزامي)'}</Label>
                         <div className="flex items-center gap-2">
                            <Button asChild variant="outline" className="flex-1">
                              <label htmlFor="file-upload" className="cursor-pointer">
@@ -289,7 +308,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                 <Button type="submit" disabled={isSaving || calculating || !!calcError}>
                     {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                    {isSaving ? 'جاري الحفظ...' : 'تقديم الطلب'}
+                    {isSaving ? 'جاري الحفظ...' : (isEditing ? 'حفظ التعديلات' : 'تقديم الطلب')}
                 </Button>
             </DialogFooter>
         </form>
