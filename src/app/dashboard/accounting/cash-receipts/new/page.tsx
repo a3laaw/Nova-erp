@@ -1,3 +1,6 @@
+
+'use client';
+
 import {
   Card,
   CardContent,
@@ -18,9 +21,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { clients } from '@/lib/data';
-import { Printer, Save } from 'lucide-react';
+import { Printer, Save, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function NewCashReceiptPage() {
+  const router = useRouter();
+
   return (
     <Card className="max-w-4xl mx-auto">
       <CardHeader>
@@ -107,6 +113,10 @@ export default function NewCashReceiptPage() {
         
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
+        <Button variant="outline" onClick={() => router.push('/dashboard/accounting')}>
+            <X className="ml-2 h-4 w-4" />
+            إلغاء
+        </Button>
         <Button variant="outline">
             <Printer className="ml-2 h-4 w-4" />
             طباعة
