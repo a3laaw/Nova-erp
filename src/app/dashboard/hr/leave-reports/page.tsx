@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, Timestamp, type DocumentData } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest } from '@/lib/types';
@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -67,68 +67,64 @@ export default function LeaveReportsPage() {
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
-    const [loading, setLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(true);
+    const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
     
     const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [statusFilter, setStatusFilter] = useState<'all' | LeaveRequest['status']>('all');
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    const [reportData, setReportData] = useState<LeaveRequest[]>([]);
+    // Fetch all data once on component mount
+    useEffect(() => {
+        if (!firestore) return;
 
-    const handleGenerateReport = async () => {
-        if (!firestore || !dateFrom || !dateTo) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد تاريخ البدء والنهاية.' });
-            return;
-        }
-
-        setLoading(true);
-        setReportData([]);
-
-        try {
-            const startDate = new Date(dateFrom);
-            startDate.setHours(0, 0, 0, 0); // Set to start of the day
-            
-            const endDate = new Date(dateTo);
-            endDate.setHours(23, 59, 59, 999); // Set to end of the day
-
-            const constraints = [
-                where('startDate', '>=', Timestamp.fromDate(startDate)),
-                where('startDate', '<=', Timestamp.fromDate(endDate)),
-            ];
-            
-            const q = query(
-                collection(firestore, 'leaveRequests'), 
-                ...constraints
-            );
-            
-            const querySnapshot = await getDocs(q);
-            let data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-            
-            // Client-side filtering by status
-            if (statusFilter !== 'all') {
-                data = data.filter(req => req.status === statusFilter);
+        const fetchAllData = async () => {
+            setIsFetching(true);
+            try {
+                const q = query(collection(firestore, 'leaveRequests'));
+                const querySnapshot = await getDocs(q);
+                const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+                setAllRequests(data);
+            } catch (error) {
+                 console.error("Error fetching all leave requests: ", error);
+                 toast({ variant: 'destructive', title: 'خطأ في الاستعلام', description: 'فشل في جلب البيانات الأولية من قاعدة البيانات.' });
+            } finally {
+                setIsFetching(false);
+                setIsInitialLoad(false);
             }
+        };
+        
+        fetchAllData();
+    }, [firestore, toast]);
 
-            // Client-side sorting
-            data.sort((a, b) => {
-                const dateA = a.startDate ? (a.startDate as any).toDate() : new Date(0);
-                const dateB = b.startDate ? (b.startDate as any).toDate() : new Date(0);
-                return dateB.getTime() - dateA.getTime();
-            });
+    const reportData = useMemo(() => {
+        if (isInitialLoad) return [];
 
-            setReportData(data);
+        const start = parseISO(dateFrom);
+        start.setHours(0, 0, 0, 0);
 
-            if (data.length === 0) {
-                 toast({ title: 'لا توجد نتائج', description: 'لم يتم العثور على طلبات إجازة تطابق معايير البحث.' });
-            }
+        const end = parseISO(dateTo);
+        end.setHours(23, 59, 59, 999);
+        
+        const filteredData = allRequests.filter(req => {
+            const reqDate = req.startDate instanceof Timestamp ? req.startDate.toDate() : new Date(req.startDate);
+            
+            const isDateInRange = reqDate >= start && reqDate <= end;
+            const isStatusMatch = statusFilter === 'all' || req.status === statusFilter;
 
-        } catch (error) {
-            console.error("Error generating report: ", error);
-            toast({ variant: 'destructive', title: 'خطأ في الاستعلام', description: 'فشل في جلب البيانات. قد تحتاج إلى إنشاء فهرس مركب في Firestore. راجع الكونسول لمزيد من التفاصيل.' });
-        } finally {
-            setLoading(false);
-        }
-    }
+            return isDateInRange && isStatusMatch;
+        });
+
+        // Client-side sorting
+        filteredData.sort((a, b) => {
+            const dateA = a.startDate instanceof Timestamp ? a.startDate.toDate() : new Date(a.startDate);
+            const dateB = b.startDate instanceof Timestamp ? b.startDate.toDate() : new Date(b.startDate);
+            return dateB.getTime() - dateA.getTime();
+        });
+
+        return filteredData;
+    }, [allRequests, dateFrom, dateTo, statusFilter, isInitialLoad]);
     
     const totalDays = useMemo(() => {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
@@ -137,7 +133,7 @@ export default function LeaveReportsPage() {
     const formatDateForDisplay = (date: any) => {
         if (!date) return '-';
         try {
-            const d = typeof date === 'string' ? new Date(date) : date.toDate();
+            const d = date instanceof Timestamp ? date.toDate() : new Date(date);
             if (isNaN(d.getTime())) return '-';
             return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
         } catch (e) { return '-'; }
@@ -195,9 +191,14 @@ export default function LeaveReportsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <Button onClick={handleGenerateReport} disabled={loading} className="col-span-2 lg:col-span-1">
-                            {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}
-                            {loading ? 'جاري البحث...' : 'توليد التقرير'}
+                         <div className="hidden lg:block"></div> {/* Spacer */}
+                        <Button onClick={() => {
+                            if (reportData.length === 0 && !isFetching) {
+                                toast({ title: 'لا توجد نتائج', description: 'لم يتم العثور على طلبات إجازة تطابق معايير البحث.' });
+                            }
+                        }} disabled={isFetching} className="col-span-2 lg:col-span-1">
+                            {isFetching ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}
+                            {isFetching ? 'جاري التحميل...' : 'تحديث العرض'}
                         </Button>
                     </div>
                 </div>
@@ -208,8 +209,8 @@ export default function LeaveReportsPage() {
                         <div>
                             <h3 className='font-bold'>تقرير الإجازات</h3>
                             {dateFrom && dateTo && (
-                                 <p className='text-sm text-muted-foreground'>
-                                    للفترة من {format(new Date(dateFrom), "dd/MM/yyyy", { numberingSystem: 'latn' } as any)} إلى {format(new Date(dateTo), "dd/MM/yyyy", { numberingSystem: 'latn' } as any)}
+                                 <p className='text-sm text-muted-foreground' dir='ltr'>
+                                    For period from {format(new Date(dateFrom), "dd/MM/yyyy")} to {format(new Date(dateTo), "dd/MM/yyyy")}
                                 </p>
                             )}
                            
@@ -231,19 +232,19 @@ export default function LeaveReportsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                             {loading && Array.from({ length: 5 }).map((_, i) => (
+                             {isFetching && Array.from({ length: 5 }).map((_, i) => (
                                 <TableRow key={`skel-${i}`}>
                                     <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                                 </TableRow>
                             ))}
-                            {!loading && reportData.length === 0 && (
+                            {!isFetching && reportData.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
-                                        {reportData.length === 0 && !loading ? 'لا توجد بيانات لعرضها. الرجاء تحديد الفلاتر وتوليد التقرير.' : ''}
+                                        لا توجد بيانات تطابق الفلاتر المحددة.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!loading && reportData.map(req => (
+                            {!isFetching && reportData.map(req => (
                                 <TableRow key={req.id}>
                                     <TableCell className='font-medium'>{req.employeeName}</TableCell>
                                     <TableCell>
