@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -33,12 +31,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -78,6 +77,12 @@ export default function LeaveRequestsPage() {
     const [isReturnConfirmOpen, setIsReturnConfirmOpen] = useState(false);
     const [isProcessingReturn, setIsProcessingReturn] = useState(false);
 
+    const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [isRejectConfirmOpen, setIsRejectConfirmOpen] = useState(false);
+    const [isProcessingReject, setIsProcessingReject] = useState(false);
+
+
     useEffect(() => {
         if (isReturnConfirmOpen) {
             setActualReturnDate(new Date().toISOString().split('T')[0]);
@@ -97,12 +102,13 @@ export default function LeaveRequestsPage() {
     const requests = useMemo(() => {
         if (!snapshot) return [];
         const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+        // Client-side sorting
         reqs.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
         return reqs;
     }, [snapshot]);
 
 
-    const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected', employeeId?: string, workingDays?: number) => {
+    const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected', employeeId?: string, rejectionReason?: string) => {
         if (!firestore || !employeeId) return;
 
         const requestRef = doc(firestore, 'leaveRequests', requestId);
@@ -111,20 +117,20 @@ export default function LeaveRequestsPage() {
         try {
             const batch = writeBatch(firestore);
 
-            batch.update(requestRef, {
+            const updateData: DocumentData = {
                 status: newStatus,
                 approvedAt: serverTimestamp(),
                 // approvedBy: currentUser?.uid // In a real app with auth context
-            });
+            };
+            
+            if (newStatus === 'rejected') {
+                updateData.rejectionReason = rejectionReason || 'لم يتم تحديد سبب.';
+            }
 
-            // If approved, update employee status and leave balance
+            batch.update(requestRef, updateData);
+
             if (newStatus === 'approved') {
-                batch.update(employeeRef, { 
-                    status: 'on-leave',
-                    // This is a simplified update. A robust system would use transactions
-                    // and cloud functions to handle leave accrual and usage precisely.
-                    // annualLeaveUsed: increment(workingDays) 
-                });
+                batch.update(employeeRef, { status: 'on-leave' });
             }
 
             await batch.commit();
@@ -156,6 +162,12 @@ export default function LeaveRequestsPage() {
     const handleReturnClick = (request: LeaveRequest) => {
         setRequestToReturn(request);
         setIsReturnConfirmOpen(true);
+    }
+    
+    const handleRejectClick = (request: LeaveRequest) => {
+        setRequestToReject(request);
+        setRejectionReason('');
+        setIsRejectConfirmOpen(true);
     }
 
     const handleConfirmReturn = async () => {
@@ -191,6 +203,16 @@ export default function LeaveRequestsPage() {
             setRequestToReturn(null);
         }
     };
+
+    const handleConfirmReject = async () => {
+        if (!requestToReject) return;
+        setIsProcessingReject(true);
+        await handleStatusUpdate(requestToReject.id, 'rejected', requestToReject.employeeId, rejectionReason);
+        setIsProcessingReject(false);
+        setIsRejectConfirmOpen(false);
+        setRequestToReject(null);
+    };
+
 
     const handleCloseForm = () => {
         setIsFormOpen(false);
@@ -301,9 +323,16 @@ export default function LeaveRequestsPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant="outline" className={statusColors[req.status]}>
-                                        {statusTranslations[req.status]}
-                                    </Badge>
+                                    <div className="flex flex-col gap-1">
+                                        <Badge variant="outline" className={statusColors[req.status]}>
+                                            {statusTranslations[req.status]}
+                                        </Badge>
+                                        {req.status === 'rejected' && req.rejectionReason && (
+                                            <p className='text-xs text-muted-foreground truncate' title={req.rejectionReason}>
+                                                السبب: {req.rejectionReason}
+                                            </p>
+                                        )}
+                                    </div>
                                 </TableCell>
                                 <TableCell className='text-center'>
                                     {filter === 'pending' && (
@@ -311,10 +340,10 @@ export default function LeaveRequestsPage() {
                                             <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId, req.workingDays)}>
+                                            <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)}>
                                                 <Check className="h-4 w-4" />
                                             </Button>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleStatusUpdate(req.id, 'rejected', req.employeeId)}>
+                                            <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(req)}>
                                                 <X className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -369,6 +398,32 @@ export default function LeaveRequestsPage() {
                     <AlertDialogCancel disabled={isProcessingReturn}>إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleConfirmReturn} disabled={isProcessingReturn}>
                         {isProcessingReturn ? 'جاري الحفظ...' : 'تأكيد العودة'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={isRejectConfirmOpen} onOpenChange={setIsRejectConfirmOpen}>
+            <AlertDialogContent dir="rtl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>رفض طلب الإجازة</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        الرجاء كتابة سبب رفض طلب الإجازة للموظف "{requestToReject?.employeeName}".
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                 <div className="grid gap-2 py-4">
+                    <Label htmlFor="rejectionReason">سبب الرفض</Label>
+                    <Textarea
+                        id="rejectionReason"
+                        placeholder="مثال: ضغط العمل في هذه الفترة، عدم وجود بديل..."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                    />
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isProcessingReject}>إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmReject} disabled={isProcessingReject || !rejectionReason} className="bg-destructive hover:bg-destructive/90">
+                        {isProcessingReject ? 'جاري الرفض...' : 'تأكيد الرفض'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

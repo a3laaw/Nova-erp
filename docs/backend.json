@@ -182,6 +182,7 @@
             "createdAt": { "type": "string", "format": "date-time" },
             "approvedBy": { "type": "string", "description": "UID of the user who approved/rejected the request." },
             "approvedAt": { "type": "string", "format": "date-time" },
+            "rejectionReason": { "type": "string", "description": "Reason for rejecting the leave request." },
             "isBackFromLeave": { "type": "boolean", "description": "Indicates if the employee has returned from this specific leave." },
             "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." }
         },

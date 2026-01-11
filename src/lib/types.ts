@@ -212,6 +212,7 @@ export interface LeaveRequest {
     createdAt: any;
     approvedBy?: string;
     approvedAt?: any;
+    rejectionReason?: string;
     isBackFromLeave?: boolean;
     actualReturnDate?: any;
 }
