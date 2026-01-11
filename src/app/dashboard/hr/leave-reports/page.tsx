@@ -111,8 +111,8 @@ export default function LeaveReportsPage() {
 
             // Client-side sorting
             data.sort((a, b) => {
-                const dateA = a.startDate ? (typeof a.startDate === 'string' ? new Date(a.startDate) : (a.startDate as any).toDate()) : new Date(0);
-                const dateB = b.startDate ? (typeof b.startDate === 'string' ? new Date(b.startDate) : (b.startDate as any).toDate()) : new Date(0);
+                const dateA = a.startDate ? (a.startDate as any).toDate() : new Date(0);
+                const dateB = b.startDate ? (b.startDate as any).toDate() : new Date(0);
                 return dateB.getTime() - dateA.getTime();
             });
 
@@ -139,7 +139,7 @@ export default function LeaveReportsPage() {
         try {
             const d = typeof date === 'string' ? new Date(date) : date.toDate();
             if (isNaN(d.getTime())) return '-';
-            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
         } catch (e) { return '-'; }
     }
     

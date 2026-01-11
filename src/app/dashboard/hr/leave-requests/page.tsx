@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -230,21 +231,14 @@ export default function LeaveRequestsPage() {
   const formatDate = (date: any) => {
     if (!date) return '-';
     try {
-        let d: Date;
-        if (typeof date === 'string') {
-            d = new Date(date);
-        } else if (date && typeof date.seconds === 'number') {
-            d = new Date(date.seconds * 1000);
-        } else {
-            return '-';
-        }
-        
+        // Handle both ISO strings and Firestore Timestamps
+        const d = typeof date === 'string' ? new Date(date) : date.toDate();
         if (isNaN(d.getTime())) return '-';
-
         return new Intl.DateTimeFormat('en-GB', {
             day: '2-digit',
             month: '2-digit',
-            year: 'numeric'
+            year: 'numeric',
+            numberingSystem: 'latn'
         }).format(d);
     } catch (e) {
         return '-';
@@ -323,8 +317,8 @@ export default function LeaveRequestsPage() {
                                 </TableCell>
                                 <TableCell>{formatDate(req.startDate)}</TableCell>
                                 <TableCell>{formatDate(req.endDate)}</TableCell>
-                                <TableCell className="font-medium">
-                                  {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
+                                 <TableCell className='font-medium'>
+                                    {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-1">

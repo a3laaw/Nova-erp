@@ -24,7 +24,7 @@ import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, addDoc, updateDoc, doc, serverTimestamp, getDocs, type DocumentData } from 'firebase/firestore';
+import { collection, query, where, addDoc, updateDoc, doc, serverTimestamp, getDocs, type DocumentData, Timestamp } from 'firebase/firestore';
 import type { Employee, LeaveRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { differenceInCalendarDays, format } from 'date-fns';
@@ -97,8 +97,10 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         if (isEditing && requestToEdit) {
             setEmployeeId(requestToEdit.employeeId);
             setLeaveType(requestToEdit.leaveType);
-            setStartDate(format(new Date(requestToEdit.startDate), 'yyyy-MM-dd'));
-            setEndDate(format(new Date(requestToEdit.endDate), 'yyyy-MM-dd'));
+            const start = requestToEdit.startDate ? (requestToEdit.startDate as any).toDate() : new Date();
+            const end = requestToEdit.endDate ? (requestToEdit.endDate as any).toDate() : new Date();
+            setStartDate(format(start, 'yyyy-MM-dd'));
+            setEndDate(format(end, 'yyyy-MM-dd'));
             setNotes(requestToEdit.notes || '');
         } else {
             resetForm();
@@ -123,10 +125,8 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     }, [selectedEmployee, isEditing, requestToEdit]);
 
     const remainingBalance = useMemo(() => {
-        if (leaveType === 'Annual') {
-            return currentBalance - workingDays;
-        }
-        return currentBalance; // For other leave types, the balance is not affected
+        if (leaveType !== 'Annual') return currentBalance;
+        return currentBalance - workingDays;
     }, [currentBalance, workingDays, leaveType]);
 
 
@@ -168,8 +168,8 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                 employeeId: employeeId,
                 employeeName: selectedEmployee.fullName,
                 leaveType: leaveType,
-                startDate: new Date(startDate).toISOString(),
-                endDate: new Date(endDate).toISOString(),
+                startDate: Timestamp.fromDate(new Date(startDate)),
+                endDate: Timestamp.fromDate(new Date(endDate)),
                 days: totalCalendarDays,
                 workingDays: workingDays,
                 notes: notes,
