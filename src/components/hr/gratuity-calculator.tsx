@@ -67,7 +67,7 @@ export function GratuityCalculator() {
         setEmployeesLoading(true);
         try {
             // Fetch only active or terminated employees who might need calculation
-            const q = query(collection(firestore, 'employees'), where('status', '!=', 'on-leave'), orderBy('fullName'));
+            const q = query(collection(firestore, 'employees'), where('status', 'in', ['active', 'terminated']), orderBy('fullName'));
             const querySnapshot = await getDocs(q);
             const fetchedEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
