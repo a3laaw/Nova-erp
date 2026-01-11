@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, endOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -85,12 +85,11 @@ export default function LeaveReportsPage() {
         setReportData([]);
 
         try {
-            const startDate = new Date(dateFrom); // Start of the day
-            startDate.setHours(0, 0, 0, 0);
+            const startDate = new Date(dateFrom);
+            startDate.setHours(0, 0, 0, 0); // Set to start of the day
             
-            const endDate = new Date(dateTo); // End of the day
-            endDate.setHours(23, 59, 59, 999);
-
+            const endDate = new Date(dateTo);
+            endDate.setHours(23, 59, 59, 999); // Set to end of the day
 
             const constraints = [
                 where('startDate', '>=', Timestamp.fromDate(startDate)),
@@ -109,6 +108,7 @@ export default function LeaveReportsPage() {
             const querySnapshot = await getDocs(q);
             const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             
+            // Sort client-side to avoid needing another composite index
             data.sort((a, b) => {
                 const dateA = a.startDate ? (typeof a.startDate === 'string' ? new Date(a.startDate) : (a.startDate as any).toDate()) : new Date(0);
                 const dateB = b.startDate ? (typeof b.startDate === 'string' ? new Date(b.startDate) : (b.startDate as any).toDate()) : new Date(0);
