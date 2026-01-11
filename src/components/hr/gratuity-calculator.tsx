@@ -66,7 +66,6 @@ export function GratuityCalculator() {
     const fetchEmployees = async () => {
         setEmployeesLoading(true);
         try {
-            // Fetch all employees ordered by name
             const q = query(collection(firestore, 'employees'), orderBy('fullName'));
             const querySnapshot = await getDocs(q);
             const fetchedEmployees: Employee[] = [];
@@ -124,13 +123,6 @@ export function GratuityCalculator() {
         gratuity += basicSalary * remainingYears;
     }
     
-    // Total indemnity should not exceed 1.5 years' salary
-    const maxGratuity = basicSalary * 1.5 * (yearsOfService > 5 ? Math.floor(yearsOfService) : 5);
-    // A more standard cap is just 1.5 year's total salary. Let's use total remuneration for cap.
-    const totalRemuneration = (selectedEmployee.basicSalary || 0) + (selectedEmployee.housingAllowance || 0) + (selectedEmployee.transportAllowance || 0);
-    gratuity = Math.min(gratuity, totalRemuneration * 1.5);
-    
-
     // From Article 52 - rules for resignation
     if (terminationReason === 'resignation') {
         if (yearsOfService < 3) {
