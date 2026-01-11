@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -37,6 +37,8 @@ import { collection, query, orderBy, where, doc, updateDoc, writeBatch, serverTi
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest } from '@/lib/types';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -72,9 +74,15 @@ export default function LeaveRequestsPage() {
     const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
     
     const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
+    const [actualReturnDate, setActualReturnDate] = useState('');
     const [isReturnConfirmOpen, setIsReturnConfirmOpen] = useState(false);
     const [isProcessingReturn, setIsProcessingReturn] = useState(false);
 
+    useEffect(() => {
+        if (isReturnConfirmOpen) {
+            setActualReturnDate(new Date().toISOString().split('T')[0]);
+        }
+    }, [isReturnConfirmOpen]);
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
@@ -151,7 +159,10 @@ export default function LeaveRequestsPage() {
     }
 
     const handleConfirmReturn = async () => {
-        if (!firestore || !requestToReturn) return;
+        if (!firestore || !requestToReturn || !actualReturnDate) {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد تاريخ العودة الفعلي.' });
+            return;
+        }
 
         setIsProcessingReturn(true);
         const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id);
@@ -162,7 +173,7 @@ export default function LeaveRequestsPage() {
 
             batch.update(requestRef, {
                 isBackFromLeave: true,
-                actualReturnDate: serverTimestamp(),
+                actualReturnDate: new Date(actualReturnDate).toISOString(),
             });
 
             batch.update(employeeRef, {
@@ -187,7 +198,7 @@ export default function LeaveRequestsPage() {
     };
 
 
-  const formatDate = (date: string | { seconds: number, nanoseconds: number }) => {
+  const formatDate = (date: any) => {
     if (!date) return '-';
     try {
         let d: Date;
@@ -340,15 +351,24 @@ export default function LeaveRequestsPage() {
        <AlertDialog open={isReturnConfirmOpen} onOpenChange={setIsReturnConfirmOpen}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>تأكيد عودة الموظف</AlertDialogTitle>
+                    <AlertDialogTitle>تسجيل عودة الموظف</AlertDialogTitle>
                     <AlertDialogDescription>
-                        هل تؤكد عودة الموظف "{requestToReturn?.employeeName}" من الإجازة بتاريخ اليوم؟ سيتم تحديث حالة الموظف إلى "نشط".
+                        الرجاء تحديد تاريخ العودة الفعلي للموظف "{requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                 <div className="grid gap-2 py-4">
+                    <Label htmlFor="actualReturnDate">تاريخ العودة الفعلي</Label>
+                    <Input
+                        id="actualReturnDate"
+                        type="date"
+                        value={actualReturnDate}
+                        onChange={(e) => setActualReturnDate(e.target.value)}
+                    />
+                </div>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isProcessingReturn}>إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleConfirmReturn} disabled={isProcessingReturn}>
-                        {isProcessingReturn ? 'جاري الحفظ...' : 'نعم، تأكيد العودة'}
+                        {isProcessingReturn ? 'جاري الحفظ...' : 'تأكيد العودة'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
