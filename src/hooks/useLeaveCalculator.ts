@@ -1,16 +1,16 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useFirestore, useCollection } from '@/firebase';
+import { useState, useEffect } from 'react';
+import { useFirestore } from '@/firebase';
 import { collection, getDocs, query, type DocumentData } from 'firebase/firestore';
 import { eachDayOfInterval, format, isFriday } from 'date-fns';
 import type { Holiday } from '@/lib/types';
 
-// Simple in-memory cache for holidays to prevent re-fetching on every date change.
+// In-memory cache for holidays to prevent re-fetching on every date change.
 let holidayCache: Set<string> | null = null;
 let cacheTimestamp: number | null = null;
-const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+const CACHE_DURATION = 1000 * 60 * 15; // 15 minutes
 
 async function getHolidays(firestore: DocumentData): Promise<Set<string>> {
   const now = Date.now();
@@ -18,18 +18,28 @@ async function getHolidays(firestore: DocumentData): Promise<Set<string>> {
     return holidayCache;
   }
 
-  const holidaysQuery = query(collection(firestore, 'holidays'));
-  const holidaysSnapshot = await getDocs(holidaysQuery);
-  const holidayDates = new Set<string>();
-  holidaysSnapshot.forEach(doc => {
-    const data = doc.data() as Holiday;
-    // Store date in 'yyyy-MM-dd' format for easy comparison
-    holidayDates.add(format(new Date(data.date), 'yyyy-MM-dd'));
-  });
+  try {
+    const holidaysQuery = query(collection(firestore, 'holidays'));
+    const holidaysSnapshot = await getDocs(holidaysQuery);
+    const holidayDates = new Set<string>();
+    holidaysSnapshot.forEach(doc => {
+      const data = doc.data() as Holiday;
+      // Store date in 'yyyy-MM-dd' format for easy comparison
+      if (data.date) {
+        // Handle Firestore Timestamp or ISO string
+        const date = typeof data.date === 'string' ? new Date(data.date) : data.date.toDate();
+        holidayDates.add(format(date, 'yyyy-MM-dd'));
+      }
+    });
 
-  holidayCache = holidayDates;
-  cacheTimestamp = now;
-  return holidayDates;
+    holidayCache = holidayDates;
+    cacheTimestamp = now;
+    return holidayDates;
+  } catch (error) {
+    console.error("Error fetching holidays:", error);
+    // In case of error, return an empty set to allow calculation to proceed without holidays
+    return new Set();
+  }
 }
 
 export function useLeaveCalculator(startDate: string, endDate: string) {
@@ -40,7 +50,14 @@ export function useLeaveCalculator(startDate: string, endDate: string) {
 
   useEffect(() => {
     const calculate = async () => {
-      if (!startDate || !endDate || !firestore) {
+      if (!startDate || !endDate) {
+        setWorkingDays(0);
+        setError(null);
+        return;
+      }
+      
+      if (!firestore) {
+        setError('فشل الاتصال بقاعدة البيانات.');
         setWorkingDays(0);
         return;
       }
@@ -48,9 +65,9 @@ export function useLeaveCalculator(startDate: string, endDate: string) {
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      if (start > end) {
+      if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
         setWorkingDays(0);
-        setError('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.');
+        setError(start > end ? 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية.' : null);
         return;
       }
       

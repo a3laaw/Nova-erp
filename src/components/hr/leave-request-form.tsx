@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,14 +22,15 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info, Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, addDoc, serverTimestamp, doc, updateDoc, getDoc, type DocumentData } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, differenceInYears } from 'date-fns';
 import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '../ui/skeleton';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -37,6 +38,26 @@ interface LeaveRequestFormProps {
 }
 
 type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
+
+const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
+    if (!employee || !employee.hireDate) return 0;
+    
+    const hireDate = new Date(employee.hireDate);
+    const yearsOfService = differenceInYears(new Date(), hireDate);
+    
+    if (yearsOfService < 1) return 0;
+    
+    const accrued = employee.annualLeaveAccrued || 0;
+    const used = employee.annualLeaveUsed || 0;
+    const carried = employee.carriedLeaveDays || 0;
+
+    const effectiveCarried = Math.min(carried, 15);
+    const totalEntitlement = accrued + effectiveCarried;
+    const balance = totalEntitlement - used;
+    
+    return Math.max(0, Math.min(45, Math.floor(balance)));
+};
+
 
 export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const firestore = useFirestore();
@@ -47,11 +68,16 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         return query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
     }, [firestore]);
 
-    const [employeesSnapshot, employeesLoading, employeesError] = useCollection(employeesQuery);
+    const [employeesSnapshot, employeesLoading] = useCollection(employeesQuery);
 
-    const employees = useMemo(() => {
+    const employees: Employee[] = useMemo(() => {
         if (!employeesSnapshot) return [];
-        return employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+        const employeeList = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+        // Recalculate balance on the client side for display
+        return employeeList.map(emp => ({
+            ...emp,
+            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
+        }));
     }, [employeesSnapshot]);
 
     const [employeeId, setEmployeeId] = useState('');
@@ -71,7 +97,6 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const currentBalance = selectedEmployee?.annualLeaveBalance ?? 0;
     const remainingBalance = currentBalance - workingDays;
 
-    // This calculates total calendar days for display, but workingDays is used for logic
     const totalCalendarDays = useMemo(() => {
         if (startDate && endDate) {
             const start = new Date(startDate);
@@ -82,18 +107,25 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         return 0;
     }, [startDate, endDate]);
 
-    const resetForm = () => {
+    const resetForm = useCallback(() => {
         setEmployeeId('');
         setLeaveType('');
         setStartDate('');
         setEndDate('');
         setNotes('');
         setFile(null);
-    };
+    }, []);
+
+    useEffect(() => {
+        // Reset form when dialog is closed
+        if (!isOpen) {
+            resetForm();
+        }
+    }, [isOpen, resetForm]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore) return;
+        if (!firestore || !selectedEmployee) return;
         
         if (!employeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
@@ -119,7 +151,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             
             await addDoc(collection(firestore, 'leaveRequests'), {
                 employeeId: employeeId,
-                employeeName: selectedEmployee?.fullName || 'N/A',
+                employeeName: selectedEmployee.fullName,
                 leaveType: leaveType,
                 startDate: new Date(startDate).toISOString(),
                 endDate: new Date(endDate).toISOString(),
@@ -132,7 +164,6 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             });
 
             toast({ title: 'نجاح', description: 'تم تقديم طلب الإجازة بنجاح.' });
-            resetForm();
             onClose();
         } catch (err) {
             console.error(err);
@@ -160,7 +191,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                             <SelectValue placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
-                            {employeesLoading && <p className="p-2 text-xs text-muted-foreground">جاري تحميل الموظفين...</p>}
+                            {employeesLoading && <div className='p-2'><Skeleton className='h-8 w-full' /></div>}
                             {!employeesLoading && employees.length === 0 ? (
                                 <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون نشطون حالياً.</p>
                             ) : (
@@ -168,7 +199,6 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                                     <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
                                 ))
                             )}
-                             {employeesError && <p className="p-2 text-xs text-destructive">فشل تحميل الموظفين</p>}
                         </SelectContent>
                     </Select>
                 </div>
@@ -209,23 +239,23 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                                 <div className='text-destructive'>{calcError}</div>
                            ) : (
                             <>
-                                <div className="flex justify-between">
-                                    <span>مجموع أيام العمل المطلوبة:</span>
-                                    <span className="font-bold">{workingDays} أيام</span>
+                                <div className="flex justify-between items-center">
+                                    <span className='flex items-center gap-1'><CalendarCheck className='h-4 w-4 text-muted-foreground' />أيام العمل المطلوبة:</span>
+                                    <span className="font-bold text-primary">{workingDays} أيام</span>
                                 </div>
-                                 <div className="flex justify-between">
-                                    <span>الرصيد الحالي للموظف:</span>
+                                 <div className="flex justify-between items-center">
+                                    <span className='flex items-center gap-1'><Wallet className='h-4 w-4 text-muted-foreground' />الرصيد الحالي للموظف:</span>
                                     <span>{currentBalance} يوم</span>
                                 </div>
                                 <hr className="border-dashed" />
-                                <div className={cn("flex justify-between font-semibold", remainingBalance < 0 && "text-destructive")}>
-                                    <span>الرصيد المتبقي بعد هذا الطلب:</span>
+                                <div className={cn("flex justify-between font-semibold items-center", remainingBalance < 0 && "text-destructive")}>
+                                    <span className='flex items-center gap-1'><Wallet className='h-4 w-4' />الرصيد المتبقي بعد الطلب:</span>
                                     <span>{remainingBalance} يوم</span>
                                 </div>
                                 {remainingBalance < 0 && (
-                                     <div className="text-destructive text-xs flex items-center gap-1">
+                                     <div className="text-destructive text-xs flex items-center gap-1 p-2 bg-destructive/10 rounded-md">
                                         <AlertCircle className="h-3 w-3"/>
-                                        الرصيد سيكون سالبًا!
+                                        الرصيد سيكون سالبًا! هذا الطلب سيخصم من الرصيد المستقبلي.
                                     </div>
                                 )}
                             </>
@@ -233,7 +263,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                         </AlertDescription>
                     </Alert>
                 )}
-                 {totalCalendarDays < 0 && <Alert variant="destructive"><AlertDescription>تاريخ النهاية يجب أن يكون بعد تاريخ البداية.</AlertDescription></Alert>}
+                 {totalCalendarDays < 0 && <Alert variant="destructive"><AlertCircle className="h-4 w-4"/><AlertTitle>خطأ في التاريخ</AlertTitle><AlertDescription>تاريخ النهاية يجب أن يكون بعد تاريخ البداية.</AlertDescription></Alert>}
 
                 <div className="grid gap-2">
                     <Label htmlFor="notes">ملاحظات</Label>

@@ -38,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { addMonths, format } from 'date-fns';
+import { addMonths, format, differenceInYears } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Checkbox } from '../ui/checkbox';
 
@@ -56,23 +56,27 @@ const statusColors: Record<Employee['status'], string> = {
 
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
     if (!employee.hireDate) return 0;
+    
     const hireDate = new Date(employee.hireDate);
-    // Use a client-side safe date
-    const today = new Date();
-    const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-
+    const yearsOfService = differenceInYears(new Date(), hireDate);
+    
+    // As per Kuwait law, no leave entitlement in the first year of service
     if (yearsOfService < 1) {
         return 0;
     }
     
+    // Assuming accrual logic has been handled server-side or via a batch job
+    // and stored in the employee document.
     const accrued = employee.annualLeaveAccrued || 0;
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
     // Max carry-over is 15 days, total balance cannot exceed 45 (30 current + 15 carried).
-    const totalBalance = accrued + Math.min(carried, 15) - used;
+    const effectiveCarried = Math.min(carried, 15);
+    const totalEntitlement = accrued + effectiveCarried;
+    const balance = totalEntitlement - used;
     
-    return Math.max(0, Math.min(45, Math.floor(totalBalance)));
+    return Math.max(0, Math.min(45, Math.floor(balance)));
 };
 
 export function EmployeesTable() {
@@ -88,11 +92,12 @@ export function EmployeesTable() {
 
     const employees = useMemo(() => {
         if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            leaveBalance: calculateAnnualLeaveBalance(doc.data() as Employee)
-        } as Employee & { leaveBalance: number }));
+        const employeeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+        // Recalculate balance on the client side for display
+        return employeeList.map(emp => ({
+            ...emp,
+            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
+        }));
     }, [snapshot]);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
@@ -277,7 +282,7 @@ export function EmployeesTable() {
                         <TableCell>{employee.department}</TableCell>
                         <TableCell>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</TableCell>
                         <TableCell className='font-medium'>
-                            {employee.leaveBalance !== null ? `${employee.leaveBalance} يوم` : '...'}
+                            {employee.annualLeaveBalance !== undefined ? `${employee.annualLeaveBalance} يوم` : '...'}
                         </TableCell>
                         <TableCell>
                             <Badge variant={'outline'} className={statusColors[employee.status]}>
