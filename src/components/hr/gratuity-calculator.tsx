@@ -25,6 +25,7 @@ import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
+import { intervalToDuration } from 'date-fns';
 
 type TerminationReason = 'resignation' | 'termination';
 
@@ -105,17 +106,22 @@ export function GratuityCalculator() {
     if (termDate < hireDate) {
         return { error: 'تاريخ انتهاء الخدمة لا يمكن أن يكون قبل تاريخ التعيين.' };
     }
+    
+    const duration = intervalToDuration({ start: hireDate, end: termDate });
+    const formattedDuration = `${duration.years || 0} سنوات, ${duration.months || 0} أشهر, ${duration.days || 0} أيام`;
 
     const serviceDays = (termDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24);
     const yearsOfService = serviceDays / 365.25;
 
     // From Article 51 of Kuwait Labor Law
     const basicSalary = selectedEmployee.basicSalary || 0;
+    const totalRemuneration = basicSalary + (selectedEmployee.housingAllowance || 0) + (selectedEmployee.transportAllowance || 0);
+
     let gratuity = 0;
     
     // First 5 years: 15 days pay for each year
     const first5Years = Math.min(yearsOfService, 5);
-    gratuity += (15 / 30) * basicSalary * first5Years;
+    gratuity += (15 / 26) * basicSalary * first5Years;
 
     // After 5 years: 1 month pay for each year
     if (yearsOfService > 5) {
@@ -143,6 +149,7 @@ export function GratuityCalculator() {
 
     return { 
         yearsOfService: parseFloat(yearsOfService.toFixed(2)),
+        formattedDuration,
         basicSalary, 
         gratuity, 
         leaveBalance, 
@@ -208,7 +215,7 @@ export function GratuityCalculator() {
               <div className="mt-4 space-y-3">
                 <div className='flex justify-between'>
                     <span>سنوات الخدمة:</span>
-                    <span className='font-bold'>{calculationResult.yearsOfService} سنة</span>
+                    <span className='font-bold'>{calculationResult.formattedDuration}</span>
                 </div>
                 <div className='flex justify-between'>
                     <span>الراتب الأساسي المستخدم في الحساب:</span>
