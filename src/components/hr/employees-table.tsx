@@ -280,7 +280,7 @@ export function EmployeesTable() {
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>
-                        <TableCell>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</TableCell>
+                        <TableCell>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }) : '-'}</TableCell>
                         <TableCell className='font-medium'>
                             {employee.annualLeaveBalance !== undefined ? `${employee.annualLeaveBalance} يوم` : '...'}
                         </TableCell>
