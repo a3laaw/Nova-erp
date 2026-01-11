@@ -55,10 +55,10 @@ export function useFirebaseApp() {
 /**
  * A custom hook to specifically access the Firebase Auth instance.
  */
-export function useAuthContext() {
+export function useAuth() {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
-    throw new Error('useAuthContext must be used within a FirebaseProvider');
+    throw new Error('useAuth must be used within a FirebaseProvider');
   }
   return context.auth;
 }

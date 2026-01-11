@@ -18,14 +18,14 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
         <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
-            <LanguageProvider>
-                <FirebaseClientProvider>
-                  <AuthProvider>
-                    {children}
-                    <Toaster />
-                  </AuthProvider>
-                </FirebaseClientProvider>
-            </LanguageProvider>
+            <FirebaseClientProvider>
+              <LanguageProvider>
+                <AuthProvider>
+                  {children}
+                  <Toaster />
+                </AuthProvider>
+              </LanguageProvider>
+            </FirebaseClientProvider>
         </body>
     </html>
   );
