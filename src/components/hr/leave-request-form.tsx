@@ -22,7 +22,7 @@ import {
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { collection, query, where, orderBy, addDoc, serverTimestamp, getDocs, type DocumentData } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -59,9 +59,15 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             if (!firestore || !isOpen) return;
             setEmployeesLoading(true);
             try {
-                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
+                // Simplified query to avoid composite index requirement.
+                // We will sort the employees on the client-side.
+                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEmployees = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                
+                // Sort employees by name on the client
+                fetchedEmployees.sort((a, b) => a.fullName.localeCompare(b.fullName));
+                
                 setEmployees(fetchedEmployees);
             } catch (error) {
                 console.error("Failed to fetch employees:", error);
@@ -71,7 +77,9 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             }
         };
 
-        fetchEmployees();
+        if (isOpen) {
+            fetchEmployees();
+        }
     }, [firestore, isOpen, toast]);
     
     const { workingDays, loading: calculating, error: calcError } = useLeaveCalculator(startDate, endDate);
@@ -79,10 +87,15 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const selectedEmployee = useMemo(() => {
         return employees.find(emp => emp.id === employeeId) || null;
     }, [employeeId, employees]);
+    
+    const currentBalance = useMemo(() => {
+        if (!selectedEmployee) return 0;
+        const accrued = selectedEmployee.annualLeaveAccrued || 0;
+        const used = selectedEmployee.annualLeaveUsed || 0;
+        const carried = selectedEmployee.carriedLeaveDays || 0;
+        return (accrued + carried) - used;
+    }, [selectedEmployee]);
 
-    // This logic needs to be revisited as annualLeaveBalance is calculated in the table.
-    // For now, we will use the property directly if it exists, or default to 0.
-    const currentBalance = selectedEmployee?.annualLeaveBalance ?? selectedEmployee?.annualLeaveAccrued ?? 0;
     const remainingBalance = currentBalance - workingDays;
 
     const totalCalendarDays = useMemo(() => {
@@ -243,7 +256,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                                 {remainingBalance < 0 && (
                                      <div className="text-destructive text-xs flex items-center gap-1 p-2 bg-destructive/10 rounded-md">
                                         <AlertCircle className="h-3 w-3"/>
-                                        الرصيد سيكون سالبًا! هذا الطلب سيخصم من الرصيد المستقبلي.
+                                        الرصيد سيكون سالبًا!
                                     </div>
                                 )}
                             </>
