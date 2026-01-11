@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, PlusCircle, X, Pencil } from 'lucide-react';
+import { Check, PlusCircle, X, Pencil, LogIn, CheckCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,27 +20,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, where, doc, updateDoc, serverTimestamp, type DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-
-
-interface LeaveRequest extends DocumentData {
-    id: string;
-    employeeId: string;
-    employeeName: string;
-    leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
-    startDate: string;
-    endDate: string;
-    days: number;
-    workingDays?: number;
-    notes?: string;
-    status: 'pending' | 'approved' | 'rejected';
-    createdAt: { seconds: number, nanoseconds: number };
-}
+import type { LeaveRequest } from '@/lib/types';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -73,6 +70,11 @@ export default function LeaveRequestsPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
     const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
+    
+    const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
+    const [isReturnConfirmOpen, setIsReturnConfirmOpen] = useState(false);
+    const [isProcessingReturn, setIsProcessingReturn] = useState(false);
+
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
@@ -92,15 +94,33 @@ export default function LeaveRequestsPage() {
     }, [snapshot]);
 
 
-    const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected') => {
-        if (!firestore) return;
+    const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected', employeeId?: string, workingDays?: number) => {
+        if (!firestore || !employeeId) return;
+
         const requestRef = doc(firestore, 'leaveRequests', requestId);
+        const employeeRef = doc(firestore, 'employees', employeeId);
+
         try {
-            await updateDoc(requestRef, {
+            const batch = writeBatch(firestore);
+
+            batch.update(requestRef, {
                 status: newStatus,
                 approvedAt: serverTimestamp(),
                 // approvedBy: currentUser?.uid // In a real app with auth context
             });
+
+            // If approved, update employee status and leave balance
+            if (newStatus === 'approved') {
+                batch.update(employeeRef, { 
+                    status: 'on-leave',
+                    // This is a simplified update. A robust system would use transactions
+                    // and cloud functions to handle leave accrual and usage precisely.
+                    // annualLeaveUsed: increment(workingDays) 
+                });
+            }
+
+            await batch.commit();
+            
             toast({
                 title: 'نجاح',
                 description: `تم ${newStatus === 'approved' ? 'قبول' : 'رفض'} الطلب بنجاح.`
@@ -125,22 +145,67 @@ export default function LeaveRequestsPage() {
         setIsFormOpen(true);
     };
 
+    const handleReturnClick = (request: LeaveRequest) => {
+        setRequestToReturn(request);
+        setIsReturnConfirmOpen(true);
+    }
+
+    const handleConfirmReturn = async () => {
+        if (!firestore || !requestToReturn) return;
+
+        setIsProcessingReturn(true);
+        const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id);
+        const employeeRef = doc(firestore, 'employees', requestToReturn.employeeId);
+
+        try {
+            const batch = writeBatch(firestore);
+
+            batch.update(requestRef, {
+                isBackFromLeave: true,
+                actualReturnDate: serverTimestamp(),
+            });
+
+            batch.update(employeeRef, {
+                status: 'active'
+            });
+
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم تسجيل عودة الموظف بنجاح.' });
+        } catch (err) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل عودة الموظف.' });
+        } finally {
+            setIsProcessingReturn(false);
+            setIsReturnConfirmOpen(false);
+            setRequestToReturn(null);
+        }
+    };
+
     const handleCloseForm = () => {
         setIsFormOpen(false);
-        setEditingRequest(null); // Ensure editing state is cleared on close
+        setEditingRequest(null);
     };
 
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
+  const formatDate = (date: string | { seconds: number, nanoseconds: number }) => {
+    if (!date) return '-';
     try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return '-';
+        let d: Date;
+        if (typeof date === 'string') {
+            d = new Date(date);
+        } else if (date && typeof date.seconds === 'number') {
+            d = new Date(date.seconds * 1000);
+        } else {
+            return '-';
+        }
+        
+        if (isNaN(d.getTime())) return '-';
+
         return new Intl.DateTimeFormat('ar-KW', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
-        }).format(date);
+        }).format(d);
     } catch (e) {
         return '-';
     }
@@ -164,14 +229,14 @@ export default function LeaveRequestsPage() {
             </div>
         </CardHeader>
         <CardContent>
-             <div className="flex gap-2 mb-4">
-                <Button variant={filter === 'pending' ? 'default' : 'outline'} onClick={() => setFilter('pending')}>
+             <div className="flex gap-2 mb-4 border-b pb-4">
+                <Button variant={filter === 'pending' ? 'secondary' : 'ghost'} onClick={() => setFilter('pending')}>
                     طلبات معلقة
                 </Button>
-                <Button variant={filter === 'approved' ? 'default' : 'outline'} onClick={() => setFilter('approved')} className='bg-green-600 hover:bg-green-700 text-white'>
+                <Button variant={filter === 'approved' ? 'secondary' : 'ghost'} onClick={() => setFilter('approved')} >
                     طلبات مقبولة
                 </Button>
-                <Button variant={filter === 'rejected' ? 'default' : 'outline'} onClick={() => setFilter('rejected')} className='bg-red-600 hover:bg-red-700 text-white'>
+                <Button variant={filter === 'rejected' ? 'secondary' : 'ghost'} onClick={() => setFilter('rejected')} >
                     طلبات مرفوضة
                 </Button>
             </div>
@@ -185,25 +250,25 @@ export default function LeaveRequestsPage() {
                             <TableHead>إلى تاريخ</TableHead>
                             <TableHead>الأيام</TableHead>
                             <TableHead>الحالة</TableHead>
-                            {filter === 'pending' && <TableHead>الإجراءات</TableHead>}
+                            <TableHead className='text-center'>الإجراءات</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                          {loading && Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={`skel-${i}`}>
-                                <TableCell colSpan={filter === 'pending' ? 7 : 6}><Skeleton className="h-8 w-full" /></TableCell>
+                                <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
                             </TableRow>
                         ))}
                         {error && (
                             <TableRow>
-                                <TableCell colSpan={filter === 'pending' ? 7 : 6} className="h-24 text-center text-destructive">
+                                <TableCell colSpan={7} className="h-24 text-center text-destructive">
                                     حدث خطأ أثناء جلب البيانات.
                                 </TableCell>
                             </TableRow>
                         )}
                         {!loading && requests.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={filter === 'pending' ? 7 : 6} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     لا توجد طلبات إجازة حالياً.
                                 </TableCell>
                             </TableRow>
@@ -229,21 +294,36 @@ export default function LeaveRequestsPage() {
                                         {statusTranslations[req.status]}
                                     </Badge>
                                 </TableCell>
-                                {filter === 'pending' && (
-                                    <TableCell>
-                                        <div className='flex gap-2'>
-                                             <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
+                                <TableCell className='text-center'>
+                                    {filter === 'pending' && (
+                                        <div className='flex gap-2 justify-center'>
+                                            <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved')}>
+                                            <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId, req.workingDays)}>
                                                 <Check className="h-4 w-4" />
                                             </Button>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleStatusUpdate(req.id, 'rejected')}>
+                                            <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleStatusUpdate(req.id, 'rejected', req.employeeId)}>
                                                 <X className="h-4 w-4" />
                                             </Button>
                                         </div>
-                                    </TableCell>
-                                )}
+                                    )}
+                                    {filter === 'approved' && (
+                                        <>
+                                            {req.isBackFromLeave ? (
+                                                 <div className='flex items-center justify-center gap-2 text-green-600'>
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    <span className='text-xs'>عاد في: {formatDate(req.actualReturnDate)}</span>
+                                                 </div>
+                                            ) : (
+                                                <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)}>
+                                                    <LogIn className="ml-2 h-4 w-4" />
+                                                    تسجيل العودة
+                                                </Button>
+                                            )}
+                                        </>
+                                    )}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -256,6 +336,23 @@ export default function LeaveRequestsPage() {
         onClose={handleCloseForm}
         requestToEdit={editingRequest}
       />
+
+       <AlertDialog open={isReturnConfirmOpen} onOpenChange={setIsReturnConfirmOpen}>
+            <AlertDialogContent dir="rtl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>تأكيد عودة الموظف</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        هل تؤكد عودة الموظف "{requestToReturn?.employeeName}" من الإجازة بتاريخ اليوم؟ سيتم تحديث حالة الموظف إلى "نشط".
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isProcessingReturn}>إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmReturn} disabled={isProcessingReturn}>
+                        {isProcessingReturn ? 'جاري الحفظ...' : 'نعم، تأكيد العودة'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </>
   );
 }

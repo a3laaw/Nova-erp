@@ -181,7 +181,9 @@
             "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The current status of the leave request." },
             "createdAt": { "type": "string", "format": "date-time" },
             "approvedBy": { "type": "string", "description": "UID of the user who approved/rejected the request." },
-            "approvedAt": { "type": "string", "format": "date-time" }
+            "approvedAt": { "type": "string", "format": "date-time" },
+            "isBackFromLeave": { "type": "boolean", "description": "Indicates if the employee has returned from this specific leave." },
+            "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." }
         },
         "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
     },

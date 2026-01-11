@@ -212,11 +212,13 @@ export interface LeaveRequest {
     createdAt: any;
     approvedBy?: string;
     approvedAt?: any;
+    isBackFromLeave?: boolean;
+    actualReturnDate?: any;
 }
 
 
 export interface Holiday {
-    id: string;
+    id?: string;
     name: string;
-    date: string; // ISO string date
+    date: any; // Can be string or Timestamp
 }
