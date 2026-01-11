@@ -32,12 +32,18 @@ export default function HRPage() {
             <TabsTrigger value="leave-requests" asChild>
                 <Link href="/dashboard/hr/leave-requests">طلبات الإجازة</Link>
             </TabsTrigger>
+            <TabsTrigger value="leave-reports" asChild>
+                <Link href="/dashboard/hr/leave-reports">تقارير الإجازات</Link>
+            </TabsTrigger>
             <TabsTrigger value="gratuity">مكافآت نهاية الخدمة</TabsTrigger>
           </TabsList>
           <TabsContent value="employees" className="mt-4">
             <EmployeesTable />
           </TabsContent>
           <TabsContent value="leave-requests" className="mt-4">
+             {/* This content will be rendered on its own page now */}
+          </TabsContent>
+           <TabsContent value="leave-reports" className="mt-4">
              {/* This content will be rendered on its own page now */}
           </TabsContent>
           <TabsContent value="gratuity" className="mt-4">
