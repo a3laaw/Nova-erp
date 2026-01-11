@@ -202,8 +202,8 @@ export interface LeaveRequest {
     employeeId: string;
     employeeName: string;
     leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
-    startDate: string;
-    endDate: string;
+    startDate: any;
+    endDate: any;
     days: number;
     workingDays?: number;
     notes?: string;

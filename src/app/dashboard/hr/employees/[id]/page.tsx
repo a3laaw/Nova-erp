@@ -105,12 +105,12 @@ export default function EmployeeProfilePage() {
   
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', numberingSystem: 'latn' });
   }
 
   const formatCurrency = (amount: number | null | undefined) => {
      if (amount === undefined || amount === null) return '-';
-     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'KWD' }).format(amount);
+     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'KWD', numberingSystem: 'latn' }).format(amount);
   }
 
   return (

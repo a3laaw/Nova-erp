@@ -132,6 +132,7 @@ export default function NewEmployeePage() {
                 createdAt: serverTimestamp(),
                 terminationDate: null,
                 terminationReason: null,
+                noticeStartDate: null,
                 annualLeaveAccrued: 0,
                 annualLeaveUsed: 0,
                 carriedLeaveDays: 0,
