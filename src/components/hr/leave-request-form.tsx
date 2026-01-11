@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,13 +21,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '../ui/textarea';
-import { Alert, AlertDescription } from '../ui/alert';
-import { Upload } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Info, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { differenceInCalendarDays } from 'date-fns';
+import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
+import { cn } from '@/lib/utils';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -44,12 +47,12 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         return query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
     }, [firestore]);
 
-    const [snapshot, loading, error] = useCollection(employeesQuery);
+    const [employeesSnapshot, employeesLoading, employeesError] = useCollection(employeesQuery);
 
     const employees = useMemo(() => {
-        if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-    }, [snapshot]);
+        if (!employeesSnapshot) return [];
+        return employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+    }, [employeesSnapshot]);
 
     const [employeeId, setEmployeeId] = useState('');
     const [leaveType, setLeaveType] = useState<LeaveType | ''>('');
@@ -58,8 +61,18 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const [notes, setNotes] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    const { workingDays, loading: calculating, error: calcError } = useLeaveCalculator(startDate, endDate);
 
-    const days = useMemo(() => {
+    const selectedEmployee = useMemo(() => {
+        return employees.find(emp => emp.id === employeeId) || null;
+    }, [employeeId, employees]);
+
+    const currentBalance = selectedEmployee?.annualLeaveBalance ?? 0;
+    const remainingBalance = currentBalance - workingDays;
+
+    // This calculates total calendar days for display, but workingDays is used for logic
+    const totalCalendarDays = useMemo(() => {
         if (startDate && endDate) {
             const start = new Date(startDate);
             const end = new Date(endDate);
@@ -82,12 +95,11 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         e.preventDefault();
         if (!firestore) return;
         
-        // --- Validation ---
         if (!employeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
             return;
         }
-        if (days <= 0) {
+        if (totalCalendarDays <= 0) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.' });
             return;
         }
@@ -95,13 +107,15 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إرفاق التقرير الطبي للإجازة المرضية.' });
             return;
         }
+        if (calcError) {
+             toast({ variant: 'destructive', title: 'خطأ في الحساب', description: 'لا يمكن تقديم الطلب أثناء وجود خطأ في حساب الأيام.' });
+            return;
+        }
         
         setIsSaving(true);
         try {
-            const selectedEmployee = employees.find(emp => emp.id === employeeId);
             
             // In a real app, you would upload the file to Firebase Storage first and get the URL
-            // For now, we will skip this step.
             
             await addDoc(collection(firestore, 'leaveRequests'), {
                 employeeId: employeeId,
@@ -109,7 +123,8 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                 leaveType: leaveType,
                 startDate: new Date(startDate).toISOString(),
                 endDate: new Date(endDate).toISOString(),
-                days: days,
+                days: totalCalendarDays,
+                workingDays: workingDays,
                 notes: notes,
                 attachmentUrl: null, // Placeholder for file URL
                 status: 'pending',
@@ -129,7 +144,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md" dir="rtl">
+      <DialogContent className="sm:max-w-lg" dir="rtl">
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>طلب إجازة جديد</DialogTitle>
@@ -141,19 +156,19 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                 <div className="grid gap-2">
                     <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
                     <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} required>
-                        <SelectTrigger id="employee" disabled={loading}>
-                            <SelectValue placeholder={loading ? "تحميل..." : "اختر الموظف..."} />
+                        <SelectTrigger id="employee" disabled={employeesLoading}>
+                            <SelectValue placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."} />
                         </SelectTrigger>
                         <SelectContent>
-                            {loading && <p className="p-2 text-xs text-muted-foreground">جاري تحميل الموظفين...</p>}
-                            {!loading && employees.length === 0 ? (
+                            {employeesLoading && <p className="p-2 text-xs text-muted-foreground">جاري تحميل الموظفين...</p>}
+                            {!employeesLoading && employees.length === 0 ? (
                                 <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون نشطون حالياً.</p>
                             ) : (
                                 employees.map(emp => (
                                     <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
                                 ))
                             )}
-                             {error && <p className="p-2 text-xs text-destructive">فشل تحميل الموظفين</p>}
+                             {employeesError && <p className="p-2 text-xs text-destructive">فشل تحميل الموظفين</p>}
                         </SelectContent>
                     </Select>
                 </div>
@@ -181,11 +196,48 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                         <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
                     </div>
                 </div>
-                 {days > 0 && <Alert variant="default" className='bg-muted/50'><AlertDescription>مجموع الأيام: {days} يوم</AlertDescription></Alert>}
-                 {days < 0 && <Alert variant="destructive"><AlertDescription>تاريخ النهاية يجب أن يكون بعد تاريخ البداية.</AlertDescription></Alert>}
+
+                {/* Dynamic Calculation Section */}
+                {selectedEmployee && startDate && endDate && totalCalendarDays > 0 && (
+                     <Alert variant="default" className="bg-muted/50">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>ملخص الطلب</AlertTitle>
+                        <AlertDescription className="space-y-2 mt-2">
+                           {calculating ? (
+                                <div className='flex items-center gap-2'><Loader2 className='h-4 w-4 animate-spin' /> جاري حساب أيام العمل...</div>
+                           ) : calcError ? (
+                                <div className='text-destructive'>{calcError}</div>
+                           ) : (
+                            <>
+                                <div className="flex justify-between">
+                                    <span>مجموع أيام العمل المطلوبة:</span>
+                                    <span className="font-bold">{workingDays} أيام</span>
+                                </div>
+                                 <div className="flex justify-between">
+                                    <span>الرصيد الحالي للموظف:</span>
+                                    <span>{currentBalance} يوم</span>
+                                </div>
+                                <hr className="border-dashed" />
+                                <div className={cn("flex justify-between font-semibold", remainingBalance < 0 && "text-destructive")}>
+                                    <span>الرصيد المتبقي بعد هذا الطلب:</span>
+                                    <span>{remainingBalance} يوم</span>
+                                </div>
+                                {remainingBalance < 0 && (
+                                     <div className="text-destructive text-xs flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3"/>
+                                        الرصيد سيكون سالبًا!
+                                    </div>
+                                )}
+                            </>
+                           )}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                 {totalCalendarDays < 0 && <Alert variant="destructive"><AlertDescription>تاريخ النهاية يجب أن يكون بعد تاريخ البداية.</AlertDescription></Alert>}
+
                 <div className="grid gap-2">
                     <Label htmlFor="notes">ملاحظات</Label>
-                    <Textarea id="notes" placeholder={leaveType === 'Emergency' ? 'سبب الإجازة الطارئة (إلزامي)' : 'أدخل ملاحظاتك هنا...'} value={notes} onChange={e => setNotes(e.target.value)} />
+                    <Textarea id="notes" placeholder={leaveType === 'Emergency' ? 'سبب الإجازة الطارئة (إلزامي)' : 'أدخل ملاحظاتك هنا...'} value={notes} onChange={e => setNotes(e.target.value)} required={leaveType === 'Emergency'} />
                 </div>
                 {leaveType === 'Sick' && (
                     <div className="grid gap-2">
@@ -197,14 +249,15 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
                                 {file ? file.name : 'اختر ملف'}
                              </label>
                            </Button>
-                           <Input id="file-upload" type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                           <Input id="file-upload" type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept="image/*,.pdf" />
                         </div>
                     </div>
                 )}
             </div>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                <Button type="submit" disabled={isSaving}>
+                <Button type="submit" disabled={isSaving || calculating || !!calcError}>
+                    {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                     {isSaving ? 'جاري الحفظ...' : 'تقديم الطلب'}
                 </Button>
             </DialogFooter>

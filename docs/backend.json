@@ -148,7 +148,8 @@
         "sickLeaveUsed": { "type": "number" },
         "emergencyLeaveUsed": { "type": "number" },
         "maxEmergencyLeave": { "type": "number" },
-        "lastLeaveResetDate": { "type": "string", "format": "date-time" }
+        "lastLeaveResetDate": { "type": "string", "format": "date-time" },
+        "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." }
       },
       "required": [
         "fullName",
@@ -174,6 +175,7 @@
             "startDate": { "type": "string", "format": "date-time" },
             "endDate": { "type": "string", "format": "date-time" },
             "days": { "type": "number", "description": "Total number of leave days." },
+            "workingDays": { "type": "number", "description": "Total number of calculated working days." },
             "notes": { "type": "string", "description": "Reason or notes for the leave." },
             "attachmentUrl": { "type": "string", "format": "uri", "description": "URL to a medical report or other document." },
             "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The current status of the leave request." },
@@ -182,6 +184,16 @@
             "approvedAt": { "type": "string", "format": "date-time" }
         },
         "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
+    },
+    "Holiday": {
+        "title": "Holiday",
+        "description": "Represents an official public holiday.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string", "description": "The name of the holiday." },
+            "date": { "type": "string", "format": "date-time", "description": "The date of the holiday." }
+        },
+        "required": ["name", "date"]
     }
   },
   "auth": {
@@ -209,6 +221,10 @@
     "/leaveRequests/{leaveRequestId}": {
         "schema": { "$ref": "#/entities/LeaveRequest" },
         "description": "Stores all employee leave requests."
+    },
+    "/holidays/{holidayId}": {
+        "schema": { "$ref": "#/entities/Holiday" },
+        "description": "Stores all official public holidays."
     }
   }
 }

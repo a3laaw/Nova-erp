@@ -1,5 +1,6 @@
 
 
+
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 
 export type UserProfile = {
@@ -194,4 +195,11 @@ export type Employee = {
     maxEmergencyLeave?: number;
     lastLeaveResetDate?: string; // ISO String
     createdAt?: any; 
+    annualLeaveBalance?: number;
 };
+
+export interface Holiday {
+    id: string;
+    name: string;
+    date: string; // ISO string date
+}

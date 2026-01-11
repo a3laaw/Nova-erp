@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -33,6 +34,7 @@ interface LeaveRequest extends DocumentData {
     startDate: string;
     endDate: string;
     days: number;
+    workingDays?: number;
     status: 'pending' | 'approved' | 'rejected';
 }
 
@@ -161,7 +163,7 @@ export default function LeaveRequestsPage() {
                             <TableHead>نوع الإجازة</TableHead>
                             <TableHead>من تاريخ</TableHead>
                             <TableHead>إلى تاريخ</TableHead>
-                            <TableHead>عدد الأيام</TableHead>
+                            <TableHead>الأيام</TableHead>
                             <TableHead>الحالة</TableHead>
                             {filter === 'pending' && <TableHead>الإجراءات</TableHead>}
                         </TableRow>
@@ -196,7 +198,12 @@ export default function LeaveRequestsPage() {
                                 </TableCell>
                                 <TableCell>{formatDate(req.startDate)}</TableCell>
                                 <TableCell>{formatDate(req.endDate)}</TableCell>
-                                <TableCell>{req.days}</TableCell>
+                                <TableCell>
+                                    <div className='flex flex-col'>
+                                        <span className='font-medium'>{req.days} أيام</span>
+                                        {req.workingDays !== undefined && <span className='text-xs text-muted-foreground'>({req.workingDays} أيام عمل)</span>}
+                                    </div>
+                                </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={statusColors[req.status]}>
                                         {statusTranslations[req.status]}
