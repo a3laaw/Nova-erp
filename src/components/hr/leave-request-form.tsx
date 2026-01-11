@@ -60,12 +60,16 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
 
     useEffect(() => {
         const fetchEmployees = async () => {
-            if (!firestore) return;
+            if (!firestore || !isOpen) return;
             setEmployeesLoading(true);
             try {
+                // Fetch only active employees
                 const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const querySnapshot = await getDocs(q);
-                const fetchedEmployees = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                const fetchedEmployees: Employee[] = [];
+                 querySnapshot.forEach((doc) => {
+                    fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
+                });
                 fetchedEmployees.sort((a, b) => a.fullName.localeCompare(b.fullName));
                 setEmployees(fetchedEmployees);
             } catch (error) {
@@ -76,9 +80,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
             }
         };
 
-        if (isOpen) {
-            fetchEmployees();
-        }
+        fetchEmployees();
     }, [firestore, isOpen, toast]);
     
     const resetForm = useCallback(() => {
@@ -115,12 +117,18 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         const accrued = selectedEmployee.annualLeaveAccrued || 0;
         const used = selectedEmployee.annualLeaveUsed || 0;
         const carried = selectedEmployee.carriedLeaveDays || 0;
-        // If editing, we should not deduct the days from the request being edited from the current balance
-        const daysToExclude = isEditing && requestToEdit?.status === 'approved' && requestToEdit?.workingDays ? requestToEdit.workingDays : 0;
+        // If editing an approved annual leave, add its days back to the current balance for recalculation
+        const daysToExclude = isEditing && requestToEdit?.leaveType === 'Annual' && requestToEdit?.status === 'approved' && requestToEdit?.workingDays ? requestToEdit.workingDays : 0;
         return (accrued + carried) - (used - daysToExclude);
     }, [selectedEmployee, isEditing, requestToEdit]);
 
-    const remainingBalance = currentBalance - workingDays;
+    const remainingBalance = useMemo(() => {
+        if (leaveType === 'Annual') {
+            return currentBalance - workingDays;
+        }
+        return currentBalance; // For other leave types, the balance is not affected
+    }, [currentBalance, workingDays, leaveType]);
+
 
     const totalCalendarDays = useMemo(() => {
         if (startDate && endDate) {
@@ -248,10 +256,10 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                 </div>
 
                 {/* Dynamic Calculation Section */}
-                {selectedEmployee && startDate && endDate && totalCalendarDays > 0 && (
+                {selectedEmployee && startDate && endDate && totalCalendarDays > 0 && leaveType === 'Annual' && (
                      <Alert variant="default" className="bg-muted/50">
                         <Info className="h-4 w-4" />
-                        <AlertTitle>ملخص الطلب</AlertTitle>
+                        <AlertTitle>ملخص الرصيد (للإجازة السنوية فقط)</AlertTitle>
                         <AlertDescription className="space-y-2 mt-2">
                            {calculating ? (
                                 <div className='flex items-center gap-2'><Loader2 className='h-4 w-4 animate-spin' /> جاري حساب أيام العمل...</div>
