@@ -23,13 +23,16 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   const firestore = getFirestore(app);
 
   if (process.env.NODE_ENV === 'development') {
+    const emulatorHost = process.env.NEXT_PUBLIC_EMULATOR_HOST || '127.0.0.1';
+    
     // Check if emulators are already running to avoid re-connecting on hot-reloads
     if (!(auth as any).emulatorConfig) {
-      connectAuthEmulator(auth, `http://${process.env.NEXT_PUBLIC_EMULATOR_HOST || '127.0.0.1'}:9099`, { disableWarnings: true });
+      connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true });
     }
+    
     // Firestore doesn't have a built-in way to check, so we connect every time in dev.
     // connectFirestoreEmulator handles this gracefully if already connected.
-    connectFirestoreEmulator(firestore, process.env.NEXT_PUBLIC_EMULATOR_HOST || '127.0.0.1', 8080);
+    connectFirestoreEmulator(firestore, emulatorHost, 8080);
   }
 
   return { app, auth, firestore };
