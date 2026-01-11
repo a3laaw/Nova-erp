@@ -27,20 +27,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CalendarIcon, Loader2, Printer, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Loader2, Printer, Search } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -73,8 +67,8 @@ export default function LeaveReportsPage() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     
-    const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
-    const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
+    const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [statusFilter, setStatusFilter] = useState<'all' | LeaveRequest['status']>('all');
 
     const [reportData, setReportData] = useState<LeaveRequest[]>([]);
@@ -90,16 +84,14 @@ export default function LeaveReportsPage() {
 
         try {
             const constraints = [
-                where('startDate', '>=', Timestamp.fromDate(dateFrom)),
-                where('startDate', '<=', Timestamp.fromDate(dateTo)),
+                where('startDate', '>=', Timestamp.fromDate(new Date(dateFrom))),
+                where('startDate', '<=', Timestamp.fromDate(new Date(dateTo))),
             ];
 
             if (statusFilter !== 'all') {
                 constraints.push(where('status', '==', statusFilter));
             }
             
-            // Note: This complex query might require a composite index in Firestore.
-            // The error message from Firestore in the console will guide you to create it.
             const q = query(
                 collection(firestore, 'leaveRequests'), 
                 ...constraints,
@@ -126,7 +118,7 @@ export default function LeaveReportsPage() {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
     }, [reportData]);
 
-    const formatDate = (date: any) => {
+    const formatDateForDisplay = (date: any) => {
         if (!date) return '-';
         try {
             const d = typeof date === 'string' ? new Date(date) : date.toDate();
@@ -152,53 +144,21 @@ export default function LeaveReportsPage() {
                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end'>
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">من تاريخ</Label>
-                         <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "justify-start text-left font-normal",
-                                    !dateFrom && "text-muted-foreground"
-                                )}
-                                >
-                                <CalendarIcon className="ml-2 h-4 w-4" />
-                                {dateFrom ? format(dateFrom, "dd/MM/yyyy") : <span>اختر تاريخ</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                mode="single"
-                                selected={dateFrom}
-                                onSelect={setDateFrom}
-                                initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <Input 
+                            id="dateFrom"
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                        />
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">إلى تاريخ</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "justify-start text-left font-normal",
-                                    !dateTo && "text-muted-foreground"
-                                )}
-                                >
-                                <CalendarIcon className="ml-2 h-4 w-4" />
-                                {dateTo ? format(dateTo, "dd/MM/yyyy") : <span>اختر تاريخ</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                mode="single"
-                                selected={dateTo}
-                                onSelect={setDateTo}
-                                initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <Input 
+                            id="dateTo"
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="statusFilter">حالة الطلب</Label>
@@ -228,7 +188,7 @@ export default function LeaveReportsPage() {
                         <h3 className='font-bold'>تقرير الإجازات</h3>
                         {dateFrom && dateTo && (
                              <p className='text-sm text-muted-foreground'>
-                                للفترة من {format(dateFrom, "dd/MM/yyyy")} إلى {format(dateTo, "dd/MM/yyyy")}
+                                للفترة من {format(new Date(dateFrom), "dd/MM/yyyy")} إلى {format(new Date(dateTo), "dd/MM/yyyy")}
                             </p>
                         )}
                        
@@ -270,8 +230,8 @@ export default function LeaveReportsPage() {
                                         {typeTranslations[req.leaveType]}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{formatDate(req.startDate)}</TableCell>
-                                <TableCell>{formatDate(req.endDate)}</TableCell>
+                                <TableCell>{formatDateForDisplay(req.startDate)}</TableCell>
+                                <TableCell>{formatDateForDisplay(req.endDate)}</TableCell>
                                 <TableCell>{req.workingDays ?? req.days}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={statusColors[req.status]}>
