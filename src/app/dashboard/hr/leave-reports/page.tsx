@@ -95,10 +95,6 @@ export default function LeaveReportsPage() {
                 where('startDate', '>=', Timestamp.fromDate(startDate)),
                 where('startDate', '<=', Timestamp.fromDate(endDate)),
             ];
-
-            if (statusFilter !== 'all') {
-                constraints.push(where('status', '==', statusFilter));
-            }
             
             const q = query(
                 collection(firestore, 'leaveRequests'), 
@@ -106,9 +102,14 @@ export default function LeaveReportsPage() {
             );
             
             const querySnapshot = await getDocs(q);
-            const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+            let data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
             
-            // Sort client-side to avoid needing another composite index
+            // Client-side filtering by status
+            if (statusFilter !== 'all') {
+                data = data.filter(req => req.status === statusFilter);
+            }
+
+            // Client-side sorting
             data.sort((a, b) => {
                 const dateA = a.startDate ? (typeof a.startDate === 'string' ? new Date(a.startDate) : (a.startDate as any).toDate()) : new Date(0);
                 const dateB = b.startDate ? (typeof b.startDate === 'string' ? new Date(b.startDate) : (b.startDate as any).toDate()) : new Date(0);
@@ -208,7 +209,7 @@ export default function LeaveReportsPage() {
                             <h3 className='font-bold'>تقرير الإجازات</h3>
                             {dateFrom && dateTo && (
                                  <p className='text-sm text-muted-foreground'>
-                                    للفترة من {format(new Date(dateFrom), "dd/MM/yyyy")} إلى {format(new Date(dateTo), "dd/MM/yyyy")}
+                                    للفترة من {format(new Date(dateFrom), "dd/MM/yyyy", { numberingSystem: 'latn' } as any)} إلى {format(new Date(dateTo), "dd/MM/yyyy", { numberingSystem: 'latn' } as any)}
                                 </p>
                             )}
                            
