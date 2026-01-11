@@ -29,7 +29,7 @@ async function getHolidays(firestore: DocumentData): Promise<Set<string>> {
 
   holidayCache = holidayDates;
   cacheTimestamp = now;
-  return holidayCache;
+  return holidayDates;
 }
 
 export function useLeaveCalculator(startDate: string, endDate: string) {

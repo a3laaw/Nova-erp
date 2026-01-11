@@ -1,6 +1,5 @@
 
 
-
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 
 export type UserProfile = {
@@ -197,6 +196,24 @@ export type Employee = {
     createdAt?: any; 
     annualLeaveBalance?: number;
 };
+
+export interface LeaveRequest {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
+    startDate: string;
+    endDate: string;
+    days: number;
+    workingDays?: number;
+    notes?: string;
+    attachmentUrl?: string;
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: any;
+    approvedBy?: string;
+    approvedAt?: any;
+}
+
 
 export interface Holiday {
     id: string;
