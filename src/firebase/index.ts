@@ -1,8 +1,8 @@
 'use client';
 
 import { initializeApp, getApp, getApps, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, type Firestore } from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -21,19 +21,6 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   const auth = getAuth(app);
   const firestore = getFirestore(app);
-
-  if (process.env.NODE_ENV === 'development') {
-    const emulatorHost = process.env.NEXT_PUBLIC_EMULATOR_HOST || '127.0.0.1';
-    
-    // Check if emulators are already running to avoid re-connecting on hot-reloads
-    if (!(auth as any).emulatorConfig) {
-      connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true });
-    }
-    
-    // Firestore doesn't have a built-in way to check, so we connect every time in dev.
-    // connectFirestoreEmulator handles this gracefully if already connected.
-    connectFirestoreEmulator(firestore, emulatorHost, 8080);
-  }
 
   return { app, auth, firestore };
 }
