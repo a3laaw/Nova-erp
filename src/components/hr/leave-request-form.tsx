@@ -27,7 +27,7 @@ import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, where, orderBy, addDoc, serverTimestamp, doc, updateDoc, getDoc, type DocumentData } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInCalendarDays, differenceInYears } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -38,25 +38,6 @@ interface LeaveRequestFormProps {
 }
 
 type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
-
-const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
-    if (!employee || !employee.hireDate) return 0;
-    
-    const hireDate = new Date(employee.hireDate);
-    const yearsOfService = differenceInYears(new Date(), hireDate);
-    
-    if (yearsOfService < 1) return 0;
-    
-    const accrued = employee.annualLeaveAccrued || 0;
-    const used = employee.annualLeaveUsed || 0;
-    const carried = employee.carriedLeaveDays || 0;
-
-    const effectiveCarried = Math.min(carried, 15);
-    const totalEntitlement = accrued + effectiveCarried;
-    const balance = totalEntitlement - used;
-    
-    return Math.max(0, Math.min(45, Math.floor(balance)));
-};
 
 
 export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
@@ -72,12 +53,7 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
 
     const employees: Employee[] = useMemo(() => {
         if (!employeesSnapshot) return [];
-        const employeeList = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-        // Recalculate balance on the client side for display
-        return employeeList.map(emp => ({
-            ...emp,
-            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
-        }));
+        return employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
     }, [employeesSnapshot]);
 
     const [employeeId, setEmployeeId] = useState('');
