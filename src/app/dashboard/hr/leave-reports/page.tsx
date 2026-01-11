@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, endOfDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -85,9 +85,16 @@ export default function LeaveReportsPage() {
         setReportData([]);
 
         try {
+            const startDate = new Date(dateFrom); // Start of the day
+            startDate.setHours(0, 0, 0, 0);
+            
+            const endDate = new Date(dateTo); // End of the day
+            endDate.setHours(23, 59, 59, 999);
+
+
             const constraints = [
-                where('startDate', '>=', Timestamp.fromDate(new Date(dateFrom))),
-                where('startDate', '<=', Timestamp.fromDate(new Date(dateTo))),
+                where('startDate', '>=', Timestamp.fromDate(startDate)),
+                where('startDate', '<=', Timestamp.fromDate(endDate)),
             ];
 
             if (statusFilter !== 'all') {
