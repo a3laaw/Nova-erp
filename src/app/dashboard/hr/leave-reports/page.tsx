@@ -94,12 +94,19 @@ export default function LeaveReportsPage() {
             
             const q = query(
                 collection(firestore, 'leaveRequests'), 
-                ...constraints,
-                orderBy('startDate', 'desc')
+                ...constraints
             );
             
             const querySnapshot = await getDocs(q);
             const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+            
+            // Sort data on the client-side
+            data.sort((a, b) => {
+                const dateA = a.startDate ? (typeof a.startDate === 'string' ? new Date(a.startDate) : (a.startDate as any).toDate()) : new Date(0);
+                const dateB = b.startDate ? (typeof b.startDate === 'string' ? new Date(b.startDate) : (b.startDate as any).toDate()) : new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            });
+
             setReportData(data);
 
             if (data.length === 0) {
@@ -253,4 +260,3 @@ export default function LeaveReportsPage() {
     </Card>
   );
 }
-
