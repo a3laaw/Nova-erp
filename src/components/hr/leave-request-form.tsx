@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Upload } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, orderBy, addDoc, serverTimestamp, type DocumentData } from 'firebase/firestore';
+import { collection, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { differenceInCalendarDays } from 'date-fns';

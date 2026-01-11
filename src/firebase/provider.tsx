@@ -5,14 +5,20 @@ import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 
+// This defines the shape of the context data.
 interface FirebaseContextType {
   app: FirebaseApp | null;
   auth: Auth | null;
   firestore: Firestore | null;
 }
 
+// Create the context with an undefined initial value.
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
+/**
+ * The provider component that makes Firebase services available to the component tree.
+ * It takes the initialized services as a value prop.
+ */
 export function FirebaseProvider({
   children,
   value,
@@ -23,6 +29,10 @@ export function FirebaseProvider({
   return <FirebaseContext.Provider value={value}>{children}</FirebaseContext.Provider>;
 }
 
+/**
+ * A custom hook to access the full Firebase context (app, auth, firestore).
+ * Throws an error if used outside of a FirebaseProvider.
+ */
 export function useFirebase() {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
@@ -31,7 +41,9 @@ export function useFirebase() {
   return context;
 }
 
-
+/**
+ * A custom hook to specifically access the Firebase App instance.
+ */
 export function useFirebaseApp() {
     const context = useContext(FirebaseContext);
     if (context === undefined) {
@@ -40,6 +52,9 @@ export function useFirebaseApp() {
     return context.app;
 }
 
+/**
+ * A custom hook to specifically access the Firebase Auth instance.
+ */
 export function useAuthContext() {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
@@ -48,6 +63,9 @@ export function useAuthContext() {
   return context.auth;
 }
 
+/**
+ * A custom hook to specifically access the Firestore instance.
+ */
 export function useFirestore() {
   const context = useContext(FirebaseContext);
   if (context === undefined) {

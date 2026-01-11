@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -66,7 +66,6 @@ export default function LeaveRequestsPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
     const requestsQuery = useMemo(() => {
@@ -80,11 +79,11 @@ export default function LeaveRequestsPage() {
 
     const [snapshot, loading, error] = useCollection(requestsQuery);
 
-    useEffect(() => {
-        if (snapshot) {
-            setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
-        }
+    const requests = useMemo(() => {
+        if (!snapshot) return [];
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest))
     }, [snapshot]);
+
 
     const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected') => {
         if (!firestore) return;

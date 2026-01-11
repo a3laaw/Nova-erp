@@ -157,7 +157,7 @@ export default function ClientsPage() {
               {loading && <TableRow><TableCell colSpan={5} className="text-center">{currentText.loading}</TableCell></TableRow>}
               {error && <TableRow><TableCell colSpan={5} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
               {!loading && clients.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">{currentText.noClients}</TableCell></TableRow>}
-              {clients.map((client, index) => (
+              {clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell className="font-mono">{client.id.substring(0, 8)}</TableCell>
                   <TableCell className="font-medium">{client.fullName}</TableCell>
