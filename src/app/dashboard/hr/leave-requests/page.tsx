@@ -36,6 +36,7 @@ interface LeaveRequest extends DocumentData {
     days: number;
     workingDays?: number;
     status: 'pending' | 'approved' | 'rejected';
+    createdAt: { seconds: number, nanoseconds: number };
 }
 
 
@@ -72,10 +73,10 @@ export default function LeaveRequestsPage() {
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
+        // Removed orderBy to avoid composite index requirement. Sorting will be done on the client.
         return query(
             collection(firestore, 'leaveRequests'), 
-            where('status', '==', filter),
-            orderBy('createdAt', 'desc')
+            where('status', '==', filter)
         );
     }, [firestore, filter]);
 
@@ -83,7 +84,14 @@ export default function LeaveRequestsPage() {
 
     const requests = useMemo(() => {
         if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest))
+        const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+        // Sort client-side
+        reqs.sort((a, b) => {
+            const dateA = a.createdAt?.seconds ?? 0;
+            const dateB = b.createdAt?.seconds ?? 0;
+            return dateB - dateA; // Sort descending
+        });
+        return reqs;
     }, [snapshot]);
 
 
