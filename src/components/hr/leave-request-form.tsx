@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -24,7 +23,7 @@ import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, orderBy, addDoc, serverTimestamp, doc, updateDoc, getDoc, type DocumentData } from 'firebase/firestore';
+import { collection, query, where, orderBy, addDoc, serverTimestamp, getDocs, type DocumentData } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { differenceInCalendarDays } from 'date-fns';
@@ -44,17 +43,8 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    const employeesQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
-    }, [firestore]);
-
-    const [employeesSnapshot, employeesLoading] = useCollection(employeesQuery);
-
-    const employees: Employee[] = useMemo(() => {
-        if (!employeesSnapshot) return [];
-        return employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-    }, [employeesSnapshot]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [employeesLoading, setEmployeesLoading] = useState(true);
 
     const [employeeId, setEmployeeId] = useState('');
     const [leaveType, setLeaveType] = useState<LeaveType | ''>('');
@@ -63,6 +53,26 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
     const [notes, setNotes] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            if (!firestore || !isOpen) return;
+            setEmployeesLoading(true);
+            try {
+                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
+                const querySnapshot = await getDocs(q);
+                const fetchedEmployees = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                setEmployees(fetchedEmployees);
+            } catch (error) {
+                console.error("Failed to fetch employees:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
+            } finally {
+                setEmployeesLoading(false);
+            }
+        };
+
+        fetchEmployees();
+    }, [firestore, isOpen, toast]);
     
     const { workingDays, loading: calculating, error: calcError } = useLeaveCalculator(startDate, endDate);
 
@@ -70,7 +80,9 @@ export function LeaveRequestForm({ isOpen, onClose }: LeaveRequestFormProps) {
         return employees.find(emp => emp.id === employeeId) || null;
     }, [employeeId, employees]);
 
-    const currentBalance = selectedEmployee?.annualLeaveBalance ?? 0;
+    // This logic needs to be revisited as annualLeaveBalance is calculated in the table.
+    // For now, we will use the property directly if it exists, or default to 0.
+    const currentBalance = selectedEmployee?.annualLeaveBalance ?? selectedEmployee?.annualLeaveAccrued ?? 0;
     const remainingBalance = currentBalance - workingDays;
 
     const totalCalendarDays = useMemo(() => {
