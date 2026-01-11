@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useMemo } from 'react';
 import { FirebaseProvider } from './provider';
 import { initializeFirebase } from './index';
 import type { FirebaseApp } from 'firebase/app';
@@ -13,29 +13,34 @@ interface FirebaseServices {
   firestore: Firestore;
 }
 
-// This module-level variable will hold the initialized services.
-// This is key to preventing re-initialization on re-renders.
-let firebaseServices: FirebaseServices | null = null;
+// Create a module-level promise to ensure initialization only runs once.
+let firebaseInitializationPromise: Promise<FirebaseServices> | null = null;
+
+const initialize = () => {
+    if (!firebaseInitializationPromise) {
+        firebaseInitializationPromise = new Promise((resolve) => {
+            const services = initializeFirebase();
+            resolve(services);
+        });
+    }
+    return firebaseInitializationPromise;
+};
 
 export function FirebaseClientProvider({ children }: { children: ReactNode }) {
-  const [services, setServices] = useState<FirebaseServices | null>(firebaseServices);
+  const [services, setServices] = useState<FirebaseServices | null>(null);
 
   useEffect(() => {
-    // We only initialize Firebase if it hasn't been already.
-    // This effect runs only once on the client after mount.
-    if (!firebaseServices) {
-      firebaseServices = initializeFirebase();
-      setServices(firebaseServices);
-    }
+    // This effect runs once on the client after mount.
+    initialize().then(setServices);
   }, []); // The empty dependency array ensures this runs only once.
 
   if (!services) {
-    // You can render a loading spinner here while Firebase initializes.
-    // Returning null is also fine for a brief moment.
-    return null;
+    // You can render a global loading spinner here.
+    // Returning null is fine for the very brief initialization moment.
+    return null; 
   }
   
-  // Once initialized, we provide the services to the rest of the app.
+  // Once initialized, we provide the stable services to the rest of the app.
   return (
     <FirebaseProvider value={services}>
       {children}

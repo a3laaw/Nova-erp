@@ -64,7 +64,11 @@ export default function ClientsPage() {
   }, [firestore]);
 
   const [snapshot, loading, error] = useCollection(clientsQuery);
-  const clients = useMemo(() => snapshot?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)) || [], [snapshot]);
+  
+  const clients = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+  }, [snapshot]);
 
   const handleStatusChange = async (clientId: string, newStatus: ClientStatus) => {
     if (!firestore) return;
