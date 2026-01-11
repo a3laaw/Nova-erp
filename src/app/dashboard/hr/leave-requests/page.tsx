@@ -31,7 +31,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest } from '@/lib/types';
@@ -103,7 +103,14 @@ export default function LeaveRequestsPage() {
         if (!snapshot) return [];
         const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
         // Client-side sorting
-        reqs.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        reqs.sort((a, b) => {
+            const dateA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt)) : 0;
+            const dateB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt)) : 0;
+            if (dateA && dateB) {
+                return dateB.getTime() - dateA.getTime();
+            }
+            return 0;
+        });
         return reqs;
     }, [snapshot]);
 
@@ -317,10 +324,9 @@ export default function LeaveRequestsPage() {
                                 <TableCell>{formatDate(req.startDate)}</TableCell>
                                 <TableCell>{formatDate(req.endDate)}</TableCell>
                                 <TableCell>
-                                    <div className='flex flex-col'>
-                                        <span className='font-medium'>{req.days} أيام</span>
-                                        {req.workingDays !== undefined && <span className='text-xs text-muted-foreground'>({req.workingDays} أيام عمل)</span>}
-                                    </div>
+                                    <span className="font-medium">
+                                        {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
+                                    </span>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-1">
