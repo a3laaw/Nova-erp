@@ -163,6 +163,26 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         
         setIsSaving(true);
         try {
+            // --- Validation for existing requests ---
+            if (!isEditing) {
+                const existingRequestsQuery = query(
+                    collection(firestore, 'leaveRequests'),
+                    where('employeeId', '==', employeeId),
+                    where('status', 'in', ['pending', 'approved'])
+                );
+                const existingRequestsSnapshot = await getDocs(existingRequestsQuery);
+                if (!existingRequestsSnapshot.empty) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'طلب مكرر',
+                        description: 'لدى هذا الموظف بالفعل طلب إجازة معلق أو مقبول. لا يمكن إنشاء طلب جديد.',
+                    });
+                    setIsSaving(false);
+                    return;
+                }
+            }
+
+
             // In a real app, you would upload the file to Firebase Storage first and get the URL
             const dataToSave = {
                 employeeId: employeeId,
