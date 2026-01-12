@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -48,10 +49,8 @@ export default function EditEmployeePage() {
     const formatDateForInput = (date: any): string => {
         if (!date) return '';
         try {
-            // Firestore Timestamps have a toDate() method
             const d = date.toDate ? date.toDate() : new Date(date);
             if (isNaN(d.getTime())) return '';
-            // Ensure we get 'yyyy-MM-dd'
             return d.toISOString().split('T')[0];
         } catch (e) {
             return '';
