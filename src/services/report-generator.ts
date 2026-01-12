@@ -248,10 +248,10 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
                 headersMap.newDepartment = { key: 'newDepartment', label: 'القسم الجديد' };
                 row = { 
                     ...row, 
-                    oldJobTitle: log.oldValue?.jobTitle, 
-                    newJobTitle: log.newValue?.jobTitle, 
-                    oldDepartment: log.oldValue?.department, 
-                    newDepartment: log.newValue?.department
+                    oldJobTitle: log.oldValue?.jobTitle ?? null, 
+                    newJobTitle: log.newValue?.jobTitle ?? null, 
+                    oldDepartment: log.oldValue?.department ?? null, 
+                    newDepartment: log.newValue?.department ?? null
                 };
             } else {
                  if(fields.includes('residencyExpiry')) headersMap.oldValue.type = 'date';

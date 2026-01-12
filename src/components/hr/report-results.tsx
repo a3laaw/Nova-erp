@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import {
@@ -22,10 +23,10 @@ const formatValue = (value: any, type?: 'date' | 'currency' | 'number'): string 
     if (type === 'date') {
         try {
             const d = value.toDate ? value.toDate() : new Date(value);
-            if (isNaN(d.getTime())) return String(value);
+            if (isNaN(d.getTime())) return String(value) || '-';
             return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
         } catch (e) {
-            return String(value);
+            return String(value) || '-';
         }
     }
     if (type === 'currency') {
