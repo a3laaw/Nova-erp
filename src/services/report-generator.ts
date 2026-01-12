@@ -221,7 +221,6 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
         where('effectiveDate', '<=', dateTo)
     ];
 
-    // Specific filtering for ResidencyRenewal which uses 'DataUpdate' type
     if (changeType === 'DataUpdate') {
         conditions.push(where('field', '==', 'residencyExpiry'));
     }
@@ -251,12 +250,12 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
         const log = logDoc.data() as AuditLog;
         const employeeId = logDoc.ref.parent.parent?.id;
         const employee = employeeId ? employeesMap.get(employeeId) : undefined;
-        const changedByUser = log.changedBy ? employeesMap.get(log.changedBy) : undefined;
+        const changedByUserDoc = log.changedBy ? employeesMap.get(log.changedBy) : undefined;
 
         let row: DocumentData = {
             employeeName: employee?.fullName ?? 'موظف غير معروف',
             effectiveDate: log.effectiveDate,
-            changedBy: changedByUser?.fullName ?? log.changedBy ?? 'غير معروف',
+            changedBy: changedByUserDoc?.fullName ?? log.changedBy ?? 'غير معروف',
             oldValue: log.oldValue ?? null,
             newValue: log.newValue ?? null,
             oldJobTitle: log.oldValue?.jobTitle ?? null,
@@ -293,9 +292,8 @@ function getHeadersForAuditReport(changeType: AuditLog['changeType']): ReportHea
         ];
     } 
     
-    // For SalaryChange and ResidencyRenewal (which uses DataUpdate)
     const isCurrency = changeType === 'SalaryChange';
-    const isDate = changeType === 'DataUpdate'; // ResidencyRenewal is DataUpdate
+    const isDate = changeType === 'DataUpdate';
     
     return [
         ...baseHeaders,
@@ -317,7 +315,6 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
         case 'JobChange':
             return generateAuditLogReport(db, 'JobChange', 'تقرير التغييرات الوظيفية', options);
         case 'ResidencyRenewal':
-            // The logic inside generateAuditLogReport now handles the 'field' filtering.
             return generateAuditLogReport(db, 'DataUpdate', 'تقرير تجديد الإقامات', options);
         default:
             throw new Error('نوع التقرير غير معروف.');
