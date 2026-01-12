@@ -149,8 +149,8 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'terminated',
-                noticeStartDate: new Date(noticeStartDate).toISOString(),
-                terminationDate: new Date(terminationDate).toISOString(),
+                noticeStartDate: new Date(noticeStartDate),
+                terminationDate: new Date(terminationDate),
                 terminationReason: terminationReason
             });
 
@@ -187,7 +187,7 @@ export function EmployeesTable() {
         };
 
         if (rehireType === 'new') {
-            updateData.hireDate = new Date(newHireDate).toISOString();
+            updateData.hireDate = new Date(newHireDate);
         }
 
         if (resetLeaveBalance) {
@@ -196,8 +196,8 @@ export function EmployeesTable() {
             updateData.carriedLeaveDays = 0;
             updateData.sickLeaveUsed = 0;
             updateData.emergencyLeaveUsed = 0;
-            updateData.lastLeaveResetDate = new Date(newHireDate).toISOString();
-            updateData.lastVacationAccrualDate = new Date(newHireDate).toISOString();
+            updateData.lastLeaveResetDate = new Date(newHireDate);
+            updateData.lastVacationAccrualDate = new Date(newHireDate);
         }
 
         try {
@@ -217,6 +217,20 @@ export function EmployeesTable() {
             setIsRehiring(false);
             setEmployeeToRehire(null);
         }
+    };
+
+    const formatDateCell = (dateValue: any) => {
+        if (!dateValue) return '-';
+        // Handle Firestore Timestamps
+        if (dateValue.toDate) {
+            return dateValue.toDate().toLocaleDateString('en-GB');
+        }
+        // Handle ISO strings or other date formats
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) {
+            return '-'; // Or 'Invalid Date' if you prefer
+        }
+        return date.toLocaleDateString('en-GB');
     };
 
 
@@ -281,7 +295,7 @@ export function EmployeesTable() {
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>
-                        <TableCell>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }) : '-'}</TableCell>
+                        <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
                         <TableCell className='font-medium'>
                             {employee.annualLeaveBalance !== undefined ? `${employee.annualLeaveBalance} يوم` : '...'}
                         </TableCell>
@@ -431,3 +445,5 @@ export function EmployeesTable() {
         </>
     );
 }
+
+    
