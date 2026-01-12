@@ -3,12 +3,29 @@
 import { Inter, Space_Grotesk } from 'next/font/google';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/context/auth-context';
-import { LanguageProvider } from '@/context/language-context';
+import { LanguageProvider, useLanguage } from '@/context/language-context';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
+
+function AppLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const { language, direction } = useLanguage();
+
+  return (
+     <html lang={language} dir={direction}>
+        <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
+            {children}
+            <Toaster />
+        </body>
+    </html>
+  )
+}
 
 export default function RootLayout({
   children,
@@ -16,17 +33,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl">
-        <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
-            <FirebaseClientProvider>
-              <LanguageProvider>
-                <AuthProvider>
-                  {children}
-                  <Toaster />
-                </AuthProvider>
-              </LanguageProvider>
-            </FirebaseClientProvider>
-        </body>
-    </html>
+    <FirebaseClientProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppLayout>{children}</AppLayout>
+        </AuthProvider>
+      </LanguageProvider>
+    </FirebaseClientProvider>
   );
 }

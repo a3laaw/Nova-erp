@@ -7,6 +7,7 @@ import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
 import { Loader } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/context/language-context';
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const { language } = useLanguage();
 
   if (loading) {
     return (
@@ -47,7 +49,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
-        <Sidebar>
+        <Sidebar side={language === 'ar' ? 'right' : 'left'}>
           <MainNav currentUser={currentUser} onLogout={handleLogout} />
         </Sidebar>
         <div className="flex flex-col w-full">

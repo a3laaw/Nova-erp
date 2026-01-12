@@ -18,7 +18,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useLanguage } from "@/context/language-context"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -167,7 +166,7 @@ const Sidebar = React.forwardRef<
 >(
   (
     {
-      side: sideProp,
+      side = 'left',
       variant = "sidebar",
       collapsible = "offcanvas",
       className,
@@ -177,9 +176,6 @@ const Sidebar = React.forwardRef<
     ref
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-    const { language } = useLanguage();
-    const side = sideProp || (language === 'ar' ? 'right' : 'left');
-
 
     if (collapsible === "none") {
       return (
