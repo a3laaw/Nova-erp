@@ -86,6 +86,19 @@ async function reconstructEmployeeState(db: Firestore, employee: Employee, asOfD
     if (!employee.id) return {};
     const auditLogs = await fetchSubcollection(db, 'employees', employee.id, 'auditLogs') as AuditLog[];
 
+    // If there are no logs, return the current state of the employee.
+    if (auditLogs.length === 0) {
+        return {
+            jobTitle: employee.jobTitle,
+            department: employee.department,
+            position: employee.position,
+            basicSalary: employee.basicSalary,
+            housingAllowance: employee.housingAllowance,
+            transportAllowance: employee.transportAllowance,
+            residencyExpiry: employee.residencyExpiry,
+        };
+    }
+
     const reconstructedState: Partial<Employee> = {
         jobTitle: findValueAsOf(auditLogs, 'jobTitle', asOfDate, employee.jobTitle),
         department: findValueAsOf(auditLogs, 'department', asOfDate, employee.department),
@@ -214,7 +227,7 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
     const dateTo = options.dateTo ? Timestamp.fromDate(parseISO(options.dateTo)) : Timestamp.now();
     
     const headers = getHeadersForAuditReport(changeType);
-
+    
     const conditions = [
         where('changeType', '==', changeType),
         where('effectiveDate', '>=', dateFrom),
