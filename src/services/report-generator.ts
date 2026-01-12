@@ -1,4 +1,5 @@
 
+
 import { 
     collection, 
     getDocs, 
@@ -62,9 +63,9 @@ async function fetchSubcollection(db: Firestore, parentCollection: string, paren
 // --- Historical Data Reconstruction Logic ---
 
 function toDate(timestampOrString: any): Date | null {
-    if (!timestampOrString) return null;
-    const date = timestampOrString.toDate ? timestampOrString.toDate() : new Date(timestampOrString);
-    return isNaN(date.getTime()) ? null : date;
+  if (timestampOrString === null || timestampOrString === undefined) return null;
+  const date = timestampOrString?.toDate ? timestampOrString.toDate() : new Date(timestampOrString);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialValue: any) {
@@ -245,7 +246,13 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
                 headersMap.newJobTitle = { key: 'newJobTitle', label: 'الوظيفة الجديدة' };
                 headersMap.oldDepartment = { key: 'oldDepartment', label: 'القسم القديم' };
                 headersMap.newDepartment = { key: 'newDepartment', label: 'القسم الجديد' };
-                row = { ...row, oldJobTitle: log.oldValue?.jobTitle, newJobTitle: log.newValue?.jobTitle, oldDepartment: log.oldValue?.department, newDepartment: log.newValue?.department};
+                row = { 
+                    ...row, 
+                    oldJobTitle: log.oldValue?.jobTitle, 
+                    newJobTitle: log.newValue?.jobTitle, 
+                    oldDepartment: log.oldValue?.department, 
+                    newDepartment: log.newValue?.department
+                };
             } else {
                  if(fields.includes('residencyExpiry')) headersMap.oldValue.type = 'date';
                  if(fields.includes('residencyExpiry')) headersMap.newValue.type = 'date';
