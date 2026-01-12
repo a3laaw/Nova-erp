@@ -1,3 +1,5 @@
+
+'use client';
 import {
   Card,
   CardContent,
@@ -27,6 +29,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
+import { useLanguage } from '@/context/language-context';
+
 
 const statusStyles: Record<InvoiceStatus, string> = {
     'Paid': 'bg-green-100 text-green-800 border-green-200',
@@ -36,6 +40,7 @@ const statusStyles: Record<InvoiceStatus, string> = {
 };
 
 export default function AccountingPage() {
+  const { language } = useLanguage();
   return (
     <Card>
       <CardHeader>
@@ -70,7 +75,7 @@ export default function AccountingPage() {
                         return (
                             <TableRow key={invoice.id}>
                                 <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                                <TableCell>{client?.name}</TableCell>
+                                <TableCell>{client?.name[language]}</TableCell>
                                 <TableCell>{new Date(invoice.issueDate).toLocaleDateString('en-GB')}</TableCell>
                                 <TableCell>{new Date(invoice.dueDate).toLocaleDateString('en-GB')}</TableCell>
                                 <TableCell>

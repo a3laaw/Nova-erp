@@ -23,9 +23,11 @@ import {
 import { clients } from '@/lib/data';
 import { Printer, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/context/language-context';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
+  const { language } = useLanguage();
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -52,7 +54,7 @@ export default function NewCashReceiptPage() {
                 </SelectTrigger>
                 <SelectContent>
                     {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        <SelectItem key={client.id} value={client.id}>{client.name[language]}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>

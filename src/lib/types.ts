@@ -1,5 +1,10 @@
 
 
+export type MultilingualString = {
+    ar: string;
+    en: string;
+};
+
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 
 export type UserProfile = {
@@ -20,11 +25,11 @@ export type UserProfile = {
 
 export type Client = {
   id: string;
-  name: string;
-  contactPerson: string;
+  name: MultilingualString;
+  contactPerson: MultilingualString;
   email: string;
   phone: string;
-  address: string;
+  address: MultilingualString;
   totalVisits: number;
   projectIds: string[];
 };
@@ -32,8 +37,8 @@ export type Client = {
 export type ProjectStatus = 'Planning' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';
 
 export type EngineeringDiscipline = {
-  name: 'Architectural' | 'Structural' | 'Exterior' | 'Electrical' | 'Plumbing' | 'Interior Design';
-  stages: { name: string; status: 'Pending' | 'In Progress' | 'Completed' }[];
+  name: MultilingualString;
+  stages: { name: MultilingualString; status: 'Pending' | 'In Progress' | 'Completed' }[];
 };
 
 export type ProjectFile = {
@@ -47,9 +52,9 @@ export type ProjectFile = {
 export type TimelineEvent = {
   id: string;
   type: 'Milestone' | 'Visit' | 'Task' | 'Report';
-  title: string;
+  title: MultilingualString;
   date: string;
-  description: string;
+  description: MultilingualString;
   authorId?: string;
 };
 
@@ -65,13 +70,13 @@ export type DailyReport = {
 
 export type Project = {
   id: string;
-  name: string;
+  name: MultilingualString;
   clientId: string;
   leadEngineerId: string;
   status: ProjectStatus;
   startDate: string;
   endDate: string;
-  description: string;
+  description: MultilingualString;
   imageUrl: string;
   imageHint: string;
   disciplines: EngineeringDiscipline[];
@@ -83,17 +88,17 @@ export type Project = {
 
 export type Appointment = {
   id: string;
-  title: string;
+  title: MultilingualString;
   date: string;
   clientId: string;
   projectId: string;
   engineerId: string;
-  notes: string;
+  notes: MultilingualString;
 };
 
 export type PaymentMilestone = {
   id: string;
-  name: string;
+  name: MultilingualString;
   percentage: number;
   dueDate: string;
   status: 'Pending' | 'Completed' | 'Overdue';
@@ -104,7 +109,7 @@ export type Contract = {
   projectId: string;
   clientId: string;
   engineerId: string;
-  title: string;
+  title: MultilingualString;
   totalAmount: number;
   startDate: string;
   milestones: PaymentMilestone[];
@@ -130,10 +135,10 @@ export type CashReceipt = {
     date: string;
     clientId: string;
     amount: number;
-    amountInWords: string;
+    amountInWords: MultilingualString;
     paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer';
     reference?: string; // Cheque number or transfer reference
-    description: string;
+    description: MultilingualString;
 };
 
 export type Transaction = {
@@ -148,15 +153,15 @@ export type Transaction = {
 
 export type InventoryItem = {
   id: string;
-  name: string;
+  name: MultilingualString;
   quantity: number;
-  unit: 'bags' | 'tons' | 'pieces' | 'sqm';
+  unit: MultilingualString;
   lowStockThreshold: number;
-  supplier: string;
+  supplier: MultilingualString;
 };
 
 export type Employee = {
-    id: string;
+    id?: string;
     fullName: string; 
     nameEn?: string;
     dob?: string;

@@ -1,3 +1,5 @@
+
+'use client';
 import {
   Card,
   CardContent,
@@ -8,23 +10,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
 import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments';
+import { useLanguage } from '@/context/language-context';
 
 export default function AppointmentsPage() {
+    const { language } = useLanguage();
+    const t = (language === 'ar') ? 
+        { title: 'المواعيد', description: 'جدولة وإدارة جميع اجتماعات العملاء والزيارات الميدانية.', new: 'موعد جديد', calendar: 'عرض التقويم قريباً', calendarDesc: 'سيتم تنفيذ عرض تقويم كامل للجدولة هنا.' } : 
+        { title: 'Appointments', description: 'Schedule and manage all client meetings and site visits.', new: 'New Appointment', calendar: 'Calendar View Coming Soon', calendarDesc: 'A full calendar view for scheduling will be implemented here.' };
+        
     return (
-        <div className="space-y-8">
+        <div className="space-y-8" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Appointments</CardTitle>
-                            <CardDescription>
-                                Schedule and manage all client meetings and site visits.
-                            </CardDescription>
+                            <CardTitle>{t.title}</CardTitle>
+                            <CardDescription>{t.description}</CardDescription>
                         </div>
                         <Button asChild size="sm" className="gap-1">
                             
                                 <><PlusCircle className="h-4 w-4" />
-                                New Appointment</>
+                                {t.new}</>
                             
                         </Button>
                     </div>
@@ -32,9 +38,9 @@ export default function AppointmentsPage() {
                 <CardContent>
                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
                         <CalendarIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-4 text-lg font-medium">Calendar View Coming Soon</h3>
+                        <h3 className="mt-4 text-lg font-medium">{t.calendar}</h3>
                         <p className="mt-2 text-sm text-muted-foreground">
-                            A full calendar view for scheduling will be implemented here.
+                            {t.calendarDesc}
                         </p>
                     </div>
                 </CardContent>

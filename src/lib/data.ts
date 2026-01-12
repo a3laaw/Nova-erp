@@ -1,4 +1,4 @@
-import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile } from './types';
+import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile, MultilingualString } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
@@ -15,51 +15,69 @@ export const users: Partial<UserProfile>[] = [
 
 
 export const clients: Client[] = [
-  { id: 'client-1', name: 'Emaar Properties', contactPerson: 'Mohamed Alabbar', email: 'contact@emaar.ae', phone: '+971 4 123 4567', address: 'Dubai, UAE', totalVisits: 5, projectIds: ['proj-1', 'proj-3'] },
-  { id: 'client-2', name: 'Aldar Properties', contactPerson: 'Talal Al Dhiyebi', email: 'info@aldar.com', phone: '+971 2 987 6543', address: 'Abu Dhabi, UAE', totalVisits: 8, projectIds: ['proj-2'] },
+  { 
+    id: 'client-1', 
+    name: { ar: 'إعمار العقارية', en: 'Emaar Properties' }, 
+    contactPerson: { ar: 'محمد العبار', en: 'Mohamed Alabbar' }, 
+    email: 'contact@emaar.ae', 
+    phone: '+971 4 123 4567', 
+    address: { ar: 'دبي, الإمارات العربية المتحدة', en: 'Dubai, UAE' }, 
+    totalVisits: 5, 
+    projectIds: ['proj-1', 'proj-3'] 
+  },
+  { 
+    id: 'client-2', 
+    name: { ar: 'الدار العقارية', en: 'Aldar Properties' }, 
+    contactPerson: { ar: 'طلال الذييبي', en: 'Talal Al Dhiyebi' }, 
+    email: 'info@aldar.com', 
+    phone: '+971 2 987 6543', 
+    address: { ar: 'أبو ظبي, الإمارات العربية المتحدة', en: 'Abu Dhabi, UAE' }, 
+    totalVisits: 8, 
+    projectIds: ['proj-2'] 
+  },
 ];
 
 export const projects: Project[] = [
   {
     id: 'proj-1',
-    name: 'Downtown Dubai Villa',
+    name: { ar: 'فيلا في داون تاون دبي', en: 'Downtown Dubai Villa' },
     clientId: 'client-1',
     leadEngineerId: 'user-2', // This will need to match a UID from Firestore
     status: 'In Progress',
     startDate: '2023-10-01',
     endDate: '2024-12-31',
-    description: 'A luxury 5-bedroom villa with a private pool and modern amenities in the heart of Downtown Dubai.',
+    description: { ar: 'فيلا فاخرة مكونة من 5 غرف نوم مع مسبح خاص ووسائل راحة حديثة في قلب دبي.', en: 'A luxury 5-bedroom villa with a private pool and modern amenities in the heart of Downtown Dubai.' },
     imageUrl: getUserAvatar('project-image-1'),
     imageHint: 'modern villa',
     disciplines: [
-      { name: 'Architectural', stages: [{ name: 'Basement', status: 'Completed' }, { name: 'Ground', status: 'In Progress' }, { name: 'First', status: 'Pending' }] },
-      { name: 'Structural', stages: [{ name: 'Columns design', status: 'Completed' }, { name: 'Structural drawings', status: 'In Progress' }] },
-      { name: 'Exterior', stages: [{ name: '3D facade', status: 'Completed' }, { name: 'Execution drawings', status: 'Pending' }] },
-      { name: 'Electrical', stages: [{ name: 'Electrical layout', status: 'Pending' }] },
+      { name: { ar: 'الهندسة المعمارية', en: 'Architectural' }, stages: [{ name: {ar: 'الطابق السفلي', en: 'Basement'}, status: 'Completed' }, { name: {ar: 'الطابق الأرضي', en: 'Ground'}, status: 'In Progress' }, { name: {ar: 'الطابق الأول', en: 'First'}, status: 'Pending' }] },
+      { name: { ar: 'الهندسة الإنشائية', en: 'Structural' }, stages: [{ name: {ar: 'تصميم الأعمدة', en: 'Columns design'}, status: 'Completed' }, { name: {ar: 'المخططات الإنشائية', en: 'Structural drawings'}, status: 'In Progress' }] },
+      { name: { ar: 'التصميم الخارجي', en: 'Exterior' }, stages: [{ name: {ar: 'واجهة ثلاثية الأبعاد', en: '3D facade'}, status: 'Completed' }, { name: {ar: 'مخططات التنفيذ', en: 'Execution drawings'}, status: 'Pending' }] },
+      { name: { ar: 'الهندسة الكهربائية', en: 'Electrical' }, stages: [{ name: {ar: 'تخطيط الكهرباء', en: 'Electrical layout'}, status: 'Pending' }] },
     ],
     files: [],
     timeline: [
-      { id: 'tl-1', type: 'Milestone', title: 'Project Kick-off', date: '2023-10-01', description: 'Initial meeting and project start.' },
-      { id: 'tl-2', type: 'Visit', title: 'Initial Site Survey', date: '2023-10-05', description: 'Surveyed the plot and soil conditions.', authorId: 'user-2' },
-      { id: 'tl-3', type: 'Task', title: 'Finalize Architectural Blueprints', date: '2023-11-15', description: 'Client approved the final designs.', authorId: 'user-2' },
+      { id: 'tl-1', type: 'Milestone', title: { ar: 'انطلاق المشروع', en: 'Project Kick-off' }, date: '2023-10-01', description: { ar: 'الاجتماع الأولي وبدء المشروع.', en: 'Initial meeting and project start.' } },
+      { id: 'tl-2', type: 'Visit', title: { ar: 'مسح أولي للموقع', en: 'Initial Site Survey' }, date: '2023-10-05', description: { ar: 'تم مسح قطعة الأرض وحالة التربة.', en: 'Surveyed the plot and soil conditions.' }, authorId: 'user-2' },
+      { id: 'tl-3', type: 'Task', title: { ar: 'وضع اللمسات الأخيرة على المخططات المعمارية', en: 'Finalize Architectural Blueprints' }, date: '2023-11-15', description: { ar: 'وافق العميل على التصاميم النهائية.', en: 'Client approved the final designs.' }, authorId: 'user-2' },
     ],
     reports: [],
     contractId: 'cont-1',
   },
   {
     id: 'proj-2',
-    name: 'Yas Island Residential Tower',
+    name: { ar: 'برج سكني في جزيرة ياس', en: 'Yas Island Residential Tower' },
     clientId: 'client-2',
     leadEngineerId: 'user-5', // This will need to match a UID from Firestore
     status: 'Planning',
     startDate: '2024-02-15',
     endDate: '2026-08-30',
-    description: 'A 20-story residential building featuring 150 apartments, a gym, and retail spaces.',
+    description: { ar: 'مبنى سكني مكون من 20 طابقًا يضم 150 شقة وصالة رياضية ومساحات تجارية.', en: 'A 20-story residential building featuring 150 apartments, a gym, and retail spaces.' },
     imageUrl: getUserAvatar('project-image-2'),
     imageHint: 'modern skyscraper',
     disciplines: [
-      { name: 'Architectural', stages: [{ name: 'Concept Design', status: 'In Progress' }] },
-      { name: 'Structural', stages: [{ name: 'Initial Calculations', status: 'Pending' }] },
+      { name: { ar: 'الهندسة المعمارية', en: 'Architectural' }, stages: [{ name: { ar: 'التصميم المبدئي', en: 'Concept Design' }, status: 'In Progress' }] },
+      { name: { ar: 'الهندسة الإنشائية', en: 'Structural' }, stages: [{ name: { ar: 'الحسابات الأولية', en: 'Initial Calculations' }, status: 'Pending' }] },
     ],
     files: [],
     timeline: [],
@@ -68,13 +86,13 @@ export const projects: Project[] = [
   },
   {
     id: 'proj-3',
-    name: 'Dubai Marina Kiosk',
+    name: { ar: 'كشك في دبي مارينا', en: 'Dubai Marina Kiosk' },
     clientId: 'client-1',
     leadEngineerId: 'user-2', // This will need to match a UID from Firestore
     status: 'Completed',
     startDate: '2023-05-01',
     endDate: '2023-08-01',
-    description: 'A small commercial kiosk for a food and beverage brand in Dubai Marina.',
+    description: { ar: 'كشك تجاري صغير لعلامة تجارية للمأكولات والمشروبات في دبي مارينا.', en: 'A small commercial kiosk for a food and beverage brand in Dubai Marina.' },
     imageUrl: getUserAvatar('project-image-3'),
     imageHint: 'food kiosk',
     disciplines: [],
@@ -85,8 +103,8 @@ export const projects: Project[] = [
 ];
 
 export const appointments: Appointment[] = [
-  { id: 'appt-1', title: 'Villa Site Visit', date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), clientId: 'client-1', projectId: 'proj-1', engineerId: 'user-2', notes: 'Check foundation progress.' },
-  { id: 'appt-2', title: 'Tower Design Review', date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), clientId: 'client-2', projectId: 'proj-2', engineerId: 'user-5', notes: 'Reviewing the latest architectural drafts with the client.' },
+  { id: 'appt-1', title: { ar: 'زيارة موقع الفيلا', en: 'Villa Site Visit' }, date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), clientId: 'client-1', projectId: 'proj-1', engineerId: 'user-2', notes: { ar: 'التحقق من تقدم الأساسات.', en: 'Check foundation progress.' } },
+  { id: 'appt-2', title: { ar: 'مراجعة تصميم البرج', en: 'Tower Design Review' }, date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), clientId: 'client-2', projectId: 'proj-2', engineerId: 'user-5', notes: { ar: 'مراجعة أحدث المسودات المعمارية مع العميل.', en: 'Reviewing the latest architectural drafts with the client.' } },
 ];
 
 export const contracts: Contract[] = [
@@ -95,14 +113,14 @@ export const contracts: Contract[] = [
         projectId: 'proj-1',
         clientId: 'client-1',
         engineerId: 'user-2',
-        title: 'Contract for Downtown Dubai Villa',
+        title: { ar: 'عقد فيلا في داون تاون دبي', en: 'Contract for Downtown Dubai Villa' },
         totalAmount: 5000000,
         startDate: '2023-09-25',
         milestones: [
-            { id: 'ms-1', name: 'Design Approval', percentage: 20, dueDate: '2023-11-15', status: 'Completed' },
-            { id: 'ms-2', name: 'Foundation Completion', percentage: 30, dueDate: '2024-03-01', status: 'Pending' },
-            { id: 'ms-3', name: 'Structure Completion', percentage: 30, dueDate: '2024-08-01', status: 'Pending' },
-            { id: 'ms-4', name: 'Handover', percentage: 20, dueDate: '2024-12-31', status: 'Pending' },
+            { id: 'ms-1', name: { ar: 'الموافقة على التصميم', en: 'Design Approval' }, percentage: 20, dueDate: '2023-11-15', status: 'Completed' },
+            { id: 'ms-2', name: { ar: 'اكتمال الأساسات', en: 'Foundation Completion' }, percentage: 30, dueDate: '2024-03-01', status: 'Pending' },
+            { id: 'ms-3', name: { ar: 'اكتمال الهيكل', en: 'Structure Completion' }, percentage: 30, dueDate: '2024-08-01', status: 'Pending' },
+            { id: 'ms-4', name: { ar: 'التسليم', en: 'Handover' }, percentage: 20, dueDate: '2024-12-31', status: 'Pending' },
         ],
     },
     {
@@ -110,11 +128,11 @@ export const contracts: Contract[] = [
         projectId: 'proj-2',
         clientId: 'client-2',
         engineerId: 'user-5',
-        title: 'Contract for Yas Island Tower',
+        title: { ar: 'عقد برج جزيرة ياس', en: 'Contract for Yas Island Tower' },
         totalAmount: 75000000,
         startDate: '2024-02-01',
         milestones: [
-            { id: 'ms-5', name: 'Initial Deposit', percentage: 10, dueDate: '2024-02-15', status: 'Pending' },
+            { id: 'ms-5', name: { ar: 'دفعة أولى', en: 'Initial Deposit' }, percentage: 10, dueDate: '2024-02-15', status: 'Pending' },
         ],
     }
 ];
@@ -131,17 +149,17 @@ export const cashReceipts: CashReceipt[] = [
         date: '2024-07-20',
         clientId: 'client-1',
         amount: 50000,
-        amountInWords: 'Fifty Thousand Dirhams only',
+        amountInWords: { ar: 'خمسون ألف درهم فقط لا غير', en: 'Fifty Thousand Dirhams only' },
         paymentMethod: 'Cheque',
         reference: '123456',
-        description: 'Advance payment for Downtown Dubai Villa',
+        description: { ar: 'دفعة مقدمة لفيلا في داون تاون دبي', en: 'Advance payment for Downtown Dubai Villa' },
     }
 ];
 
 
 export const inventory: InventoryItem[] = [
-    { id: 'item-1', name: 'Cement', quantity: 500, unit: 'bags', lowStockThreshold: 100, supplier: 'Emirates Cement Co.' },
-    { id: 'item-2', name: 'Steel Rebar', quantity: 20, unit: 'tons', lowStockThreshold: 5, supplier: 'Conares Steel' },
-    { id: 'item-3', name: 'Ceramic Tiles', quantity: 150, unit: 'sqm', lowStockThreshold: 50, supplier: 'RAK Ceramics' },
-    { id: 'item-4', name: 'Electrical Wiring', quantity: 80, unit: 'pieces', lowStockThreshold: 20, supplier: 'Dubai Cables' },
+    { id: 'item-1', name: { ar: 'أسمنت', en: 'Cement' }, quantity: 500, unit: { ar: 'أكياس', en: 'bags' }, lowStockThreshold: 100, supplier: { ar: 'شركة أسمنت الإمارات', en: 'Emirates Cement Co.' } },
+    { id: 'item-2', name: { ar: 'حديد تسليح', en: 'Steel Rebar' }, quantity: 20, unit: { ar: 'أطنان', en: 'tons' }, lowStockThreshold: 5, supplier: { ar: 'كونارس للحديد', en: 'Conares Steel' } },
+    { id: 'item-3', name: { ar: 'بلاط سيراميك', en: 'Ceramic Tiles' }, quantity: 150, unit: { ar: 'متر مربع', en: 'sqm' }, lowStockThreshold: 50, supplier: { ar: 'سيراميك رأس الخيمة', en: 'RAK Ceramics' } },
+    { id: 'item-4', name: { ar: 'أسلاك كهربائية', en: 'Electrical Wiring' }, quantity: 80, unit: { ar: 'قطع', en: 'pieces' }, lowStockThreshold: 20, supplier: { ar: 'كابلات دبي', en: 'Dubai Cables' } },
 ];

@@ -1,8 +1,11 @@
+
+'use client';
 import type { Project } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { CheckCircle, Milestone, MessageSquare, Construction, Plus } from 'lucide-react';
 import { DelayReportGenerator } from './delay-report-generator';
+import { useLanguage } from '@/context/language-context';
 
 const eventIcons = {
   Milestone: <Milestone className="h-5 w-5 text-purple-500" />,
@@ -12,18 +15,23 @@ const eventIcons = {
 };
 
 export function ProjectTimeline({ project }: { project: Project }) {
+  const { language } = useLanguage();
   const sortedTimeline = [...project.timeline].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  
+  const t = (language === 'ar') ? 
+    { title: 'الجدول الزمني للمشروع', description: 'سجل زمني لجميع أنشطة المشروع.', add: 'إضافة حدث' } : 
+    { title: 'Project Timeline', description: 'A chronological log of all project activities.', add: 'Add Event' };
 
   return (
-    <Card>
+    <Card dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <CardHeader>
         <div className="flex items-center justify-between">
             <div>
-                <CardTitle>Project Timeline</CardTitle>
-                <CardDescription>A chronological log of all project activities.</CardDescription>
+                <CardTitle>{t.title}</CardTitle>
+                <CardDescription>{t.description}</CardDescription>
             </div>
             <div className='flex gap-2'>
-                <Button variant="outline"><Plus className="mr-2 h-4 w-4" /> Add Event</Button>
+                <Button variant="outline"><Plus className="mr-2 h-4 w-4" /> {t.add}</Button>
                 <DelayReportGenerator project={project} />
             </div>
         </div>
@@ -40,10 +48,10 @@ export function ProjectTimeline({ project }: { project: Project }) {
               </div>
               <div className="ml-4 flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold">{event.title}</p>
+                  <p className="font-semibold">{event.title[language]}</p>
                   <time className="text-sm text-muted-foreground">{new Date(event.date).toLocaleDateString()}</time>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{event.description[language]}</p>
               </div>
             </div>
           ))}

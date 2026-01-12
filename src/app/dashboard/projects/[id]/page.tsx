@@ -26,6 +26,7 @@ import { ProjectReports } from '@/components/projects/project-reports';
 import { ProjectContracts } from '@/components/projects/project-contracts';
 import { ProjectFiles } from '@/components/projects/project-files';
 import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/context/language-context';
 
 const statusStyles: Record<ProjectStatus, string> = {
     'In Progress': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -37,6 +38,7 @@ const statusStyles: Record<ProjectStatus, string> = {
 
 export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { language } = useLanguage();
   const project = projects.find(p => p.id === params.id);
 
   if (!project) {
@@ -45,19 +47,24 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
 
   const client = clients.find(c => c.id === project.clientId);
   const leadEngineer = users.find(u => u.id === project.leadEngineerId);
+  
+  const t = (language === 'ar') ? 
+    { back: 'العودة إلى المشاريع', client: 'العميل', lead: 'المهندس المسؤول', timeline: 'الجدول الزمني', contract: 'عرض العقد', disciplines: 'التخصصات', reports: 'التقارير اليومية', contracts: 'العقود', files: 'الملفات' } : 
+    { back: 'Back to Projects', client: 'Client', lead: 'Lead Engineer', timeline: 'Timeline', contract: 'View Contract', disciplines: 'Disciplines', reports: 'Daily Reports', contracts: 'Contracts', files: 'Files' };
+
 
   return (
-    <div className="grid gap-8">
+    <div className="grid gap-8" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Button variant="outline" onClick={() => router.push('/dashboard/projects')} className='w-fit'>
             <ArrowRight className="ml-2 h-4 w-4" />
-            العودة إلى المشاريع
+            {t.back}
         </Button>
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row gap-4 md:gap-8">
             <Image
               src={project.imageUrl}
-              alt={project.name}
+              alt={project.name[language]}
               width={250}
               height={160}
               className="rounded-lg object-cover"
@@ -65,28 +72,28 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
             />
             <div className="flex-1">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-3xl font-headline">{project.name}</CardTitle>
+                <CardTitle className="text-3xl font-headline">{project.name[language]}</CardTitle>
                 <Badge variant="outline" className={cn("text-sm", statusStyles[project.status])}>
                   {project.status}
                 </Badge>
               </div>
-              <CardDescription className="mt-2 text-base">{project.description}</CardDescription>
+              <CardDescription className="mt-2 text-base">{project.description[language]}</CardDescription>
               <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <ClientsIcon className="h-4 w-4" />
-                  <span><strong>Client:</strong> {client?.name}</span>
+                  <span><strong>{t.client}:</strong> {client?.name[language]}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  <span><strong>Lead Engineer:</strong> {leadEngineer?.fullName}</span>
+                  <span><strong>{t.lead}:</strong> {leadEngineer?.fullName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <span><strong>Timeline:</strong> {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}</span>
+                  <span><strong>{t.timeline}:</strong> {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <BadgeDollarSign className="h-4 w-4" />
-                  <span><strong>Contract:</strong> <a href="#" className="text-primary hover:underline">View Contract</a></span>
+                  <span><strong>{t.contracts}:</strong> <a href="#" className="text-primary hover:underline">{t.contract}</a></span>
                 </div>
               </div>
             </div>
@@ -96,11 +103,11 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
       
       <Tabs defaultValue="timeline" className="w-full">
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-5">
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="disciplines">Disciplines</TabsTrigger>
-          <TabsTrigger value="reports">Daily Reports</TabsTrigger>
-          <TabsTrigger value="contracts">Contracts</TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
+          <TabsTrigger value="timeline">{t.timeline}</TabsTrigger>
+          <TabsTrigger value="disciplines">{t.disciplines}</TabsTrigger>
+          <TabsTrigger value="reports">{t.reports}</TabsTrigger>
+          <TabsTrigger value="contracts">{t.contracts}</TabsTrigger>
+          <TabsTrigger value="files">{t.files}</TabsTrigger>
         </TabsList>
         <TabsContent value="timeline">
           <ProjectTimeline project={project} />

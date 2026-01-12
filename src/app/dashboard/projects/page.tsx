@@ -1,3 +1,5 @@
+
+'use client';
 import {
   Card,
   CardContent,
@@ -28,6 +30,7 @@ import { projects, clients, users } from '@/lib/data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import type { ProjectStatus } from '@/lib/types';
+import { useLanguage } from '@/context/language-context';
 
 const statusStyles: Record<ProjectStatus, string> = {
     'In Progress': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -39,20 +42,25 @@ const statusStyles: Record<ProjectStatus, string> = {
 
 
 export default function ProjectsPage() {
+  const { language } = useLanguage();
+  const t = (language === 'ar') ? 
+    { title: 'المشاريع', description: 'إدارة جميع مشاريعك الهندسية والإنشائية.', add: 'إضافة مشروع', project: 'المشروع', client: 'العميل', lead: 'المهندس المسؤول', status: 'الحالة', actions: 'الإجراءات', view: 'عرض التفاصيل', edit: 'تعديل', delete: 'حذف' } :
+    { title: 'Projects', description: 'Manage all your engineering and construction projects.', add: 'Add Project', project: 'Project', client: 'Client', lead: 'Lead Engineer', status: 'Status', actions: 'Actions', view: 'View Details', edit: 'Edit', delete: 'Delete' };
+
   return (
-    <Card>
+    <Card dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <CardHeader>
         <div className="flex items-center justify-between">
             <div>
-                <CardTitle>Projects</CardTitle>
+                <CardTitle>{t.title}</CardTitle>
                 <CardDescription>
-                Manage all your engineering and construction projects.
+                {t.description}
                 </CardDescription>
             </div>
             <Button asChild size="sm" className="gap-1">
                 <Link href="#">
                     <PlusCircle className="h-4 w-4" />
-                    Add Project
+                    {t.add}
                 </Link>
             </Button>
         </div>
@@ -64,16 +72,16 @@ export default function ProjectsPage() {
               <TableHead className="hidden w-[100px] sm:table-cell">
                 <span className="sr-only">Image</span>
               </TableHead>
-              <TableHead>Project</TableHead>
-              <TableHead>Client</TableHead>
+              <TableHead>{t.project}</TableHead>
+              <TableHead>{t.client}</TableHead>
               <TableHead className="hidden md:table-cell">
-                Lead Engineer
+                {t.lead}
               </TableHead>
               <TableHead className="hidden md:table-cell">
-                Status
+                {t.status}
               </TableHead>
               <TableHead>
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">{t.actions}</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -85,16 +93,16 @@ export default function ProjectsPage() {
                 <TableRow key={project.id}>
                   <TableCell className="hidden sm:table-cell">
                     <Avatar className="h-10 w-10 rounded-md">
-                        <AvatarImage src={project.imageUrl} alt={project.name} className='object-cover' data-ai-hint={project.imageHint}/>
-                        <AvatarFallback className="rounded-md">{project.name.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={project.imageUrl} alt={project.name[language]} className='object-cover' data-ai-hint={project.imageHint}/>
+                        <AvatarFallback className="rounded-md">{project.name[language].charAt(0)}</AvatarFallback>
                     </Avatar>
                   </TableCell>
                   <TableCell className="font-medium">
                     <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
-                        {project.name}
+                        {project.name[language]}
                     </Link>
                   </TableCell>
-                  <TableCell>{client?.name}</TableCell>
+                  <TableCell>{client?.name[language]}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <div className='flex items-center gap-2'>
                         <Avatar className="h-8 w-8">
@@ -121,11 +129,11 @@ export default function ProjectsPage() {
                           <span className="sr-only">Toggle menu</span>
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem asChild><Link href={`/dashboard/projects/${project.id}`}>View Details</Link></DropdownMenuItem>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem className='text-destructive'>Delete</DropdownMenuItem>
+                      <DropdownMenuContent align="end" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                        <DropdownMenuLabel>{t.actions}</DropdownMenuLabel>
+                        <DropdownMenuItem asChild><Link href={`/dashboard/projects/${project.id}`}>{t.view}</Link></DropdownMenuItem>
+                        <DropdownMenuItem>{t.edit}</DropdownMenuItem>
+                        <DropdownMenuItem className='text-destructive'>{t.delete}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
