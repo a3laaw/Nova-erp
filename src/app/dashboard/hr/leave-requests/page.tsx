@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, PlusCircle, X, Pencil, LogIn, CheckCircle } from 'lucide-react';
+import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -39,6 +39,7 @@ import type { LeaveRequest } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useRouter } from 'next/navigation';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -68,6 +69,7 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
 
 export default function LeaveRequestsPage() {
     const firestore = useFirestore();
+    const router = useRouter();
     const { toast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
@@ -246,186 +248,190 @@ export default function LeaveRequestsPage() {
   }
 
   return (
-    <>
-      <Card dir="rtl">
-        <CardHeader>
-            <div className='flex justify-between items-center'>
-                <div>
-                    <CardTitle>طلبات الإجازة</CardTitle>
-                    <CardDescription>
-                    إدارة طلبات الإجازات المقدمة من الموظفين.
-                    </CardDescription>
+    <div className='space-y-6'>
+        <Button variant="outline" onClick={() => router.push('/dashboard/hr')}>
+            <ArrowRight className="ml-2 h-4 w-4" />
+            العودة إلى الموارد البشرية
+        </Button>
+        <Card dir="rtl">
+            <CardHeader>
+                <div className='flex justify-between items-center'>
+                    <div>
+                        <CardTitle>طلبات الإجازة</CardTitle>
+                        <CardDescription>
+                        إدارة طلبات الإجازات المقدمة من الموظفين.
+                        </CardDescription>
+                    </div>
+                    <Button onClick={handleNewRequestClick}>
+                        <PlusCircle className="ml-2 h-4 w-4" />
+                        طلب إجازة جديد
+                    </Button>
                 </div>
-                <Button onClick={handleNewRequestClick}>
-                    <PlusCircle className="ml-2 h-4 w-4" />
-                    طلب إجازة جديد
-                </Button>
-            </div>
-        </CardHeader>
-        <CardContent>
-             <div className="flex gap-2 mb-4 border-b pb-4">
-                <Button variant={filter === 'pending' ? 'secondary' : 'ghost'} onClick={() => setFilter('pending')}>
-                    طلبات معلقة
-                </Button>
-                <Button variant={filter === 'approved' ? 'secondary' : 'ghost'} onClick={() => setFilter('approved')} >
-                    طلبات مقبولة
-                </Button>
-                <Button variant={filter === 'rejected' ? 'secondary' : 'ghost'} onClick={() => setFilter('rejected')} >
-                    طلبات مرفوضة
-                </Button>
-            </div>
-            <div className="border rounded-lg">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>اسم الموظف</TableHead>
-                            <TableHead>نوع الإجازة</TableHead>
-                            <TableHead>من تاريخ</TableHead>
-                            <TableHead>إلى تاريخ</TableHead>
-                            <TableHead>الأيام</TableHead>
-                            <TableHead>الحالة</TableHead>
-                            <TableHead className='text-center'>الإجراءات</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                         {loading && Array.from({ length: 3 }).map((_, i) => (
-                            <TableRow key={`skel-${i}`}>
-                                <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
-                            </TableRow>
-                        ))}
-                        {error && (
+            </CardHeader>
+            <CardContent>
+                <div className="flex gap-2 mb-4 border-b pb-4">
+                    <Button variant={filter === 'pending' ? 'secondary' : 'ghost'} onClick={() => setFilter('pending')}>
+                        طلبات معلقة
+                    </Button>
+                    <Button variant={filter === 'approved' ? 'secondary' : 'ghost'} onClick={() => setFilter('approved')} >
+                        طلبات مقبولة
+                    </Button>
+                    <Button variant={filter === 'rejected' ? 'secondary' : 'ghost'} onClick={() => setFilter('rejected')} >
+                        طلبات مرفوضة
+                    </Button>
+                </div>
+                <div className="border rounded-lg">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center text-destructive">
-                                    حدث خطأ أثناء جلب البيانات.
-                                </TableCell>
+                                <TableHead>اسم الموظف</TableHead>
+                                <TableHead>نوع الإجازة</TableHead>
+                                <TableHead>من تاريخ</TableHead>
+                                <TableHead>إلى تاريخ</TableHead>
+                                <TableHead>الأيام</TableHead>
+                                <TableHead>الحالة</TableHead>
+                                <TableHead className='text-center'>الإجراءات</TableHead>
                             </TableRow>
-                        )}
-                        {!loading && requests.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center">
-                                    لا توجد طلبات إجازة حالياً.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {!loading && requests.map(req => (
-                            <TableRow key={req.id}>
-                                <TableCell className='font-medium'>{req.employeeName}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={typeColors[req.leaveType]}>
-                                        {typeTranslations[req.leaveType]}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>{formatDate(req.startDate)}</TableCell>
-                                <TableCell>{formatDate(req.endDate)}</TableCell>
-                                 <TableCell className='font-medium'>
-                                    {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col gap-1">
-                                        <Badge variant="outline" className={statusColors[req.status]}>
-                                            {statusTranslations[req.status]}
+                        </TableHeader>
+                        <TableBody>
+                            {loading && Array.from({ length: 3 }).map((_, i) => (
+                                <TableRow key={`skel-${i}`}>
+                                    <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                                </TableRow>
+                            ))}
+                            {error && (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="h-24 text-center text-destructive">
+                                        حدث خطأ أثناء جلب البيانات.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!loading && requests.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="h-24 text-center">
+                                        لا توجد طلبات إجازة حالياً.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!loading && requests.map(req => (
+                                <TableRow key={req.id}>
+                                    <TableCell className='font-medium'>{req.employeeName}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={typeColors[req.leaveType]}>
+                                            {typeTranslations[req.leaveType]}
                                         </Badge>
-                                        {req.status === 'rejected' && req.rejectionReason && (
-                                            <p className='text-xs text-muted-foreground truncate' title={req.rejectionReason}>
-                                                السبب: {req.rejectionReason}
-                                            </p>
-                                        )}
-                                    </div>
-                                </TableCell>
-                                <TableCell className='text-center'>
-                                    {filter === 'pending' && (
-                                        <div className='flex gap-2 justify-center'>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)}>
-                                                <Check className="h-4 w-4" />
-                                            </Button>
-                                            <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(req)}>
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                    {filter === 'approved' && (
-                                        <>
-                                            {req.isBackFromLeave ? (
-                                                 <div className='flex items-center justify-center gap-2 text-green-600'>
-                                                    <CheckCircle className="h-4 w-4" />
-                                                    <span className='text-xs'>عاد في: {formatDate(req.actualReturnDate)}</span>
-                                                 </div>
-                                            ) : (
-                                                <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)}>
-                                                    <LogIn className="ml-2 h-4 w-4" />
-                                                    تسجيل العودة
-                                                </Button>
+                                    </TableCell>
+                                    <TableCell>{formatDate(req.startDate)}</TableCell>
+                                    <TableCell>{formatDate(req.endDate)}</TableCell>
+                                    <TableCell className='font-medium'>
+                                        {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-1">
+                                            <Badge variant="outline" className={statusColors[req.status]}>
+                                                {statusTranslations[req.status]}
+                                            </Badge>
+                                            {req.status === 'rejected' && req.rejectionReason && (
+                                                <p className='text-xs text-muted-foreground truncate' title={req.rejectionReason}>
+                                                    السبب: {req.rejectionReason}
+                                                </p>
                                             )}
-                                        </>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
-        </CardContent>
-      </Card>
-      <LeaveRequestForm 
-        isOpen={isFormOpen} 
-        onClose={handleCloseForm}
-        requestToEdit={editingRequest}
-      />
-
-       <AlertDialog open={isReturnConfirmOpen} onOpenChange={setIsReturnConfirmOpen}>
-            <AlertDialogContent dir="rtl">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>تسجيل عودة الموظف</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        الرجاء تحديد تاريخ العودة الفعلي للموظف "{requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                 <div className="grid gap-2 py-4">
-                    <Label htmlFor="actualReturnDate">تاريخ العودة الفعلي</Label>
-                    <Input
-                        id="actualReturnDate"
-                        type="date"
-                        value={actualReturnDate}
-                        onChange={(e) => setActualReturnDate(e.target.value)}
-                    />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className='text-center'>
+                                        {filter === 'pending' && (
+                                            <div className='flex gap-2 justify-center'>
+                                                <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)}>
+                                                    <Check className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(req)}>
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {filter === 'approved' && (
+                                            <>
+                                                {req.isBackFromLeave ? (
+                                                    <div className='flex items-center justify-center gap-2 text-green-600'>
+                                                        <CheckCircle className="h-4 w-4" />
+                                                        <span className='text-xs'>عاد في: {formatDate(req.actualReturnDate)}</span>
+                                                    </div>
+                                                ) : (
+                                                    <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)}>
+                                                        <LogIn className="ml-2 h-4 w-4" />
+                                                        تسجيل العودة
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </div>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isProcessingReturn}>إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmReturn} disabled={isProcessingReturn}>
-                        {isProcessingReturn ? 'جاري الحفظ...' : 'تأكيد العودة'}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+            </CardContent>
+        </Card>
+        <LeaveRequestForm 
+            isOpen={isFormOpen} 
+            onClose={handleCloseForm}
+            requestToEdit={editingRequest}
+        />
 
-        <AlertDialog open={isRejectConfirmOpen} onOpenChange={setIsRejectConfirmOpen}>
-            <AlertDialogContent dir="rtl">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>رفض طلب الإجازة</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        الرجاء كتابة سبب رفض طلب الإجازة للموظف "{requestToReject?.employeeName}".
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                 <div className="grid gap-2 py-4">
-                    <Label htmlFor="rejectionReason">سبب الرفض</Label>
-                    <Textarea
-                        id="rejectionReason"
-                        placeholder="مثال: ضغط العمل في هذه الفترة، عدم وجود بديل..."
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                    />
-                </div>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isProcessingReject}>إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmReject} disabled={isProcessingReject || !rejectionReason} className="bg-destructive hover:bg-destructive/90">
-                        {isProcessingReject ? 'جاري الرفض...' : 'تأكيد الرفض'}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </>
+        <AlertDialog open={isReturnConfirmOpen} onOpenChange={setIsReturnConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تسجيل عودة الموظف</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            الرجاء تحديد تاريخ العودة الفعلي للموظف "{requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-2 py-4">
+                        <Label htmlFor="actualReturnDate">تاريخ العودة الفعلي</Label>
+                        <Input
+                            id="actualReturnDate"
+                            type="date"
+                            value={actualReturnDate}
+                            onChange={(e) => setActualReturnDate(e.target.value)}
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isProcessingReturn}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmReturn} disabled={isProcessingReturn}>
+                            {isProcessingReturn ? 'جاري الحفظ...' : 'تأكيد العودة'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isRejectConfirmOpen} onOpenChange={setIsRejectConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>رفض طلب الإجازة</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            الرجاء كتابة سبب رفض طلب الإجازة للموظف "{requestToReject?.employeeName}".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-2 py-4">
+                        <Label htmlFor="rejectionReason">سبب الرفض</Label>
+                        <Textarea
+                            id="rejectionReason"
+                            placeholder="مثال: ضغط العمل في هذه الفترة، عدم وجود بديل..."
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isProcessingReject}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmReject} disabled={isProcessingReject || !rejectionReason} className="bg-destructive hover:bg-destructive/90">
+                            {isProcessingReject ? 'جاري الرفض...' : 'تأكيد الرفض'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+    </div>
   );
 }
