@@ -221,22 +221,16 @@ export function EmployeesTable() {
         }
     };
 
-    const formatDateCell = (dateValue: any) => {
+    const formatDateCell = (dateValue: any): string => {
         if (!dateValue) return '-';
-        
-        // Handle Firestore Timestamps which have a toDate method
-        if (typeof dateValue.toDate === 'function') {
-            return dateValue.toDate().toLocaleDateString('en-GB');
-        }
-        
-        // Handle ISO strings or other date formats
-        const date = new Date(dateValue);
-        if (isNaN(date.getTime())) {
+        try {
+            const d = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+            if (isNaN(d.getTime())) return '-';
+            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+        } catch (e) {
             return '-';
         }
-        
-        return date.toLocaleDateString('en-GB');
-    };
+    }
 
 
     return (

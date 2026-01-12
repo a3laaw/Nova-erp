@@ -45,7 +45,6 @@ export default function EditEmployeePage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
 
-    // Helper to safely convert Firestore Timestamp or string to 'yyyy-MM-dd' format
     const formatDateForInput = (date: any): string => {
         if (!date) return '';
         try {
@@ -57,6 +56,7 @@ export default function EditEmployeePage() {
             const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         } catch (e) {
+            console.error("Failed to format date:", date, e);
             return '';
         }
     };
