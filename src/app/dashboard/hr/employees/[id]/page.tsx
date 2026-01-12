@@ -108,9 +108,9 @@ export default function EmployeeProfilePage() {
   const formatDate = (dateValue: any): string => {
     if (!dateValue) return '-';
     try {
-        const d = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+        const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
         if (isNaN(d.getTime())) return '-';
-        return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', numberingSystem: 'latn' }).format(d);
+        return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
     } catch (e) {
         return '-';
     }

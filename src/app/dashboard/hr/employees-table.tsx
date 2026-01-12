@@ -42,6 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { addMonths, format, differenceInYears } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useLanguage } from '@/context/language-context';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -83,6 +84,7 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
 export function EmployeesTable() {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { language } = useLanguage();
 
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -149,8 +151,8 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'terminated',
-                noticeStartDate: new Date(noticeStartDate).toISOString(),
-                terminationDate: new Date(terminationDate).toISOString(),
+                noticeStartDate: new Date(noticeStartDate),
+                terminationDate: new Date(terminationDate),
                 terminationReason: terminationReason
             });
 
@@ -187,7 +189,7 @@ export function EmployeesTable() {
         };
 
         if (rehireType === 'new') {
-            updateData.hireDate = new Date(newHireDate).toISOString();
+            updateData.hireDate = new Date(newHireDate);
         }
 
         if (resetLeaveBalance) {
@@ -196,8 +198,8 @@ export function EmployeesTable() {
             updateData.carriedLeaveDays = 0;
             updateData.sickLeaveUsed = 0;
             updateData.emergencyLeaveUsed = 0;
-            updateData.lastLeaveResetDate = new Date(newHireDate).toISOString();
-            updateData.lastVacationAccrualDate = new Date(newHireDate).toISOString();
+            updateData.lastLeaveResetDate = new Date(newHireDate);
+            updateData.lastVacationAccrualDate = new Date(newHireDate);
         }
 
         try {
@@ -218,6 +220,17 @@ export function EmployeesTable() {
             setEmployeeToRehire(null);
         }
     };
+
+    const formatDateCell = (dateValue: any): string => {
+        if (!dateValue) return '-';
+        try {
+            const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
+            if (isNaN(d.getTime())) return '-';
+            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+        } catch (e) {
+            return '-';
+        }
+    }
 
 
     return (
@@ -281,7 +294,7 @@ export function EmployeesTable() {
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>
-                        <TableCell>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-GB') : '-'}</TableCell>
+                        <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
                         <TableCell className='font-medium'>
                             {employee.annualLeaveBalance !== undefined ? `${employee.annualLeaveBalance} يوم` : '...'}
                         </TableCell>
@@ -431,5 +444,4 @@ export function EmployeesTable() {
         </>
     );
 }
-
     

@@ -152,10 +152,10 @@ export default function LeaveReportsPage() {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
     }, [reportData]);
 
-    const formatDateForDisplay = (date: any): string => {
-        if (!date) return '-';
+    const formatDateForDisplay = (dateValue: any): string => {
+        if (!dateValue) return '-';
         try {
-            const d = date instanceof Timestamp ? date.toDate() : new Date(date);
+            const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
             if (isNaN(d.getTime())) return '-';
             return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
         } catch (e) { return '-'; }
@@ -311,4 +311,3 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
-

@@ -48,7 +48,7 @@ export default function EditEmployeePage() {
     const formatDateForInput = (date: any): string => {
         if (!date) return '';
         try {
-            const d = date.toDate ? date.toDate() : new Date(date);
+            const d = date?.toDate ? date.toDate() : new Date(date);
             if (isNaN(d.getTime())) return '';
             // Ensure month and day are 2 digits
             const year = d.getFullYear();
