@@ -29,6 +29,7 @@ import {
   Phone,
   User,
   Wallet,
+  Printer,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -103,9 +104,15 @@ export default function EmployeeProfilePage() {
     );
   }
   
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', numberingSystem: 'latn' });
+  const formatDate = (dateValue: any) => {
+    if (!dateValue) return '-';
+    try {
+        const d = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+        if (isNaN(d.getTime())) return '-';
+        return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', numberingSystem: 'latn' }).format(d);
+    } catch (e) {
+        return '-';
+    }
   }
 
   const formatCurrency = (amount: number | null | undefined) => {
@@ -120,14 +127,22 @@ export default function EmployeeProfilePage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
                 العودة إلى قائمة الموظفين
             </Button>
-            {employee.status !== 'terminated' && (
-                 <Button asChild>
-                    <Link href={`/dashboard/hr/employees/${id}/edit`}>
-                        <Pencil className="ml-2 h-4 w-4" />
-                        تعديل بيانات الموظف
+            <div className='flex gap-2'>
+                 <Button variant="outline" asChild>
+                    <Link href={`/dashboard/hr/employees/${id}/report`} target="_blank">
+                        <Printer className="ml-2 h-4 w-4" />
+                        طباعة تقرير الموظف
                     </Link>
                 </Button>
-            )}
+                {employee.status !== 'terminated' && (
+                     <Button asChild>
+                        <Link href={`/dashboard/hr/employees/${id}/edit`}>
+                            <Pencil className="ml-2 h-4 w-4" />
+                            تعديل بيانات الموظف
+                        </Link>
+                    </Button>
+                )}
+            </div>
         </div>
         <Card>
             <CardHeader className='flex-row items-center gap-6'>
