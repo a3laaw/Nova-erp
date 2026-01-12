@@ -10,7 +10,7 @@ import {
     type DocumentData 
 } from 'firebase/firestore';
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
-import { format, intervalToDuration, isFriday, eachDayOfInterval } from 'date-fns';
+import { format, intervalToDuration, isFriday, eachDayOfInterval, parseISO } from 'date-fns';
 
 export type ReportType = 'Comprehensive' | 'SalaryChange' | 'JobChange' | 'ResidencyRenewal' | 'LeaveActivity';
 
@@ -229,7 +229,7 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
                 headersMap.newJobTitle = { key: 'newJobTitle', label: 'الوظيفة الجديدة' };
                 headersMap.oldDepartment = { key: 'oldDepartment', label: 'القسم القديم' };
                 headersMap.newDepartment = { key: 'newDepartment', label: 'القسم الجديد' };
-                row = { ...row, oldJobTitle: log.field === 'jobTitle' ? log.oldValue : '-', newJobTitle: log.field === 'jobTitle' ? log.newValue : '-', oldDepartment: log.field === 'department' ? log.oldValue : '-', newDepartment: log.field === 'department' ? log.newValue : '-'};
+                row = { ...row, oldJobTitle: log.oldValue?.jobTitle, newJobTitle: log.newValue?.jobTitle, oldDepartment: log.oldValue?.department, newDepartment: log.newValue?.department};
             } else {
                  if(fields.includes('residencyExpiry')) headersMap.oldValue.type = 'date';
                  if(fields.includes('residencyExpiry')) headersMap.newValue.type = 'date';

@@ -13,6 +13,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import type { ReportData } from '@/services/report-generator';
+import { formatCurrency } from '@/lib/utils';
+
 
 const formatValue = (value: any, type?: 'date' | 'currency' | 'number'): string => {    
     if (value === null || value === undefined || value === '') return '-';
@@ -27,7 +29,7 @@ const formatValue = (value: any, type?: 'date' | 'currency' | 'number'): string 
         }
     }
     if (type === 'currency') {
-        return new Intl.NumberFormat('en-KW', { style: 'currency', currency: 'KWD' }).format(Number(value) || 0);
+        return formatCurrency(Number(value) || 0);
     }
     
     return String(value);
@@ -77,7 +79,7 @@ export function ReportResults({ reportData }: { reportData: ReportData }) {
                             <TableCell colSpan={reportData.footer.colSpan} className="font-bold">
                                 {reportData.footer.label}
                             </TableCell>
-                            <TableCell className="font-bold text-left">
+                            <TableCell className="font-bold text-left" colSpan={reportData.headers.length - reportData.footer.colSpan}>
                                 {formatValue(reportData.footer.value, reportData.footer.type)}
                             </TableCell>
                         </TableRow>

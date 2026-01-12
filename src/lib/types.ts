@@ -226,9 +226,9 @@ export interface Holiday {
 
 
 export type AuditLog = {
-    id: string;
+    id?: string;
     changeType: 'SalaryChange' | 'JobChange' | 'DataUpdate';
-    field: string; // e.g., 'basicSalary', 'residencyExpiry', 'jobTitle', 'department'
+    field: string | string[]; // e.g., 'basicSalary', ['jobTitle', 'department']
     oldValue: any;
     newValue: any;
     effectiveDate: any; // Timestamp or ISO String

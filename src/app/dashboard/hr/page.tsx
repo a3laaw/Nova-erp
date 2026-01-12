@@ -12,7 +12,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { EmployeesTable } from '@/components/hr/employees-table';
+import { EmployeesTable } from './employees-table';
 import Link from 'next/link';
 import { GratuityCalculator } from '@/components/hr/gratuity-calculator';
 
