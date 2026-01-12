@@ -213,21 +213,27 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
     const dateFrom = options.dateFrom ? Timestamp.fromDate(parseISO(options.dateFrom)) : Timestamp.fromDate(new Date(0));
     const dateTo = options.dateTo ? Timestamp.fromDate(parseISO(options.dateTo)) : Timestamp.now();
     
-    // 1. Get the correct headers for the report type first. This is crucial.
     const headers = getHeadersForAuditReport(changeType);
 
-    // 2. Fetch all relevant logs in a single efficient query
-    const logsQuery = query(
-        collectionGroup(db, 'auditLogs'), 
+    const conditions = [
         where('changeType', '==', changeType),
         where('effectiveDate', '>=', dateFrom),
-        where('effectiveDate', '<=', dateTo),
+        where('effectiveDate', '<=', dateTo)
+    ];
+
+    // Specific filtering for ResidencyRenewal which uses 'DataUpdate' type
+    if (changeType === 'DataUpdate') {
+        conditions.push(where('field', '==', 'residencyExpiry'));
+    }
+
+    const logsQuery = query(
+        collectionGroup(db, 'auditLogs'), 
+        ...conditions,
         orderBy('effectiveDate', 'desc')
     );
-
+    
     const logsSnapshot = await getDocs(logsQuery);
     
-    // 3. If no logs, return an empty report with correct headers.
     if (logsSnapshot.empty) {
         return {
             title,
@@ -237,34 +243,27 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
         };
     }
 
-    // 4. Map employees for quick lookup if there are logs
     const employeesSnapshot = await getDocs(query(collection(db, 'employees'), orderBy('fullName')));
     const employeesMap = new Map<string, Employee>();
     employeesSnapshot.forEach(doc => employeesMap.set(doc.id, { id: doc.id, ...doc.data() } as Employee));
 
-
-    // 5. Process the logs
     const rows = logsSnapshot.docs.map(logDoc => {
         const log = logDoc.data() as AuditLog;
-        const employeeId = logDoc.ref.parent.parent?.id; // Get parent employee ID
+        const employeeId = logDoc.ref.parent.parent?.id;
         const employee = employeeId ? employeesMap.get(employeeId) : undefined;
         const changedByUser = log.changedBy ? employeesMap.get(log.changedBy) : undefined;
 
         let row: DocumentData = {
-            employeeName: employee?.fullName || 'موظف غير معروف',
+            employeeName: employee?.fullName ?? 'موظف غير معروف',
             effectiveDate: log.effectiveDate,
-            changedBy: changedByUser?.fullName || log.changedBy || 'غير معروف',
+            changedBy: changedByUser?.fullName ?? log.changedBy ?? 'غير معروف',
+            oldValue: log.oldValue ?? null,
+            newValue: log.newValue ?? null,
+            oldJobTitle: log.oldValue?.jobTitle ?? null,
+            newJobTitle: log.newValue?.jobTitle ?? null,
+            oldDepartment: log.oldValue?.department ?? null,
+            newDepartment: log.newValue?.department ?? null,
         };
-
-        if (changeType === 'JobChange') {
-            row.oldJobTitle = log.oldValue?.jobTitle ?? null;
-            row.newJobTitle = log.newValue?.jobTitle ?? null;
-            row.oldDepartment = log.oldValue?.department ?? null;
-            row.newDepartment = log.newValue?.department ?? null;
-        } else {
-            row.oldValue = log.oldValue ?? null;
-            row.newValue = log.newValue ?? null;
-        }
         return row;
     });
 
@@ -292,18 +291,18 @@ function getHeadersForAuditReport(changeType: AuditLog['changeType']): ReportHea
             { key: 'newDepartment', label: 'القسم الجديد' },
             changedByHeader,
         ];
-    } else {
-        const isCurrency = changeType === 'SalaryChange';
-        // For 'ResidencyRenewal' we assume it's a 'DataUpdate' type log
-        const isDate = changeType === 'ResidencyRenewal'; 
-        
-        return [
-            ...baseHeaders,
-            { key: 'oldValue', label: 'القيمة القديمة', type: isCurrency ? 'currency' : (isDate ? 'date' : undefined) },
-            { key: 'newValue', label: 'القيمة الجديدة', type: isCurrency ? 'currency' : (isDate ? 'date' : undefined) },
-            changedByHeader,
-        ];
-    }
+    } 
+    
+    // For SalaryChange and ResidencyRenewal (which uses DataUpdate)
+    const isCurrency = changeType === 'SalaryChange';
+    const isDate = changeType === 'DataUpdate'; // ResidencyRenewal is DataUpdate
+    
+    return [
+        ...baseHeaders,
+        { key: 'oldValue', label: 'القيمة القديمة', type: isCurrency ? 'currency' : (isDate ? 'date' : undefined) },
+        { key: 'newValue', label: 'القيمة الجديدة', type: isCurrency ? 'currency' : (isDate ? 'date' : undefined) },
+        changedByHeader,
+    ];
 }
 
 
@@ -318,10 +317,7 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
         case 'JobChange':
             return generateAuditLogReport(db, 'JobChange', 'تقرير التغييرات الوظيفية', options);
         case 'ResidencyRenewal':
-            // Assuming ResidencyRenewal maps to a DataUpdate changeType with a specific field.
-            // For now, let's treat it as a distinct type for header generation
-            // and filter by it if it existed as a changeType. If not, it will be empty.
-            // The query above will filter by 'DataUpdate', so let's pass that.
+            // The logic inside generateAuditLogReport now handles the 'field' filtering.
             return generateAuditLogReport(db, 'DataUpdate', 'تقرير تجديد الإقامات', options);
         default:
             throw new Error('نوع التقرير غير معروف.');
