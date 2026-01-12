@@ -217,13 +217,41 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
     const employees = await fetchAllData(db, 'employees') as Employee[];
     const rows: DocumentData[] = [];
 
-    const headersMap: Record<string, ReportHeader> = {
-        employeeName: { key: 'employeeName', label: 'اسم الموظف' },
-        effectiveDate: { key: 'effectiveDate', label: 'تاريخ التغيير', type: 'date' },
-        oldValue: { key: 'oldValue', label: 'القيمة القديمة' },
-        newValue: { key: 'newValue', label: 'القيمة الجديدة' },
-        changedBy: { key: 'changedBy', label: 'تم بواسطة' },
-    };
+    // Statically define headers based on report type
+    let finalHeaders: ReportHeader[];
+
+    if (changeType === 'JobChange') {
+        finalHeaders = [
+            { key: 'employeeName', label: 'اسم الموظف' },
+            { key: 'effectiveDate', label: 'تاريخ التغيير', type: 'date' },
+            { key: 'oldJobTitle', label: 'الوظيفة القديمة' },
+            { key: 'newJobTitle', label: 'الوظيفة الجديدة' },
+            { key: 'oldDepartment', label: 'القسم القديم' },
+            { key: 'newDepartment', label: 'القسم الجديد' },
+            { key: 'changedBy', label: 'تم بواسطة' },
+        ];
+    } else {
+        const oldValueHeader: ReportHeader = { key: 'oldValue', label: 'القيمة القديمة' };
+        const newValueHeader: ReportHeader = { key: 'newValue', label: 'القيمة الجديدة' };
+
+        if (fields.includes('residencyExpiry')) {
+            oldValueHeader.type = 'date';
+            newValueHeader.type = 'date';
+        }
+        if (fields.includes('basicSalary')) {
+            oldValueHeader.type = 'currency';
+            newValueHeader.type = 'currency';
+        }
+        
+        finalHeaders = [
+            { key: 'employeeName', label: 'اسم الموظف' },
+            { key: 'effectiveDate', label: 'تاريخ التغيير', type: 'date' },
+            oldValueHeader,
+            newValueHeader,
+            { key: 'changedBy', label: 'تم بواسطة' },
+        ];
+    }
+
 
     for (const emp of employees) {
         if (!emp.id) continue;
@@ -242,10 +270,6 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
             };
 
             if (changeType === 'JobChange') {
-                headersMap.oldJobTitle = { key: 'oldJobTitle', label: 'الوظيفة القديمة' };
-                headersMap.newJobTitle = { key: 'newJobTitle', label: 'الوظيفة الجديدة' };
-                headersMap.oldDepartment = { key: 'oldDepartment', label: 'القسم القديم' };
-                headersMap.newDepartment = { key: 'newDepartment', label: 'القسم الجديد' };
                 row = { 
                     ...row, 
                     oldJobTitle: log.oldValue?.jobTitle ?? null, 
@@ -254,11 +278,6 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
                     newDepartment: log.newValue?.department ?? null
                 };
             } else {
-                 if(fields.includes('residencyExpiry')) headersMap.oldValue.type = 'date';
-                 if(fields.includes('residencyExpiry')) headersMap.newValue.type = 'date';
-                 if(fields.includes('basicSalary')) headersMap.oldValue.type = 'currency';
-                 if(fields.includes('basicSalary')) headersMap.newValue.type = 'currency';
-
                  row.oldValue = log.oldValue;
                  row.newValue = log.newValue;
             }
@@ -268,11 +287,6 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
     
     // Sort combined logs by date
     rows.sort((a,b) => toDate(b.effectiveDate)!.getTime() - toDate(a.effectiveDate)!.getTime());
-
-    const finalHeaders = (changeType === 'JobChange')
-        ? [headersMap.employeeName, headersMap.effectiveDate, headersMap.oldJobTitle, headersMap.newJobTitle, headersMap.oldDepartment, headersMap.newDepartment, headersMap.changedBy]
-        : [headersMap.employeeName, headersMap.effectiveDate, headersMap.oldValue, headersMap.newValue, headersMap.changedBy];
-
 
     return {
         title,
