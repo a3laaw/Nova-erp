@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, type DocumentData, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, type DocumentData, getDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -44,9 +44,24 @@ export default function EditEmployeePage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
 
+    // Helper to safely convert Firestore Timestamp or string to 'yyyy-MM-dd' format
+    const formatDateForInput = (date: any): string => {
+        if (!date) return '';
+        try {
+            // Firestore Timestamps have a toDate() method
+            const d = date.toDate ? date.toDate() : new Date(date);
+            if (isNaN(d.getTime())) return '';
+            // Ensure we get 'yyyy-MM-dd'
+            return d.toISOString().split('T')[0];
+        } catch (e) {
+            return '';
+        }
+    };
+
+
     useEffect(() => {
         if (!id || !firestore) {
-            router.push('/dashboard/hr');
+            if(!id) router.push('/dashboard/hr');
             return;
         };
 
@@ -58,13 +73,12 @@ export default function EditEmployeePage() {
 
                 if (employeeSnap.exists()) {
                     const data = employeeSnap.data() as Employee;
-                    // Format dates for input fields
                     const formattedData = {
                         ...data,
-                        dob: data.dob ? new Date(data.dob).toISOString().split('T')[0] : '',
-                        hireDate: data.hireDate ? new Date(data.hireDate).toISOString().split('T')[0] : '',
-                        residencyExpiry: data.residencyExpiry ? new Date(data.residencyExpiry).toISOString().split('T')[0] : '',
-                        contractExpiry: data.contractExpiry ? new Date(data.contractExpiry).toISOString().split('T')[0] : '',
+                        dob: formatDateForInput(data.dob),
+                        hireDate: formatDateForInput(data.hireDate),
+                        residencyExpiry: formatDateForInput(data.residencyExpiry),
+                        contractExpiry: formatDateForInput(data.contractExpiry),
                     };
                     setFormData(formattedData);
                     setIncludeHousing(!!data.housingAllowance && data.housingAllowance > 0);
@@ -124,14 +138,9 @@ export default function EditEmployeePage() {
                 }
             }
             
-            const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'];
-            for (const field of dateFields) {
-                const dateValue = formData[field];
-                if (dateValue && isNaN(new Date(dateValue as string).getTime())) {
-                     toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: `قيمة التاريخ المدخلة في حقل "${field}" غير صحيحة.` });
-                     setIsLoading(false);
-                     return;
-                }
+            const toDateOrNull = (dateString: string | undefined | null) => {
+                if (!dateString || isNaN(new Date(dateString).getTime())) return null;
+                return new Date(dateString);
             }
 
             if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
@@ -150,19 +159,19 @@ export default function EditEmployeePage() {
                 mobile: formData.mobile,
                 department: formData.department,
                 jobTitle: formData.jobTitle,
-                hireDate: new Date(formData.hireDate!).toISOString(),
+                hireDate: toDateOrNull(formData.hireDate),
                 contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
             };
 
             // Update optional fields
-            if (formData.dob) employeeData.dob = new Date(formData.dob).toISOString();
+            employeeData.dob = toDateOrNull(formData.dob);
             if (formData.gender) employeeData.gender = formData.gender;
             if (formData.visaType) employeeData.visaType = formData.visaType;
-            if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry).toISOString();
+            employeeData.residencyExpiry = toDateOrNull(formData.residencyExpiry);
             
-            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && formData.contractExpiry) {
-                employeeData.contractExpiry = new Date(formData.contractExpiry).toISOString();
+            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor')) {
+                employeeData.contractExpiry = toDateOrNull(formData.contractExpiry);
             } else {
                 employeeData.contractExpiry = null;
             }
@@ -310,7 +319,7 @@ export default function EditEmployeePage() {
                             {formData.visaType !== 'kuwaiti' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti'} />
+                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} />
                                 </div>
                             )}
                         </div>
@@ -381,7 +390,7 @@ export default function EditEmployeePage() {
                             {(formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
-                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} required={formData.contractType !== 'permanent'} />
+                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} />
                                 </div>
                             )}
                         </div>
@@ -476,3 +485,5 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
+
+    
