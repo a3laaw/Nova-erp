@@ -221,15 +221,18 @@ export function EmployeesTable() {
 
     const formatDateCell = (dateValue: any) => {
         if (!dateValue) return '-';
-        // Handle Firestore Timestamps
-        if (dateValue.toDate) {
+        
+        // Handle Firestore Timestamps which have a toDate method
+        if (typeof dateValue.toDate === 'function') {
             return dateValue.toDate().toLocaleDateString('en-GB');
         }
+        
         // Handle ISO strings or other date formats
         const date = new Date(dateValue);
         if (isNaN(date.getTime())) {
-            return '-'; // Or 'Invalid Date' if you prefer
+            return '-';
         }
+        
         return date.toLocaleDateString('en-GB');
     };
 
@@ -445,7 +448,4 @@ export function EmployeesTable() {
         </>
     );
 }
-
-    
-
     
