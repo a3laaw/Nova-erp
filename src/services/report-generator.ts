@@ -13,7 +13,7 @@ import {
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
 import { format, intervalToDuration, isFriday, eachDayOfInterval, parseISO } from 'date-fns';
 
-export type ReportType = 'Comprehensive' | 'SalaryChange' | 'JobChange' | 'ResidencyRenewal' | 'LeaveActivity';
+export type ReportType = 'Comprehensive' | 'SalaryChange' | 'JobChange' | 'ResidencyRenewal';
 
 export interface ReportHeader {
     key: string;
@@ -297,41 +297,6 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
 }
 
 
-async function generateLeaveActivityReport(db: Firestore, options: ReportOptions): Promise<ReportData> {
-    const dateFrom = options.dateFrom ? parseISO(options.dateFrom) : new Date(0);
-    const dateTo = options.dateTo ? parseISO(options.dateTo) : new Date();
-    dateTo.setHours(23, 59, 59, 999);
-
-    const allLeaveRequests = await fetchAllData(db, 'leaveRequests') as LeaveRequest[];
-    
-    const rows = allLeaveRequests.filter(lr => {
-        const leaveDate = toDate(lr.startDate);
-        return leaveDate && leaveDate >= dateFrom && leaveDate <= dateTo;
-    }).map(lr => ({
-        employeeName: lr.employeeName,
-        leaveType: lr.leaveType,
-        startDate: lr.startDate,
-        endDate: lr.endDate,
-        days: lr.workingDays ?? lr.days,
-        status: lr.status
-    })).sort((a,b) => toDate(b.startDate)!.getTime() - toDate(a.startDate)!.getTime());
-    
-    return {
-        title: 'تقرير حركة الإجازات',
-        subtitle: `للفترة من ${format(dateFrom, 'dd/MM/yyyy')} إلى ${format(dateTo, 'dd/MM/yyyy')}`,
-        headers: [
-            { key: 'employeeName', label: 'اسم الموظف' },
-            { key: 'leaveType', label: 'نوع الإجازة' },
-            { key: 'startDate', label: 'من تاريخ', type: 'date' },
-            { key: 'endDate', label: 'إلى تاريخ', type: 'date' },
-            { key: 'days', label: 'الأيام', type: 'number' },
-            { key: 'status', label: 'الحالة' }
-        ],
-        rows
-    };
-}
-
-
 // --- Main Entry Point ---
 
 export async function generateReport(db: Firestore, reportType: ReportType, options: ReportOptions): Promise<ReportData> {
@@ -344,8 +309,6 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             return generateAuditLogReport(db, 'JobChange', ['jobTitle', 'department', 'position'], 'تقرير التغييرات الوظيفية', options);
         case 'ResidencyRenewal':
             return generateAuditLogReport(db, 'DataUpdate', ['residencyExpiry'], 'تقرير تجديد الإقامات', options);
-        case 'LeaveActivity':
-            return generateLeaveActivityReport(db, options);
         default:
             throw new Error('نوع التقرير غير معروف.');
     }

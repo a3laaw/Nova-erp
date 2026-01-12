@@ -67,7 +67,7 @@ export default function ReportsPage() {
     };
     
     const isDateRangeReport = useMemo(() => {
-        return ['SalaryChange', 'ResidencyRenewal', 'LeaveActivity', 'JobChange'].includes(reportType);
+        return ['SalaryChange', 'ResidencyRenewal', 'JobChange'].includes(reportType);
     }, [reportType]);
 
   return (
@@ -97,7 +97,6 @@ export default function ReportsPage() {
                                     <SelectItem value="SalaryChange">تغيرات الرواتب</SelectItem>
                                     <SelectItem value="JobChange">التغييرات الوظيفية</SelectItem>
                                     <SelectItem value="ResidencyRenewal">تجديد الإقامات</SelectItem>
-                                    <SelectItem value="LeaveActivity">حركة الإجازات</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
