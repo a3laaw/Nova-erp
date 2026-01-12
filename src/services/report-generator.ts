@@ -1,3 +1,4 @@
+'use server';
 
 import { 
     collection, 
@@ -246,10 +247,12 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
     
     const logsSnapshot = await getDocs(logsQuery);
     
+    const subtitle = `للفترة من ${format(dateFrom.toDate(), 'dd/MM/yyyy')} إلى ${format(dateTo.toDate(), 'dd/MM/yyyy')}`;
+
     if (logsSnapshot.empty) {
         return {
             title,
-            subtitle: `للفترة من ${format(dateFrom.toDate(), 'dd/MM/yyyy')} إلى ${format(dateTo.toDate(), 'dd/MM/yyyy')}`,
+            subtitle,
             headers,
             rows: []
         };
@@ -281,7 +284,7 @@ async function generateAuditLogReport(db: Firestore, changeType: AuditLog['chang
 
     return {
         title,
-        subtitle: `للفترة من ${format(dateFrom.toDate(), 'dd/MM/yyyy')} إلى ${format(dateTo.toDate(), 'dd/MM/yyyy')}`,
+        subtitle,
         headers,
         rows
     };
