@@ -86,7 +86,15 @@ export default function EditEmployeePage() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormData(prev => prev ? ({ ...prev, [id]: value }) : null);
+        let sanitizedValue = value;
+        if (id === 'fullName') {
+            // Allow Arabic letters and spaces only
+            sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
+        } else if (id === 'nameEn') {
+            // Allow English letters and spaces only
+            sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
+        }
+        setFormData(prev => prev ? ({ ...prev, [id]: sanitizedValue }) : null);
     };
 
     const handleSelectChange = (id: keyof Employee, value: any) => {

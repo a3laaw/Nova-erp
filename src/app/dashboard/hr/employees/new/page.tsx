@@ -73,7 +73,15 @@ export default function NewEmployeePage() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
+        let sanitizedValue = value;
+        if (id === 'fullName') {
+            // Allow Arabic letters and spaces only
+            sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
+        } else if (id === 'nameEn') {
+            // Allow English letters and spaces only
+            sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
+        }
+        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
 
     const handleSelectChange = (id: keyof Employee, value: any) => {
@@ -482,5 +490,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
