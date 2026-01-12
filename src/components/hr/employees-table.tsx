@@ -36,12 +36,12 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addMonths, format, differenceInYears } from 'date-fns';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Checkbox } from '../ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -445,5 +445,7 @@ export function EmployeesTable() {
         </>
     );
 }
+
+    
 
     
