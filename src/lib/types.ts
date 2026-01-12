@@ -163,7 +163,7 @@ export type Employee = {
     gender?: 'male' | 'female';
     civilId: string;
     visaType?: 'worker' | 'engineer' | 'driver' | 'admin' | 'kuwaiti';
-    residencyExpiry?: string;
+    residencyExpiry?: any;
     contractExpiry?: string;
     mobile: string;
     emergencyContact?: string;
@@ -175,9 +175,9 @@ export type Employee = {
     accountNumber?: string;
     iban?: string;
     profilePicture?: string;
-    hireDate: string; // ISO String
+    hireDate: any; // ISO String
     noticeStartDate: string | null; // Date when notice is given
-    terminationDate: string | null;
+    terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor';
     department: string;
@@ -185,14 +185,14 @@ export type Employee = {
     housingAllowance?: number;
     transportAllowance?: number;
     status: 'active' | 'on-leave' | 'terminated';
-    lastVacationAccrualDate: string; // ISO String
+    lastVacationAccrualDate: any; // ISO String
     annualLeaveAccrued?: number;
     annualLeaveUsed?: number;
     carriedLeaveDays?: number;
     sickLeaveUsed?: number;
     emergencyLeaveUsed?: number;
     maxEmergencyLeave?: number;
-    lastLeaveResetDate?: string; // ISO String
+    lastLeaveResetDate?: any; // ISO String
     createdAt?: any; 
     annualLeaveBalance?: number;
 };
@@ -223,3 +223,15 @@ export interface Holiday {
     name: string;
     date: any; // Can be string or Timestamp
 }
+
+
+export type AuditLog = {
+    id: string;
+    changeType: 'SalaryChange' | 'JobChange' | 'DataUpdate';
+    field: string; // e.g., 'basicSalary', 'residencyExpiry', 'jobTitle', 'department'
+    oldValue: any;
+    newValue: any;
+    effectiveDate: any; // Timestamp or ISO String
+    changedBy: string; // User ID
+    notes?: string;
+};
