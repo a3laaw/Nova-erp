@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type DocumentData } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -99,6 +99,24 @@ export default function NewEmployeePage() {
                     return;
                 }
             }
+            
+            // --- Uniqueness Check for Civil ID and Mobile ---
+            const civilIdQuery = query(collection(firestore, 'employees'), where('civilId', '==', formData.civilId));
+            const civilIdSnapshot = await getDocs(civilIdQuery);
+            if (!civilIdSnapshot.empty) {
+                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرقم المدني هذا مسجل لموظف آخر.' });
+                setIsLoading(false);
+                return;
+            }
+
+            const mobileQuery = query(collection(firestore, 'employees'), where('mobile', '==', formData.mobile));
+            const mobileSnapshot = await getDocs(mobileQuery);
+            if (!mobileSnapshot.empty) {
+                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الجوال هذا مسجل لموظف آخر.' });
+                setIsLoading(false);
+                return;
+            }
+
 
             const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'];
             for (const field of dateFields) {
@@ -125,7 +143,7 @@ export default function NewEmployeePage() {
                 mobile: formData.mobile,
                 department: formData.department,
                 jobTitle: formData.jobTitle,
-                hireDate: new Date(formData.hireDate!).toISOString(),
+                hireDate: new Date(formData.hireDate!),
                 contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
                 status: 'active',
@@ -139,19 +157,19 @@ export default function NewEmployeePage() {
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
                 maxEmergencyLeave: 5,
-                lastVacationAccrualDate: new Date(formData.hireDate!).toISOString(),
-                lastLeaveResetDate: new Date(formData.hireDate!).toISOString(),
+                lastVacationAccrualDate: new Date(formData.hireDate!),
+                lastLeaveResetDate: new Date(formData.hireDate!),
             };
 
             // Add optional fields only if they have a valid value
-            if (formData.dob) employeeData.dob = new Date(formData.dob).toISOString();
+            if (formData.dob) employeeData.dob = new Date(formData.dob);
             if (formData.gender) employeeData.gender = formData.gender;
             if (formData.visaType) employeeData.visaType = formData.visaType;
-            if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry).toISOString();
+            if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry);
             
             // Handle conditional contract expiry
             if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && formData.contractExpiry) {
-                employeeData.contractExpiry = new Date(formData.contractExpiry).toISOString();
+                employeeData.contractExpiry = new Date(formData.contractExpiry);
             } else {
                 employeeData.contractExpiry = null;
             }
@@ -464,3 +482,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
