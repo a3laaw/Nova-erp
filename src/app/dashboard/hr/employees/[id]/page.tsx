@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -104,7 +105,7 @@ export default function EmployeeProfilePage() {
     );
   }
   
-  const formatDate = (dateValue: any) => {
+  const formatDate = (dateValue: any): string => {
     if (!dateValue) return '-';
     try {
         const d = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);

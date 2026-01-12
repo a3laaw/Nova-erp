@@ -152,7 +152,7 @@ export default function LeaveReportsPage() {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
     }, [reportData]);
 
-    const formatDateForDisplay = (date: any) => {
+    const formatDateForDisplay = (date: any): string => {
         if (!date) return '-';
         try {
             const d = date instanceof Timestamp ? date.toDate() : new Date(date);
