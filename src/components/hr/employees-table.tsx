@@ -42,6 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { addMonths, format, differenceInYears } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useLanguage } from '@/context/language-context';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -83,6 +84,7 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
 export function EmployeesTable() {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { language } = useLanguage();
 
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -448,4 +450,6 @@ export function EmployeesTable() {
         </>
     );
 }
+    
+
     
