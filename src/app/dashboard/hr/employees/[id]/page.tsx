@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { fromFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -106,14 +107,11 @@ export default function EmployeeProfilePage() {
   }
   
   const formatDate = (dateValue: any): string => {
-    if (!dateValue) return '-';
-    try {
-        const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
-        if (isNaN(d.getTime())) return '-';
-        return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
-    } catch (e) {
-        return '-';
-    }
+      const dateString = fromFirestoreDate(dateValue);
+      if (!dateString) return '-';
+      // fromFirestoreDate returns yyyy-MM-dd, so we reformat to dd/MM/yyyy
+      const [year, month, day] = dateString.split('-');
+      return `${day}/${month}/${year}`;
   }
 
   const formatCurrency = (amount: number | null | undefined) => {

@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
+import { fromFirestoreDate, toFirestoreDate } from '@/services/date-converter';
 
 
 export default function EditEmployeePage() {
@@ -47,23 +48,6 @@ export default function EditEmployeePage() {
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
-
-    const formatDateForInput = (date: any): string => {
-        if (!date) return '';
-        try {
-            const d = date?.toDate ? date.toDate() : new Date(date);
-            if (isNaN(d.getTime())) return '';
-            // Ensure month and day are 2 digits
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        } catch (e) {
-            console.error("Failed to format date:", date, e);
-            return '';
-        }
-    };
-
 
     useEffect(() => {
         if (!id || !firestore) {
@@ -82,10 +66,10 @@ export default function EditEmployeePage() {
                     setOriginalData(data); // Store original data for comparison
                     const formattedData = {
                         ...data,
-                        dob: formatDateForInput(data.dob),
-                        hireDate: formatDateForInput(data.hireDate),
-                        residencyExpiry: formatDateForInput(data.residencyExpiry),
-                        contractExpiry: formatDateForInput(data.contractExpiry),
+                        dob: fromFirestoreDate(data.dob),
+                        hireDate: fromFirestoreDate(data.hireDate),
+                        residencyExpiry: fromFirestoreDate(data.residencyExpiry),
+                        contractExpiry: fromFirestoreDate(data.contractExpiry),
                     };
                     setFormData(formattedData);
                     setIncludeHousing(!!data.housingAllowance && data.housingAllowance > 0);
@@ -134,28 +118,6 @@ export default function EditEmployeePage() {
         const employeeRef = doc(firestore, 'employees', id);
 
         try {
-            const toDateOrNull = (dateValue: string | Date | Timestamp | undefined | null): Date | null => {
-                if (!dateValue) return null;
-
-                // If it's already a Date object
-                if (dateValue instanceof Date) {
-                    return isNaN(dateValue.getTime()) ? null : dateValue;
-                }
-                
-                // If it's a Firestore Timestamp
-                if (typeof dateValue === 'object' && 'toDate' in dateValue && typeof dateValue.toDate === 'function') {
-                    return dateValue.toDate();
-                }
-
-                // If it's a string
-                if (typeof dateValue === 'string') {
-                    const d = new Date(dateValue);
-                    return isNaN(d.getTime()) ? null : d;
-                }
-                
-                return null;
-            }
-
             const updatedEmployeeData: Record<string, any> = {};
             const auditLogs: Partial<AuditLog>[] = [];
 
@@ -169,23 +131,32 @@ export default function EditEmployeePage() {
                 let originalValue: any = originalData[field];
 
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
-                    formValue = toDateOrNull(formValue as string | Date | undefined);
-                    originalValue = toDateOrNull(originalValue as Timestamp | string | Date | undefined);
-                }
-                
-                if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
+                    // Convert both to Date objects for comparison to avoid timezone/format issues
+                    const formDate = toFirestoreDate(formValue as string);
+                    const originalDate = toFirestoreDate(originalValue as string | Timestamp);
+
+                    // Use getTime() for a reliable numeric comparison
+                    if (formDate?.getTime() !== originalDate?.getTime()) {
+                         updatedEmployeeData[field] = formDate; // Store the Date object for saving
+                    }
+                } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
                     formValue = Number(formValue) || 0;
                     if (field === 'housingAllowance' && !includeHousing) formValue = 0;
                     if (field === 'transportAllowance' && !includeTransport) formValue = 0;
                     originalValue = Number(originalValue) || 0;
-                }
 
-                // Simple comparison (won't work perfectly for dates/objects without serialization)
-                // Stringify is okay for this purpose to detect a change
-                if (JSON.stringify(formValue) !== JSON.stringify(originalValue)) {
-                    updatedEmployeeData[field] = formValue;
-                    
-                    let changeType: AuditLog['changeType'] = 'DataUpdate';
+                    if (formValue !== originalValue) {
+                        updatedEmployeeData[field] = formValue;
+                    }
+                } else {
+                     if (formValue !== originalValue) {
+                        updatedEmployeeData[field] = formValue;
+                    }
+                }
+                
+                // If a change was detected and added to updatedEmployeeData, log it
+                if (updatedEmployeeData.hasOwnProperty(field)) {
+                     let changeType: AuditLog['changeType'] = 'DataUpdate';
                     if (field === 'basicSalary' || field === 'housingAllowance' || field === 'transportAllowance') {
                         changeType = 'SalaryChange';
                     } else if (field === 'jobTitle' || field === 'department' || field === 'position') {
@@ -197,7 +168,7 @@ export default function EditEmployeePage() {
                         changeType,
                         field,
                         oldValue: originalValue,
-                        newValue: formValue,
+                        newValue: updatedEmployeeData[field],
                         effectiveDate,
                         changedBy: currentUser.uid,
                     });
@@ -515,5 +486,3 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
-
-    

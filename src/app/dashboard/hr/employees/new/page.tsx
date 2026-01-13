@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
+import { toFirestoreDate } from '@/services/date-converter';
 
 
 export default function NewEmployeePage() {
@@ -132,7 +133,7 @@ export default function NewEmployeePage() {
             const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'];
             for (const field of dateFields) {
                 const dateValue = formData[field];
-                if (dateValue && isNaN(new Date(dateValue as string).getTime())) {
+                if (dateValue && isNaN(toFirestoreDate(dateValue as string)!.getTime())) {
                      toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: `قيمة التاريخ المدخلة في حقل "${field}" غير صحيحة.` });
                      setIsLoading(false);
                      return;
@@ -147,6 +148,13 @@ export default function NewEmployeePage() {
             }
 
             // --- Data Sanitization & Preparation ---
+            const hireDate = toFirestoreDate(formData.hireDate as string);
+            if(!hireDate) {
+                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'تاريخ التعيين مطلوب' });
+                 setIsLoading(false);
+                 return;
+            }
+
             const employeeData: DocumentData = {
                 fullName: formData.fullName,
                 nameEn: formData.nameEn,
@@ -154,7 +162,7 @@ export default function NewEmployeePage() {
                 mobile: formData.mobile,
                 department: formData.department,
                 jobTitle: formData.jobTitle,
-                hireDate: new Date(formData.hireDate!),
+                hireDate: hireDate,
                 contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
                 status: 'active',
@@ -168,19 +176,19 @@ export default function NewEmployeePage() {
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
                 maxEmergencyLeave: 5,
-                lastVacationAccrualDate: new Date(formData.hireDate!),
-                lastLeaveResetDate: new Date(formData.hireDate!),
+                lastVacationAccrualDate: hireDate,
+                lastLeaveResetDate: hireDate,
             };
 
             // Add optional fields only if they have a valid value
-            if (formData.dob) employeeData.dob = new Date(formData.dob);
+            employeeData.dob = toFirestoreDate(formData.dob as string);
             if (formData.gender) employeeData.gender = formData.gender;
             if (formData.visaType) employeeData.visaType = formData.visaType;
-            if (formData.residencyExpiry) employeeData.residencyExpiry = new Date(formData.residencyExpiry);
+            employeeData.residencyExpiry = toFirestoreDate(formData.residencyExpiry as string);
             
             // Handle conditional contract expiry
-            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && formData.contractExpiry) {
-                employeeData.contractExpiry = new Date(formData.contractExpiry);
+            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor')) {
+                employeeData.contractExpiry = toFirestoreDate(formData.contractExpiry as string);
             } else {
                 employeeData.contractExpiry = null;
             }
