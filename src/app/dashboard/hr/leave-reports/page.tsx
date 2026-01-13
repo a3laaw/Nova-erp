@@ -38,6 +38,12 @@ import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
+// Represents a leave request augmented with the current employee name
+interface AugmentedLeaveRequest extends LeaveRequest {
+  currentEmployeeName: string;
+}
+
+
 const statusColors: Record<LeaveRequest['status'], string> = {
     'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
     'approved': 'bg-green-100 text-green-800 border-green-200',
@@ -68,14 +74,13 @@ export default function LeaveReportsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const [isFetching, setIsFetching] = useState(true);
-    const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
+    const [allRequests, setAllRequests] = useState<AugmentedLeaveRequest[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     
     const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [statusFilter, setStatusFilter] = useState<'all' | LeaveRequest['status']>('all');
     const [employeeFilter, setEmployeeFilter] = useState<'all' | string>('all');
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Fetch all data once on component mount
     useEffect(() => {
@@ -84,23 +89,34 @@ export default function LeaveReportsPage() {
         const fetchAllData = async () => {
             setIsFetching(true);
             try {
-                const requestsQuery = query(collection(firestore, 'leaveRequests'));
-                const requestsSnapshot = await getDocs(requestsQuery);
-                const requestsData = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-                setAllRequests(requestsData);
-
-                const employeesQuery = query(collection(firestore, 'employees'));
-                const employeesSnapshot = await getDocs(employeesQuery);
+                // 1. Fetch employees first and create a Map for quick lookup
+                const employeesSnapshot = await getDocs(query(collection(firestore, 'employees')));
                 const employeesData = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
                 employeesData.sort((a,b) => a.fullName.localeCompare(b.fullName));
                 setEmployees(employeesData);
+                const employeeMap = new Map(employeesData.map(emp => [emp.id, emp.fullName]));
+
+                // 2. Fetch all leave requests
+                const requestsQuery = query(collection(firestore, 'leaveRequests'));
+                const requestsSnapshot = await getDocs(requestsQuery);
+
+                // 3. Augment requests with the most current employee name
+                const requestsData = requestsSnapshot.docs.map(doc => {
+                    const req = { id: doc.id, ...doc.data() } as LeaveRequest;
+                    return {
+                        ...req,
+                        // Use the up-to-date name from the map, or fallback to the stored name
+                        currentEmployeeName: employeeMap.get(req.employeeId) || req.employeeName,
+                    };
+                });
+                
+                setAllRequests(requestsData);
 
             } catch (error) {
                  console.error("Error fetching initial data: ", error);
                  toast({ variant: 'destructive', title: 'خطأ في الاستعلام', description: 'فشل في جلب البيانات الأولية من قاعدة البيانات.' });
             } finally {
                 setIsFetching(false);
-                setIsInitialLoad(false);
             }
         };
         
@@ -108,7 +124,7 @@ export default function LeaveReportsPage() {
     }, [firestore, toast]);
 
     const reportData = useMemo(() => {
-        if (isInitialLoad) return [];
+        if (isFetching) return [];
 
         let reportStart: Date, reportEnd: Date;
         try {
@@ -149,7 +165,7 @@ export default function LeaveReportsPage() {
         });
 
         return filteredData;
-    }, [allRequests, dateFrom, dateTo, statusFilter, employeeFilter, isInitialLoad]);
+    }, [allRequests, dateFrom, dateTo, statusFilter, employeeFilter, isFetching]);
     
     const totalDays = useMemo(() => {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
@@ -284,7 +300,7 @@ export default function LeaveReportsPage() {
                             )}
                             {!isFetching && reportData.map(req => (
                                 <TableRow key={req.id}>
-                                    <TableCell className='font-medium'>{req.employeeName}</TableCell>
+                                    <TableCell className='font-medium'>{req.currentEmployeeName}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={typeColors[req.leaveType]}>
                                             {typeTranslations[req.leaveType]}
@@ -314,5 +330,7 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
+
+    
 
     
