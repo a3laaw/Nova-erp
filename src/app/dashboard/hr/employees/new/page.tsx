@@ -26,15 +26,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/context/auth-context';
 
 
 export default function NewEmployeePage() {
     const router = useRouter();
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
@@ -91,8 +93,8 @@ export default function NewEmployeePage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات. الرجاء المحاولة مرة أخرى.' });
+        if (!firestore || !currentUser) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات أو تحديد المستخدم الحالي.' });
             return;
         }
         setIsLoading(true);
@@ -196,10 +198,31 @@ export default function NewEmployeePage() {
             if (formData.iban) employeeData.iban = formData.iban;
             if(formData.profilePicture) employeeData.profilePicture = formData.profilePicture;
 
+            // --- Use a write batch to add employee and initial audit log ---
+            const batch = writeBatch(firestore);
 
-            await addDoc(collection(firestore, 'employees'), employeeData);
+            const newEmployeeRef = doc(collection(firestore, 'employees'));
+            batch.set(newEmployeeRef, employeeData);
 
-            toast({ title: 'نجاح', description: 'تم حفظ الموظف بنجاح.' });
+            const auditLogRef = doc(collection(firestore, `employees/${newEmployeeRef.id}/auditLogs`));
+            batch.set(auditLogRef, {
+                changeType: 'Creation',
+                field: 'employee',
+                oldValue: null,
+                newValue: {
+                    fullName: employeeData.fullName,
+                    jobTitle: employeeData.jobTitle,
+                    department: employeeData.department,
+                    basicSalary: employeeData.basicSalary
+                },
+                effectiveDate: employeeData.hireDate,
+                changedBy: currentUser.uid,
+                notes: 'إنشاء ملف موظف جديد.'
+            });
+
+            await batch.commit();
+
+            toast({ title: 'نجاح', description: 'تم حفظ الموظف وسجل الإنشاء بنجاح.' });
             router.push('/dashboard/hr');
         } catch (error) {
             console.error("Error saving employee:", error);

@@ -24,12 +24,13 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
-import type { Employee } from '@/lib/types';
+import type { Employee, AuditLog } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, type DocumentData, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/context/auth-context';
 
 
 export default function EditEmployeePage() {
@@ -37,8 +38,10 @@ export default function EditEmployeePage() {
     const params = useParams();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
+    const [originalData, setOriginalData] = useState<Partial<Employee> | null>(null);
     const [formData, setFormData] = useState<Partial<Employee> | null>(null);
     const [includeHousing, setIncludeHousing] = useState(false);
     const [includeTransport, setIncludeTransport] = useState(false);
@@ -76,6 +79,7 @@ export default function EditEmployeePage() {
 
                 if (employeeSnap.exists()) {
                     const data = employeeSnap.data() as Employee;
+                    setOriginalData(data); // Store original data for comparison
                     const formattedData = {
                         ...data,
                         dob: formatDateForInput(data.dob),
@@ -120,80 +124,79 @@ export default function EditEmployeePage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !id || !formData) {
+        if (!firestore || !id || !formData || !originalData || !currentUser) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات. الرجاء المحاولة مرة أخرى.' });
             return;
         }
         setIsLoading(true);
         
+        const batch = writeBatch(firestore);
+        const employeeRef = doc(firestore, 'employees', id);
+
         try {
-            // --- Validation ---
-            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
-            for (const field of requiredFields) {
-                const value = formData[field];
-                 if (value === undefined || value === null || value === '') {
-                    // For numbers, allow 0
-                    if (typeof formData[field] === 'number' && Number(formData[field]) === 0) continue;
-                    
-                    toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
-                    setIsLoading(false);
-                    return;
-                }
-            }
-            
             const toDateOrNull = (dateString: string | undefined | null) => {
                 if (!dateString || isNaN(new Date(dateString).getTime())) return null;
                 return new Date(dateString);
             }
 
-            if (formData.salaryPaymentType === 'transfer' && !formData.iban) {
-                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الحساب الدولي (IBAN) مطلوب عند اختيار التحويل البنكي.' });
-                setIsLoading(false);
-                return;
-            }
+            const updatedEmployeeData: Record<string, any> = {};
+            const auditLogs: Partial<AuditLog>[] = [];
 
-            // --- Data Sanitization & Preparation ---
-            const employeeData: DocumentData = {
-                // Keep all existing data and overwrite changed fields
-                ...formData,
-                fullName: formData.fullName,
-                nameEn: formData.nameEn,
-                civilId: formData.civilId,
-                mobile: formData.mobile,
-                department: formData.department,
-                jobTitle: formData.jobTitle,
-                hireDate: toDateOrNull(formData.hireDate),
-                contractType: formData.contractType || 'permanent',
-                basicSalary: Number(formData.basicSalary) || 0,
-            };
-
-            // Update optional fields
-            employeeData.dob = toDateOrNull(formData.dob);
-            if (formData.gender) employeeData.gender = formData.gender;
-            if (formData.visaType) employeeData.visaType = formData.visaType;
-            employeeData.residencyExpiry = toDateOrNull(formData.residencyExpiry);
+            // --- Compare and build update object and audit logs ---
+            const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban'];
             
-            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor')) {
-                employeeData.contractExpiry = toDateOrNull(formData.contractExpiry);
-            } else {
-                employeeData.contractExpiry = null;
+            const effectiveDate = new Date();
+
+            fieldsToCompare.forEach(field => {
+                let formValue = formData[field];
+                let originalValue = originalData[field];
+
+                if (['dob', 'residencyExpiry', 'contractExpiry'].includes(field)) {
+                    formValue = toDateOrNull(formValue as string);
+                    originalValue = originalValue ? (originalValue as any).toDate() : null;
+                }
+                
+                if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
+                    formValue = Number(formValue) || 0;
+                    if (field === 'housingAllowance' && !includeHousing) formValue = 0;
+                    if (field === 'transportAllowance' && !includeTransport) formValue = 0;
+                    originalValue = Number(originalValue) || 0;
+                }
+
+                // Simple comparison (won't work perfectly for dates/objects without serialization)
+                if (JSON.stringify(formValue) !== JSON.stringify(originalValue)) {
+                    updatedEmployeeData[field] = formValue;
+                    
+                    let changeType: AuditLog['changeType'] = 'DataUpdate';
+                    if (field === 'basicSalary' || field === 'housingAllowance' || field === 'transportAllowance') {
+                        changeType = 'SalaryChange';
+                    } else if (field === 'jobTitle' || field === 'department' || field === 'position') {
+                        changeType = 'JobChange';
+                    }
+
+                    auditLogs.push({
+                        changeType,
+                        field,
+                        oldValue: originalValue,
+                        newValue: formValue,
+                        effectiveDate,
+                        changedBy: currentUser.uid,
+                    });
+                }
+            });
+
+            if (Object.keys(updatedEmployeeData).length > 0) {
+                 batch.update(employeeRef, updatedEmployeeData);
+            }
+           
+            if (auditLogs.length > 0) {
+                auditLogs.forEach(log => {
+                    const logRef = doc(collection(firestore, `employees/${id}/auditLogs`));
+                    batch.set(logRef, log);
+                });
             }
 
-            if (formData.emergencyContact) employeeData.emergencyContact = formData.emergencyContact;
-            if (formData.email) employeeData.email = formData.email;
-            if (formData.position) employeeData.position = formData.position;
-
-            employeeData.housingAllowance = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
-            employeeData.transportAllowance = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
-
-            if (formData.salaryPaymentType) employeeData.salaryPaymentType = formData.salaryPaymentType;
-            if (formData.bankName) employeeData.bankName = formData.bankName;
-            if (formData.iban) employeeData.iban = formData.iban;
-            if(formData.profilePicture) employeeData.profilePicture = formData.profilePicture;
-
-
-            const employeeRef = doc(firestore, 'employees', id);
-            await updateDoc(employeeRef, employeeData);
+            await batch.commit();
 
             toast({ title: 'نجاح', description: 'تم تحديث بيانات الموظف بنجاح.' });
             router.push(`/dashboard/hr/employees/${id}`);
