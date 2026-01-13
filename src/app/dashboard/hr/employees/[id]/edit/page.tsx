@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee, AuditLog } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, writeBatch, collection, type Timestamp } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -130,14 +130,13 @@ export default function EditEmployeePage() {
                 let formValue: any = formData[field];
                 let originalValue: any = originalData[field];
 
+                // Convert dates for reliable comparison
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
-                    // Convert both to Date objects for comparison to avoid timezone/format issues
                     const formDate = toFirestoreDate(formValue as string);
-                    const originalDate = toFirestoreDate(originalValue as string | Timestamp);
-
-                    // Use getTime() for a reliable numeric comparison
+                    const originalDate = toFirestoreDate(originalValue);
+                    
                     if (formDate?.getTime() !== originalDate?.getTime()) {
-                         updatedEmployeeData[field] = formDate; // Store the Date object for saving
+                         updatedEmployeeData[field] = formDate; // Will be saved as Timestamp or null
                     }
                 } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
                     formValue = Number(formValue) || 0;
@@ -172,6 +171,13 @@ export default function EditEmployeePage() {
                         effectiveDate,
                         changedBy: currentUser.uid,
                     });
+                }
+            });
+
+            // Remove null date fields to avoid Firestore errors
+            Object.keys(updatedEmployeeData).forEach(key => {
+                if (updatedEmployeeData[key] === null && ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(key)) {
+                    delete updatedEmployeeData[key];
                 }
             });
 
@@ -486,3 +492,5 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
+
+    

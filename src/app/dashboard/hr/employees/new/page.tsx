@@ -130,14 +130,11 @@ export default function NewEmployeePage() {
             }
 
 
-            const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'];
-            for (const field of dateFields) {
-                const dateValue = formData[field];
-                if (dateValue && isNaN(toFirestoreDate(dateValue as string)!.getTime())) {
-                     toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: `قيمة التاريخ المدخلة في حقل "${field}" غير صحيحة.` });
-                     setIsLoading(false);
-                     return;
-                }
+            const hireDate = toFirestoreDate(formData.hireDate as string);
+            if(!hireDate) {
+                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'تاريخ التعيين مطلوب' });
+                 setIsLoading(false);
+                 return;
             }
 
 
@@ -148,13 +145,6 @@ export default function NewEmployeePage() {
             }
 
             // --- Data Sanitization & Preparation ---
-            const hireDate = toFirestoreDate(formData.hireDate as string);
-            if(!hireDate) {
-                 toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'تاريخ التعيين مطلوب' });
-                 setIsLoading(false);
-                 return;
-            }
-
             const employeeData: DocumentData = {
                 fullName: formData.fullName,
                 nameEn: formData.nameEn,
@@ -181,14 +171,19 @@ export default function NewEmployeePage() {
             };
 
             // Add optional fields only if they have a valid value
-            employeeData.dob = toFirestoreDate(formData.dob as string);
+            const dob = toFirestoreDate(formData.dob as string);
+            if (dob) employeeData.dob = dob;
+
+            const residencyExpiry = toFirestoreDate(formData.residencyExpiry as string);
+            if (residencyExpiry) employeeData.residencyExpiry = residencyExpiry;
+
             if (formData.gender) employeeData.gender = formData.gender;
             if (formData.visaType) employeeData.visaType = formData.visaType;
-            employeeData.residencyExpiry = toFirestoreDate(formData.residencyExpiry as string);
             
             // Handle conditional contract expiry
             if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor')) {
-                employeeData.contractExpiry = toFirestoreDate(formData.contractExpiry as string);
+                const contractExpiry = toFirestoreDate(formData.contractExpiry as string);
+                if (contractExpiry) employeeData.contractExpiry = contractExpiry;
             } else {
                 employeeData.contractExpiry = null;
             }
@@ -523,3 +518,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
