@@ -42,32 +42,48 @@ export function fromFirestoreDate(date: any): string {
 /**
  * Converts a "yyyy-MM-dd" string from an HTML input to a JavaScript Date object.
  * Returns null if the input string is empty, null, or invalid.
- * @param dateString - The date string in "yyyy-MM-dd" format.
+ * @param dateInput - The date value from any source (string, Date, Timestamp, null, undefined).
  * @returns A Date object or null.
  */
-export function toFirestoreDate(dateString: string | null | undefined | Date | Timestamp): Date | null {
-  // If it's already a Date or Timestamp, handle it
-  if (dateString instanceof Date) {
-    return isNaN(dateString.getTime()) ? null : dateString;
-  }
-  if (dateString instanceof Timestamp) {
-    return dateString.toDate();
-  }
-  
-  if (!dateString) {
+export function toFirestoreDate(dateInput: any): Date | null {
+  if (!dateInput) {
     return null;
   }
 
-  try {
-    // Add time component to avoid timezone issues where the date might be interpreted as the previous day
-    const d = new Date(`${dateString}T00:00:00`); 
-    
-    if (isNaN(d.getTime())) {
+  // If it's already a Date object
+  if (dateInput instanceof Date) {
+    return isNaN(dateInput.getTime()) ? null : dateInput;
+  }
+
+  // If it's a Firestore Timestamp
+  if (dateInput.toDate && typeof dateInput.toDate === 'function') {
+    return dateInput.toDate();
+  }
+  
+  // If it's a string
+  if (typeof dateInput === 'string') {
+    try {
+      // Add time component to avoid timezone issues where the date might be interpreted as the previous day
+      const d = new Date(`${dateInput}T00:00:00`); 
+      
+      if (isNaN(d.getTime())) {
+        return null; // Invalid date string
+      }
+      return d;
+    } catch (e) {
+      console.error("Failed to convert date string to Date object:", dateInput, e);
       return null;
     }
-    return d;
-  } catch (e) {
-    console.error("Failed to convert date string to Firestore date:", dateString, e);
-    return null;
   }
+
+  // If it's a number (milliseconds from epoch)
+  if (typeof dateInput === 'number') {
+    const d = new Date(dateInput);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // If we can't determine the type, return null
+  return null;
 }
+
+    

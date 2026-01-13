@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Card,
@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee, AuditLog } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -120,17 +120,14 @@ export default function EditEmployeePage() {
         try {
             const updatedEmployeeData: Record<string, any> = {};
             const auditLogs: Partial<AuditLog>[] = [];
-
-            // --- Compare and build update object and audit logs ---
-            const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban'];
-            
             const effectiveDate = new Date();
 
+            const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban'];
+            
             fieldsToCompare.forEach(field => {
-                let formValue: any = formData[field];
-                let originalValue: any = originalData[field];
+                let formValue = formData[field];
+                let originalValue = originalData[field];
 
-                // Convert dates for reliable comparison
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
                     const formDate = toFirestoreDate(formValue as string);
                     const originalDate = toFirestoreDate(originalValue);
@@ -139,13 +136,11 @@ export default function EditEmployeePage() {
                          updatedEmployeeData[field] = formDate; // Will be saved as Timestamp or null
                     }
                 } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
-                    formValue = Number(formValue) || 0;
-                    if (field === 'housingAllowance' && !includeHousing) formValue = 0;
-                    if (field === 'transportAllowance' && !includeTransport) formValue = 0;
-                    originalValue = Number(originalValue) || 0;
+                    const formNumValue = Number(formValue) || 0;
+                    const originalNumValue = Number(originalValue) || 0;
 
-                    if (formValue !== originalValue) {
-                        updatedEmployeeData[field] = formValue;
+                    if (formNumValue !== originalNumValue) {
+                        updatedEmployeeData[field] = formNumValue;
                     }
                 } else {
                      if (formValue !== originalValue) {
@@ -173,11 +168,22 @@ export default function EditEmployeePage() {
                     });
                 }
             });
+            
+            // Handle conditional allowances
+            const housingValue = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
+            if(housingValue !== (Number(originalData.housingAllowance) || 0)) {
+                updatedEmployeeData.housingAllowance = housingValue;
+            }
+            const transportValue = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
+             if(transportValue !== (Number(originalData.transportAllowance) || 0)) {
+                updatedEmployeeData.transportAllowance = transportValue;
+            }
+
 
             // Remove null date fields to avoid Firestore errors
             Object.keys(updatedEmployeeData).forEach(key => {
-                if (updatedEmployeeData[key] === null && ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(key)) {
-                    delete updatedEmployeeData[key];
+                if (updatedEmployeeData[key] === null) {
+                   delete updatedEmployeeData[key];
                 }
             });
 

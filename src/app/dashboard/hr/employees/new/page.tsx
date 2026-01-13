@@ -146,15 +146,11 @@ export default function NewEmployeePage() {
 
             // --- Data Sanitization & Preparation ---
             const employeeData: DocumentData = {
-                fullName: formData.fullName,
-                nameEn: formData.nameEn,
-                civilId: formData.civilId,
-                mobile: formData.mobile,
-                department: formData.department,
-                jobTitle: formData.jobTitle,
+                ...formData,
                 hireDate: hireDate,
-                contractType: formData.contractType || 'permanent',
                 basicSalary: Number(formData.basicSalary) || 0,
+                housingAllowance: includeHousing ? Number(formData.housingAllowance) || 0 : 0,
+                transportAllowance: includeTransport ? Number(formData.transportAllowance) || 0 : 0,
                 status: 'active',
                 createdAt: serverTimestamp(),
                 terminationDate: null,
@@ -170,36 +166,22 @@ export default function NewEmployeePage() {
                 lastLeaveResetDate: hireDate,
             };
 
-            // Add optional fields only if they have a valid value
-            const dob = toFirestoreDate(formData.dob as string);
-            if (dob) employeeData.dob = dob;
+            // Convert all date strings to Date objects or remove if empty
+            const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry'];
+            dateFields.forEach(field => {
+                const dateValue = toFirestoreDate(formData[field] as string);
+                if (dateValue) {
+                    employeeData[field] = dateValue;
+                } else {
+                    delete employeeData[field]; // Remove field if date is null/invalid
+                }
+            });
 
-            const residencyExpiry = toFirestoreDate(formData.residencyExpiry as string);
-            if (residencyExpiry) employeeData.residencyExpiry = residencyExpiry;
-
-            if (formData.gender) employeeData.gender = formData.gender;
-            if (formData.visaType) employeeData.visaType = formData.visaType;
-            
-            // Handle conditional contract expiry
-            if ((formData.contractType === 'temporary' || formData.contractType === 'subcontractor')) {
-                const contractExpiry = toFirestoreDate(formData.contractExpiry as string);
-                if (contractExpiry) employeeData.contractExpiry = contractExpiry;
-            } else {
-                employeeData.contractExpiry = null;
+            // Ensure contractExpiry is null if not a relevant contract type
+            if (formData.contractType === 'permanent') {
+                delete employeeData.contractExpiry;
             }
-
-            if (formData.emergencyContact) employeeData.emergencyContact = formData.emergencyContact;
-            if (formData.email) employeeData.email = formData.email;
-            if (formData.position) employeeData.position = formData.position;
-
-            // Handle conditional allowances
-            employeeData.housingAllowance = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
-            employeeData.transportAllowance = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
-
-            if (formData.salaryPaymentType) employeeData.salaryPaymentType = formData.salaryPaymentType;
-            if (formData.bankName) employeeData.bankName = formData.bankName;
-            if (formData.iban) employeeData.iban = formData.iban;
-            if(formData.profilePicture) employeeData.profilePicture = formData.profilePicture;
+            
 
             // --- Use a write batch to add employee and initial audit log ---
             const batch = writeBatch(firestore);
@@ -518,5 +500,7 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
 
     
