@@ -110,32 +110,35 @@ export default function LeaveReportsPage() {
     const reportData = useMemo(() => {
         if (isInitialLoad) return [];
 
-        let start: Date, end: Date;
+        let reportStart: Date, reportEnd: Date;
         try {
-            start = parseISO(dateFrom);
-            start.setHours(0, 0, 0, 0);
+            reportStart = parseISO(dateFrom);
+            reportStart.setHours(0, 0, 0, 0);
 
-            end = parseISO(dateTo);
-            end.setHours(23, 59, 59, 999);
-            if (start > end) return [];
+            reportEnd = parseISO(dateTo);
+            reportEnd.setHours(23, 59, 59, 999);
+            if (reportStart > reportEnd) return [];
         } catch (e) {
             return [];
         }
         
         const filteredData = allRequests.filter(req => {
-            let reqDate: Date;
+            let leaveStart: Date, leaveEnd: Date;
             try {
-                 reqDate = req.startDate instanceof Timestamp ? req.startDate.toDate() : new Date(req.startDate);
-                 if(isNaN(reqDate.getTime())) return false;
+                 leaveStart = req.startDate instanceof Timestamp ? req.startDate.toDate() : new Date(req.startDate);
+                 leaveEnd = req.endDate instanceof Timestamp ? req.endDate.toDate() : new Date(req.endDate);
+                 if(isNaN(leaveStart.getTime()) || isNaN(leaveEnd.getTime())) return false;
             } catch(e) {
                 return false;
             }
             
-            const isDateInRange = reqDate >= start && reqDate <= end;
+            // Check for date range overlap
+            const overlaps = (leaveStart <= reportEnd) && (leaveEnd >= reportStart);
+
             const isStatusMatch = statusFilter === 'all' || req.status === statusFilter;
             const isEmployeeMatch = employeeFilter === 'all' || req.employeeId === employeeFilter;
 
-            return isDateInRange && isStatusMatch && isEmployeeMatch;
+            return overlaps && isStatusMatch && isEmployeeMatch;
         });
 
         // Client-side sorting
@@ -311,3 +314,5 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
+
+    
