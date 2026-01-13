@@ -122,7 +122,7 @@ async function reconstructEmployeeState(db: Firestore, employee: Employee, asOfD
 
 // --- CALCULATION FUNCTIONS ---
 
-function calculateEosb(employee: Employee, asOfDate: Date): number {
+function calculateEosb(employee: Employee, asOfDate: Date, leaveBalance: number): number {
     const hireDate = toDate(employee.hireDate);
     const basicSalary = employee.basicSalary || 0;
     if (!hireDate || basicSalary === 0 || hireDate > asOfDate) return 0;
@@ -138,14 +138,19 @@ function calculateEosb(employee: Employee, asOfDate: Date): number {
         gratuity += basicSalary * (yearsOfService - 5); // After 5 years
     }
     
-    // In case of resignation
-    if (employee.terminationReason === 'resignation' && toDate(employee.terminationDate) === toDate(asOfDate)) {
-         if (yearsOfService < 3) return 0;
-         if (yearsOfService < 5) return gratuity * 0.5;
-         if (yearsOfService < 10) return gratuity * (2/3);
+    // From Article 70 - payment for unused annual leave. Balance is pre-calculated.
+    const validLeaveBalance = Math.max(0, leaveBalance); // Ensure balance is not negative
+    const leavePayout = (basicSalary / 26) * validLeaveBalance;
+    const totalPayout = gratuity + leavePayout;
+
+    // From Article 52 - rules for resignation
+    if (employee.terminationReason === 'resignation' && toDate(employee.terminationDate) && toDate(employee.terminationDate)! <= asOfDate) {
+         if (yearsOfService < 3) return 0; // No gratuity, only leave payout
+         if (yearsOfService < 5) return (gratuity * 0.5) + leavePayout;
+         if (yearsOfService < 10) return (gratuity * (2/3)) + leavePayout;
     }
     
-    return Math.max(0, gratuity);
+    return Math.max(0, totalPayout);
 }
 
 function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveRequests: LeaveRequest[], holidays: Set<string>): number {
@@ -163,7 +168,7 @@ function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveReque
     const leavesTaken = allLeaveRequests.filter(lr => 
         lr.employeeId === employee.id && 
         lr.status === 'approved' && 
-        lr.leaveType === 'Annual' && 
+        lr.leaveType === 'Annual' && // IMPORTANT: Only count Annual leave against the annual balance
         toDate(lr.startDate)! <= asOfDate
     );
     
@@ -195,8 +200,9 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
 
     const processEmployee = async (emp: Employee) => {
         const reconstructed = await reconstructEmployeeState(db, emp, asOfDate);
-        reconstructed.eosb = calculateEosb(reconstructed, asOfDate);
-        reconstructed.leaveBalance = calculateLeaveBalance(reconstructed, asOfDate, allLeaveRequests, holidaysSet);
+        const leaveBalance = calculateLeaveBalance(reconstructed, asOfDate, allLeaveRequests, holidaysSet);
+        reconstructed.leaveBalance = leaveBalance;
+        reconstructed.eosb = calculateEosb(reconstructed, asOfDate, leaveBalance);
         reconstructed.lastLeave = allLeaveRequests.filter(lr => lr.employeeId === emp.id && lr.isBackFromLeave && toDate(lr.actualReturnDate)! <= asOfDate)
                                    .sort((a,b) => toDate(b.actualReturnDate)!.getTime() - toDate(a.actualReturnDate)!.getTime())[0] || null;
         reconstructed.serviceDuration = intervalToDuration({ start: toDate(emp.hireDate)!, end: asOfDate });
@@ -255,7 +261,6 @@ async function generateAuditLogReport(db: Firestore, options: ReportOptions, cha
     };
     
     const finalHeaders = headersMap[changeType];
-
     const fieldToFilter = changeType === 'ResidencyRenewal' ? 'residencyExpiry' : undefined;
     const typeToFilter = changeType === 'ResidencyRenewal' ? 'DataUpdate' : changeType;
 
