@@ -148,12 +148,13 @@ export default function EditEmployeePage() {
             const effectiveDate = new Date();
 
             fieldsToCompare.forEach(field => {
-                let formValue = formData[field];
-                let originalValue = originalData[field];
+                let formValue: any = formData[field];
+                let originalValue: any = originalData[field];
 
-                if (['dob', 'residencyExpiry', 'contractExpiry'].includes(field)) {
+                if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
                     formValue = toDateOrNull(formValue as string);
-                    originalValue = originalValue ? (originalValue as any).toDate() : null;
+                    // Also convert original value to Date for accurate comparison
+                    originalValue = originalValue ? toDateOrNull((originalValue as any).toDate ? (originalValue as any).toDate().toISOString().split('T')[0] : originalValue) : null;
                 }
                 
                 if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
@@ -164,6 +165,7 @@ export default function EditEmployeePage() {
                 }
 
                 // Simple comparison (won't work perfectly for dates/objects without serialization)
+                // Stringify is okay for this purpose to detect a change
                 if (JSON.stringify(formValue) !== JSON.stringify(originalValue)) {
                     updatedEmployeeData[field] = formValue;
                     
@@ -197,9 +199,14 @@ export default function EditEmployeePage() {
                 });
             }
 
-            await batch.commit();
+            if (Object.keys(updatedEmployeeData).length > 0 || auditLogs.length > 0) {
+                await batch.commit();
+                toast({ title: 'نجاح', description: 'تم تحديث بيانات الموظف بنجاح.' });
+            } else {
+                 toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات.' });
+            }
 
-            toast({ title: 'نجاح', description: 'تم تحديث بيانات الموظف بنجاح.' });
+            
             router.push(`/dashboard/hr/employees/${id}`);
         } catch (error) {
             console.error("Error saving employee:", error);
@@ -492,5 +499,7 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
+
+    
 
     
