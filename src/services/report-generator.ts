@@ -90,8 +90,8 @@ function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialV
         .sort((a, b) => toDate(b.effectiveDate)!.getTime() - toDate(a.effectiveDate)!.getTime())[0];
     
     if (relevantLog) {
-         if (typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue) && relevantLog.newValue.hasOwnProperty(field)) {
-            return relevantLog.newValue[field] ?? initialValue;
+         if (typeof relevantLog.newValue === 'object' && relevantLog.newValue !== null && !Array.isArray(relevantLog.newValue) && relevantLog.newValue.hasOwnProperty(field)) {
+            return relevantLog.newValue[field];
         }
         return relevantLog.newValue;
     }
@@ -254,6 +254,10 @@ async function generateAuditLogReport(db: Firestore, options: ReportOptions, cha
     };
     
     const finalHeaders = headersMap[changeType];
+    if (!finalHeaders) {
+         throw new Error(`Invalid report type for audit log: ${changeType}`);
+    }
+
     const fieldToFilter = changeType === 'ResidencyRenewal' ? 'residencyExpiry' : undefined;
 
     let auditLogsQuery = query(
