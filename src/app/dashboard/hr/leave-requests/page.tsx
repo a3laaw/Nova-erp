@@ -32,10 +32,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { LeaveRequest } from '@/lib/types';
+import type { LeaveRequest, Employee } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,12 +85,43 @@ export default function LeaveRequestsPage() {
     const [isRejectConfirmOpen, setIsRejectConfirmOpen] = useState(false);
     const [isProcessingReject, setIsProcessingReject] = useState(false);
 
+    const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+    const [dataLoading, setDataLoading] = useState(true);
 
     useEffect(() => {
         if (isReturnConfirmOpen) {
             setActualReturnDate(new Date().toISOString().split('T')[0]);
         }
     }, [isReturnConfirmOpen]);
+    
+    useEffect(() => {
+        if (!firestore) return;
+
+        const fetchAllEmployees = async () => {
+            setDataLoading(true);
+            try {
+                const employeesSnapshot = await getDocs(collection(firestore, 'employees'));
+                const newEmployeesMap = new Map<string, string>();
+                employeesSnapshot.forEach(doc => {
+                    const emp = doc.data() as Employee;
+                    newEmployeesMap.set(doc.id, emp.fullName);
+                });
+                setEmployeesMap(newEmployeesMap);
+            } catch (error) {
+                console.error("Failed to fetch employees for map:", error);
+                toast({
+                    variant: "destructive",
+                    title: "خطأ",
+                    description: "فشل في جلب بيانات الموظفين.",
+                });
+            } finally {
+                setDataLoading(false);
+            }
+        };
+
+        fetchAllEmployees();
+    }, [firestore, toast]);
+
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
@@ -247,6 +278,8 @@ export default function LeaveRequestsPage() {
     }
   }
 
+  const isLoading = loading || dataLoading;
+
   return (
     <div className='space-y-6'>
         <Button variant="outline" onClick={() => router.push('/dashboard/hr')}>
@@ -294,7 +327,7 @@ export default function LeaveRequestsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading && Array.from({ length: 3 }).map((_, i) => (
+                            {isLoading && Array.from({ length: 3 }).map((_, i) => (
                                 <TableRow key={`skel-${i}`}>
                                     <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
                                 </TableRow>
@@ -306,16 +339,16 @@ export default function LeaveRequestsPage() {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!loading && requests.length === 0 && (
+                            {!isLoading && requests.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center">
                                         لا توجد طلبات إجازة حالياً.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!loading && requests.map(req => (
+                            {!isLoading && requests.map(req => (
                                 <TableRow key={req.id}>
-                                    <TableCell className='font-medium'>{req.employeeName}</TableCell>
+                                    <TableCell className='font-medium'>{employeesMap.get(req.employeeId) || req.employeeName}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={typeColors[req.leaveType]}>
                                             {typeTranslations[req.leaveType]}
@@ -386,7 +419,7 @@ export default function LeaveRequestsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>تسجيل عودة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
-                            الرجاء تحديد تاريخ العودة الفعلي للموظف "{requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
+                            الرجاء تحديد تاريخ العودة الفعلي للموظف "{employeesMap.get(requestToReturn?.employeeId || '') || requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="grid gap-2 py-4">
@@ -412,7 +445,7 @@ export default function LeaveRequestsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>رفض طلب الإجازة</AlertDialogTitle>
                         <AlertDialogDescription>
-                            الرجاء كتابة سبب رفض طلب الإجازة للموظف "{requestToReject?.employeeName}".
+                            الرجاء كتابة سبب رفض طلب الإجازة للموظف "{employeesMap.get(requestToReject?.employeeId || '') || requestToReject?.employeeName}".
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="grid gap-2 py-4">
