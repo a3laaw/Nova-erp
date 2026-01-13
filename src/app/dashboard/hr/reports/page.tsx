@@ -25,20 +25,45 @@ import { useToast } from '@/hooks/use-toast';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { ReportResults } from '@/components/hr/report-results';
-import { generateReport, ReportData, ReportType } from '@/services/report-generator';
+import { generateReport, ReportData, ReportType, BulkReportData } from '@/services/report-generator';
+import type { Employee } from '@/lib/types';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { EmployeeDossier } from '@/components/hr/employee-dossier';
 
 export default function ReportsPage() {
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
     
-    const [reportType, setReportType] = useState<ReportType>('Comprehensive');
-    const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-    const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
     const [asOfDate, setAsOfDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
     const [isGenerating, setIsGenerating] = useState(false);
-    const [reportData, setReportData] = useState<ReportData | null>(null);
+    const [reportData, setReportData] = useState<ReportData | BulkReportData | null>(null);
+
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
+
+
+    // Fetch employees for the dropdown
+    useState(() => {
+        if (!firestore) return;
+        const fetchEmployees = async () => {
+            try {
+                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const querySnapshot = await getDocs(q);
+                const fetchedEmployees: Employee[] = [];
+                querySnapshot.forEach(doc => {
+                    fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
+                });
+                setEmployees(fetchedEmployees.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
+            }
+        };
+        fetchEmployees();
+    });
 
     const handleGenerateReport = async () => {
         if (!firestore) {
@@ -50,10 +75,13 @@ export default function ReportsPage() {
         setReportData(null);
 
         try {
-            const options = reportType === 'Comprehensive' ? { asOfDate } : { dateFrom, dateTo };
-            const data = await generateReport(firestore, reportType, options);
+            const data = await generateReport(firestore, reportType, { 
+                asOfDate,
+                employeeId: selectedEmployeeId,
+                statusFilter: statusFilter
+             });
             
-            if (data.rows.length === 0) {
+            if (('rows' in data && data.rows.length === 0) || ('dossiers' in data && data.dossiers.length === 0)) {
                  toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على نتائج تطابق معايير البحث المحددة.' });
             }
             setReportData(data);
@@ -66,10 +94,6 @@ export default function ReportsPage() {
         }
     };
     
-    const isDateRangeReport = useMemo(() => {
-        return ['SalaryChange', 'ResidencyRenewal', 'JobChange'].includes(reportType);
-    }, [reportType]);
-
   return (
     <div className='space-y-6'>
          <Button variant="outline" onClick={() => router.push('/dashboard/hr')} className="print:hidden">
@@ -86,49 +110,95 @@ export default function ReportsPage() {
             <CardContent>
                 <div className="bg-muted/50 p-4 rounded-lg mb-6 print:hidden">
                     <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end'>
-                        <div className="grid gap-2 sm:col-span-2 md:col-span-1">
+                        <div className="grid gap-2">
                             <Label htmlFor="reportType">نوع التقرير</Label>
                              <Select dir="rtl" value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
-                                <SelectTrigger id="reportType">
-                                    <SelectValue />
-                                </SelectTrigger>
+                                <SelectTrigger id="reportType"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Comprehensive">تقرير الموظفين الشامل</SelectItem>
-                                    <SelectItem value="SalaryChange">تغيرات الرواتب</SelectItem>
-                                    <SelectItem value="JobChange">التغييرات الوظيفية</SelectItem>
-                                    <SelectItem value="ResidencyRenewal">تجديد الإقامات</SelectItem>
+                                    <SelectItem value="EmployeeDossier">ملف الموظف الشامل</SelectItem>
+                                    <SelectItem value="LeaveActivity">تقرير الإجازات التفصيلي</SelectItem>
+                                    <SelectItem value="EmployeeRoster">ملخص جميع الموظفين</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         
-                        {isDateRangeReport ? (
-                            <>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dateFrom">من تاريخ</Label>
-                                    <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dateTo">إلى تاريخ</Label>
-                                    <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                                </div>
-                            </>
-                        ) : (
-                            <div className="grid gap-2">
-                                <Label htmlFor="asOfDate">تاريخ التقرير</Label>
-                                <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+                         <div className="grid gap-2">
+                            <Label htmlFor="asOfDate">تاريخ التقرير</Label>
+                            <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+                        </div>
+                        
+                        {reportType !== 'EmployeeRoster' && (
+                             <div className="grid gap-2">
+                                <Label htmlFor="employeeFilter">تحديد موظف</Label>
+                                <Select dir="rtl" value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                                    <SelectTrigger id="employeeFilter"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">جميع الموظفين (تقرير جماعي)</SelectItem>
+                                        {employees.map(emp => (
+                                            <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         )}
+
+                        {selectedEmployeeId === 'all' && (
+                             <div className="grid gap-2">
+                                <Label htmlFor="statusFilter">حالة الموظفين</Label>
+                                <Select dir="rtl" value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                                    <SelectTrigger id="statusFilter"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">النشطون فقط</SelectItem>
+                                        <SelectItem value="all">الكل</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                             </div>
+                        )}
                        
-                        <Button onClick={handleGenerateReport} disabled={isGenerating} className="sm:col-span-2 md:col-span-1">
+                        <Button onClick={handleGenerateReport} disabled={isGenerating} className="sm:col-span-full md:col-span-1">
                             {isGenerating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}
                             {isGenerating ? 'جاري إنشاء التقرير...' : 'إنشاء التقرير'}
                         </Button>
                     </div>
                 </div>
 
-                {reportData ? (
-                    <ReportResults reportData={reportData} />
-                ) : (
+                {isGenerating && (
+                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                        <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
+                        <h3 className="mt-4 text-lg font-medium">جاري إنشاء التقرير...</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            قد تستغرق هذه العملية بعض الوقت، خصوصًا مع التقارير الجماعية.
+                        </p>
+                    </div>
+                )}
+
+                {reportData && !isGenerating && (
+                    <>
+                        {reportData.type === 'EmployeeDossier' && reportData.employee && (
+                           <EmployeeDossier employee={reportData.employee} reportDate={parseISO(asOfDate)} />
+                        )}
+                        {reportData.type === 'BulkEmployeeDossiers' && (
+                            <div className='space-y-8'>
+                                <div className="p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm print:hidden">
+                                   تم إنشاء تقرير جماعي لـ <span className='font-bold'>{reportData.dossiers.length}</span> موظفين. كل تقرير سيظهر في صفحة منفصلة عند الطباعة.
+                                </div>
+                                {reportData.dossiers.map(emp => (
+                                    <div key={emp.id} className="page-break print:break-before-page">
+                                         <EmployeeDossier employee={emp} reportDate={parseISO(asOfDate)} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {reportData.type === 'LeaveActivity' && 'rows' in reportData && (
+                            <ReportResults reportData={reportData} />
+                        )}
+                        {reportData.type === 'EmployeeRoster' && 'rows' in reportData && (
+                            <ReportResults reportData={reportData} />
+                        )}
+                    </>
+                )}
+
+                {!reportData && !isGenerating && (
                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
                         <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                         <h3 className="mt-4 text-lg font-medium">جاهز لإنشاء التقارير</h3>

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { 
@@ -12,14 +13,14 @@ import {
     collectionGroup
 } from 'firebase/firestore';
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
-import { format, intervalToDuration, isFriday, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, differenceInYears, eachDayOfInterval, isFriday, intervalToDuration, parseISO, differenceInDays } from 'date-fns';
 
-export type ReportType = 'Comprehensive' | 'SalaryChange' | 'JobChange' | 'ResidencyRenewal';
+export type ReportType = 'EmployeeDossier' | 'LeaveActivity' | 'EmployeeRoster';
 
 export interface ReportHeader {
     key: string;
     label: string;
-    type?: 'date' | 'currency' | 'number';
+    type?: 'date' | 'currency' | 'number' | 'component';
 }
 
 export interface ReportFooter {
@@ -29,7 +30,8 @@ export interface ReportFooter {
     type?: 'date' | 'currency' | 'number';
 }
 
-export interface ReportData {
+export interface StandardReportData {
+    type: 'LeaveActivity' | 'EmployeeRoster';
     title: string;
     subtitle: string;
     headers: ReportHeader[];
@@ -37,37 +39,38 @@ export interface ReportData {
     footer?: ReportFooter;
 }
 
+export interface DossierReportData {
+    type: 'EmployeeDossier';
+    employee: Employee;
+}
+
+export interface BulkReportData {
+    type: 'BulkEmployeeDossiers';
+    dossiers: Employee[];
+}
+
+export type ReportData = StandardReportData | DossierReportData | BulkReportData;
+
 interface ReportOptions {
-    dateFrom?: string;
-    dateTo?: string;
-    asOfDate?: string;
+    asOfDate: string;
+    employeeId?: string;
+    statusFilter?: 'active' | 'all';
 }
 
-// --- Data Fetching Utilities ---
+// --- UTILITY FUNCTIONS ---
 
-async function fetchAllData(db: Firestore, collectionName: string, conditions: any[] = []) {
-    let q = query(collection(db, collectionName));
-    conditions.forEach(cond => {
-        q = query(q, where(cond.field, cond.op, cond.value));
-    });
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-
-async function fetchSubcollection(db: Firestore, parentCollection: string, parentId: string, subcollectionName: string) {
-    const subcollectionRef = collection(db, parentCollection, parentId, subcollectionName);
-    const snapshot = await getDocs(query(subcollectionRef));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-
-
-// --- Historical Data Reconstruction Logic ---
-
-function toDate(timestampOrString: any): Date | null {
+const toDate = (timestampOrString: any): Date | null => {
   if (timestampOrString === null || timestampOrString === undefined) return null;
   const date = timestampOrString?.toDate ? timestampOrString.toDate() : new Date(timestampOrString);
   return isNaN(date.getTime()) ? null : date;
+};
+
+async function fetchCollection<T>(db: Firestore, collectionName: string): Promise<T[]> {
+    const snapshot = await getDocs(collection(db, collectionName));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
 }
+
+// --- HISTORICAL DATA RECONSTRUCTION ---
 
 function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialValue: any) {
     const relevantLog = logs
@@ -75,50 +78,33 @@ function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialV
         .sort((a, b) => toDate(b.effectiveDate)!.getTime() - toDate(a.effectiveDate)!.getTime())[0];
     
     if (relevantLog) {
-         if (typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue)) {
-            return relevantLog.newValue?.[field] ?? initialValue;
+         if (typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue) && relevantLog.newValue.hasOwnProperty(field)) {
+            return relevantLog.newValue[field] ?? initialValue;
         }
         return relevantLog.newValue;
     }
     return initialValue;
 }
 
-async function reconstructEmployeeState(db: Firestore, employee: Employee, asOfDate: Date): Promise<Partial<Employee>> {
-    if (!employee.id) return {};
-    const auditLogs = await fetchSubcollection(db, 'employees', employee.id, 'auditLogs') as AuditLog[];
+async function reconstructEmployeeState(db: Firestore, employee: Employee, asOfDate: Date): Promise<Employee> {
+    const auditLogs = await fetchCollection<AuditLog>(db, `employees/${employee.id}/auditLogs`);
 
-    // If there are no logs, return the current state of the employee.
-    if (auditLogs.length === 0) {
-        return {
-            jobTitle: employee.jobTitle,
-            department: employee.department,
-            position: employee.position,
-            basicSalary: employee.basicSalary,
-            housingAllowance: employee.housingAllowance,
-            transportAllowance: employee.transportAllowance,
-            residencyExpiry: employee.residencyExpiry,
-        };
-    }
+    const reconstructed: Partial<Employee> = {};
+    const fieldsToReconstruct: (keyof Employee)[] = ['jobTitle', 'department', 'position', 'basicSalary', 'housingAllowance', 'transportAllowance', 'residencyExpiry', 'contractExpiry', 'visaType', 'contractType', 'iban', 'salaryPaymentType', 'bankName'];
 
-    const reconstructedState: Partial<Employee> = {
-        jobTitle: findValueAsOf(auditLogs, 'jobTitle', asOfDate, employee.jobTitle),
-        department: findValueAsOf(auditLogs, 'department', asOfDate, employee.department),
-        position: findValueAsOf(auditLogs, 'position', asOfDate, employee.position),
-        basicSalary: findValueAsOf(auditLogs, 'basicSalary', asOfDate, employee.basicSalary),
-        housingAllowance: findValueAsOf(auditLogs, 'housingAllowance', asOfDate, employee.housingAllowance),
-        transportAllowance: findValueAsOf(auditLogs, 'transportAllowance', asOfDate, employee.transportAllowance),
-        residencyExpiry: findValueAsOf(auditLogs, 'residencyExpiry', asOfDate, employee.residencyExpiry),
-    };
-    
-    return reconstructedState;
+    fieldsToReconstruct.forEach(field => {
+        (reconstructed as any)[field] = findValueAsOf(auditLogs, field as string, asOfDate, employee[field as keyof Employee]);
+    });
+
+    return { ...employee, ...reconstructed, auditLogs };
 }
 
+// --- CALCULATION FUNCTIONS ---
 
-// --- Calculation Utilities (as of date) ---
-
-function calculateEosb(employee: Partial<Employee>, hireDate: Date, asOfDate: Date): number {
+function calculateEosb(employee: Employee, asOfDate: Date): number {
+    const hireDate = toDate(employee.hireDate);
     const basicSalary = employee.basicSalary || 0;
-    if (basicSalary === 0 || hireDate > asOfDate) return 0;
+    if (!hireDate || basicSalary === 0 || hireDate > asOfDate) return 0;
     
     const serviceDays = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24);
     const yearsOfService = serviceDays / 365.25;
@@ -130,37 +116,41 @@ function calculateEosb(employee: Partial<Employee>, hireDate: Date, asOfDate: Da
         gratuity += (15 / 26) * basicSalary * 5; // First 5 years
         gratuity += basicSalary * (yearsOfService - 5); // After 5 years
     }
-
-    return gratuity;
+    
+    // In case of resignation
+    if (employee.terminationReason === 'resignation' && toDate(employee.terminationDate) === toDate(asOfDate)) {
+         if (yearsOfService < 3) return 0;
+         if (yearsOfService < 5) return gratuity * 0.5;
+         if (yearsOfService < 10) return gratuity * (2/3);
+    }
+    
+    return Math.max(0, gratuity);
 }
 
-function calculateLeaveBalance(allLeaveRequests: LeaveRequest[], holidays: Set<string>, employeeId: string | undefined, hireDate: Date, asOfDate: Date): number {
-    if (!employeeId || hireDate > asOfDate) return 0;
+function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveRequests: LeaveRequest[], holidays: Set<string>): number {
+    const hireDate = toDate(employee.hireDate);
+    if (!hireDate || hireDate > asOfDate) return 0;
     
-    const yearsOfService = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    const yearsOfService = differenceInYears(asOfDate, hireDate);
     if (yearsOfService < 1) return 0;
     
-    const accruedDays = Math.floor(yearsOfService) * 30; // Simplified: 30 days per year after first year
-    
-    const leavesTaken = allLeaveRequests.filter(lr => {
-        const startDate = toDate(lr.startDate);
-        return lr.employeeId === employeeId && 
-               lr.status === 'approved' && 
-               lr.leaveType === 'Annual' && 
-               startDate && startDate <= asOfDate;
-    });
+    // Simplified accrual: 30 days per year of service after the first year.
+    const accruedDays = (yearsOfService -1) * 30 + (employee.carriedLeaveDays || 0);
 
+    const leavesTaken = allLeaveRequests.filter(lr => 
+        lr.employeeId === employee.id && 
+        lr.status === 'approved' && 
+        lr.leaveType === 'Annual' && 
+        toDate(lr.startDate)! <= asOfDate
+    );
+    
     let usedDays = 0;
     leavesTaken.forEach(leave => {
         const leaveStart = toDate(leave.startDate)!;
         const leaveEnd = toDate(leave.endDate)! > asOfDate ? asOfDate : toDate(leave.endDate)!;
-
         if(leaveStart > leaveEnd) return;
-
-        const interval = eachDayOfInterval({ start: leaveStart, end: leaveEnd });
-        interval.forEach(day => {
-            const dayStr = format(day, 'yyyy-MM-dd');
-            if (!isFriday(day) && !holidays.has(dayStr)) {
+        eachDayOfInterval({ start: leaveStart, end: leaveEnd }).forEach(day => {
+            if (!isFriday(day) && !holidays.has(format(day, 'yyyy-MM-dd'))) {
                 usedDays++;
             }
         });
@@ -169,169 +159,133 @@ function calculateLeaveBalance(allLeaveRequests: LeaveRequest[], holidays: Set<s
     return accruedDays - usedDays;
 }
 
+// --- REPORT GENERATORS ---
 
-// --- Report Generation Functions ---
-
-async function generateComprehensiveReport(db: Firestore, options: ReportOptions): Promise<ReportData> {
-    const asOfDate = options.asOfDate ? parseISO(options.asOfDate) : new Date();
+async function generateEmployeeDossier(db: Firestore, options: ReportOptions): Promise<ReportData> {
+    const asOfDate = parseISO(options.asOfDate);
     asOfDate.setHours(23, 59, 59, 999);
-
-    const [employees, allLeaveRequests, holidaysSnapshot] = await Promise.all([
-        fetchAllData(db, 'employees', [{ field: 'status', op: '==', value: 'active' }]) as Promise<Employee[]>,
-        fetchAllData(db, 'leaveRequests') as Promise<LeaveRequest[]>,
-        fetchAllData(db, 'holidays') as Promise<Holiday[]>
-    ]);
     
-    const holidays = new Set(holidaysSnapshot.map(h => {
-        const holidayDate = toDate(h.date);
-        return holidayDate ? format(holidayDate, 'yyyy-MM-dd') : '';
-    }));
+    const allEmployees = await fetchCollection<Employee>(db, 'employees');
+    const allLeaveRequests = await fetchCollection<LeaveRequest>(db, 'leaveRequests');
+    const allHolidays = await fetchCollection<Holiday>(db, 'holidays');
+    const holidaysSet = new Set(allHolidays.map(h => format(toDate(h.date)!, 'yyyy-MM-dd')));
 
-    const rows: DocumentData[] = [];
+    const processEmployee = async (emp: Employee) => {
+        const reconstructed = await reconstructEmployeeState(db, emp, asOfDate);
+        reconstructed.eosb = calculateEosb(reconstructed, asOfDate);
+        reconstructed.leaveBalance = calculateLeaveBalance(reconstructed, asOfDate, allLeaveRequests, holidaysSet);
+        reconstructed.lastLeave = allLeaveRequests.filter(lr => lr.employeeId === emp.id && lr.isBackFromLeave && toDate(lr.actualReturnDate)! <= asOfDate)
+                                   .sort((a,b) => toDate(b.actualReturnDate)!.getTime() - toDate(a.actualReturnDate)!.getTime())[0] || null;
+        reconstructed.serviceDuration = intervalToDuration({ start: toDate(emp.hireDate)!, end: asOfDate });
+        return reconstructed;
+    };
 
-    for (const emp of employees) {
-        const hireDate = toDate(emp.hireDate);
-        if (!hireDate || hireDate > asOfDate) continue;
-
-        const reconstructedState = await reconstructEmployeeState(db, emp, asOfDate);
+    if (options.employeeId && options.employeeId !== 'all') {
+        const employee = allEmployees.find(e => e.id === options.employeeId);
+        if (!employee) throw new Error('لم يتم العثور على الموظف.');
+        const dossier = await processEmployee(employee);
+        return { type: 'EmployeeDossier', employee: dossier };
+    } else {
+        let filteredEmployees = allEmployees;
+        if (options.statusFilter === 'active') {
+            filteredEmployees = allEmployees.filter(e => e.status === 'active');
+        }
         
-        rows.push({
-            fullName: emp.fullName,
-            jobTitle: reconstructedState.jobTitle,
-            department: reconstructedState.department,
-            hireDate: emp.hireDate,
-            eosb: calculateEosb(reconstructedState, hireDate, asOfDate),
-            leaveBalance: calculateLeaveBalance(allLeaveRequests, holidays, emp.id, hireDate, asOfDate),
-            residencyExpiry: reconstructedState.residencyExpiry
-        });
+        const dossiers = await Promise.all(filteredEmployees.map(emp => processEmployee(emp)));
+        return { type: 'BulkEmployeeDossiers', dossiers };
     }
+}
+
+async function generateLeaveActivityReport(db: Firestore, options: ReportOptions): Promise<StandardReportData> {
+     const asOfDate = parseISO(options.asOfDate);
+    const startDate = new Date(asOfDate.getFullYear(), 0, 1); // Start of the report year
+
+    let q = query(
+        collection(db, 'leaveRequests'),
+        where('startDate', '>=', startDate),
+        where('startDate', '<=', asOfDate)
+    );
+
+    if (options.employeeId && options.employeeId !== 'all') {
+        q = query(q, where('employeeId', '==', options.employeeId));
+    }
+    
+    const snapshot = await getDocs(q);
+    const rows = snapshot.docs.map(doc => doc.data() as LeaveRequest);
+    
+    const approvedLeaves = rows.filter(r => r.status === 'approved');
+    const totalDays = approvedLeaves.reduce((sum, r) => sum + (r.workingDays || r.days), 0);
+    const affectedEmployees = new Set(approvedLeaves.map(r => r.employeeId)).size;
 
     return {
-        title: 'تقرير الموظفين الشامل',
-        subtitle: `البيانات كما في تاريخ: ${format(asOfDate, 'dd/MM/yyyy')}`,
+        type: 'LeaveActivity',
+        title: 'تقرير حركة الإجازات',
+        subtitle: `للفترة من ${format(startDate, 'dd/MM/yyyy')} إلى ${format(asOfDate, 'dd/MM/yyyy')}`,
         headers: [
-            { key: 'fullName', label: 'اسم الموظف' },
-            { key: 'jobTitle', label: 'المسمى الوظيفي' },
+            { key: 'employeeName', label: 'اسم الموظف' },
+            { key: 'leaveType', label: 'نوع الإجازة' },
+            { key: 'startDate', label: 'تاريخ البدء', type: 'date' },
+            { key: 'endDate', label: 'تاريخ الانتهاء', type: 'date' },
+            { key: 'workingDays', label: 'أيام العمل', type: 'number' },
+            { key: 'status', label: 'الحالة' },
+        ],
+        rows,
+        footer: {
+            colSpan: 5,
+            label: `الإجمالي: ${totalDays} يوم عمل لـ ${affectedEmployees} موظفين`,
+            value: ''
+        }
+    };
+}
+
+async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Promise<StandardReportData> {
+    const asOfDate = parseISO(options.asOfDate);
+    const employees = await fetchCollection<Employee>(db, 'employees');
+
+    const rows = employees.map(emp => {
+        const residencyExpiry = toDate(emp.residencyExpiry);
+        const contractExpiry = toDate(emp.contractExpiry);
+        let alerts = [];
+        if (residencyExpiry && differenceInDays(residencyExpiry, asOfDate) <= 30 && differenceInDays(residencyExpiry, asOfDate) > 0) {
+            alerts.push(`⚠️ الإقامة تنتهي خلال ${differenceInDays(residencyExpiry, asOfDate)} يوم`);
+        }
+        if (contractExpiry && differenceInDays(contractExpiry, asOfDate) <= 30 && differenceInDays(contractExpiry, asOfDate) > 0) {
+            alerts.push(`⚠️ العقد ينتهي خلال ${differenceInDays(contractExpiry, asOfDate)} يوم`);
+        }
+        
+        return {
+            ...emp,
+            alerts: alerts.join(', ')
+        }
+    });
+
+     return {
+        type: 'EmployeeRoster',
+        title: 'ملخص جميع الموظفين',
+        subtitle: `الحالة كما في تاريخ: ${format(asOfDate, 'dd/MM/yyyy')}`,
+        headers: [
+            { key: 'fullName', label: 'الاسم' },
+            { key: 'civilId', label: 'الرقم المدني' },
             { key: 'department', label: 'القسم' },
-            { key: 'hireDate', label: 'تاريخ التعيين', type: 'date' },
-            { key: 'residencyExpiry', label: 'انتهاء الإقامة', type: 'date' },
-            { key: 'leaveBalance', label: 'رصيد الإجازة (يوم)', type: 'number' },
-            { key: 'eosb', label: 'مكافأة نهاية الخدمة', type: 'currency' },
+            { key: 'jobTitle', label: 'المسمى الوظيفي' },
+            { key: 'status', label: 'الحالة' },
+            { key: 'alerts', label: 'تنبيهات حرجة' },
         ],
         rows,
     };
 }
 
 
-async function generateAuditLogReport(db: Firestore, changeType: AuditLog['changeType'], title: string, options: ReportOptions): Promise<ReportData> {
-    const dateFrom = options.dateFrom ? Timestamp.fromDate(parseISO(options.dateFrom)) : Timestamp.fromDate(new Date(0));
-    const dateTo = options.dateTo ? Timestamp.fromDate(parseISO(options.dateTo)) : Timestamp.now();
-    
-    const headers = getHeadersForAuditReport(changeType);
-    
-    const conditions = [
-        where('changeType', '==', changeType),
-        where('effectiveDate', '>=', dateFrom),
-        where('effectiveDate', '<=', dateTo)
-    ];
-
-    if (changeType === 'DataUpdate') {
-        conditions.push(where('field', '==', 'residencyExpiry'));
-    }
-
-    const logsQuery = query(
-        collectionGroup(db, 'auditLogs'), 
-        ...conditions,
-        orderBy('effectiveDate', 'desc')
-    );
-    
-    const logsSnapshot = await getDocs(logsQuery);
-    
-    const subtitle = `للفترة من ${format(dateFrom.toDate(), 'dd/MM/yyyy')} إلى ${format(dateTo.toDate(), 'dd/MM/yyyy')}`;
-
-    if (logsSnapshot.empty) {
-        return {
-            title,
-            subtitle,
-            headers,
-            rows: []
-        };
-    }
-
-    const employeesSnapshot = await getDocs(query(collection(db, 'employees'), orderBy('fullName')));
-    const employeesMap = new Map<string, Employee>();
-    employeesSnapshot.forEach(doc => employeesMap.set(doc.id, { id: doc.id, ...doc.data() } as Employee));
-
-    const rows = logsSnapshot.docs.map(logDoc => {
-        const log = logDoc.data() as AuditLog;
-        const employeeId = logDoc.ref.parent.parent?.id;
-        const employee = employeeId ? employeesMap.get(employeeId) : undefined;
-        const changedByUserDoc = log.changedBy ? employeesMap.get(log.changedBy) : undefined;
-
-        let row: DocumentData = {
-            employeeName: employee?.fullName ?? 'موظف غير معروف',
-            effectiveDate: log.effectiveDate,
-            changedBy: changedByUserDoc?.fullName ?? log.changedBy ?? 'غير معروف',
-            oldValue: log.oldValue ?? null,
-            newValue: log.newValue ?? null,
-            oldJobTitle: log.oldValue?.jobTitle ?? null,
-            newJobTitle: log.newValue?.jobTitle ?? null,
-            oldDepartment: log.oldValue?.department ?? null,
-            newDepartment: log.newValue?.department ?? null,
-        };
-        return row;
-    });
-
-    return {
-        title,
-        subtitle,
-        headers,
-        rows
-    };
-}
-
-function getHeadersForAuditReport(changeType: AuditLog['changeType']): ReportHeader[] {
-    const baseHeaders: ReportHeader[] = [
-        { key: 'employeeName', label: 'اسم الموظف' },
-        { key: 'effectiveDate', label: 'تاريخ التغيير', type: 'date' },
-    ];
-    const changedByHeader: ReportHeader = { key: 'changedBy', label: 'تم بواسطة' };
-
-    if (changeType === 'JobChange') {
-        return [
-            ...baseHeaders,
-            { key: 'oldJobTitle', label: 'الوظيفة القديمة' },
-            { key: 'newJobTitle', label: 'الوظيفة الجديدة' },
-            { key: 'oldDepartment', label: 'القسم القديم' },
-            { key: 'newDepartment', label: 'القسم الجديد' },
-            changedByHeader,
-        ];
-    } 
-    
-    const isCurrency = changeType === 'SalaryChange';
-    const isDate = changeType === 'DataUpdate';
-    
-    return [
-        ...baseHeaders,
-        { key: 'oldValue', label: 'القيمة القديمة', type: isCurrency ? 'currency' : (isDate ? 'date' : undefined) },
-        { key: 'newValue', label: 'القيمة الجديدة', type: isCurrency ? 'currency' : (isDate ? 'date' : undefined) },
-        changedByHeader,
-    ];
-}
-
-
-// --- Main Entry Point ---
+// --- MAIN EXPORT ---
 
 export async function generateReport(db: Firestore, reportType: ReportType, options: ReportOptions): Promise<ReportData> {
     switch (reportType) {
-        case 'Comprehensive':
-            return generateComprehensiveReport(db, options);
-        case 'SalaryChange':
-            return generateAuditLogReport(db, 'SalaryChange', 'تقرير تغيرات الرواتب', options);
-        case 'JobChange':
-            return generateAuditLogReport(db, 'JobChange', 'تقرير التغييرات الوظيفية', options);
-        case 'ResidencyRenewal':
-            return generateAuditLogReport(db, 'DataUpdate', 'تقرير تجديد الإقامات', options);
+        case 'EmployeeDossier':
+            return generateEmployeeDossier(db, options);
+        case 'LeaveActivity':
+            return generateLeaveActivityReport(db, options);
+        case 'EmployeeRoster':
+            return generateEmployeeRoster(db, options);
         default:
             throw new Error('نوع التقرير غير معروف.');
     }

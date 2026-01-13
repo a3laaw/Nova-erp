@@ -169,7 +169,7 @@ export type Employee = {
     civilId: string;
     visaType?: 'worker' | 'engineer' | 'driver' | 'admin' | 'kuwaiti';
     residencyExpiry?: any;
-    contractExpiry?: string;
+    contractExpiry?: any;
     mobile: string;
     emergencyContact?: string;
     email?: string;
@@ -199,7 +199,12 @@ export type Employee = {
     maxEmergencyLeave?: number;
     lastLeaveResetDate?: any; // ISO String
     createdAt?: any; 
-    annualLeaveBalance?: number;
+    // Fields below are calculated/reconstructed and not stored in DB
+    auditLogs?: AuditLog[];
+    eosb?: number;
+    leaveBalance?: number;
+    lastLeave?: LeaveRequest | null;
+    serviceDuration?: Duration;
 };
 
 export interface LeaveRequest {

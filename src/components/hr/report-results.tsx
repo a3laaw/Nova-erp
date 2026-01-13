@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import {
@@ -13,18 +12,43 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
-import type { ReportData } from '@/services/report-generator';
+import type { StandardReportData } from '@/services/report-generator';
 import { formatCurrency } from '@/lib/utils';
+import { Badge } from '../ui/badge';
+import { cn } from '@/lib/utils';
 
 
-const formatValue = (value: any, type?: 'date' | 'currency' | 'number'): string => {    
+const statusColors: Record<string, string> = {
+    'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    'approved': 'bg-green-100 text-green-800 border-green-200',
+    'rejected': 'bg-red-100 text-red-800 border-red-200',
+    'active': 'bg-green-100 text-green-800 border-green-200',
+    'on-leave': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    'terminated': 'bg-red-100 text-red-800 border-red-200',
+};
+
+const statusTranslations: Record<string, string> = {
+    'pending': 'معلقة',
+    'approved': 'مقبولة',
+    'rejected': 'مرفوضة',
+    'Annual': 'سنوية',
+    'Sick': 'مرضية',
+    'Emergency': 'طارئة',
+    'Unpaid': 'بدون راتب',
+    'active': 'نشط',
+    'on-leave': 'في إجازة',
+    'terminated': 'منتهية خدمته',
+};
+
+
+const formatValue = (value: any, type?: 'date' | 'currency' | 'number' | 'component'): string | React.ReactNode => {    
     if (value === null || value === undefined || value === '') return '-';
 
     if (type === 'date') {
         try {
             const d = value.toDate ? value.toDate() : new Date(value);
             if (isNaN(d.getTime())) return String(value) || '-';
-            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+            return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
         } catch (e) {
             return String(value) || '-';
         }
@@ -32,12 +56,16 @@ const formatValue = (value: any, type?: 'date' | 'currency' | 'number'): string 
     if (type === 'currency') {
         return formatCurrency(Number(value) || 0);
     }
+
+    if(statusTranslations[value]) {
+         return <Badge variant="outline" className={cn(statusColors[value] || 'bg-gray-100')}>{statusTranslations[value]}</Badge>;
+    }
     
     return String(value);
 };
 
 
-export function ReportResults({ reportData }: { reportData: ReportData }) {
+export function ReportResults({ reportData }: { reportData: StandardReportData }) {
 
     const handlePrint = () => {
         window.print();
@@ -45,7 +73,7 @@ export function ReportResults({ reportData }: { reportData: ReportData }) {
     
     return (
         <div className="border rounded-lg" id="report-content">
-            <div className='p-4 flex justify-between items-center print:p-0'>
+            <div className='p-4 flex justify-between items-center print:p-0 print:mb-4'>
                 <div>
                     <h3 className='font-bold text-lg'>{reportData.title}</h3>
                     <p className='text-sm text-muted-foreground' dir='ltr'>{reportData.subtitle}</p>
@@ -65,7 +93,7 @@ export function ReportResults({ reportData }: { reportData: ReportData }) {
                 </TableHeader>
                 <TableBody>
                     {reportData.rows.map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
+                        <TableRow key={rowIndex} className={row.alerts ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}>
                             {reportData.headers.map((header) => (
                                 <TableCell key={`${rowIndex}-${header.key}`} className="font-medium">
                                     {formatValue(row[header.key], header.type)}
