@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -30,13 +30,27 @@ import type { Employee } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
 
+const REPORT_TYPES: { value: ReportType, label: string }[] = [
+    { value: 'EmployeeDossier', label: 'الملف الشامل للموظف' },
+    { value: 'EmployeeRoster', label: 'ملخص جميع الموظفين' },
+    { value: 'SalaryChange', label: 'تقرير تغيرات الرواتب' },
+    { value: 'JobChange', label: 'تقرير التغييرات الوظيفية' },
+    { value: 'ResidencyRenewal', label: 'تقرير تجديد الإقامات' },
+];
+
 export default function ReportsPage() {
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
     
     const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
+    
+    // State for point-in-time reports
     const [asOfDate, setAsOfDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+    
+    // State for date-range reports
+    const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [reportData, setReportData] = useState<ReportData | BulkReportData | null>(null);
@@ -45,9 +59,12 @@ export default function ReportsPage() {
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
 
+    const isDateRangeReport = useMemo(() => {
+        return ['SalaryChange', 'ResidencyRenewal', 'JobChange'].includes(reportType);
+    }, [reportType]);
 
-    // Fetch employees for the dropdown
-    useState(() => {
+
+    useEffect(() => {
         if (!firestore) return;
         const fetchEmployees = async () => {
             try {
@@ -63,7 +80,7 @@ export default function ReportsPage() {
             }
         };
         fetchEmployees();
-    });
+    }, [firestore, toast]);
 
     const handleGenerateReport = async () => {
         if (!firestore) {
@@ -73,13 +90,17 @@ export default function ReportsPage() {
 
         setIsGenerating(true);
         setReportData(null);
+        
+        const options = {
+            asOfDate,
+            dateFrom: isDateRangeReport ? dateFrom : undefined,
+            dateTo: isDateRangeReport ? dateTo : undefined,
+            employeeId: selectedEmployeeId,
+            statusFilter: statusFilter
+        };
 
         try {
-            const data = await generateReport(firestore, reportType, { 
-                asOfDate,
-                employeeId: selectedEmployeeId,
-                statusFilter: statusFilter
-             });
+            const data = await generateReport(firestore, reportType, options);
             
             if (('rows' in data && data.rows.length === 0) || ('dossiers' in data && data.dossiers.length === 0)) {
                  toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على نتائج تطابق معايير البحث المحددة.' });
@@ -109,23 +130,36 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
                 <div className="bg-muted/50 p-4 rounded-lg mb-6 print:hidden">
-                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end'>
+                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end'>
                         <div className="grid gap-2">
                             <Label htmlFor="reportType">نوع التقرير</Label>
                              <Select dir="rtl" value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
                                 <SelectTrigger id="reportType"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="EmployeeDossier">ملف الموظف الشامل</SelectItem>
-                                    <SelectItem value="LeaveActivity">تقرير الإجازات التفصيلي</SelectItem>
-                                    <SelectItem value="EmployeeRoster">ملخص جميع الموظفين</SelectItem>
+                                    {REPORT_TYPES.map(rt => (
+                                        <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         
-                         <div className="grid gap-2">
-                            <Label htmlFor="asOfDate">تاريخ التقرير</Label>
-                            <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
-                        </div>
+                        {isDateRangeReport ? (
+                            <>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                                    <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                                    <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                                </div>
+                            </>
+                        ) : (
+                             <div className="grid gap-2">
+                                <Label htmlFor="asOfDate">تاريخ التقرير</Label>
+                                <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+                            </div>
+                        )}
                         
                         {reportType !== 'EmployeeRoster' && (
                              <div className="grid gap-2">
@@ -155,9 +189,9 @@ export default function ReportsPage() {
                              </div>
                         )}
                        
-                        <Button onClick={handleGenerateReport} disabled={isGenerating} className="sm:col-span-full md:col-span-1">
+                        <Button onClick={handleGenerateReport} disabled={isGenerating} className="lg:col-start-5">
                             {isGenerating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}
-                            {isGenerating ? 'جاري إنشاء التقرير...' : 'إنشاء التقرير'}
+                            {isGenerating ? 'جاري الإنشاء...' : 'إنشاء التقرير'}
                         </Button>
                     </div>
                 </div>
@@ -189,10 +223,7 @@ export default function ReportsPage() {
                                 ))}
                             </div>
                         )}
-                        {reportData.type === 'LeaveActivity' && 'rows' in reportData && (
-                            <ReportResults reportData={reportData} />
-                        )}
-                        {reportData.type === 'EmployeeRoster' && 'rows' in reportData && (
+                         {['EmployeeRoster', 'SalaryChange', 'JobChange', 'ResidencyRenewal'].includes(reportData.type) && 'rows' in reportData && (
                             <ReportResults reportData={reportData} />
                         )}
                     </>
@@ -213,3 +244,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
