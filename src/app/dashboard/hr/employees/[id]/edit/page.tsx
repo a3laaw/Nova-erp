@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee, AuditLog } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, type Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -134,9 +134,26 @@ export default function EditEmployeePage() {
         const employeeRef = doc(firestore, 'employees', id);
 
         try {
-            const toDateOrNull = (dateString: string | undefined | null) => {
-                if (!dateString || isNaN(new Date(dateString).getTime())) return null;
-                return new Date(dateString);
+            const toDateOrNull = (dateValue: string | Date | Timestamp | undefined | null): Date | null => {
+                if (!dateValue) return null;
+
+                // If it's already a Date object
+                if (dateValue instanceof Date) {
+                    return isNaN(dateValue.getTime()) ? null : dateValue;
+                }
+                
+                // If it's a Firestore Timestamp
+                if (typeof dateValue === 'object' && 'toDate' in dateValue && typeof dateValue.toDate === 'function') {
+                    return dateValue.toDate();
+                }
+
+                // If it's a string
+                if (typeof dateValue === 'string') {
+                    const d = new Date(dateValue);
+                    return isNaN(d.getTime()) ? null : d;
+                }
+                
+                return null;
             }
 
             const updatedEmployeeData: Record<string, any> = {};
@@ -152,9 +169,8 @@ export default function EditEmployeePage() {
                 let originalValue: any = originalData[field];
 
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
-                    formValue = toDateOrNull(formValue as string);
-                    // Also convert original value to Date for accurate comparison
-                    originalValue = originalValue ? toDateOrNull((originalValue as any).toDate ? (originalValue as any).toDate().toISOString().split('T')[0] : originalValue) : null;
+                    formValue = toDateOrNull(formValue as string | Date | undefined);
+                    originalValue = toDateOrNull(originalValue as Timestamp | string | Date | undefined);
                 }
                 
                 if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
@@ -499,7 +515,5 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
-
-    
 
     
