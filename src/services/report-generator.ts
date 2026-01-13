@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { 
@@ -151,13 +152,13 @@ function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveReque
     const hireDate = toDate(employee.hireDate);
     if (!hireDate || hireDate > asOfDate) return 0;
     
-    const yearsOfService = differenceInYears(asOfDate, hireDate);
+    const yearsOfService = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
     if (yearsOfService < 1) {
         return 0; // No leave entitlement in the first year
     }
     
-    // Simplified accrual: 30 days per year of service after the first year.
-    const accruedDays = (yearsOfService -1) * 30 + (employee.carriedLeaveDays || 0);
+    // Pro-rata accrual based on exact years of service.
+    const accruedDays = yearsOfService * 30 + (employee.carriedLeaveDays || 0);
 
     const leavesTaken = allLeaveRequests.filter(lr => 
         lr.employeeId === employee.id && 
@@ -254,11 +255,10 @@ async function generateAuditLogReport(db: Firestore, options: ReportOptions, cha
     };
     
     const finalHeaders = headersMap[changeType];
-    if (!finalHeaders) {
-         throw new Error(`Invalid report type for audit log: ${changeType}`);
-    }
 
     const fieldToFilter = changeType === 'ResidencyRenewal' ? 'residencyExpiry' : undefined;
+    const typeToFilter = changeType === 'ResidencyRenewal' ? 'DataUpdate' : changeType;
+
 
     let auditLogsQuery = query(
         collectionGroup(db, 'auditLogs'),
@@ -267,10 +267,10 @@ async function generateAuditLogReport(db: Firestore, options: ReportOptions, cha
         orderBy('effectiveDate', 'desc')
     );
 
-    if (changeType !== 'ResidencyRenewal') {
-         auditLogsQuery = query(auditLogsQuery, where('changeType', '==', changeType));
+    if (typeToFilter) {
+         auditLogsQuery = query(auditLogsQuery, where('changeType', '==', typeToFilter));
     }
-     if(fieldToFilter){
+    if(fieldToFilter){
         auditLogsQuery = query(auditLogsQuery, where('field', '==', fieldToFilter));
     }
 
