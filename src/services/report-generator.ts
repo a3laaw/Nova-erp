@@ -152,7 +152,9 @@ function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveReque
     if (!hireDate || hireDate > asOfDate) return 0;
     
     const yearsOfService = differenceInYears(asOfDate, hireDate);
-    if (yearsOfService < 1) return 0;
+    if (yearsOfService < 1) {
+        return 0; // No leave entitlement in the first year
+    }
     
     // Simplified accrual: 30 days per year of service after the first year.
     const accruedDays = (yearsOfService -1) * 30 + (employee.carriedLeaveDays || 0);
@@ -256,13 +258,15 @@ async function generateAuditLogReport(db: Firestore, options: ReportOptions, cha
 
     let auditLogsQuery = query(
         collectionGroup(db, 'auditLogs'),
-        where('changeType', '==', changeType),
         where('effectiveDate', '>=', startDate),
         where('effectiveDate', '<=', endDate),
         orderBy('effectiveDate', 'desc')
     );
-    
-    if(fieldToFilter){
+
+    if (changeType !== 'ResidencyRenewal') {
+         auditLogsQuery = query(auditLogsQuery, where('changeType', '==', changeType));
+    }
+     if(fieldToFilter){
         auditLogsQuery = query(auditLogsQuery, where('field', '==', fieldToFilter));
     }
 
@@ -388,5 +392,3 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             throw new Error(`نوع التقرير غير معروف: ${exhaustiveCheck}`);
     }
 }
-
-    
