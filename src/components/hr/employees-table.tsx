@@ -39,7 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addMonths, format, differenceInYears } from 'date-fns';
+import { addMonths, format, differenceInYears, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
@@ -55,6 +55,13 @@ const statusColors: Record<Employee['status'], string> = {
   'on-leave': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   terminated: 'bg-red-100 text-red-800 border-red-200',
 };
+
+const terminationReasons: Record<string, string> = {
+    resignation: 'استقالة',
+    termination: 'إنهاء خدمة (من الشركة)',
+    probation: 'إنهاء فترة التجربة'
+};
+
 
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
     if (!employee.hireDate) return 0;
@@ -107,7 +114,9 @@ export function EmployeesTable() {
     const [isTerminating, setIsTerminating] = useState(false);
     const [noticeStartDate, setNoticeStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [terminationDate, setTerminationDate] = useState('');
-    const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
+    const [terminationReason, setTerminationReason] = useState<string>('');
+    const [isImmediate, setIsImmediate] = useState(false);
+
 
     const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
     const [isRehiring, setIsRehiring] = useState(false);
@@ -116,13 +125,29 @@ export function EmployeesTable() {
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
 
     useEffect(() => {
-        if (noticeStartDate) {
-            const noticeDate = new Date(noticeStartDate);
-            const termDate = addMonths(noticeDate, 3);
-            setTerminationDate(format(termDate, 'yyyy-MM-dd'));
+        if (isImmediate || !noticeStartDate) {
+            // If immediate, or if notice start date is cleared, no automatic calculation
+            return;
         }
-    }, [noticeStartDate]);
-
+        const noticeDate = new Date(noticeStartDate);
+        const termDate = addMonths(noticeDate, 3);
+        setTerminationDate(format(termDate, 'yyyy-MM-dd'));
+    }, [noticeStartDate, isImmediate]);
+    
+     useEffect(() => {
+        if (employeeToTerminate) {
+            const hireDate = new Date(employeeToTerminate.hireDate);
+            const isProbation = differenceInDays(new Date(), hireDate) <= 90;
+            if (isProbation) {
+                setTerminationReason('probation');
+            } else {
+                setTerminationReason('');
+            }
+             setTerminationDate(new Date().toISOString().split('T')[0]);
+             setIsImmediate(isProbation); // Default to immediate if on probation
+        }
+    }, [employeeToTerminate]);
+    
     const handleTerminateClick = (employee: Employee) => {
         setNoticeStartDate(new Date().toISOString().split('T')[0]);
         setEmployeeToTerminate(employee);
@@ -136,11 +161,11 @@ export function EmployeesTable() {
     };
 
     const handleTerminationConfirm = async () => {
-        if (!employeeToTerminate || !firestore || !terminationReason || !noticeStartDate) {
+        if (!employeeToTerminate || !firestore || !terminationReason) {
             toast({
                 variant: 'destructive',
                 title: 'خطأ',
-                description: 'الرجاء تعبئة تاريخ بدء الإنذار وسبب إنهاء الخدمة.'
+                description: 'الرجاء اختيار سبب إنهاء الخدمة.'
             });
             return;
         }
@@ -151,7 +176,7 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'terminated',
-                noticeStartDate: new Date(noticeStartDate),
+                noticeStartDate: isImmediate ? null : new Date(noticeStartDate),
                 terminationDate: new Date(terminationDate),
                 terminationReason: terminationReason
             });
@@ -172,6 +197,7 @@ export function EmployeesTable() {
             setIsTerminating(false);
             setEmployeeToTerminate(null);
             setTerminationReason('');
+            setIsImmediate(false);
         }
     };
     
@@ -224,7 +250,7 @@ export function EmployeesTable() {
     const formatDateCell = (dateValue: any): string => {
         if (!dateValue) return '-';
         try {
-            const d = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+            const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
             if (isNaN(d.getTime())) return '-';
             return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
         } catch (e) {
@@ -348,46 +374,53 @@ export function EmployeesTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
-                            أدخل تاريخ بدء فترة الإنذار. سيتم حساب تاريخ انتهاء الخدمة الفعلي تلقائيًا بعد 3 أشهر.
+                           اختر سبب وتاريخ إنهاء الخدمة للموظف: {employeeToTerminate?.fullName}.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="grid gap-2">
                              <Label htmlFor="terminationReason">سبب إنهاء الخدمة</Label>
-                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v as any)}>
+                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v)}>
                                 <SelectTrigger id="terminationReason">
                                     <SelectValue placeholder="اختر السبب..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="resignation">استقالة</SelectItem>
-                                    <SelectItem value="termination">إنهاء من صاحب العمل</SelectItem>
+                                    {Object.entries(terminationReasons).map(([key, value]) => (
+                                        <SelectItem key={key} value={key}>{value}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="flex items-center space-x-2">
+                           <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
+                           <Label htmlFor="immediate">إنهاء فوري بدون فترة إنذار</Label>
+                        </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="noticeStartDate">تاريخ تقديم الاستقالة / بدء الإنذار</Label>
+                            <Label htmlFor="noticeStartDate" className={isImmediate ? 'text-muted-foreground' : ''}>تاريخ تقديم الاستقالة / بدء الإنذار</Label>
                             <Input
                                 id="noticeStartDate"
                                 type="date"
                                 value={noticeStartDate}
                                 onChange={(e) => setNoticeStartDate(e.target.value)}
+                                disabled={isImmediate}
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="terminationDate">تاريخ إنهاء الخدمة الفعلي (بعد 3 أشهر)</Label>
+                            <Label htmlFor="terminationDate" className={!isImmediate ? 'text-muted-foreground' : ''}>تاريخ إنهاء الخدمة الفعلي</Label>
                             <Input
                                 id="terminationDate"
                                 type="date"
                                 value={terminationDate}
-                                readOnly
-                                disabled
-                                className="bg-muted"
+                                onChange={(e) => setTerminationDate(e.target.value)}
+                                readOnly={!isImmediate}
+                                disabled={!isImmediate}
+                                className={!isImmediate ? 'bg-muted' : ''}
                             />
                         </div>
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating} className='bg-destructive hover:bg-destructive/90'>
+                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating || !terminationReason} className='bg-destructive hover:bg-destructive/90'>
                             {isTerminating ? 'جاري الحفظ...' : 'تأكيد إنهاء الخدمة'}
                         </AlertDialogAction>
                     </AlertDialogFooter>

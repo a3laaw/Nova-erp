@@ -1,4 +1,5 @@
 
+          
 
 export type MultilingualString = {
     ar: string;
@@ -183,7 +184,7 @@ export type Employee = {
     hireDate: any; // ISO String
     noticeStartDate: string | null; // Date when notice is given
     terminationDate: any | null;
-    terminationReason: 'resignation' | 'termination' | null;
+    terminationReason: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor';
     department: string;
     basicSalary: number; // KWD
@@ -246,3 +247,5 @@ export type AuditLog = {
     changedBy: string; // User ID
     notes?: string;
 };
+
+      
