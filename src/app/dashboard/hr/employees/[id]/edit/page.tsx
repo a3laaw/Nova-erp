@@ -63,7 +63,6 @@ export default function EditEmployeePage() {
 
                 if (employeeSnap.exists()) {
                     const data = employeeSnap.data() as Employee;
-                    setOriginalData(data); // Store original data for comparison
                     const formattedData = {
                         ...data,
                         dob: fromFirestoreDate(data.dob),
@@ -71,6 +70,7 @@ export default function EditEmployeePage() {
                         residencyExpiry: fromFirestoreDate(data.residencyExpiry),
                         contractExpiry: fromFirestoreDate(data.contractExpiry),
                     };
+                    setOriginalData(data); // Store original data for comparison
                     setFormData(formattedData);
                     setIncludeHousing(!!data.housingAllowance && data.housingAllowance > 0);
                     setIncludeTransport(!!data.transportAllowance && data.transportAllowance > 0);
@@ -127,29 +127,25 @@ export default function EditEmployeePage() {
             fieldsToCompare.forEach(field => {
                 const originalValue = originalData[field];
                 const formValue = formData[field];
+                let isChanged = false;
 
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
-                    const originalDate = toFirestoreDate(originalValue);
+                    const originalDate = toFirestoreDate(originalValue as string);
                     const formDate = toFirestoreDate(formValue as string);
-                    
-                    if (originalDate?.getTime() !== formDate?.getTime()) {
-                         updatedEmployeeData[field] = formDate; 
-                    }
+                     isChanged = originalDate?.getTime() !== formDate?.getTime();
+                     if (isChanged) updatedEmployeeData[field] = formDate;
+
                 } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
                     const originalNumValue = Number(originalValue) || 0;
                     const formNumValue = Number(formValue) || 0;
-
-                    if (originalNumValue !== formNumValue) {
-                        updatedEmployeeData[field] = formNumValue;
-                    }
+                    isChanged = originalNumValue !== formNumValue;
+                    if (isChanged) updatedEmployeeData[field] = formNumValue;
                 } else {
-                     if (formValue !== originalValue) {
-                        updatedEmployeeData[field] = formValue;
-                    }
+                     isChanged = formValue !== originalValue;
+                     if (isChanged) updatedEmployeeData[field] = formValue;
                 }
                 
-                // If a change was detected and added to updatedEmployeeData, log it
-                if (updatedEmployeeData.hasOwnProperty(field)) {
+                if (isChanged) {
                     let changeType: AuditLog['changeType'] = 'DataUpdate';
                     if (field === 'basicSalary' || field === 'housingAllowance' || field === 'transportAllowance') {
                         changeType = 'SalaryChange';
@@ -169,11 +165,9 @@ export default function EditEmployeePage() {
                 }
             });
             
-            // Handle conditional allowances
             const housingValue = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
             if(housingValue !== (Number(originalData.housingAllowance) || 0)) {
                 if (!updatedEmployeeData.hasOwnProperty('housingAllowance')) {
-                    // Log change if not already logged
                      auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'housingAllowance', oldValue: originalData.housingAllowance, newValue: housingValue, effectiveDate, changedBy: currentUser.uid });
                 }
                 updatedEmployeeData.housingAllowance = housingValue;
@@ -181,7 +175,6 @@ export default function EditEmployeePage() {
             const transportValue = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
              if(transportValue !== (Number(originalData.transportAllowance) || 0)) {
                 if (!updatedEmployeeData.hasOwnProperty('transportAllowance')) {
-                    // Log change if not already logged
                      auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'transportAllowance', oldValue: originalData.transportAllowance, newValue: transportValue, effectiveDate, changedBy: currentUser.uid });
                 }
                 updatedEmployeeData.transportAllowance = transportValue;
@@ -505,5 +498,7 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
+
+    
 
     
