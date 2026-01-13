@@ -28,8 +28,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // This effect can be simplified or removed if auth is fully disabled.
-    // For now, it will just set loading to false.
+    // This effect now sets a mock user to ensure other parts of the app work.
+    const mockUser: AuthenticatedUser = {
+      uid: 'mock-admin-uid',
+      username: 'admin.user',
+      email: 'admin@bmec-kw.local',
+      role: 'Admin',
+      isActive: true,
+      employeeId: 'emp-admin',
+      fullName: 'المدير العام',
+      avatarUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
+      passwordHash: '',
+    };
+    setUser(mockUser);
     setLoading(false);
   }, []);
 
@@ -40,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     console.log("Logout function is disabled.");
+    setUser(null);
     router.push('/');
   };
 
