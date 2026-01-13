@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -206,6 +206,7 @@ export default function NewEmployeePage() {
 
             const auditLogRef = doc(collection(firestore, `employees/${newEmployeeRef.id}/auditLogs`));
             batch.set(auditLogRef, {
+                employeeId: newEmployeeRef.id,
                 changeType: 'Creation',
                 field: 'employee',
                 oldValue: null,

@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { 
@@ -203,11 +202,14 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
     // Organize all audit logs by employee ID for quick lookup
     const allAuditLogs = new Map<string, AuditLog[]>();
     auditLogsSnapshot.forEach(doc => {
-        const employeeId = doc.ref.parent.parent!.id;
+        const logData = doc.data() as AuditLog & { employeeId: string };
+        const { employeeId } = logData;
+        if (!employeeId) return;
+
         if (!allAuditLogs.has(employeeId)) {
             allAuditLogs.set(employeeId, []);
         }
-        allAuditLogs.get(employeeId)!.push(doc.data() as AuditLog);
+        allAuditLogs.get(employeeId)!.push(logData);
     });
 
     const processEmployee = async (emp: Employee) => {
@@ -302,13 +304,13 @@ async function generateAuditLogReport(db: Firestore, options: ReportOptions, cha
         };
     }
     
-    const employeeIds = [...new Set(auditLogsSnapshot.docs.map(log => log.ref.parent.parent!.id))];
+    const employeeIds = [...new Set(auditLogsSnapshot.docs.map(log => (log.data() as AuditLog & {employeeId: string}).employeeId))];
     const employeesSnapshot = await getDocs(query(collection(db, 'employees'), where('__name__', 'in', employeeIds)));
     const employeesMap = new Map(employeesSnapshot.docs.map(doc => [doc.id, doc.data() as Employee]));
 
     const rows = auditLogsSnapshot.docs.map(logDoc => {
-        const log = logDoc.data() as AuditLog;
-        const employeeId = logDoc.ref.parent.parent!.id;
+        const log = logDoc.data() as AuditLog & {employeeId: string};
+        const { employeeId } = log;
         const employee = employeesMap.get(employeeId);
         
         const baseRow = {

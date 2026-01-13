@@ -237,7 +237,8 @@ export interface Holiday {
 
 export type AuditLog = {
     id?: string;
-    changeType: 'SalaryChange' | 'JobChange' | 'DataUpdate';
+    employeeId: string;
+    changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate';
     field: string | string[]; // e.g., 'basicSalary', ['jobTitle', 'department']
     oldValue: any;
     newValue: any;

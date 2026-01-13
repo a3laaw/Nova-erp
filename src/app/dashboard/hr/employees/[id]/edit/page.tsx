@@ -175,6 +175,7 @@ export default function EditEmployeePage() {
                     }
 
                     auditLogs.push({
+                        employeeId: id,
                         changeType,
                         field,
                         oldValue: originalValue,
