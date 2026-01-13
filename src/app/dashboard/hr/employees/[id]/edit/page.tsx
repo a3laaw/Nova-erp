@@ -91,13 +91,13 @@ export default function EditEmployeePage() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        let sanitizedValue = value;
+        let sanitizedValue: string | number = value;
         if (id === 'fullName') {
-            // Allow Arabic letters and spaces only
             sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
         } else if (id === 'nameEn') {
-            // Allow English letters and spaces only
             sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
+        } else if (id === 'basicSalary' || id === 'housingAllowance' || id === 'transportAllowance') {
+            sanitizedValue = value; // Keep as string for input control, will be converted to number on submit
         }
         setFormData(prev => prev ? ({ ...prev, [id]: sanitizedValue }) : null);
     };
@@ -125,21 +125,21 @@ export default function EditEmployeePage() {
             const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban'];
             
             fieldsToCompare.forEach(field => {
-                let formValue = formData[field];
-                let originalValue = originalData[field];
+                const originalValue = originalData[field];
+                const formValue = formData[field];
 
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
-                    const formDate = toFirestoreDate(formValue as string);
                     const originalDate = toFirestoreDate(originalValue);
+                    const formDate = toFirestoreDate(formValue as string);
                     
-                    if (formDate?.getTime() !== originalDate?.getTime()) {
-                         updatedEmployeeData[field] = formDate; // Will be saved as Timestamp or null
+                    if (originalDate?.getTime() !== formDate?.getTime()) {
+                         updatedEmployeeData[field] = formDate; 
                     }
                 } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
-                    const formNumValue = Number(formValue) || 0;
                     const originalNumValue = Number(originalValue) || 0;
+                    const formNumValue = Number(formValue) || 0;
 
-                    if (formNumValue !== originalNumValue) {
+                    if (originalNumValue !== formNumValue) {
                         updatedEmployeeData[field] = formNumValue;
                     }
                 } else {
@@ -150,7 +150,7 @@ export default function EditEmployeePage() {
                 
                 // If a change was detected and added to updatedEmployeeData, log it
                 if (updatedEmployeeData.hasOwnProperty(field)) {
-                     let changeType: AuditLog['changeType'] = 'DataUpdate';
+                    let changeType: AuditLog['changeType'] = 'DataUpdate';
                     if (field === 'basicSalary' || field === 'housingAllowance' || field === 'transportAllowance') {
                         changeType = 'SalaryChange';
                     } else if (field === 'jobTitle' || field === 'department' || field === 'position') {
@@ -172,17 +172,25 @@ export default function EditEmployeePage() {
             // Handle conditional allowances
             const housingValue = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
             if(housingValue !== (Number(originalData.housingAllowance) || 0)) {
+                if (!updatedEmployeeData.hasOwnProperty('housingAllowance')) {
+                    // Log change if not already logged
+                     auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'housingAllowance', oldValue: originalData.housingAllowance, newValue: housingValue, effectiveDate, changedBy: currentUser.uid });
+                }
                 updatedEmployeeData.housingAllowance = housingValue;
             }
             const transportValue = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
              if(transportValue !== (Number(originalData.transportAllowance) || 0)) {
+                if (!updatedEmployeeData.hasOwnProperty('transportAllowance')) {
+                    // Log change if not already logged
+                     auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'transportAllowance', oldValue: originalData.transportAllowance, newValue: transportValue, effectiveDate, changedBy: currentUser.uid });
+                }
                 updatedEmployeeData.transportAllowance = transportValue;
             }
 
 
             // Remove null date fields to avoid Firestore errors
             Object.keys(updatedEmployeeData).forEach(key => {
-                if (updatedEmployeeData[key] === null) {
+                if (updatedEmployeeData[key] === null && ['dob', 'residencyExpiry', 'contractExpiry'].includes(key)) {
                    delete updatedEmployeeData[key];
                 }
             });
@@ -204,7 +212,6 @@ export default function EditEmployeePage() {
             } else {
                  toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات.' });
             }
-
             
             router.push(`/dashboard/hr/employees/${id}`);
         } catch (error) {
