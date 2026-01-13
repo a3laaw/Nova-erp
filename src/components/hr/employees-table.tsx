@@ -138,18 +138,16 @@ export function EmployeesTable() {
         if (employeeToTerminate) {
             const hireDate = new Date(employeeToTerminate.hireDate);
             const isProbation = differenceInDays(new Date(), hireDate) <= 90;
-            if (isProbation) {
-                setTerminationReason('probation');
-            } else {
-                setTerminationReason('');
-            }
-             setTerminationDate(new Date().toISOString().split('T')[0]);
-             setIsImmediate(isProbation); // Default to immediate if on probation
+            
+            // Reset state when a new employee is selected for termination
+            setTerminationReason(isProbation ? 'probation' : '');
+            setTerminationDate(new Date().toISOString().split('T')[0]);
+            setIsImmediate(isProbation); // Default to immediate if on probation
+            setNoticeStartDate(new Date().toISOString().split('T')[0]);
         }
     }, [employeeToTerminate]);
     
     const handleTerminateClick = (employee: Employee) => {
-        setNoticeStartDate(new Date().toISOString().split('T')[0]);
         setEmployeeToTerminate(employee);
     };
     
