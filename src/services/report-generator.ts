@@ -99,14 +99,13 @@ function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialV
     return initialValue;
 }
 
-async function reconstructEmployeeState(db: Firestore, employee: Employee, asOfDate: Date): Promise<Employee> {
+async function reconstructEmployeeState(employee: Employee, asOfDate: Date, allAuditLogs: Map<string, AuditLog[]>): Promise<Employee> {
      if (!employee || !employee.id) {
         throw new Error('Invalid employee data provided for reconstruction.');
     }
-    const auditLogsSnapshot = await getDocs(collection(db, `employees/${employee.id}/auditLogs`));
-    const auditLogs = auditLogsSnapshot.docs.map(d => d.data() as AuditLog);
+    const employeeLogs = allAuditLogs.get(employee.id) || [];
     
-    if (auditLogs.length === 0) {
+    if (employeeLogs.length === 0) {
         return { ...employee, auditLogs: [] };
     }
 
@@ -114,10 +113,10 @@ async function reconstructEmployeeState(db: Firestore, employee: Employee, asOfD
     const fieldsToReconstruct: (keyof Employee)[] = ['jobTitle', 'department', 'position', 'basicSalary', 'housingAllowance', 'transportAllowance', 'residencyExpiry', 'contractExpiry', 'visaType', 'contractType', 'iban', 'salaryPaymentType', 'bankName'];
 
     fieldsToReconstruct.forEach(field => {
-        (reconstructed as any)[field] = findValueAsOf(auditLogs, field as string, asOfDate, employee[field as keyof Employee]);
+        (reconstructed as any)[field] = findValueAsOf(employeeLogs, field as string, asOfDate, employee[field as keyof Employee]);
     });
 
-    return { ...employee, ...reconstructed, auditLogs };
+    return { ...employee, ...reconstructed, auditLogs: employeeLogs };
 }
 
 // --- CALCULATION FUNCTIONS ---
@@ -138,18 +137,17 @@ function calculateEosb(employee: Employee, asOfDate: Date, leaveBalance: number)
         gratuity += basicSalary * (yearsOfService - 5); // After 5 years
     }
     
-    // From Article 70 - payment for unused annual leave. Balance is pre-calculated.
-    const validLeaveBalance = Math.max(0, leaveBalance); // Ensure balance is not negative
+    const validLeaveBalance = Math.max(0, leaveBalance); 
     const leavePayout = (basicSalary / 26) * validLeaveBalance;
-    const totalPayout = gratuity + leavePayout;
-
-    // From Article 52 - rules for resignation
+    
+    // Article 52 - rules for resignation
     if (employee.terminationReason === 'resignation' && toDate(employee.terminationDate) && toDate(employee.terminationDate)! <= asOfDate) {
-         if (yearsOfService < 3) return 0; // No gratuity, only leave payout
+         if (yearsOfService < 3) return leavePayout; // No gratuity, only leave payout
          if (yearsOfService < 5) return (gratuity * 0.5) + leavePayout;
          if (yearsOfService < 10) return (gratuity * (2/3)) + leavePayout;
     }
     
+    const totalPayout = gratuity + leavePayout;
     return Math.max(0, totalPayout);
 }
 
@@ -162,13 +160,12 @@ function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveReque
         return 0; // No leave entitlement in the first year
     }
     
-    // Pro-rata accrual based on exact years of service.
     const accruedDays = yearsOfService * 30 + (employee.carriedLeaveDays || 0);
 
     const leavesTaken = allLeaveRequests.filter(lr => 
         lr.employeeId === employee.id && 
         lr.status === 'approved' && 
-        lr.leaveType === 'Annual' && // IMPORTANT: Only count Annual leave against the annual balance
+        lr.leaveType === 'Annual' &&
         toDate(lr.startDate)! <= asOfDate
     );
     
@@ -193,13 +190,28 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
     const asOfDate = parseISO(options.asOfDate);
     asOfDate.setHours(23, 59, 59, 999);
     
-    const allEmployees = await fetchCollection<Employee>(db, 'employees');
-    const allLeaveRequests = await fetchCollection<LeaveRequest>(db, 'leaveRequests');
-    const allHolidays = await fetchCollection<Holiday>(db, 'holidays');
+    // Fetch all collections in parallel for efficiency
+    const [allEmployees, allLeaveRequests, allHolidays, auditLogsSnapshot] = await Promise.all([
+        fetchCollection<Employee>(db, 'employees'),
+        fetchCollection<LeaveRequest>(db, 'leaveRequests'),
+        fetchCollection<Holiday>(db, 'holidays'),
+        getDocs(collectionGroup(db, 'auditLogs'))
+    ]);
+    
     const holidaysSet = new Set(allHolidays.map(h => format(toDate(h.date)!, 'yyyy-MM-dd')));
 
+    // Organize all audit logs by employee ID for quick lookup
+    const allAuditLogs = new Map<string, AuditLog[]>();
+    auditLogsSnapshot.forEach(doc => {
+        const employeeId = doc.ref.parent.parent!.id;
+        if (!allAuditLogs.has(employeeId)) {
+            allAuditLogs.set(employeeId, []);
+        }
+        allAuditLogs.get(employeeId)!.push(doc.data() as AuditLog);
+    });
+
     const processEmployee = async (emp: Employee) => {
-        const reconstructed = await reconstructEmployeeState(db, emp, asOfDate);
+        const reconstructed = await reconstructEmployeeState(emp, asOfDate, allAuditLogs);
         const leaveBalance = calculateLeaveBalance(reconstructed, asOfDate, allLeaveRequests, holidaysSet);
         reconstructed.leaveBalance = leaveBalance;
         reconstructed.eosb = calculateEosb(reconstructed, asOfDate, leaveBalance);
