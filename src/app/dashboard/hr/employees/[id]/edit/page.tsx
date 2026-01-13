@@ -157,7 +157,7 @@ export default function EditEmployeePage() {
                         employeeId: id,
                         changeType,
                         field,
-                        oldValue: originalValue,
+                        oldValue: originalValue === undefined ? null : originalValue,
                         newValue: updatedEmployeeData[field],
                         effectiveDate,
                         changedBy: currentUser.uid,
@@ -168,14 +168,14 @@ export default function EditEmployeePage() {
             const housingValue = includeHousing ? Number(formData.housingAllowance) || 0 : 0;
             if(housingValue !== (Number(originalData.housingAllowance) || 0)) {
                 if (!updatedEmployeeData.hasOwnProperty('housingAllowance')) {
-                     auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'housingAllowance', oldValue: originalData.housingAllowance, newValue: housingValue, effectiveDate, changedBy: currentUser.uid });
+                     auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'housingAllowance', oldValue: originalData.housingAllowance === undefined ? null : originalData.housingAllowance, newValue: housingValue, effectiveDate, changedBy: currentUser.uid });
                 }
                 updatedEmployeeData.housingAllowance = housingValue;
             }
             const transportValue = includeTransport ? Number(formData.transportAllowance) || 0 : 0;
              if(transportValue !== (Number(originalData.transportAllowance) || 0)) {
                 if (!updatedEmployeeData.hasOwnProperty('transportAllowance')) {
-                     auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'transportAllowance', oldValue: originalData.transportAllowance, newValue: transportValue, effectiveDate, changedBy: currentUser.uid });
+                     auditLogs.push({ employeeId: id, changeType: 'SalaryChange', field: 'transportAllowance', oldValue: originalData.transportAllowance === undefined ? null : originalData.transportAllowance, newValue: transportValue, effectiveDate, changedBy: currentUser.uid });
                 }
                 updatedEmployeeData.transportAllowance = transportValue;
             }
@@ -498,7 +498,5 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
-
-    
 
     
