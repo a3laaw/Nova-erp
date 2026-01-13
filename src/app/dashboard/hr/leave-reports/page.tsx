@@ -68,6 +68,24 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
     'Unpaid': 'بدون راتب',
 };
 
+// Safe date conversion utility
+const toDate = (dateValue: any): Date | null => {
+    if (!dateValue) return null;
+    try {
+        const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
+        if (isNaN(d.getTime())) return null;
+        return d;
+    } catch (e) {
+        return null;
+    }
+}
+
+const formatDateForDisplay = (dateValue: any): string => {
+    const d = toDate(dateValue);
+    if (!d) return '-';
+    return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+}
+
 
 export default function LeaveReportsPage() {
     const firestore = useFirestore();
@@ -139,14 +157,12 @@ export default function LeaveReportsPage() {
         }
         
         const filteredData = allRequests.filter(req => {
-            let leaveStart: Date, leaveEnd: Date;
-            try {
-                 leaveStart = req.startDate instanceof Timestamp ? req.startDate.toDate() : new Date(req.startDate);
-                 leaveEnd = req.endDate instanceof Timestamp ? req.endDate.toDate() : new Date(req.endDate);
-                 if(isNaN(leaveStart.getTime()) || isNaN(leaveEnd.getTime())) return false;
-            } catch(e) {
-                return false;
-            }
+            let leaveStart: Date | null, leaveEnd: Date | null;
+            
+            leaveStart = toDate(req.startDate);
+            leaveEnd = toDate(req.endDate);
+
+            if (!leaveStart || !leaveEnd) return false;
             
             // Check for date range overlap
             const overlaps = (leaveStart <= reportEnd) && (leaveEnd >= reportStart);
@@ -159,8 +175,9 @@ export default function LeaveReportsPage() {
 
         // Client-side sorting
         filteredData.sort((a, b) => {
-            const dateA = a.startDate instanceof Timestamp ? a.startDate.toDate() : new Date(a.startDate);
-            const dateB = b.startDate instanceof Timestamp ? b.startDate.toDate() : new Date(b.startDate);
+            const dateA = toDate(a.startDate);
+            const dateB = toDate(b.startDate);
+            if (!dateA || !dateB) return 0;
             return dateB.getTime() - dateA.getTime();
         });
 
@@ -170,15 +187,6 @@ export default function LeaveReportsPage() {
     const totalDays = useMemo(() => {
         return reportData.reduce((acc, req) => acc + (req.workingDays || req.days || 0), 0);
     }, [reportData]);
-
-    const formatDateForDisplay = (dateValue: any): string => {
-        if (!dateValue) return '-';
-        try {
-            const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
-            if (isNaN(d.getTime())) return '-';
-            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
-        } catch (e) { return '-'; }
-    }
     
     const handlePrint = () => {
         window.print();
