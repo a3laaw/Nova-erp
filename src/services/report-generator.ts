@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { 
@@ -246,12 +247,11 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
     const employees = await fetchCollection<Employee>(db, 'employees');
 
     const rows = employees.map(emp => {
-        const residencyExpiry = toDate(emp.residencyExpiry);
-        const contractExpiry = toDate(emp.contractExpiry);
         let alerts: string[] = [];
 
         // Safe check for residency expiry
-        if (residencyExpiry && toDate(residencyExpiry)! > asOfDate) {
+        const residencyExpiry = toDate(emp.residencyExpiry);
+        if (residencyExpiry && residencyExpiry > asOfDate) {
             const residencyDaysDiff = differenceInDays(residencyExpiry, asOfDate);
             if (residencyDaysDiff <= 30) {
                 alerts.push(`⚠️ الإقامة تنتهي خلال ${residencyDaysDiff} يوم`);
@@ -259,7 +259,8 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
         }
 
         // Safe check for contract expiry
-        if (contractExpiry && toDate(contractExpiry)! > asOfDate) {
+        const contractExpiry = toDate(emp.contractExpiry);
+        if (contractExpiry && contractExpiry > asOfDate) {
              const contractDaysDiff = differenceInDays(contractExpiry, asOfDate);
             if (contractDaysDiff <= 30) {
                 alerts.push(`⚠️ العقد ينتهي خلال ${contractDaysDiff} يوم`);
