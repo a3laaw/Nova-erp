@@ -245,11 +245,21 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
         const residencyExpiry = toDate(emp.residencyExpiry);
         const contractExpiry = toDate(emp.contractExpiry);
         let alerts: string[] = [];
-        if (residencyExpiry && differenceInDays(residencyExpiry, asOfDate) <= 30 && differenceInDays(residencyExpiry, asOfDate) > 0) {
-            alerts.push(`⚠️ الإقامة تنتهي خلال ${differenceInDays(residencyExpiry, asOfDate)} يوم`);
+
+        // Safe check for residency expiry
+        if (residencyExpiry) {
+            const residencyDaysDiff = differenceInDays(residencyExpiry, asOfDate);
+            if (residencyDaysDiff <= 30 && residencyDaysDiff > 0) {
+                alerts.push(`⚠️ الإقامة تنتهي خلال ${residencyDaysDiff} يوم`);
+            }
         }
-        if (contractExpiry && differenceInDays(contractExpiry, asOfDate) <= 30 && differenceInDays(contractExpiry, asOfDate) > 0) {
-            alerts.push(`⚠️ العقد ينتهي خلال ${differenceInDays(contractExpiry, asOfDate)} يوم`);
+
+        // Safe check for contract expiry
+        if (contractExpiry) {
+             const contractDaysDiff = differenceInDays(contractExpiry, asOfDate);
+            if (contractDaysDiff <= 30 && contractDaysDiff > 0) {
+                alerts.push(`⚠️ العقد ينتهي خلال ${contractDaysDiff} يوم`);
+            }
         }
         
         return {
@@ -289,5 +299,3 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             throw new Error(`نوع التقرير غير معروف: ${exhaustiveCheck}`);
     }
 }
-
-    
