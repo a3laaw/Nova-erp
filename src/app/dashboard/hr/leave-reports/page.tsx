@@ -157,10 +157,8 @@ export default function LeaveReportsPage() {
         }
         
         const filteredData = allRequests.filter(req => {
-            let leaveStart: Date | null, leaveEnd: Date | null;
-            
-            leaveStart = toDate(req.startDate);
-            leaveEnd = toDate(req.endDate);
+            const leaveStart = toDate(req.startDate);
+            const leaveEnd = toDate(req.endDate);
 
             if (!leaveStart || !leaveEnd) return false;
             
@@ -338,7 +336,3 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
-
-    
-
-    
