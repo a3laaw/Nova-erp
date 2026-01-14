@@ -15,7 +15,7 @@ import {
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
 import { format, differenceInYears, eachDayOfInterval, isFriday, intervalToDuration, parseISO, differenceInDays } from 'date-fns';
 
-export type ReportType = 'EmployeeDossier' | 'EmployeeRoster' | 'SalaryChange' | 'JobChange' | 'ResidencyRenewal';
+export type ReportType = 'EmployeeDossier' | 'EmployeeRoster';
 
 export interface ReportHeader {
     key: string;
@@ -31,7 +31,7 @@ export interface ReportFooter {
 }
 
 export interface StandardReportData {
-    type: 'EmployeeRoster' | 'SalaryChange' | 'JobChange' | 'ResidencyRenewal';
+    type: 'EmployeeRoster';
     title: string;
     subtitle: string;
     headers: ReportHeader[];
@@ -53,8 +53,6 @@ export type ReportData = StandardReportData | DossierReportData | BulkReportData
 
 interface ReportOptions {
     asOfDate: string;
-    dateFrom?: string;
-    dateTo?: string;
     employeeId?: string;
     statusFilter?: 'active' | 'all';
 }
@@ -104,9 +102,8 @@ async function reconstructEmployeeState(employee: Employee, asOfDate: Date, allA
     }
     const employeeLogs = allAuditLogs.get(employee.id) || [];
     
-    if (employeeLogs.length === 0) {
-        return { ...employee, auditLogs: [] };
-    }
+    // Sort logs by date to ensure correct historical reconstruction
+    employeeLogs.sort((a, b) => toDate(a.effectiveDate)!.getTime() - toDate(b.effectiveDate)!.getTime());
 
     const reconstructed: Partial<Employee> = {};
     const fieldsToReconstruct: (keyof Employee)[] = ['jobTitle', 'department', 'position', 'basicSalary', 'housingAllowance', 'transportAllowance', 'residencyExpiry', 'contractExpiry', 'visaType', 'contractType', 'iban', 'salaryPaymentType', 'bankName'];
@@ -239,125 +236,6 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
     }
 }
 
-async function generateAuditLogReport(db: Firestore, options: ReportOptions, changeType: 'SalaryChange' | 'JobChange' | 'ResidencyRenewal'): Promise<StandardReportData> {
-    const { dateFrom, dateTo } = options;
-    if (!dateFrom || !dateTo) {
-        throw new Error("Date range is required for audit log reports.");
-    }
-    
-    const startDate = parseISO(dateFrom);
-    startDate.setHours(0,0,0,0);
-    const endDate = parseISO(dateTo);
-    endDate.setHours(23,59,59,999);
-
-    const headersMap: Record<string, ReportHeader[]> = {
-        'SalaryChange': [
-            { key: 'employeeName', label: 'الموظف' },
-            { key: 'effectiveDate', label: 'تاريخ السريان', type: 'date' },
-            { key: 'oldBasicSalary', label: 'الراتب الأساسي القديم', type: 'currency' },
-            { key: 'newBasicSalary', label: 'الراتب الأساسي الجديد', type: 'currency' },
-            { key: 'changedBy', label: 'تم التغيير بواسطة' },
-        ],
-        'JobChange': [
-            { key: 'employeeName', label: 'الموظف' },
-            { key: 'effectiveDate', label: 'تاريخ السريان', type: 'date' },
-            { key: 'oldJobTitle', label: 'المسمى الوظيفي القديم' },
-            { key: 'newJobTitle', label: 'المسمى الوظيفي الجديد' },
-            { key: 'oldDepartment', label: 'القسم القديم' },
-            { key: 'newDepartment', label: 'القسم الجديد' },
-        ],
-        'ResidencyRenewal': [
-            { key: 'employeeName', label: 'الموظف' },
-            { key: 'effectiveDate', label: 'تاريخ التجديد', type: 'date' },
-            { key: 'oldValue', label: 'تاريخ الانتهاء القديم', type: 'date' },
-            { key: 'newValue', label: 'تاريخ الانتهاء الجديد', type: 'date' },
-        ],
-    };
-    
-    const finalHeaders = headersMap[changeType];
-    const fieldToFilter = changeType === 'ResidencyRenewal' ? 'residencyExpiry' : undefined;
-    const typeToFilter = changeType === 'ResidencyRenewal' ? 'DataUpdate' : changeType;
-
-
-    let auditLogsQuery = query(
-        collectionGroup(db, 'auditLogs'),
-        where('effectiveDate', '>=', startDate),
-        where('effectiveDate', '<=', endDate),
-        orderBy('effectiveDate', 'desc')
-    );
-
-    if (typeToFilter) {
-         auditLogsQuery = query(auditLogsQuery, where('changeType', '==', typeToFilter));
-    }
-    if(fieldToFilter){
-        auditLogsQuery = query(auditLogsQuery, where('field', '==', fieldToFilter));
-    }
-
-    const auditLogsSnapshot = await getDocs(auditLogsQuery);
-    if (auditLogsSnapshot.empty) {
-        return {
-            type: changeType,
-            title: `تقرير ${changeType === 'SalaryChange' ? 'تغيرات الرواتب' : changeType === 'JobChange' ? 'التغييرات الوظيفية' : 'تجديد الإقامات'}`,
-            subtitle: `للفترة من ${format(startDate, 'dd/MM/yyyy')} إلى ${format(endDate, 'dd/MM/yyyy')}`,
-            headers: finalHeaders,
-            rows: []
-        };
-    }
-    
-    const employeeIds = [...new Set(auditLogsSnapshot.docs.map(log => (log.data() as AuditLog & {employeeId: string}).employeeId))];
-    const employeesSnapshot = await getDocs(query(collection(db, 'employees'), where('__name__', 'in', employeeIds)));
-    const employeesMap = new Map(employeesSnapshot.docs.map(doc => [doc.id, doc.data() as Employee]));
-
-    const rows = auditLogsSnapshot.docs.map(logDoc => {
-        const log = logDoc.data() as AuditLog & {employeeId: string};
-        const { employeeId } = log;
-        const employee = employeesMap.get(employeeId);
-        
-        const baseRow = {
-            id: logDoc.id,
-            employeeName: employee?.fullName || `موظف (ID: ${employeeId})`,
-            effectiveDate: toDate(log.effectiveDate),
-            changedBy: log.changedBy || 'نظام',
-        };
-
-        if (changeType === 'SalaryChange') {
-            return {
-                ...baseRow,
-                oldBasicSalary: log.oldValue,
-                newBasicSalary: log.newValue,
-            };
-        }
-        
-        if (changeType === 'JobChange') {
-            return {
-                ...baseRow,
-                oldJobTitle: log.oldValue?.jobTitle ?? '-',
-                newJobTitle: log.newValue?.jobTitle ?? '-',
-                oldDepartment: log.oldValue?.department ?? '-',
-                newDepartment: log.newValue?.department ?? '-',
-            };
-        }
-
-        if (changeType === 'ResidencyRenewal') {
-             return {
-                ...baseRow,
-                oldValue: log.oldValue,
-                newValue: log.newValue,
-            };
-        }
-        
-        return baseRow;
-    });
-
-    return {
-        type: changeType,
-        title: `تقرير ${changeType === 'SalaryChange' ? 'تغيرات الرواتب' : changeType === 'JobChange' ? 'التغييرات الوظيفية' : 'تجديد الإقامات'}`,
-        subtitle: `للفترة من ${format(startDate, 'dd/MM/yyyy')} إلى ${format(endDate, 'dd/MM/yyyy')}`,
-        headers: finalHeaders,
-        rows: rows
-    };
-}
-
 
 async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Promise<StandardReportData> {
     const asOfDate = parseISO(options.asOfDate);
@@ -405,13 +283,11 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             return generateEmployeeDossier(db, options);
         case 'EmployeeRoster':
             return generateEmployeeRoster(db, options);
-        case 'SalaryChange':
-        case 'JobChange':
-        case 'ResidencyRenewal':
-            return generateAuditLogReport(db, options, reportType);
         default:
             // This is a type guard, should not be reached if all cases are handled
             const exhaustiveCheck: never = reportType;
             throw new Error(`نوع التقرير غير معروف: ${exhaustiveCheck}`);
     }
 }
+
+    

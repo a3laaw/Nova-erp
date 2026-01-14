@@ -33,9 +33,6 @@ import { EmployeeDossier } from '@/components/hr/employee-dossier';
 const REPORT_TYPES: { value: ReportType, label: string }[] = [
     { value: 'EmployeeDossier', label: 'الملف الشامل للموظف' },
     { value: 'EmployeeRoster', label: 'ملخص جميع الموظفين' },
-    { value: 'SalaryChange', label: 'تقرير تغيرات الرواتب' },
-    { value: 'JobChange', label: 'تقرير التغييرات الوظيفية' },
-    { value: 'ResidencyRenewal', label: 'تقرير تجديد الإقامات' },
 ];
 
 export default function ReportsPage() {
@@ -48,21 +45,12 @@ export default function ReportsPage() {
     // State for point-in-time reports
     const [asOfDate, setAsOfDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     
-    // State for date-range reports
-    const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-    const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
-
     const [isGenerating, setIsGenerating] = useState(false);
     const [reportData, setReportData] = useState<ReportData | BulkReportData | null>(null);
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
-
-    const isDateRangeReport = useMemo(() => {
-        return ['SalaryChange', 'ResidencyRenewal', 'JobChange'].includes(reportType);
-    }, [reportType]);
-
 
     useEffect(() => {
         if (!firestore) return;
@@ -93,8 +81,6 @@ export default function ReportsPage() {
         
         const options = {
             asOfDate,
-            dateFrom: isDateRangeReport ? dateFrom : undefined,
-            dateTo: isDateRangeReport ? dateTo : undefined,
             employeeId: selectedEmployeeId,
             statusFilter: statusFilter
         };
@@ -130,7 +116,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
                 <div className="bg-muted/50 p-4 rounded-lg mb-6 print:hidden">
-                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end'>
+                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end'>
                         <div className="grid gap-2">
                             <Label htmlFor="reportType">نوع التقرير</Label>
                              <Select dir="rtl" value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
@@ -143,25 +129,12 @@ export default function ReportsPage() {
                             </Select>
                         </div>
                         
-                        {isDateRangeReport ? (
-                            <>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dateFrom">من تاريخ</Label>
-                                    <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dateTo">إلى تاريخ</Label>
-                                    <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                                </div>
-                            </>
-                        ) : (
-                             <div className="grid gap-2">
-                                <Label htmlFor="asOfDate">تاريخ التقرير</Label>
-                                <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
-                            </div>
-                        )}
+                         <div className="grid gap-2">
+                            <Label htmlFor="asOfDate">تاريخ التقرير</Label>
+                            <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+                        </div>
                         
-                        {reportType !== 'EmployeeRoster' && (
+                        {reportType === 'EmployeeDossier' && (
                              <div className="grid gap-2">
                                 <Label htmlFor="employeeFilter">تحديد موظف</Label>
                                 <Select dir="rtl" value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
@@ -189,7 +162,7 @@ export default function ReportsPage() {
                              </div>
                         )}
                        
-                        <Button onClick={handleGenerateReport} disabled={isGenerating} className="lg:col-start-5">
+                        <Button onClick={handleGenerateReport} disabled={isGenerating}>
                             {isGenerating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}
                             {isGenerating ? 'جاري الإنشاء...' : 'إنشاء التقرير'}
                         </Button>
@@ -223,7 +196,7 @@ export default function ReportsPage() {
                                 ))}
                             </div>
                         )}
-                         {['EmployeeRoster', 'SalaryChange', 'JobChange', 'ResidencyRenewal'].includes(reportData.type) && 'rows' in reportData && (
+                         {reportData.type === 'EmployeeRoster' && 'rows' in reportData && (
                             <ReportResults reportData={reportData} />
                         )}
                     </>

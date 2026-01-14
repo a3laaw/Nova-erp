@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import type { Employee } from '@/lib/types';
+import type { Employee, AuditLog } from '@/lib/types';
 import { format, intervalToDuration } from 'date-fns';
 import { Logo } from '../layout/logo';
 import { formatCurrency } from '@/lib/utils';
@@ -46,7 +46,7 @@ function Section({ title, icon, children }: { title: string, icon: React.ReactNo
 }
 
 function InfoItem({ label, value, className = '' }: { label: string, value: React.ReactNode | string | number | null | undefined, className?: string }) {
-    if (!value && typeof value !== 'number') return null;
+    if (value === null || value === undefined || value === '') return null;
     return (
         <div className={`flex justify-between items-center ${className}`}>
             <span className="text-muted-foreground">{label}:</span>
@@ -119,10 +119,11 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                  {employee.auditLogs && employee.auditLogs.length > 0 && (
                      <Section title="السجل الزمني للتغييرات" icon={<History />}>
                         <div className='md:col-span-2 space-y-3'>
-                            {employee.auditLogs.map((log: any) => (
-                                <div key={log.id} className="text-xs p-2 rounded-md bg-muted/50">
+                            {employee.auditLogs.map((log: any, index: number) => (
+                                <div key={log.id || index} className="text-xs p-2 rounded-md bg-muted/50">
                                     <span className="font-semibold text-primary">{formatDate(toDate(log.effectiveDate))}</span>: 
-                                    تغيير في <span className='font-semibold'>"{log.field}"</span> من <span className='font-mono'>{log.oldValue || '-'}</span> إلى <span className='font-mono'>{log.newValue || '-'}</span>
+                                    تغيير في <span className='font-semibold'>"{log.field}"</span> من <span className='font-mono text-muted-foreground'>{log.oldValue !== null ? String(log.oldValue) : '-'}</span> إلى <span className='font-mono'>{log.newValue !== null ? String(log.newValue) : '-'}</span>
+                                    {log.changeType === 'Creation' && <span>(إنشاء ملف)</span>}
                                 </div>
                             ))}
                         </div>
@@ -133,7 +134,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                  <Section title="حالة الإجازات" icon={<Calendar />}>
                      <div className="md:col-span-2 bg-muted/50 p-3 rounded-md text-center">
                         <p className="text-muted-foreground">رصيد الإجازات السنوية المتاح حتى تاريخ التقرير</p>
-                        <p className="text-2xl font-bold text-primary">{employee.leaveBalance} يوم</p>
+                        <p className="text-2xl font-bold text-primary">{employee.leaveBalance?.toFixed(0) ?? 0} يوم</p>
                     </div>
 
                     {employee.lastLeave && (
@@ -169,3 +170,5 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
     </div>
   );
 }
+
+    
