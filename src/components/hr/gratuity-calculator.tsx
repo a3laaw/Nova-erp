@@ -32,9 +32,13 @@ type TerminationReason = 'resignation' | 'termination';
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     if (!employee || !employee.hireDate) return 0;
     
-    // Use a client-side safe date
+    // Safely convert hireDate from either a string or a Firestore Timestamp
+    const hireDate = employee.hireDate.toDate ? employee.hireDate.toDate() : new Date(employee.hireDate);
+    if (isNaN(hireDate.getTime())) {
+        return 0; // Invalid hire date
+    }
+
     const today = new Date();
-    const hireDate = new Date(employee.hireDate);
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
     if (yearsOfService < 1) {
@@ -89,7 +93,11 @@ export function GratuityCalculator() {
   const selectedEmployee = useMemo(() => {
     const emp = employees.find((emp) => emp.id === selectedEmployeeId) || null;
     if (emp && emp.status === 'terminated' && emp.terminationDate) {
-        setTerminationDate(new Date(emp.terminationDate).toISOString().split('T')[0]);
+        // Safely convert terminationDate from either a string or a Firestore Timestamp
+        const termDate = emp.terminationDate.toDate ? emp.terminationDate.toDate() : new Date(emp.terminationDate);
+        if (!isNaN(termDate.getTime())) {
+             setTerminationDate(termDate.toISOString().split('T')[0]);
+        }
         setTerminationReason(emp.terminationReason as TerminationReason);
     }
     return emp;
@@ -100,7 +108,13 @@ export function GratuityCalculator() {
       return null;
     }
 
-    const hireDate = new Date(selectedEmployee.hireDate);
+    const hireDateSource = selectedEmployee.hireDate;
+    const hireDate = hireDateSource.toDate ? hireDateSource.toDate() : new Date(hireDateSource);
+
+    if (isNaN(hireDate.getTime())) {
+        return { error: 'تاريخ التعيين للموظف المحدد غير صالح.' };
+    }
+    
     const termDate = new Date(terminationDate);
 
     if (termDate < hireDate) {
@@ -115,8 +129,7 @@ export function GratuityCalculator() {
 
     // From Article 51 of Kuwait Labor Law
     const basicSalary = selectedEmployee.basicSalary || 0;
-    const totalRemuneration = basicSalary + (selectedEmployee.housingAllowance || 0) + (selectedEmployee.transportAllowance || 0);
-
+    
     let gratuity = 0;
     
     // First 5 years: 15 days pay for each year
