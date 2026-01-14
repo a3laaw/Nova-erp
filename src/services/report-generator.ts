@@ -228,7 +228,11 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
     } else {
         let filteredEmployees = allEmployees;
         if (options.statusFilter === 'active') {
-            filteredEmployees = allEmployees.filter(e => e.status === 'active');
+            filteredEmployees = allEmployees.filter(e => {
+                const termDate = toDate(e.terminationDate);
+                // Active if status is active, OR if terminated in the future
+                return e.status === 'active' || (termDate && termDate > asOfDate);
+            });
         }
         
         const dossiers = await Promise.all(filteredEmployees.map(emp => processEmployee(emp)));
@@ -247,17 +251,17 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
         let alerts: string[] = [];
 
         // Safe check for residency expiry
-        if (residencyExpiry) {
+        if (residencyExpiry && toDate(residencyExpiry)! > asOfDate) {
             const residencyDaysDiff = differenceInDays(residencyExpiry, asOfDate);
-            if (residencyDaysDiff <= 30 && residencyDaysDiff > 0) {
+            if (residencyDaysDiff <= 30) {
                 alerts.push(`⚠️ الإقامة تنتهي خلال ${residencyDaysDiff} يوم`);
             }
         }
 
         // Safe check for contract expiry
-        if (contractExpiry) {
+        if (contractExpiry && toDate(contractExpiry)! > asOfDate) {
              const contractDaysDiff = differenceInDays(contractExpiry, asOfDate);
-            if (contractDaysDiff <= 30 && contractDaysDiff > 0) {
+            if (contractDaysDiff <= 30) {
                 alerts.push(`⚠️ العقد ينتهي خلال ${contractDaysDiff} يوم`);
             }
         }
