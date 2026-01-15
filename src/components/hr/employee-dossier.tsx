@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import type { Employee } from '@/lib/types';
+import type { Employee, AuditLog } from '@/lib/types';
 import { format, intervalToDuration } from 'date-fns';
 import { Logo } from '../layout/logo';
 import { formatCurrency } from '@/lib/utils';
@@ -187,5 +187,3 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
     </div>
   );
 }
-
-    
