@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -39,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addMonths, format, differenceInYears, differenceInDays } from 'date-fns';
+import { addMonths, format, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
@@ -66,30 +65,28 @@ const terminationReasons: Record<string, string> = {
 
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
     if (!employee.hireDate) return 0;
-    
-    // Use the safe converter
+
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
-
-    const yearsOfService = differenceInYears(new Date(), hireDate);
     
-    // As per Kuwait law, no leave entitlement in the first year of service
-    if (yearsOfService < 1) {
+    // Per Kuwait labor law, an employee is eligible for leave after 9 months of service.
+    // Before that, the balance is effectively 0 for taking leave.
+    const daysOfService = differenceInDays(new Date(), hireDate);
+    if (daysOfService < 270) {
         return 0;
     }
-    
-    // Assuming accrual logic has been handled server-side or via a batch job
-    // and stored in the employee document.
-    const accrued = employee.annualLeaveAccrued || 0;
+
+    // Leave accrues at a rate of 30 days per year.
+    const totalAccrued = (daysOfService / 365.25) * 30;
+
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
-    // Max carry-over is 15 days, total balance cannot exceed 45 (30 current + 15 carried).
-    const effectiveCarried = Math.min(carried, 15);
-    const totalEntitlement = accrued + effectiveCarried;
-    const balance = totalEntitlement - used;
-    
-    return Math.max(0, Math.min(45, Math.floor(balance)));
+    const balance = totalAccrued + carried - used;
+
+    // As per law, total leave balance (including carried over) can be limited by company policy.
+    // We will show the raw calculated balance.
+    return Math.floor(Math.max(0, balance));
 };
 
 export function EmployeesTable() {

@@ -27,10 +27,11 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, addDoc, updateDoc, doc, serverTimestamp, getDocs, type DocumentData, Timestamp } from 'firebase/firestore';
 import type { Employee, LeaveRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInCalendarDays, format } from 'date-fns';
+import { differenceInCalendarDays, format, differenceInDays } from 'date-fns';
 import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -116,12 +117,29 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     
     const currentBalance = useMemo(() => {
         if (!selectedEmployee) return 0;
-        const accrued = selectedEmployee.annualLeaveAccrued || 0;
+
+        const hireDate = toFirestoreDate(selectedEmployee.hireDate);
+        if (!hireDate) return 0;
+
+        const daysOfService = differenceInDays(new Date(), hireDate);
+        
+        // Employee can only apply for annual leave after 9 months.
+        if (daysOfService < 270) {
+            return 0;
+        }
+        
+        const totalAccrued = (daysOfService / 365.25) * 30;
+
         const used = selectedEmployee.annualLeaveUsed || 0;
         const carried = selectedEmployee.carriedLeaveDays || 0;
-        // If editing an approved annual leave, add its days back to the current balance for recalculation
+
+        // If we are editing a previously approved request, we need to temporarily add its days back
+        // to the balance to show the correct state *before* this request is (re)submitted.
         const daysToExclude = isEditing && requestToEdit?.leaveType === 'Annual' && requestToEdit?.status === 'approved' && requestToEdit?.workingDays ? requestToEdit.workingDays : 0;
-        return (accrued + carried) - (used - daysToExclude);
+
+        const balance = totalAccrued + carried - (used - daysToExclude);
+
+        return Math.floor(Math.max(0, balance));
     }, [selectedEmployee, isEditing, requestToEdit]);
 
     const remainingBalance = useMemo(() => {
@@ -171,11 +189,23 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                     where('status', 'in', ['pending', 'approved'])
                 );
                 const existingRequestsSnapshot = await getDocs(existingRequestsQuery);
-                if (!existingRequestsSnapshot.empty) {
+                const overlappingRequest = existingRequestsSnapshot.docs.some(doc => {
+                    const req = doc.data();
+                    const reqStart = toFirestoreDate(req.startDate);
+                    const reqEnd = toFirestoreDate(req.endDate);
+                    const newStart = toFirestoreDate(startDate);
+                    const newEnd = toFirestoreDate(endDate);
+                    if (reqStart && reqEnd && newStart && newEnd) {
+                        // Check for overlap: (StartA <= EndB) and (EndA >= StartB)
+                        return newStart <= reqEnd && newEnd >= reqStart;
+                    }
+                    return false;
+                });
+                if (overlappingRequest) {
                     toast({
                         variant: 'destructive',
-                        title: 'طلب مكرر',
-                        description: 'لدى هذا الموظف بالفعل طلب إجازة معلق أو مقبول. لا يمكن إنشاء طلب جديد.',
+                        title: 'طلب متعارض',
+                        description: 'لدى هذا الموظف بالفعل طلب إجازة معتمد أو معلق يتعارض مع هذه التواريخ.',
                     });
                     setIsSaving(false);
                     return;

@@ -25,33 +25,31 @@ import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
-import { intervalToDuration, differenceInYears } from 'date-fns';
+import { intervalToDuration, differenceInDays } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 
 type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
-    if (!employee) return 0;
+    if (!employee || !employee.hireDate) return 0;
 
-    // Use the safe converter here
     const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) {
-        return 0; 
-    }
+    if (!hireDate) return 0;
 
-    const today = new Date();
-    const yearsOfService = differenceInYears(today, hireDate);
-
-    if (yearsOfService < 1) {
+    // Per Kuwait labor law, an employee is eligible for leave after 9 months of service.
+    const daysOfService = differenceInDays(new Date(), hireDate);
+    if (daysOfService < 270) {
         return 0;
     }
+
+    // Leave accrues at a rate of 30 days per year.
+    const totalAccrued = (daysOfService / 365.25) * 30;
     
-    const accrued = employee.annualLeaveAccrued || 0;
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
-    const totalBalance = accrued + carried - used;
+    const totalBalance = totalAccrued + carried - used;
     
     return Math.floor(Math.max(0, totalBalance));
 };
