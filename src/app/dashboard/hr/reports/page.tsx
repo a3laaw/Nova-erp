@@ -19,16 +19,17 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Search, ArrowRight, FileText } from 'lucide-react';
+import { Loader2, Search, ArrowRight, FileText, Printer } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { ReportResults } from '@/components/hr/report-results';
-import { generateReport, ReportData, ReportType, BulkReportData } from '@/services/report-generator';
+import { generateReport, ReportData, ReportType, BulkReportData, generateReportHTML } from '@/services/report-generator';
 import type { Employee } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
+import html2pdf from 'html2pdf.js';
 
 const REPORT_TYPES: { value: ReportType, label: string }[] = [
     { value: 'EmployeeDossier', label: 'الملف الشامل للموظف' },
@@ -104,6 +105,34 @@ export default function ReportsPage() {
         }
     };
     
+    const handlePrint = () => {
+        if (!reportData) return;
+
+        const date = parseISO(asOfDate);
+        let htmlContent = '';
+        let filename = `report_${format(date, 'yyyy-MM-dd')}.pdf`;
+        
+        if (reportData.type === 'EmployeeDossier' && reportData.employee) {
+            htmlContent = generateReportHTML(reportData.employee, date);
+            filename = `dossier_${reportData.employee.fullName?.replace(' ','_')}_${format(date, 'yyyy-MM-dd')}.pdf`
+        } else if (reportData.type === 'BulkEmployeeDossiers') {
+            htmlContent = reportData.dossiers.map(emp => generateReportHTML(emp, date)).join('<div class="html2pdf__page-break"></div>');
+            filename = `bulk_dossiers_${format(date, 'yyyy-MM-dd')}.pdf`;
+        } else {
+            // Fallback for standard reports - print the visible table
+            const reportElement = document.getElementById('report-content-to-print');
+            if (reportElement) {
+                 html2pdf().from(reportElement).set({ filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { orientation: 'portrait' } }).save();
+            }
+            return;
+        }
+
+        html2pdf().from(htmlContent).set({ filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }, margin: 0.5 }).save();
+    };
+
+    const isPrintable = reportData && (reportData.type === 'EmployeeDossier' || reportData.type === 'BulkEmployeeDossiers' || reportData.type === 'EmployeeRoster');
+
+
   return (
     <div className='space-y-6'>
          <Button variant="outline" onClick={() => router.push('/dashboard/hr')} className="print:hidden">
@@ -181,29 +210,40 @@ export default function ReportsPage() {
                         </p>
                     </div>
                 )}
-
-                {reportData && !isGenerating && (
-                    <>
-                        {reportData.type === 'EmployeeDossier' && reportData.employee && (
-                           <EmployeeDossier employee={reportData.employee} reportDate={parseISO(asOfDate)} />
-                        )}
-                        {reportData.type === 'BulkEmployeeDossiers' && (
-                            <div className='space-y-8'>
-                                <div className="p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm print:hidden">
-                                   تم إنشاء تقرير جماعي لـ <span className='font-bold'>{reportData.dossiers.length}</span> موظفين. كل تقرير سيظهر في صفحة منفصلة عند الطباعة.
+                 
+                 <div id="report-content-to-print">
+                    {reportData && !isGenerating && (
+                        <div className="space-y-4">
+                             <div className='p-4 flex justify-between items-center print:p-0 print:mb-4'>
+                                <div>
+                                    <h3 className='font-bold text-lg'>{reportData.type === 'EmployeeDossier' ? 'ملف الموظف الشامل' : reportData.type === 'BulkEmployeeDossiers' ? `تقرير جماعي لـ ${reportData.dossiers.length} موظفين` : (reportData as StandardReportData).title}</h3>
+                                    <p className='text-sm text-muted-foreground' dir='ltr'>As of: {format(parseISO(asOfDate), "dd/MM/yyyy")}</p>
                                 </div>
-                                {reportData.dossiers.map(emp => (
-                                    <div key={emp.id} className="page-break print:break-before-page">
-                                         <EmployeeDossier employee={emp} reportDate={parseISO(asOfDate)} />
-                                    </div>
-                                ))}
+                                <Button variant="outline" onClick={handlePrint} className="print:hidden" disabled={!isPrintable}>
+                                    <Printer className="ml-2 h-4 w-4" />
+                                    طباعة
+                                </Button>
                             </div>
-                        )}
-                         {reportData.type === 'EmployeeRoster' && 'rows' in reportData && (
-                            <ReportResults reportData={reportData} />
-                        )}
-                    </>
-                )}
+
+                            {reportData.type === 'EmployeeDossier' && reportData.employee && (
+                            <EmployeeDossier employee={reportData.employee} reportDate={parseISO(asOfDate)} />
+                            )}
+                            {reportData.type === 'BulkEmployeeDossiers' && (
+                                <div className='space-y-8'>
+                                    {reportData.dossiers.map(emp => (
+                                        <div key={emp.id} className="page-break print:break-before-page">
+                                            <EmployeeDossier employee={emp} reportDate={parseISO(asOfDate)} />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {reportData.type === 'EmployeeRoster' && 'rows' in reportData && (
+                                <ReportResults reportData={reportData} />
+                            )}
+                        </div>
+                    )}
+                 </div>
+                
 
                 {!reportData && !isGenerating && (
                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
