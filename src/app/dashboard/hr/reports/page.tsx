@@ -40,34 +40,33 @@ const REPORT_TYPES: { value: ReportType; label: string }[] = [
 
 
 // --- STATIC HTML GENERATOR HELPER FUNCTIONS ---
-const renderInfoItem = (label: string, value: string | number | null | undefined): string => {
-  if (value === null || value === undefined || value === '') return '';
-  return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
-            <span style="color: #64748b;">${label}:</span>
-            <span style="font-weight: 600;">${value}</span>
-          </div>`;
-};
-
-const renderSection = (title: string, content: string): string => {
-    return `<div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">${title}</h3>
-                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px;">
-                    ${content}
-                </div>
-            </div>`;
-}
-
-// A version of renderInfoItem that uses fromFirestoreDate
-const renderInfoV2 = (label: string, value: string | null | undefined): string => {
-  if (value === null || value === undefined || value === '') return '';
-  return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
-            <span style="color: #64748b;">${label}:</span>
-            <span style="font-weight: 600;">${value}</span>
-          </div>`;
-};
-
-
+// This function is now located here to avoid server-action conflicts.
 function generateReportHTML(employee: Employee, reportDate: Date): string {
+    const renderInfoItem = (label: string, value: string | number | null | undefined): string => {
+        if (value === null || value === undefined || value === '') return '';
+        return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                    <span style="color: #64748b;">${label}:</span>
+                    <span style="font-weight: 600;">${value}</span>
+                </div>`;
+    };
+
+    const renderSection = (title: string, content: string): string => {
+        return `<div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">${title}</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px;">
+                        ${content}
+                    </div>
+                </div>`;
+    }
+
+    const renderInfoV2 = (label: string, value: string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '';
+    return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                <span style="color: #64748b;">${label}:</span>
+                <span style="font-weight: 600;">${value}</span>
+            </div>`;
+    };
+
   const {
     fullName, civilId, nameEn, dob, gender, mobile, emergencyContact, email,
     department, jobTitle, position, hireDate, contractType, contractExpiry, visaType, residencyExpiry,
@@ -392,5 +391,7 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
 
     
