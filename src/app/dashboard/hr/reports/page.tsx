@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Search, ArrowRight, FileText } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { ReportResults } from '@/components/hr/report-results';
 import { generateReport, ReportData, ReportType, BulkReportData } from '@/services/report-generator';
@@ -217,5 +217,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
