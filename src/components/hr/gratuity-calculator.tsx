@@ -29,13 +29,15 @@ import { intervalToDuration } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 
-type TerminationReason = 'resignation' | 'termination';
+type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     if (!employee) return 0;
 
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return 0; // Return 0 if hire date is invalid
+    const hireDate = toFirestoreDate(employee.hireDate as any);
+    if (!hireDate) {
+        return 0; 
+    }
 
     const today = new Date();
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
@@ -61,7 +63,7 @@ export function GratuityCalculator() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   
   const [terminationDate, setTerminationDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [terminationReason, setTerminationReason] = useState<TerminationReason | null>(null);
+  const [terminationReason, setTerminationReason] = useState<TerminationReason>(null);
 
   useEffect(() => {
     if (!firestore) return;
@@ -74,7 +76,7 @@ export function GratuityCalculator() {
             querySnapshot.forEach((doc) => {
                 fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
             });
-            // Filter on the client side
+            // Filter on the client side to include active and terminated employees for calculation
             const filteredEmployees = fetchedEmployees.filter(emp => emp.status === 'active' || emp.status === 'terminated');
             setEmployees(filteredEmployees);
         } catch(e) {
@@ -88,23 +90,31 @@ export function GratuityCalculator() {
 
 
   const selectedEmployee = useMemo(() => {
-    const emp = employees.find((emp) => emp.id === selectedEmployeeId) || null;
-    if (emp && emp.status === 'terminated') {
-        const termDateStr = fromFirestoreDate(emp.terminationDate);
+    return employees.find((emp) => emp.id === selectedEmployeeId) || null;
+  }, [selectedEmployeeId, employees]);
+
+  // Effect to update form when a terminated employee is selected
+   useEffect(() => {
+    if (selectedEmployee && selectedEmployee.status === 'terminated') {
+        const termDateStr = fromFirestoreDate(selectedEmployee.terminationDate);
         if (termDateStr) {
              setTerminationDate(termDateStr);
         }
-        setTerminationReason(emp.terminationReason as TerminationReason);
+        setTerminationReason(selectedEmployee.terminationReason);
+    } else if (selectedEmployee && selectedEmployee.status === 'active') {
+        // Reset to defaults for active employees
+        setTerminationDate(new Date().toISOString().split('T')[0]);
+        setTerminationReason(null);
     }
-    return emp;
-  }, [selectedEmployeeId, employees]);
+  }, [selectedEmployee]);
+
 
   const calculationResult = useMemo(() => {
     if (!selectedEmployee || !terminationDate || !terminationReason) {
       return null;
     }
 
-    const hireDate = toFirestoreDate(selectedEmployee.hireDate);
+    const hireDate = toFirestoreDate(selectedEmployee.hireDate as any);
 
     if (!hireDate) {
         return { error: 'تاريخ التعيين للموظف المحدد غير صالح.' };
@@ -199,17 +209,19 @@ export function GratuityCalculator() {
               type="date"
               value={terminationDate}
               onChange={(e) => setTerminationDate(e.target.value)}
+               disabled={selectedEmployee?.status === 'terminated'}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="termination-reason">سبب انتهاء الخدمة</Label>
-            <Select value={terminationReason || ''} onValueChange={(v) => setTerminationReason(v as TerminationReason)} dir='rtl'>
+            <Select value={terminationReason || ''} onValueChange={(v) => setTerminationReason(v as TerminationReason)} dir='rtl' disabled={selectedEmployee?.status === 'terminated'}>
               <SelectTrigger id="termination-reason">
                 <SelectValue placeholder="اختر السبب..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="resignation">استقالة (من الموظف)</SelectItem>
                 <SelectItem value="termination">إنهاء خدمة (من الشركة)</SelectItem>
+                 <SelectItem value="probation">إنهاء فترة التجربة</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -278,3 +290,5 @@ export function GratuityCalculator() {
     </Card>
   );
 }
+
+    
