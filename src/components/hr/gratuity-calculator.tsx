@@ -26,7 +26,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { intervalToDuration } from 'date-fns';
-import { toFirestoreDate } from '@/services/date-converter';
+import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 
 type TerminationReason = 'resignation' | 'termination';
@@ -90,9 +90,9 @@ export function GratuityCalculator() {
   const selectedEmployee = useMemo(() => {
     const emp = employees.find((emp) => emp.id === selectedEmployeeId) || null;
     if (emp && emp.status === 'terminated') {
-        const termDate = toFirestoreDate(emp.terminationDate);
-        if (termDate) {
-             setTerminationDate(termDate.toISOString().split('T')[0]);
+        const termDateStr = fromFirestoreDate(emp.terminationDate);
+        if (termDateStr) {
+             setTerminationDate(termDateStr);
         }
         setTerminationReason(emp.terminationReason as TerminationReason);
     }
@@ -278,5 +278,3 @@ export function GratuityCalculator() {
     </Card>
   );
 }
-
-    

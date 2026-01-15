@@ -130,10 +130,10 @@ export default function EditEmployeePage() {
                 let isChanged = false;
 
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
-                    const originalDate = toFirestoreDate(originalValue as string);
-                    const formDate = toFirestoreDate(formValue as string);
-                     isChanged = originalDate?.getTime() !== formDate?.getTime();
-                     if (isChanged) updatedEmployeeData[field] = formDate;
+                    const originalDateStr = fromFirestoreDate(originalValue as any);
+                    const formDateStr = formValue as string;
+                     isChanged = originalDateStr !== formDateStr;
+                     if (isChanged) updatedEmployeeData[field] = toFirestoreDate(formDateStr);
 
                 } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
                     const originalNumValue = Number(originalValue) || 0;
@@ -158,7 +158,7 @@ export default function EditEmployeePage() {
                         changeType,
                         field,
                         oldValue: originalValue === undefined ? null : originalValue,
-                        newValue: updatedEmployeeData[field],
+                        newValue: updatedEmployeeData[field] === undefined ? formValue : updatedEmployeeData[field],
                         effectiveDate,
                         changedBy: currentUser.uid,
                     });
@@ -498,5 +498,3 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
-
-    

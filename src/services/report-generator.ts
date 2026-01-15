@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
 import { format, differenceInYears, eachDayOfInterval, isFriday, intervalToDuration, parseISO, differenceInDays } from 'date-fns';
-import { toFirestoreDate } from './date-converter';
+import { toFirestoreDate, fromFirestoreDate } from './date-converter';
 
 export type ReportType = 'EmployeeDossier' | 'EmployeeRoster';
 
@@ -190,7 +190,7 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
         getDocs(collectionGroup(db, 'auditLogs'))
     ]);
     
-    const holidaysSet = new Set(allHolidays.map(h => format(toFirestoreDate(h.date)!, 'yyyy-MM-dd')));
+    const holidaysSet = new Set(allHolidays.map(h => fromFirestoreDate(h.date)));
 
     // Organize all audit logs by employee ID for quick lookup
     const allAuditLogs = new Map<string, AuditLog[]>();
@@ -258,17 +258,17 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
     const rows = employees.map(emp => {
         let alerts: string[] = [];
         
-        const residencyExpiry = toFirestoreDate(emp.residencyExpiry);
-        if (residencyExpiry && residencyExpiry > asOfDate) {
-            const residencyDaysDiff = differenceInDays(residencyExpiry, asOfDate);
+        const residencyDate = toFirestoreDate(emp.residencyExpiry);
+        if (residencyDate && residencyDate > asOfDate) {
+            const residencyDaysDiff = differenceInDays(residencyDate, asOfDate);
             if (residencyDaysDiff <= 30) {
                 alerts.push(`⚠️ الإقامة تنتهي خلال ${residencyDaysDiff} يوم`);
             }
         }
 
-        const contractExpiry = toFirestoreDate(emp.contractExpiry);
-        if (contractExpiry && contractExpiry > asOfDate) {
-             const contractDaysDiff = differenceInDays(contractExpiry, asOfDate);
+        const contractDate = toFirestoreDate(emp.contractExpiry);
+        if (contractDate && contractDate > asOfDate) {
+             const contractDaysDiff = differenceInDays(contractDate, asOfDate);
             if (contractDaysDiff <= 30) {
                 alerts.push(`⚠️ العقد ينتهي خلال ${contractDaysDiff} يوم`);
             }
@@ -311,5 +311,3 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             throw new Error(`نوع التقرير غير معروف: ${exhaustiveCheck}`);
     }
 }
-
-    

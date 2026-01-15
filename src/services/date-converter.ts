@@ -85,5 +85,3 @@ export function toFirestoreDate(dateInput: any): Date | null {
   // If we can't determine the type, return null
   return null;
 }
-
-    
