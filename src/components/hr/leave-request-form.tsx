@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -123,8 +122,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
 
         const daysOfService = differenceInDays(new Date(), hireDate);
         
-        // Employee can only apply for annual leave after 9 months.
-        if (daysOfService < 270) {
+        if (daysOfService <= 0) {
             return 0;
         }
         

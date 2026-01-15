@@ -69,14 +69,14 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
     
-    // Per Kuwait labor law, an employee is eligible for leave after 9 months of service.
-    // Before that, the balance is effectively 0 for taking leave.
     const daysOfService = differenceInDays(new Date(), hireDate);
-    if (daysOfService < 270) {
+    
+    // Accrual starts from day 1.
+    if (daysOfService <= 0) {
         return 0;
     }
 
-    // Leave accrues at a rate of 30 days per year.
+    // Leave accrues at a rate of 30 days per year (2.5 days per month).
     const totalAccrued = (daysOfService / 365.25) * 30;
 
     const used = employee.annualLeaveUsed || 0;
@@ -84,8 +84,6 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
 
     const balance = totalAccrued + carried - used;
 
-    // As per law, total leave balance (including carried over) can be limited by company policy.
-    // We will show the raw calculated balance.
     return Math.floor(Math.max(0, balance));
 };
 

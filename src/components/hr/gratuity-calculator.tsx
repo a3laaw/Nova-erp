@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -37,9 +36,9 @@ const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
 
-    // Per Kuwait labor law, an employee is eligible for leave after 9 months of service.
     const daysOfService = differenceInDays(new Date(), hireDate);
-    if (daysOfService < 270) {
+
+    if (daysOfService <= 0) {
         return 0;
     }
 
