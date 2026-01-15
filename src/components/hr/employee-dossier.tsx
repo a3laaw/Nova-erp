@@ -2,39 +2,37 @@
 'use client';
 
 import React from 'react';
-import type { Employee, AuditLog } from '@/lib/types';
+import type { Employee } from '@/lib/types';
 import { format, intervalToDuration } from 'date-fns';
 import { Logo } from '../layout/logo';
 import { formatCurrency } from '@/lib/utils';
 import { Banknote, Briefcase, Calendar, Contact, FileText, Gift, Home, User, Wallet, UserCheck, Phone, Mail, History } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+import { fromFirestoreDate } from '@/services/date-converter';
 
 interface DossierProps {
   employee: Partial<Employee>;
   reportDate: Date;
 }
 
-const toDate = (timestampOrString: any): Date | null => {
-  if (!timestampOrString) return null;
-  const date = timestampOrString.toDate ? timestampOrString.toDate() : new Date(timestampOrString);
-  return isNaN(date.getTime()) ? null : date;
+const formatDate = (dateValue: any, fallback = '-') => {
+  const dateStr = fromFirestoreDate(dateValue);
+  if (!dateStr) return fallback;
+  // fromFirestoreDate returns yyyy-MM-dd, so we reformat to dd/MM/yyyy
+  try {
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+  } catch(e) {
+      return dateStr; // fallback to original string if split fails
+  }
 };
 
-const formatDate = (date: Date | null | undefined, fallback = '-') => {
-  if (!date) return fallback;
-  return new Intl.DateTimeFormat('ar-KW', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    numberingSystem: 'latn',
-  }).format(date);
-};
 
 function Section({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
     return (
-        <div className="border rounded-lg p-4">
-            <h3 className="flex items-center gap-2 font-bold text-lg mb-4 text-primary border-b pb-2">
+        <div className="border rounded-lg p-4 print:border-none print:p-2">
+            <h3 className="flex items-center gap-2 font-bold text-lg mb-4 text-primary border-b pb-2 print:text-base print:mb-2">
                 {icon}
                 {title}
             </h3>
@@ -48,7 +46,7 @@ function Section({ title, icon, children }: { title: string, icon: React.ReactNo
 function InfoItem({ label, value, className = '' }: { label: string, value: React.ReactNode | string | number | null | undefined, className?: string }) {
     if (value === null || value === undefined || value === '') return null;
     return (
-        <div className={`flex justify-between items-center ${className}`}>
+        <div className={`flex justify-between items-center py-1 print:py-0.5 ${className}`}>
             <span className="text-muted-foreground">{label}:</span>
             <span className="font-semibold text-right">{value || '-'}</span>
         </div>
@@ -57,20 +55,35 @@ function InfoItem({ label, value, className = '' }: { label: string, value: Reac
 
 
 export function EmployeeDossier({ employee, reportDate }: DossierProps) {
-  const hireDate = toDate(employee.hireDate);
-  const serviceDuration = hireDate ? employee.serviceDuration : null;
+  const hireDate = fromFirestoreDate(employee.hireDate) ? new Date(fromFirestoreDate(employee.hireDate)) : null;
+  const serviceDuration = employee.serviceDuration;
   const totalSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
 
+  const statusTranslations: Record<string, string> = {
+      active: 'نشط',
+      'on-leave': 'في إجازة',
+      terminated: 'منتهية خدمته',
+  };
+
+  const statusColors: Record<string, string> = {
+      active: 'bg-green-100 text-green-800',
+      'on-leave': 'bg-yellow-100 text-yellow-800',
+      terminated: 'bg-red-100 text-red-800',
+  };
+  
+  const currentStatus = employee.status || 'active';
+
+
   return (
-    <div className="p-4 md:p-8 bg-background font-body print:p-0" dir="rtl">
-        <div className="max-w-4xl mx-auto space-y-6 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-0">
+    <div className="p-4 md:p-6 bg-background font-body print:p-0" dir="rtl">
+        <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2">
             {/* Header */}
             <header className="flex justify-between items-start pb-4 border-b">
                 <div className='flex items-center gap-4'>
                     <Logo className="h-16 w-16 !p-3 print:hidden" />
                     <div>
-                        <h1 className="text-2xl font-bold font-headline">ملف الموظف الشامل</h1>
-                        <p className="text-muted-foreground">EmaratiScope Engineering</p>
+                        <h1 className="text-2xl font-bold font-headline print:text-xl">ملف الموظف الشامل</h1>
+                        <p className="text-muted-foreground print:text-sm">EmaratiScope Engineering</p>
                     </div>
                 </div>
                 <div className="text-left text-xs text-muted-foreground">
@@ -79,32 +92,34 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                 </div>
             </header>
 
-            <main className="space-y-6">
+            <main className="space-y-4">
                  <Section title="المعلومات الشخصية والأساسية" icon={<User />}>
                     <InfoItem label="الاسم بالعربية" value={employee.fullName} />
                     <InfoItem label="الاسم بالإنجليزية" value={employee.nameEn} />
                     <InfoItem label="الرقم المدني" value={employee.civilId} />
-                    <InfoItem label="تاريخ الميلاد" value={formatDate(toDate(employee.dob))} />
-                    {/*<InfoItem label="الجنسية" value={employee.nationality} />*/}
+                    <InfoItem label="تاريخ الميلاد" value={formatDate(employee.dob)} />
                     <InfoItem label="النوع" value={employee.gender === 'male' ? 'ذكر' : 'أنثى'} />
+                     <InfoItem 
+                        label="حالة الموظف" 
+                        value={<Badge className={statusColors[currentStatus]}>{statusTranslations[currentStatus] || 'غير معروف'}</Badge>} 
+                    />
                 </Section>
                 
                  <Section title="معلومات الاتصال" icon={<Phone />}>
                     <InfoItem label="رقم الجوال" value={employee.mobile} />
                     <InfoItem label="رقم الطوارئ" value={employee.emergencyContact} />
                     <InfoItem label="البريد الإلكتروني" value={employee.email} className="md:col-span-2" />
-                    <InfoItem label="IBAN" value={employee.iban} className="md:col-span-2" />
                 </Section>
                 
                 <Section title="البيانات الوظيفية والعقد" icon={<Briefcase />}>
                     <InfoItem label="القسم" value={employee.department} />
                     <InfoItem label="المسمى الوظيفي" value={employee.jobTitle} />
                     <InfoItem label="المنصب" value={employee.position} />
-                    <InfoItem label="حالة الموظف" value={<Badge variant={employee.status === 'active' ? 'default' : 'secondary'} className={employee.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>{employee.status === 'active' ? 'نشط' : 'غير نشط'}</Badge>} />
+                    <InfoItem label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
                     <InfoItem label="نوع العقد" value={employee.contractType} />
-                    <InfoItem label="تاريخ التعيين" value={formatDate(hireDate)} />
+                    <InfoItem label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />
                     <InfoItem label="نوع الإقامة" value={employee.visaType} />
-                    <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(toDate(employee.residencyExpiry))} />
+                    <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />
                 </Section>
 
                 <Section title="البيانات المالية" icon={<Wallet />}>
@@ -112,16 +127,18 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
                     <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
                     <InfoItem label="إجمالي الراتب" value={formatCurrency(totalSalary)} className="font-bold border-t pt-2" />
+                    <Separator className='md:col-span-2 my-1' />
                     <InfoItem label="طريقة دفع الراتب" value={employee.salaryPaymentType} />
                     <InfoItem label="اسم البنك" value={employee.bankName} />
+                    <InfoItem label="IBAN" value={employee.iban} className="md:col-span-2" />
                 </Section>
 
                  {employee.auditLogs && employee.auditLogs.length > 0 && (
                      <Section title="السجل الزمني للتغييرات" icon={<History />}>
-                        <div className='md:col-span-2 space-y-3'>
+                        <div className='md:col-span-2 space-y-2'>
                             {employee.auditLogs.map((log: any, index: number) => (
                                 <div key={log.id || index} className="text-xs p-2 rounded-md bg-muted/50">
-                                    <span className="font-semibold text-primary">{formatDate(toDate(log.effectiveDate))}</span>: 
+                                    <span className="font-semibold text-primary">{formatDate(log.effectiveDate)}</span>: 
                                     تغيير في <span className='font-semibold'>"{log.field}"</span> من <span className='font-mono text-muted-foreground'>{log.oldValue !== null ? String(log.oldValue) : '-'}</span> إلى <span className='font-mono'>{log.newValue !== null ? String(log.newValue) : '-'}</span>
                                     {log.changeType === 'Creation' && <span>(إنشاء ملف)</span>}
                                 </div>
@@ -141,7 +158,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                         <div className='md:col-span-2 border-t pt-4'>
                             <p className='font-semibold mb-2'>آخر عودة من إجازة:</p>
                              <InfoItem label="نوع الإجازة" value={(employee.lastLeave as any).leaveType} />
-                             <InfoItem label="تاريخ العودة الفعلي" value={formatDate(toDate((employee.lastLeave as any).actualReturnDate))} />
+                             <InfoItem label="تاريخ العودة الفعلي" value={formatDate((employee.lastLeave as any).actualReturnDate)} />
                         </div>
                     )}
                 </Section>

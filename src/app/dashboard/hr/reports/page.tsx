@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -41,12 +41,10 @@ export default function ReportsPage() {
     const { toast } = useToast();
     
     const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
-    
-    // State for point-in-time reports
     const [asOfDate, setAsOfDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     
     const [isGenerating, setIsGenerating] = useState(false);
-    const [reportData, setReportData] = useState<ReportData | BulkReportData | null>(null);
+    const [reportData, setReportData] = useState<ReportData | null>(null);
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
@@ -56,7 +54,8 @@ export default function ReportsPage() {
         if (!firestore) return;
         const fetchEmployees = async () => {
             try {
-                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                // Fetch all employees regardless of status to allow selection in dossier
+                const q = query(collection(firestore, 'employees'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEmployees: Employee[] = [];
                 querySnapshot.forEach(doc => {
@@ -73,6 +72,10 @@ export default function ReportsPage() {
     const handleGenerateReport = async () => {
         if (!firestore) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+            return;
+        }
+        if (reportType === 'EmployeeDossier' && !selectedEmployeeId) {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار موظف لإنشاء التقرير الشامل.' });
             return;
         }
 
@@ -138,7 +141,7 @@ export default function ReportsPage() {
                              <div className="grid gap-2">
                                 <Label htmlFor="employeeFilter">تحديد موظف</Label>
                                 <Select dir="rtl" value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                                    <SelectTrigger id="employeeFilter"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger id="employeeFilter"><SelectValue placeholder="اختر..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">جميع الموظفين (تقرير جماعي)</SelectItem>
                                         {employees.map(emp => (
@@ -217,3 +220,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
