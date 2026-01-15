@@ -121,14 +121,14 @@ export default function EmployeeProfilePage() {
 
   return (
     <div className='space-y-6' dir='rtl'>
-        <div className='flex justify-between items-center'>
+        <div className='flex justify-between items-center no-print'>
              <Button variant="outline" onClick={() => router.push('/dashboard/hr')}>
                 <ArrowRight className="ml-2 h-4 w-4" />
                 العودة إلى قائمة الموظفين
             </Button>
             <div className='flex gap-2'>
                  <Button variant="outline" asChild>
-                    <Link href={`/dashboard/hr/employees/${id}/report`} target="_blank">
+                    <Link href={`/dashboard/hr/employees/${id}/report`} target="_blank" rel="noopener noreferrer">
                         <Printer className="ml-2 h-4 w-4" />
                         طباعة تقرير الموظف
                     </Link>

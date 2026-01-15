@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Search, ArrowRight, FileText, Printer } from 'lucide-react';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -29,142 +29,12 @@ import { generateReport, ReportData, ReportType, BulkReportData, StandardReportD
 import type { Employee, AuditLog } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
-import html2pdf from 'html2pdf.js';
-import { fromFirestoreDate } from '@/services/date-converter';
-import { formatCurrency } from '@/lib/utils';
+
 
 const REPORT_TYPES: { value: ReportType; label: string }[] = [
     { value: 'EmployeeDossier', label: 'ملف الموظف الشامل' },
     { value: 'EmployeeRoster', label: 'قائمة الموظفين (Roster)' },
 ];
-
-
-// --- STATIC HTML GENERATOR HELPER FUNCTIONS ---
-// This function is now located here to avoid server-action conflicts.
-function generateReportHTML(employee: Employee, reportDate: Date): string {
-    const renderInfoItem = (label: string, value: string | number | null | undefined): string => {
-        if (value === null || value === undefined || value === '') return '';
-        return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                    <span style="color: #64748b;">${label}:</span>
-                    <span style="font-weight: 600;">${value}</span>
-                </div>`;
-    };
-
-    const renderSection = (title: string, content: string): string => {
-        return `<div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">${title}</h3>
-                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px;">
-                        ${content}
-                    </div>
-                </div>`;
-    }
-
-    const renderInfoV2 = (label: string, value: string | null | undefined): string => {
-    if (value === null || value === undefined || value === '') return '';
-    return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                <span style="color: #64748b;">${label}:</span>
-                <span style="font-weight: 600;">${value}</span>
-            </div>`;
-    };
-
-  const {
-    fullName, civilId, nameEn, dob, gender, mobile, emergencyContact, email,
-    department, jobTitle, position, hireDate, contractType, contractExpiry, visaType, residencyExpiry,
-    basicSalary = 0, housingAllowance = 0, transportAllowance = 0,
-    salaryPaymentType, bankName, iban, status,
-    auditLogs, eosb, leaveBalance, lastLeave, serviceDuration
-  } = employee;
-
-  const totalSalary = basicSalary + housingAllowance + transportAllowance;
-
-  let personalInfo = renderInfoItem('الاسم بالعربية', fullName) +
-                     renderInfoItem('الاسم بالإنجليزية', nameEn) +
-                     renderInfoItem('الرقم المدني', civilId) +
-                     renderInfoV2('تاريخ الميلاد', fromFirestoreDate(dob)) +
-                     renderInfoItem('النوع', gender === 'male' ? 'ذكر' : 'أنثى') +
-                     renderInfoItem('حالة الموظف', status);
-
-  let contactInfo = renderInfoItem('رقم الجوال', mobile) +
-                    renderInfoItem('رقم الطوارئ', emergencyContact) +
-                    `<div style="grid-column: span 2 / span 2;">${renderInfoItem('البريد الإلكتروني', email)}</div>`;
-
-  let jobInfo = renderInfoItem('القسم', department) +
-                renderInfoItem('المسمى الوظيفي', jobTitle) +
-                renderInfoItem('المنصب', position) +
-                renderInfoV2('تاريخ التعيين', fromFirestoreDate(hireDate)) +
-                renderInfoItem('نوع العقد', contractType) +
-                renderInfoV2('تاريخ انتهاء العقد', fromFirestoreDate(contractExpiry)) +
-                renderInfoItem('نوع الإقامة', visaType) +
-                renderInfoV2('تاريخ انتهاء الإقامة', fromFirestoreDate(residencyExpiry));
-
-  let financialInfo = renderInfoItem('الراتب الأساسي', formatCurrency(basicSalary)) +
-                      renderInfoItem('بدل السكن', formatCurrency(housingAllowance)) +
-                      renderInfoItem('بدل النقل', formatCurrency(transportAllowance)) +
-                      `<hr style="grid-column: span 2 / span 2; margin: 8px 0; border-color: #e2e8f0;">` +
-                      `<div style="grid-column: span 2 / span 2; font-weight: bold;">${renderInfoItem('إجمالي الراتب', formatCurrency(totalSalary))}</div>` +
-                      `<hr style="grid-column: span 2 / span 2; margin: 8px 0; border-color: #e2e8f0;">` +
-                      renderInfoItem('طريقة دفع الراتب', salaryPaymentType) +
-                      renderInfoItem('اسم البنك', bankName) +
-                      `<div style="grid-column: span 2 / span 2;">${renderInfoItem('IBAN', iban)}</div>`;
-
-  let leaveInfo = `<div style="grid-column: span 2 / span 2; background-color: #f8fafc; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #64748b;">رصيد الإجازات السنوية المتاح</p>
-                        <p style="font-size: 1.5rem; font-weight: 700; color: #4FC3F7;">${leaveBalance?.toFixed(0) ?? 0} يوم</p>
-                   </div>` +
-                   (lastLeave ? 
-                    `<div style="grid-column: span 2 / span 2; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
-                        <p style="font-weight: 600; margin-bottom: 8px;">آخر عودة من إجازة:</p>
-                        ${renderInfoItem('نوع الإجازة', (lastLeave as any).leaveType)}
-                        ${renderInfoV2('تاريخ العودة الفعلي', fromFirestoreDate((lastLeave as any).actualReturnDate))}
-                    </div>` : '');
-
-    let eosbInfo = `<div style="grid-column: span 2 / span 2; background-color: #eff6ff; padding: 16px; border-radius: 8px; border: 1px solid #bfdbfe;">
-                        ${serviceDuration ? renderInfoItem('مدة الخدمة', `${serviceDuration.years || 0} سنة, ${serviceDuration.months || 0} شهر, ${serviceDuration.days || 0} يوم`) : ''}
-                        <hr style="margin: 8px 0; border-color: #bfdbfe;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                            <span style="color: #64748b;">قيمة نهاية الخدمة المستحقة:</span>
-                            <span style="font-weight: bold; font-size: 1.125rem; color: #2563eb;">${formatCurrency(eosb || 0)}</span>
-                        </div>
-                   </div>
-                   <p style="grid-column: span 2 / span 2; font-size: 0.75rem; color: #64748b;">* تم الحساب وفقًا للمادة 44 من قانون العمل الكويتي. هذا تقدير تقريبي.</p>`;
-
-    const logsHTML = auditLogs && auditLogs.length > 0 ?
-        renderSection('السجل الزمني للتغييرات',
-            `<div style="grid-column: span 2 / span 2;">${auditLogs.map(log =>
-                `<div style="font-size: 0.75rem; padding: 8px; border-radius: 4px; background-color: #f8fafc; margin-bottom: 4px;">
-                    <span style="font-weight: 600; color: #4FC3F7;">${fromFirestoreDate(log.effectiveDate)}</span>: 
-                    تغيير في <b>"${log.field}"</b> من <span style="font-family: monospace;">${log.oldValue ?? '-'}</span> إلى <span style="font-family: monospace;">${log.newValue ?? '-'}</span>
-                </div>`
-            ).join('')}</div>`
-        ) : '';
-
-
-  return `
-    <div dir="rtl" style="font-family: 'Tajawal', sans-serif; padding: 24px; background-color: white;">
-        <header style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
-            <div>
-                <h1 style="font-size: 1.5rem; font-weight: 700;">ملف الموظف الشامل</h1>
-                <p style="color: #64748b;">EmaratiScope Engineering</p>
-            </div>
-            <div style="text-align: left; font-size: 0.75rem; color: #64748b;">
-                <p>تاريخ التقرير: ${format(reportDate, 'dd/MM/yyyy')}</p>
-            </div>
-        </header>
-        <main style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
-            ${renderSection("المعلومات الشخصية والأساسية", personalInfo)}
-            ${renderSection("معلومات الاتصال", contactInfo)}
-            ${renderSection("البيانات الوظيفية والعقد", jobInfo)}
-            ${renderSection("البيانات المالية", financialInfo)}
-            ${logsHTML}
-            ${renderSection("حالة الإجازات", leaveInfo)}
-            ${renderSection("استحقاق نهاية الخدمة", eosbInfo)}
-        </main>
-        <footer style="text-align: center; padding-top: 16px; margin-top: 16px; border-top: 1px solid #e2e8f0;">
-            <p style="font-size: 0.75rem; color: #64748b;">هذا التقرير تم إنشاؤه بواسطة نظام EmaratiScope. © ${new Date().getFullYear()}</p>
-        </footer>
-    </div>
-  `;
-}
 
 
 export default function ReportsPage() {
@@ -237,31 +107,14 @@ export default function ReportsPage() {
     };
     
     const handlePrint = () => {
-        if (!reportData) return;
-
-        const date = parseISO(asOfDate);
-        let htmlContent = '';
-        let filename = `report_${format(date, 'yyyy-MM-dd')}.pdf`;
+        if (!reportData || reportType !== 'EmployeeDossier' || !('employee' in reportData) || !reportData.employee.id) return;
         
-        if (reportData.type === 'EmployeeDossier' && reportData.employee) {
-            htmlContent = generateReportHTML(reportData.employee, date);
-            filename = `dossier_${reportData.employee.fullName?.replace(' ','_')}_${format(date, 'yyyy-MM-dd')}.pdf`
-        } else if (reportData.type === 'BulkEmployeeDossiers') {
-            htmlContent = reportData.dossiers.map(emp => generateReportHTML(emp, date)).join('<div class="html2pdf__page-break"></div>');
-            filename = `bulk_dossiers_${format(date, 'yyyy-MM-dd')}.pdf`;
-        } else {
-            // Fallback for standard reports - print the visible table
-            const reportElement = document.getElementById('report-content-to-print');
-            if (reportElement) {
-                 html2pdf().from(reportElement).set({ filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { orientation: 'portrait' } }).save();
-            }
-            return;
-        }
-
-        html2pdf().from(htmlContent).set({ filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }, margin: 0.5 }).save();
+        const employeeId = reportData.employee.id;
+        const printUrl = `/dashboard/hr/employees/${employeeId}/report`;
+        window.open(printUrl, '_blank', 'noopener,noreferrer');
     };
 
-    const isPrintable = reportData && (reportData.type === 'EmployeeDossier' || reportData.type === 'BulkEmployeeDossiers' || reportData.type === 'EmployeeRoster');
+    const isPrintable = reportData && reportType === 'EmployeeDossier' && 'employee' in reportData && !!reportData.employee;
 
 
   return (
@@ -391,7 +244,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
-
-    

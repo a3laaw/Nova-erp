@@ -49,11 +49,11 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
-        <Sidebar side={language === 'ar' ? 'right' : 'left'}>
+        <Sidebar side={language === 'ar' ? 'right' : 'left'} className="no-print">
           <MainNav currentUser={currentUser} onLogout={handleLogout} />
         </Sidebar>
         <div className="flex flex-col w-full">
-          <Header currentUser={currentUser} onLogout={handleLogout} />
+          <Header currentUser={currentUser} onLogout={handleLogout} className="no-print" />
           <SidebarInset>
             <main className="flex-1 p-4 md:p-6 lg:p-8">
               {children}

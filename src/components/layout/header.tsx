@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Languages } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
+import { cn } from '@/lib/utils';
 
 const getTitleFromPathname = (pathname: string, lang: 'ar' | 'en') => {
     // Exact matches first
@@ -68,15 +69,16 @@ const titles = {
 interface HeaderProps {
     currentUser: AuthenticatedUser;
     onLogout: () => void;
+    className?: string;
 }
 
-export function Header({ currentUser, onLogout }: HeaderProps) {
+export function Header({ currentUser, onLogout, className }: HeaderProps) {
     const pathname = usePathname();
     const { language, toggleLanguage } = useLanguage();
     const title = getTitleFromPathname(pathname, language);
 
     return (
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+        <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6", className)}>
             <SidebarTrigger className="sm:hidden" />
             <div className="flex items-center gap-2">
                  <h1 className="text-xl font-semibold font-headline">{title}</h1>
