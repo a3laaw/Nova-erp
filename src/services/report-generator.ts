@@ -79,7 +79,7 @@ function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialV
             const fieldMatch = Array.isArray(logField) ? logField.includes(field) : logField === field;
             return fieldMatch && logDate <= asOfDate;
         })
-        .sort((a, b) => toFirestoreDate(b.effectiveDate)!.getTime() - toFirestoreDate(a.effectiveDate)!.getTime())[0];
+        .sort((a, b) => (toFirestoreDate(b.effectiveDate)?.getTime() ?? 0) - (toFirestoreDate(a.effectiveDate)?.getTime() ?? 0))[0];
     
     if (relevantLog) {
          if (typeof relevantLog.newValue === 'object' && relevantLog.newValue !== null && !Array.isArray(relevantLog.newValue) && relevantLog.newValue.hasOwnProperty(field)) {
@@ -243,7 +243,7 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
             filteredEmployees = allEmployees.filter(e => {
                 const termDate = toFirestoreDate(e.terminationDate);
                 // Active if status is active, OR if terminated in the future
-                return e.status === 'active' && (!termDate || termDate > asOfDate);
+                return e.status === 'active' || (termDate && termDate > asOfDate);
             });
         }
         
@@ -261,7 +261,8 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
         let alerts: string[] = [];
         
         const residencyDate = toFirestoreDate(emp.residencyExpiry);
-        if (residencyDate) { // Check if date exists before comparing
+        // Only calculate if the date exists
+        if (residencyDate) {
             const residencyDaysDiff = differenceInDays(residencyDate, asOfDate);
             if (residencyDaysDiff >= 0 && residencyDaysDiff <= 30) {
                 alerts.push(`⚠️ الإقامة تنتهي خلال ${residencyDaysDiff} يوم`);
@@ -269,7 +270,8 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
         }
 
         const contractDate = toFirestoreDate(emp.contractExpiry);
-        if (contractDate) { // Check if date exists before comparing
+        // Only calculate if the date exists
+        if (contractDate) {
              const contractDaysDiff = differenceInDays(contractDate, asOfDate);
             if (contractDaysDiff >= 0 && contractDaysDiff <= 30) {
                 alerts.push(`⚠️ العقد ينتهي خلال ${contractDaysDiff} يوم`);

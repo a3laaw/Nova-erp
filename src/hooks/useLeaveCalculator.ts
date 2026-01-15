@@ -6,6 +6,7 @@ import { useFirestore } from '@/firebase';
 import { collection, getDocs, query, type DocumentData } from 'firebase/firestore';
 import { eachDayOfInterval, format, isFriday } from 'date-fns';
 import type { Holiday } from '@/lib/types';
+import { toFirestoreDate } from '@/services/date-converter'; // Use the safe converter
 
 // In-memory cache for holidays to prevent re-fetching on every date change.
 let holidayCache: Set<string> | null = null;
@@ -24,11 +25,9 @@ async function getHolidays(firestore: DocumentData): Promise<Set<string>> {
     const holidayDates = new Set<string>();
     holidaysSnapshot.forEach(doc => {
       const data = doc.data() as Holiday;
-      // Store date in 'yyyy-MM-dd' format for easy comparison
-      if (data.date) {
-        // Handle Firestore Timestamp or ISO string
-        const date = typeof data.date === 'string' ? new Date(data.date) : data.date.toDate();
-        holidayDates.add(format(date, 'yyyy-MM-dd'));
+      const holidayDate = toFirestoreDate(data.date);
+      if (holidayDate) {
+        holidayDates.add(format(holidayDate, 'yyyy-MM-dd'));
       }
     });
 
@@ -62,12 +61,13 @@ export function useLeaveCalculator(startDate: string, endDate: string) {
         return;
       }
 
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      // Use the safe converter
+      const start = toFirestoreDate(startDate);
+      const end = toFirestoreDate(endDate);
 
-      if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+      if (!start || !end || start > end) {
         setWorkingDays(0);
-        setError(start > end ? 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية.' : null);
+        setError(start && end && start > end ? 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية.' : null);
         return;
       }
       

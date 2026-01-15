@@ -43,6 +43,7 @@ import { addMonths, format, differenceInYears, differenceInDays } from 'date-fns
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -66,7 +67,10 @@ const terminationReasons: Record<string, string> = {
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
     if (!employee.hireDate) return 0;
     
-    const hireDate = new Date(employee.hireDate);
+    // Use the safe converter
+    const hireDate = toFirestoreDate(employee.hireDate);
+    if (!hireDate) return 0;
+
     const yearsOfService = differenceInYears(new Date(), hireDate);
     
     // As per Kuwait law, no leave entitlement in the first year of service
@@ -129,15 +133,17 @@ export function EmployeesTable() {
             // If immediate, or if notice start date is cleared, no automatic calculation
             return;
         }
-        const noticeDate = new Date(noticeStartDate);
-        const termDate = addMonths(noticeDate, 3);
-        setTerminationDate(format(termDate, 'yyyy-MM-dd'));
+        const noticeDate = toFirestoreDate(noticeStartDate);
+        if (noticeDate) {
+            const termDate = addMonths(noticeDate, 3);
+            setTerminationDate(format(termDate, 'yyyy-MM-dd'));
+        }
     }, [noticeStartDate, isImmediate]);
     
      useEffect(() => {
         if (employeeToTerminate) {
-            const hireDate = new Date(employeeToTerminate.hireDate);
-            const isProbation = differenceInDays(new Date(), hireDate) <= 90;
+            const hireDate = toFirestoreDate(employeeToTerminate.hireDate);
+            const isProbation = hireDate ? differenceInDays(new Date(), hireDate) <= 90 : false;
             
             // Reset state when a new employee is selected for termination
             setTerminationReason(isProbation ? 'probation' : '');
@@ -174,8 +180,8 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'terminated',
-                noticeStartDate: isImmediate ? null : new Date(noticeStartDate),
-                terminationDate: new Date(terminationDate),
+                noticeStartDate: isImmediate ? null : toFirestoreDate(noticeStartDate),
+                terminationDate: toFirestoreDate(terminationDate),
                 terminationReason: terminationReason
             });
 
@@ -211,19 +217,21 @@ export function EmployeesTable() {
             terminationDate: null,
             terminationReason: null,
         };
+        
+        const rehireDate = toFirestoreDate(newHireDate);
 
-        if (rehireType === 'new') {
-            updateData.hireDate = new Date(newHireDate);
+        if (rehireType === 'new' && rehireDate) {
+            updateData.hireDate = rehireDate;
         }
 
-        if (resetLeaveBalance) {
+        if (resetLeaveBalance && rehireDate) {
             updateData.annualLeaveAccrued = 0;
             updateData.annualLeaveUsed = 0;
             updateData.carriedLeaveDays = 0;
             updateData.sickLeaveUsed = 0;
             updateData.emergencyLeaveUsed = 0;
-            updateData.lastLeaveResetDate = new Date(newHireDate);
-            updateData.lastVacationAccrualDate = new Date(newHireDate);
+            updateData.lastLeaveResetDate = rehireDate;
+            updateData.lastVacationAccrualDate = rehireDate;
         }
 
         try {
@@ -248,9 +256,9 @@ export function EmployeesTable() {
     const formatDateCell = (dateValue: any): string => {
         if (!dateValue) return '-';
         try {
-            const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
-            if (isNaN(d.getTime())) return '-';
-            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+            const d = toFirestoreDate(dateValue);
+            if (!d) return '-';
+            return format(d, 'dd/MM/yyyy');
         } catch (e) {
             return '-';
         }

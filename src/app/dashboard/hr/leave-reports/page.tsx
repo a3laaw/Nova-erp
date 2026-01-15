@@ -73,7 +73,8 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
 const formatDateForDisplay = (dateValue: any): string => {
     const d = toFirestoreDate(dateValue);
     if (!d) return '-';
-    return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+    // Use format from date-fns to be consistent
+    return format(d, 'dd/MM/yyyy');
 }
 
 
@@ -147,6 +148,7 @@ export default function LeaveReportsPage() {
         }
         
         const filteredData = allRequests.filter(req => {
+            // Use the safe converter for all date operations
             const leaveStart = toFirestoreDate(req.startDate);
             const leaveEnd = toFirestoreDate(req.endDate);
 

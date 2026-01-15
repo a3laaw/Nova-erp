@@ -34,6 +34,7 @@ type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     if (!employee) return 0;
 
+    // Use the safe converter here
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) {
         return 0; 
@@ -96,6 +97,7 @@ export function GratuityCalculator() {
   // Effect to update form when a terminated employee is selected
    useEffect(() => {
     if (selectedEmployee && selectedEmployee.status === 'terminated') {
+        // Use the safe converter
         const termDateStr = fromFirestoreDate(selectedEmployee.terminationDate);
         if (termDateStr) {
              setTerminationDate(termDateStr);
