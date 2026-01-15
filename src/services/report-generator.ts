@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { 
@@ -15,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
 import { format, differenceInYears, eachDayOfInterval, isFriday, intervalToDuration, parseISO, differenceInDays } from 'date-fns';
+import { toFirestoreDate } from './date-converter';
 
 export type ReportType = 'EmployeeDossier' | 'EmployeeRoster';
 
@@ -60,13 +60,6 @@ interface ReportOptions {
 
 // --- UTILITY FUNCTIONS ---
 
-const toDate = (timestampOrString: any): Date | null => {
-  if (timestampOrString === null || timestampOrString === undefined || timestampOrString === '') return null;
-  const date = timestampOrString?.toDate ? timestampOrString.toDate() : new Date(timestampOrString);
-  return isNaN(date.getTime()) ? null : date;
-};
-
-
 async function fetchCollection<T>(db: Firestore, collectionName: string): Promise<T[]> {
     const snapshot = await getDocs(collection(db, collectionName));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
@@ -80,13 +73,13 @@ function findValueAsOf(logs: AuditLog[], field: string, asOfDate: Date, initialV
     }
     const relevantLog = logs
         .filter(log => {
-            const logDate = toDate(log.effectiveDate);
+            const logDate = toFirestoreDate(log.effectiveDate);
             if (!logDate) return false;
             const logField = log.field;
             const fieldMatch = Array.isArray(logField) ? logField.includes(field) : logField === field;
             return fieldMatch && logDate <= asOfDate;
         })
-        .sort((a, b) => toDate(b.effectiveDate)!.getTime() - toDate(a.effectiveDate)!.getTime())[0];
+        .sort((a, b) => toFirestoreDate(b.effectiveDate)!.getTime() - toFirestoreDate(a.effectiveDate)!.getTime())[0];
     
     if (relevantLog) {
          if (typeof relevantLog.newValue === 'object' && relevantLog.newValue !== null && !Array.isArray(relevantLog.newValue) && relevantLog.newValue.hasOwnProperty(field)) {
@@ -104,7 +97,7 @@ async function reconstructEmployeeState(employee: Employee, asOfDate: Date, allA
     const employeeLogs = allAuditLogs.get(employee.id) || [];
     
     // Sort logs by date to ensure correct historical reconstruction
-    employeeLogs.sort((a, b) => toDate(a.effectiveDate)!.getTime() - toDate(b.effectiveDate)!.getTime());
+    employeeLogs.sort((a, b) => toFirestoreDate(a.effectiveDate)!.getTime() - toFirestoreDate(b.effectiveDate)!.getTime());
 
     const reconstructed: Partial<Employee> = {};
     const fieldsToReconstruct: (keyof Employee)[] = ['jobTitle', 'department', 'position', 'basicSalary', 'housingAllowance', 'transportAllowance', 'residencyExpiry', 'contractExpiry', 'visaType', 'contractType', 'iban', 'salaryPaymentType', 'bankName'];
@@ -119,7 +112,7 @@ async function reconstructEmployeeState(employee: Employee, asOfDate: Date, allA
 // --- CALCULATION FUNCTIONS ---
 
 function calculateEosb(employee: Employee, asOfDate: Date, leaveBalance: number): number {
-    const hireDate = toDate(employee.hireDate);
+    const hireDate = toFirestoreDate(employee.hireDate);
     const basicSalary = employee.basicSalary || 0;
     if (!hireDate || basicSalary === 0 || hireDate > asOfDate) return 0;
     
@@ -138,7 +131,8 @@ function calculateEosb(employee: Employee, asOfDate: Date, leaveBalance: number)
     const leavePayout = (basicSalary / 26) * validLeaveBalance;
     
     // Article 52 - rules for resignation
-    if (employee.terminationReason === 'resignation' && toDate(employee.terminationDate) && toDate(employee.terminationDate)! <= asOfDate) {
+    const termDate = toFirestoreDate(employee.terminationDate);
+    if (employee.terminationReason === 'resignation' && termDate && termDate <= asOfDate) {
          if (yearsOfService < 3) return leavePayout; // No gratuity, only leave payout
          if (yearsOfService < 5) return (gratuity * 0.5) + leavePayout;
          if (yearsOfService < 10) return (gratuity * (2/3)) + leavePayout;
@@ -149,7 +143,7 @@ function calculateEosb(employee: Employee, asOfDate: Date, leaveBalance: number)
 }
 
 function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveRequests: LeaveRequest[], holidays: Set<string>): number {
-    const hireDate = toDate(employee.hireDate);
+    const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate || hireDate > asOfDate) return 0;
     
     const yearsOfService = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
@@ -159,17 +153,18 @@ function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveReque
     
     const accruedDays = yearsOfService * 30 + (employee.carriedLeaveDays || 0);
 
-    const leavesTaken = allLeaveRequests.filter(lr => 
-        lr.employeeId === employee.id && 
-        lr.status === 'approved' && 
-        lr.leaveType === 'Annual' &&
-        toDate(lr.startDate)! <= asOfDate
-    );
+    const leavesTaken = allLeaveRequests.filter(lr => {
+        const startDate = toFirestoreDate(lr.startDate);
+        return lr.employeeId === employee.id && 
+               lr.status === 'approved' && 
+               lr.leaveType === 'Annual' &&
+               startDate && startDate <= asOfDate;
+    });
     
     let usedDays = 0;
     leavesTaken.forEach(leave => {
-        const leaveStart = toDate(leave.startDate)!;
-        const leaveEnd = toDate(leave.endDate)! > asOfDate ? asOfDate : toDate(leave.endDate)!;
+        const leaveStart = toFirestoreDate(leave.startDate)!;
+        const leaveEnd = toFirestoreDate(leave.endDate)! > asOfDate ? asOfDate : toFirestoreDate(leave.endDate)!;
         if(leaveStart > leaveEnd) return;
         eachDayOfInterval({ start: leaveStart, end: leaveEnd }).forEach(day => {
             if (!isFriday(day) && !holidays.has(format(day, 'yyyy-MM-dd'))) {
@@ -195,7 +190,7 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
         getDocs(collectionGroup(db, 'auditLogs'))
     ]);
     
-    const holidaysSet = new Set(allHolidays.map(h => format(toDate(h.date)!, 'yyyy-MM-dd')));
+    const holidaysSet = new Set(allHolidays.map(h => format(toFirestoreDate(h.date)!, 'yyyy-MM-dd')));
 
     // Organize all audit logs by employee ID for quick lookup
     const allAuditLogs = new Map<string, AuditLog[]>();
@@ -215,9 +210,23 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
         const leaveBalance = calculateLeaveBalance(reconstructed, asOfDate, allLeaveRequests, holidaysSet);
         reconstructed.leaveBalance = leaveBalance;
         reconstructed.eosb = calculateEosb(reconstructed, asOfDate, leaveBalance);
-        reconstructed.lastLeave = allLeaveRequests.filter(lr => lr.employeeId === emp.id && lr.isBackFromLeave && toDate(lr.actualReturnDate)! <= asOfDate)
-                                   .sort((a,b) => toDate(b.actualReturnDate)!.getTime() - toDate(a.actualReturnDate)!.getTime())[0] || null;
-        reconstructed.serviceDuration = intervalToDuration({ start: toDate(emp.hireDate)!, end: asOfDate });
+        
+        const lastLeave = allLeaveRequests
+            .filter(lr => {
+                const actualReturnDate = toFirestoreDate(lr.actualReturnDate);
+                return lr.employeeId === emp.id && 
+                       lr.isBackFromLeave && 
+                       actualReturnDate && actualReturnDate <= asOfDate;
+            })
+            .sort((a,b) => toFirestoreDate(b.actualReturnDate)!.getTime() - toFirestoreDate(a.actualReturnDate)!.getTime())[0] || null;
+
+        reconstructed.lastLeave = lastLeave;
+        
+        const hireDate = toFirestoreDate(emp.hireDate);
+        if (hireDate) {
+            reconstructed.serviceDuration = intervalToDuration({ start: hireDate, end: asOfDate });
+        }
+        
         return reconstructed;
     };
 
@@ -230,7 +239,7 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
         let filteredEmployees = allEmployees;
         if (options.statusFilter === 'active') {
             filteredEmployees = allEmployees.filter(e => {
-                const termDate = toDate(e.terminationDate);
+                const termDate = toFirestoreDate(e.terminationDate);
                 // Active if status is active, OR if terminated in the future
                 return e.status === 'active' || (termDate && termDate > asOfDate);
             });
@@ -248,9 +257,8 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
 
     const rows = employees.map(emp => {
         let alerts: string[] = [];
-
-        // Safe check for residency expiry
-        const residencyExpiry = toDate(emp.residencyExpiry);
+        
+        const residencyExpiry = toFirestoreDate(emp.residencyExpiry);
         if (residencyExpiry && residencyExpiry > asOfDate) {
             const residencyDaysDiff = differenceInDays(residencyExpiry, asOfDate);
             if (residencyDaysDiff <= 30) {
@@ -258,8 +266,7 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
             }
         }
 
-        // Safe check for contract expiry
-        const contractExpiry = toDate(emp.contractExpiry);
+        const contractExpiry = toFirestoreDate(emp.contractExpiry);
         if (contractExpiry && contractExpiry > asOfDate) {
              const contractDaysDiff = differenceInDays(contractExpiry, asOfDate);
             if (contractDaysDiff <= 30) {
@@ -304,3 +311,5 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             throw new Error(`نوع التقرير غير معروف: ${exhaustiveCheck}`);
     }
 }
+
+    

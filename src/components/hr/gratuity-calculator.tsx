@@ -26,17 +26,16 @@ import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { intervalToDuration } from 'date-fns';
+import { toFirestoreDate } from '@/services/date-converter';
+
 
 type TerminationReason = 'resignation' | 'termination';
 
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
-    if (!employee || !employee.hireDate) return 0;
-    
-    // Safely convert hireDate from either a string or a Firestore Timestamp
-    const hireDate = employee.hireDate.toDate ? employee.hireDate.toDate() : new Date(employee.hireDate);
-    if (isNaN(hireDate.getTime())) {
-        return 0; // Invalid hire date
-    }
+    if (!employee) return 0;
+
+    const hireDate = toFirestoreDate(employee.hireDate);
+    if (!hireDate) return 0; // Return 0 if hire date is invalid
 
     const today = new Date();
     const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
@@ -49,8 +48,6 @@ const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
-    // Kuwait Law: Max 30 days can be carried over. Some interpretations say it's more complex.
-    // For simplicity, we'll assume a direct balance calculation, capped at a reasonable limit like 45.
     const totalBalance = accrued + carried - used;
     
     return Math.floor(Math.max(0, totalBalance));
@@ -92,10 +89,9 @@ export function GratuityCalculator() {
 
   const selectedEmployee = useMemo(() => {
     const emp = employees.find((emp) => emp.id === selectedEmployeeId) || null;
-    if (emp && emp.status === 'terminated' && emp.terminationDate) {
-        // Safely convert terminationDate from either a string or a Firestore Timestamp
-        const termDate = emp.terminationDate.toDate ? emp.terminationDate.toDate() : new Date(emp.terminationDate);
-        if (!isNaN(termDate.getTime())) {
+    if (emp && emp.status === 'terminated') {
+        const termDate = toFirestoreDate(emp.terminationDate);
+        if (termDate) {
              setTerminationDate(termDate.toISOString().split('T')[0]);
         }
         setTerminationReason(emp.terminationReason as TerminationReason);
@@ -108,10 +104,9 @@ export function GratuityCalculator() {
       return null;
     }
 
-    const hireDateSource = selectedEmployee.hireDate;
-    const hireDate = hireDateSource.toDate ? hireDateSource.toDate() : new Date(hireDateSource);
+    const hireDate = toFirestoreDate(selectedEmployee.hireDate);
 
-    if (isNaN(hireDate.getTime())) {
+    if (!hireDate) {
         return { error: 'تاريخ التعيين للموظف المحدد غير صالح.' };
     }
     
@@ -283,3 +278,5 @@ export function GratuityCalculator() {
     </Card>
   );
 }
+
+    
