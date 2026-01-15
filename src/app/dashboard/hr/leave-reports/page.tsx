@@ -37,6 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { toFirestoreDate } from '@/services/date-converter';
 
 // Represents a leave request augmented with the current employee name
 interface AugmentedLeaveRequest extends LeaveRequest {
@@ -68,20 +69,9 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
     'Unpaid': 'بدون راتب',
 };
 
-// Safe date conversion utility
-const toDate = (dateValue: any): Date | null => {
-    if (!dateValue) return null;
-    try {
-        const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
-        if (isNaN(d.getTime())) return null;
-        return d;
-    } catch (e) {
-        return null;
-    }
-}
-
+// Safe date conversion utility, specific for display purposes
 const formatDateForDisplay = (dateValue: any): string => {
-    const d = toDate(dateValue);
+    const d = toFirestoreDate(dateValue);
     if (!d) return '-';
     return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
 }
@@ -157,8 +147,8 @@ export default function LeaveReportsPage() {
         }
         
         const filteredData = allRequests.filter(req => {
-            const leaveStart = toDate(req.startDate);
-            const leaveEnd = toDate(req.endDate);
+            const leaveStart = toFirestoreDate(req.startDate);
+            const leaveEnd = toFirestoreDate(req.endDate);
 
             if (!leaveStart || !leaveEnd) return false;
             
@@ -173,8 +163,8 @@ export default function LeaveReportsPage() {
 
         // Client-side sorting
         filteredData.sort((a, b) => {
-            const dateA = toDate(a.startDate);
-            const dateB = toDate(b.startDate);
+            const dateA = toFirestoreDate(a.startDate);
+            const dateB = toFirestoreDate(b.startDate);
             if (!dateA || !dateB) return 0;
             return dateB.getTime() - dateA.getTime();
         });

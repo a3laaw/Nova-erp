@@ -97,7 +97,7 @@ async function reconstructEmployeeState(employee: Employee, asOfDate: Date, allA
     const employeeLogs = allAuditLogs.get(employee.id) || [];
     
     // Sort logs by date to ensure correct historical reconstruction
-    employeeLogs.sort((a, b) => toFirestoreDate(a.effectiveDate)!.getTime() - toFirestoreDate(b.effectiveDate)!.getTime());
+    employeeLogs.sort((a, b) => (toFirestoreDate(a.effectiveDate)?.getTime() ?? 0) - (toFirestoreDate(b.effectiveDate)?.getTime() ?? 0));
 
     const reconstructed: Partial<Employee> = {};
     const fieldsToReconstruct: (keyof Employee)[] = ['jobTitle', 'department', 'position', 'basicSalary', 'housingAllowance', 'transportAllowance', 'residencyExpiry', 'contractExpiry', 'visaType', 'contractType', 'iban', 'salaryPaymentType', 'bankName'];
@@ -130,7 +130,6 @@ function calculateEosb(employee: Employee, asOfDate: Date, leaveBalance: number)
     const validLeaveBalance = Math.max(0, leaveBalance); 
     const leavePayout = (basicSalary / 26) * validLeaveBalance;
     
-    // Article 52 - rules for resignation
     const termDate = toFirestoreDate(employee.terminationDate);
     if (employee.terminationReason === 'resignation' && termDate && termDate <= asOfDate) {
          if (yearsOfService < 3) return leavePayout; // No gratuity, only leave payout
@@ -163,9 +162,14 @@ function calculateLeaveBalance(employee: Employee, asOfDate: Date, allLeaveReque
     
     let usedDays = 0;
     leavesTaken.forEach(leave => {
-        const leaveStart = toFirestoreDate(leave.startDate)!;
-        const leaveEnd = toFirestoreDate(leave.endDate)! > asOfDate ? asOfDate : toFirestoreDate(leave.endDate)!;
+        const leaveStart = toFirestoreDate(leave.startDate);
+        const leaveEndValue = toFirestoreDate(leave.endDate);
+        if (!leaveStart || !leaveEndValue) return;
+
+        const leaveEnd = leaveEndValue > asOfDate ? asOfDate : leaveEndValue;
+
         if(leaveStart > leaveEnd) return;
+
         eachDayOfInterval({ start: leaveStart, end: leaveEnd }).forEach(day => {
             if (!isFriday(day) && !holidays.has(format(day, 'yyyy-MM-dd'))) {
                 usedDays++;
@@ -182,7 +186,6 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
     const asOfDate = parseISO(options.asOfDate);
     asOfDate.setHours(23, 59, 59, 999);
     
-    // Fetch all collections in parallel for efficiency
     const [allEmployees, allLeaveRequests, allHolidays, auditLogsSnapshot] = await Promise.all([
         fetchCollection<Employee>(db, 'employees'),
         fetchCollection<LeaveRequest>(db, 'leaveRequests'),
@@ -192,17 +195,16 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
     
     const holidaysSet = new Set(allHolidays.map(h => fromFirestoreDate(h.date)));
 
-    // Organize all audit logs by employee ID for quick lookup
     const allAuditLogs = new Map<string, AuditLog[]>();
     auditLogsSnapshot.forEach(doc => {
         const logData = doc.data() as AuditLog & { employeeId: string };
-        const { employeeId } = logData;
+        const employeeId = doc.ref.parent.parent?.id; // Correctly get employeeId from path
         if (!employeeId) return;
 
         if (!allAuditLogs.has(employeeId)) {
             allAuditLogs.set(employeeId, []);
         }
-        allAuditLogs.get(employeeId)!.push(logData);
+        allAuditLogs.get(employeeId)!.push({ id: doc.id, ...logData });
     });
 
     const processEmployee = async (emp: Employee) => {
@@ -218,7 +220,7 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
                        lr.isBackFromLeave && 
                        actualReturnDate && actualReturnDate <= asOfDate;
             })
-            .sort((a,b) => toFirestoreDate(b.actualReturnDate)!.getTime() - toFirestoreDate(a.actualReturnDate)!.getTime())[0] || null;
+            .sort((a,b) => (toFirestoreDate(b.actualReturnDate)?.getTime() ?? 0) - (toFirestoreDate(a.actualReturnDate)?.getTime() ?? 0))[0] || null;
 
         reconstructed.lastLeave = lastLeave;
         
@@ -241,7 +243,7 @@ async function generateEmployeeDossier(db: Firestore, options: ReportOptions): P
             filteredEmployees = allEmployees.filter(e => {
                 const termDate = toFirestoreDate(e.terminationDate);
                 // Active if status is active, OR if terminated in the future
-                return e.status === 'active' || (termDate && termDate > asOfDate);
+                return e.status === 'active' && (!termDate || termDate > asOfDate);
             });
         }
         
@@ -259,17 +261,17 @@ async function generateEmployeeRoster(db: Firestore, options: ReportOptions): Pr
         let alerts: string[] = [];
         
         const residencyDate = toFirestoreDate(emp.residencyExpiry);
-        if (residencyDate && residencyDate > asOfDate) {
+        if (residencyDate) { // Check if date exists before comparing
             const residencyDaysDiff = differenceInDays(residencyDate, asOfDate);
-            if (residencyDaysDiff <= 30) {
+            if (residencyDaysDiff >= 0 && residencyDaysDiff <= 30) {
                 alerts.push(`⚠️ الإقامة تنتهي خلال ${residencyDaysDiff} يوم`);
             }
         }
 
         const contractDate = toFirestoreDate(emp.contractExpiry);
-        if (contractDate && contractDate > asOfDate) {
+        if (contractDate) { // Check if date exists before comparing
              const contractDaysDiff = differenceInDays(contractDate, asOfDate);
-            if (contractDaysDiff <= 30) {
+            if (contractDaysDiff >= 0 && contractDaysDiff <= 30) {
                 alerts.push(`⚠️ العقد ينتهي خلال ${contractDaysDiff} يوم`);
             }
         }

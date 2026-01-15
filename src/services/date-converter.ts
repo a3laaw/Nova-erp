@@ -1,4 +1,6 @@
 
+'use client';
+
 import { Timestamp } from 'firebase/firestore';
 
 /**
@@ -40,7 +42,7 @@ export function fromFirestoreDate(date: any): string {
 }
 
 /**
- * Converts a "yyyy-MM-dd" string from an HTML input to a JavaScript Date object.
+ * Converts a "yyyy-MM-dd" string from an HTML input or any other date representation to a JavaScript Date object.
  * Returns null if the input string is empty, null, or invalid.
  * @param dateInput - The date value from any source (string, Date, Timestamp, null, undefined).
  * @returns A Date object or null.
@@ -57,7 +59,8 @@ export function toFirestoreDate(dateInput: any): Date | null {
 
   // If it's a Firestore Timestamp
   if (dateInput.toDate && typeof dateInput.toDate === 'function') {
-    return dateInput.toDate();
+    const d = dateInput.toDate();
+    return isNaN(d.getTime()) ? null : d;
   }
   
   // If it's a string
@@ -67,7 +70,9 @@ export function toFirestoreDate(dateInput: any): Date | null {
       const d = new Date(`${dateInput}T00:00:00`); 
       
       if (isNaN(d.getTime())) {
-        return null; // Invalid date string
+        // Try parsing without time for robustness if the first attempt fails
+        const d2 = new Date(dateInput);
+        return isNaN(d2.getTime()) ? null : d2;
       }
       return d;
     } catch (e) {

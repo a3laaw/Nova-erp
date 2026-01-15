@@ -25,7 +25,7 @@ import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
-import { intervalToDuration } from 'date-fns';
+import { intervalToDuration, differenceInYears } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 
@@ -34,13 +34,13 @@ type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
     if (!employee) return 0;
 
-    const hireDate = toFirestoreDate(employee.hireDate as any);
+    const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) {
         return 0; 
     }
 
     const today = new Date();
-    const yearsOfService = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    const yearsOfService = differenceInYears(today, hireDate);
 
     if (yearsOfService < 1) {
         return 0;
@@ -114,14 +114,16 @@ export function GratuityCalculator() {
       return null;
     }
 
-    const hireDate = toFirestoreDate(selectedEmployee.hireDate as any);
+    const hireDate = toFirestoreDate(selectedEmployee.hireDate);
+    const termDate = toFirestoreDate(terminationDate);
 
     if (!hireDate) {
         return { error: 'تاريخ التعيين للموظف المحدد غير صالح.' };
     }
+    if (!termDate) {
+        return { error: 'تاريخ انتهاء الخدمة المحدد غير صالح.' };
+    }
     
-    const termDate = new Date(terminationDate);
-
     if (termDate < hireDate) {
         return { error: 'تاريخ انتهاء الخدمة لا يمكن أن يكون قبل تاريخ التعيين.' };
     }
@@ -290,5 +292,3 @@ export function GratuityCalculator() {
     </Card>
   );
 }
-
-    
