@@ -16,6 +16,12 @@ export default function EmployeeReportPrintPage() {
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [reportDate, setReportDate] = useState<Date | null>(null);
+
+    useEffect(() => {
+        // Set the date on the client side to avoid hydration mismatch
+        setReportDate(new Date());
+    }, []);
 
     useEffect(() => {
         if (!id || !firestore) {
@@ -28,8 +34,10 @@ export default function EmployeeReportPrintPage() {
             setLoading(true);
             setError(null);
             try {
+                // Use a consistent date for report generation
+                const asOfDateStr = new Date().toISOString().split('T')[0];
                 const reportData = await generateReport(firestore, 'EmployeeDossier', {
-                    asOfDate: new Date().toISOString().split('T')[0],
+                    asOfDate: asOfDateStr,
                     employeeId: id
                 });
                 
@@ -51,19 +59,16 @@ export default function EmployeeReportPrintPage() {
     }, [id, firestore]);
     
     useEffect(() => {
-        if (!loading && employee) {
+        if (!loading && employee && reportDate) {
             // Delay print slightly to ensure all content and styles are rendered
             const timer = setTimeout(() => {
                 window.print();
-                // Optional: close the window after printing dialog is closed
-                // This can be unreliable, so it's often better to let the user close it.
-                // setTimeout(() => window.close(), 1000);
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [loading, employee]);
+    }, [loading, employee, reportDate]);
 
-    if (loading) {
+    if (loading || !reportDate) {
         return (
             <div className="p-8 space-y-6" dir='rtl'>
                 <div className='flex justify-between items-start'>
@@ -91,7 +96,7 @@ export default function EmployeeReportPrintPage() {
     // This div ensures that only the dossier is visible, and no other UI elements from a potential layout
     return (
         <div>
-           <EmployeeDossier employee={employee} reportDate={new Date()} />
+           <EmployeeDossier employee={employee} reportDate={reportDate} />
         </div>
     );
 }

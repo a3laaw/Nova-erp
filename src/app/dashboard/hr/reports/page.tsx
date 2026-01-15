@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -29,6 +28,7 @@ import { generateReport, ReportData, ReportType, BulkReportData, StandardReportD
 import type { Employee, AuditLog } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
+import html2pdf from 'html2pdf.js';
 
 
 const REPORT_TYPES: { value: ReportType; label: string }[] = [
@@ -36,14 +36,71 @@ const REPORT_TYPES: { value: ReportType; label: string }[] = [
     { value: 'EmployeeRoster', label: 'قائمة الموظفين (Roster)' },
 ];
 
+const formatValueForHTML = (value: any, type?: 'date' | 'currency' | 'number' | 'component'): string => {    
+    if (value === null || value === undefined || value === '') return '-';
+
+    if (type === 'date') {
+        try {
+            const d = value.toDate ? value.toDate() : new Date(value);
+            if (isNaN(d.getTime())) return String(value) || '-';
+            return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+        } catch (e) {
+            return String(value) || '-';
+        }
+    }
+    if (type === 'currency') {
+        const amount = Number(value) || 0;
+         return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'KWD', numberingSystem: 'latn' }).format(amount);
+    }
+    
+    return String(value);
+};
+
+
+const generateReportHTML = (reportData: StandardReportData): string => {
+  const headers = reportData.headers.map(h => `<th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${h.label}</th>`).join('');
+  const rows = reportData.rows.map(row => {
+    const cells = reportData.headers.map(header => {
+      const cellValue = formatValueForHTML(row[header.key], header.type);
+      return `<td style="padding: 8px; border-bottom: 1px solid #eee;">${cellValue}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+  
+  const footer = reportData.footer ? `
+    <tr>
+        <td colspan="${reportData.footer.colSpan}" style="padding: 8px; font-weight: bold;">${reportData.footer.label}</td>
+        <td colspan="${reportData.headers.length - reportData.footer.colSpan}" style="padding: 8px; font-weight: bold; text-align: left;">${formatValueForHTML(reportData.footer.value, reportData.footer.type)}</td>
+    </tr>
+  ` : '';
+
+  return `
+    <div dir="rtl" style="font-family: 'Tajawal', sans-serif; padding: 20px;">
+        <h2 style="font-size: 24px; font-weight: bold;">${reportData.title}</h2>
+        <p style="color: #666; font-size: 14px;">${reportData.subtitle}</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <thead>
+                <tr>${headers}</tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+            <tfoot>
+                ${footer}
+            </tfoot>
+        </table>
+    </div>
+  `;
+};
+
 
 export default function ReportsPage() {
-    const firestore = useFirestore();
+    const firestore = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
     
     const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
-    const [asOfDate, setAsOfDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+    const [asOfDate, setAsOfDate] = useState<string>('');
     
     const [isGenerating, setIsGenerating] = useState(false);
     const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -51,6 +108,11 @@ export default function ReportsPage() {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
+    
+    useEffect(() => {
+        // Set date on client-side to prevent hydration mismatch
+        setAsOfDate(format(new Date(), 'yyyy-MM-dd'));
+    }, []);
 
     useEffect(() => {
         if (!firestore) return;
@@ -64,6 +126,9 @@ export default function ReportsPage() {
                     fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
                 });
                 setEmployees(fetchedEmployees.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+                 if (fetchedEmployees.length > 0) {
+                   setSelectedEmployeeId(fetchedEmployees[0].id!);
+                }
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
             }
@@ -107,14 +172,33 @@ export default function ReportsPage() {
     };
     
     const handlePrint = () => {
-        if (!reportData || reportType !== 'EmployeeDossier' || !('employee' in reportData) || !reportData.employee.id) return;
+        if (!reportData) return;
         
-        const employeeId = reportData.employee.id;
-        const printUrl = `/dashboard/hr/employees/${employeeId}/report`;
-        window.open(printUrl, '_blank', 'noopener,noreferrer');
+        if (reportData.type === 'EmployeeDossier' && reportData.employee.id) {
+             const printUrl = `/dashboard/hr/employees/${reportData.employee.id}/report`;
+             window.open(printUrl, '_blank', 'noopener,noreferrer');
+             return;
+        }
+
+        if (reportData.type === 'EmployeeRoster') {
+            const htmlContent = generateReportHTML(reportData);
+            const element = document.createElement('div');
+            element.innerHTML = htmlContent;
+             html2pdf().from(element).set({
+                margin:       1,
+                filename:     `${reportData.title}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+            }).save();
+        }
+        
+        if(reportData.type === 'BulkEmployeeDossiers') {
+            toast({ title: "غير متاح", description: "طباعة التقارير الجماعية غير متاحة حالياً بهذه الطريقة." });
+        }
     };
 
-    const isPrintable = reportData && reportType === 'EmployeeDossier' && 'employee' in reportData && !!reportData.employee;
+    const isPrintable = reportData && (reportData.type === 'EmployeeDossier' || reportData.type === 'EmployeeRoster');
 
 
   return (
