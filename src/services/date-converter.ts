@@ -14,7 +14,7 @@ export function fromFirestoreDate(date: any): string {
 
   try {
     let d: Date;
-    // Handle Firestore Timestamp
+    // Handle Firestore Timestamp specifically and correctly
     if (date.toDate && typeof date.toDate === 'function') {
       d = date.toDate();
     } else {
