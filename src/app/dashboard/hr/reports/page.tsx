@@ -25,13 +25,19 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { ReportResults } from '@/components/hr/report-results';
-import { generateReport, ReportData, ReportType, BulkReportData } from '@/services/report-generator';
+import { generateReport, ReportData, ReportType, BulkReportData, StandardReportData } from '@/services/report-generator';
 import type { Employee, AuditLog } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
 import html2pdf from 'html2pdf.js';
 import { fromFirestoreDate } from '@/services/date-converter';
 import { formatCurrency } from '@/lib/utils';
+
+const REPORT_TYPES: { value: ReportType; label: string }[] = [
+    { value: 'EmployeeDossier', label: 'ملف الموظف الشامل' },
+    { value: 'EmployeeRoster', label: 'قائمة الموظفين (Roster)' },
+];
+
 
 // --- STATIC HTML GENERATOR HELPER FUNCTIONS ---
 const renderInfoItem = (label: string, value: string | number | null | undefined): string => {

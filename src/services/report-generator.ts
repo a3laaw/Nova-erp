@@ -316,5 +316,3 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             throw new Error(`نوع التقرير غير معروف: ${exhaustiveCheck}`);
     }
 }
-
-    
