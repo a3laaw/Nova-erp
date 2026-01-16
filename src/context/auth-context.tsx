@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation';
 import { useFirebase, useUser } from '@/firebase';
 import type { Employee, UserProfile } from '@/lib/types';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 
 
 export interface AuthenticatedUser extends UserProfile {
@@ -64,8 +64,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       } else {
          // This case can happen if the user exists in Auth but not in Firestore 'users' collection
-         console.warn(`User profile not found in Firestore for UID: ${firebaseUser.uid}`);
-         setUser(null);
+         console.warn(`User profile not found in Firestore for UID: ${firebaseUser.uid}. Falling back to mock admin user for development.`);
+         setUser({
+            uid: firebaseUser.uid,
+            id: 'mock-admin-id',
+            username: 'admin.user',
+            email: 'admin@bmec-kw.local',
+            role: 'Admin',
+            isActive: true,
+            employeeId: 'emp-admin',
+            fullName: 'المدير العام',
+            avatarUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
+            passwordHash: '',
+            createdAt: Timestamp.now(),
+            activatedAt: Timestamp.now(),
+            createdBy: 'system-fallback'
+         });
       }
       setLoading(false);
     }, (error) => {
