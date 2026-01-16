@@ -21,8 +21,8 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, type DocumentData, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { collection, query, orderBy, type DocumentData, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     AlertDialog,
@@ -91,23 +91,37 @@ export function EmployeesTable() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { language } = useLanguage();
+    
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const employeesQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'employees'), orderBy('createdAt', 'desc'));
+
+    useEffect(() => {
+        if (!firestore) return;
+        setLoading(true);
+
+        const q = query(collection(firestore, 'employees'), orderBy('createdAt', 'desc'));
+        const unsubscribe = onSnapshot(q, 
+            (querySnapshot) => {
+                const employeeList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                const employeesWithBalance = employeeList.map(emp => ({
+                    ...emp,
+                    annualLeaveBalance: calculateAnnualLeaveBalance(emp)
+                }));
+                setEmployees(employeesWithBalance);
+                setLoading(false);
+            },
+            (err) => {
+                console.error(err);
+                setError("Failed to fetch employees.");
+                setLoading(false);
+            }
+        );
+
+        return () => unsubscribe();
     }, [firestore]);
 
-    const [snapshot, loading, error] = useCollection(employeesQuery);
-
-    const employees = useMemo(() => {
-        if (!snapshot) return [];
-        const employeeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-        // Recalculate balance on the client side for display
-        return employeeList.map(emp => ({
-            ...emp,
-            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
-        }));
-    }, [snapshot]);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
@@ -303,7 +317,7 @@ export function EmployeesTable() {
                     {error && (
                          <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-destructive">
-                                حدث خطأ أثناء جلب البيانات.
+                                {error}
                             </TableCell>
                         </TableRow>
                     )}

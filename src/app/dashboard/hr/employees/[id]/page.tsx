@@ -1,8 +1,8 @@
-
 'use client';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDoc } from '@/firebase';
+import { useFirestore } from '@/firebase';
+import { doc, onSnapshot, type DocumentData } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import {
   Card,
@@ -63,18 +63,42 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 export default function EmployeeProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const firestore = useFirestore();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  const docPath = useMemo(() => (id ? `employees/${id}` : undefined), [id]);
-  const [snapshot, loading, error] = useDoc(docPath);
-
-  const employee = snapshot?.data() as Employee | undefined;
+  const [employee, setEmployee] = useState<Employee | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !error && snapshot && !snapshot.exists()) {
-      router.push('/dashboard/hr'); // Redirect if not found
-    }
-  }, [snapshot, loading, error, router]);
+    if (!firestore || !id) {
+        setLoading(false);
+        if(!id) router.push('/dashboard/hr');
+        return;
+    };
+    setLoading(true);
+
+    const docRef = doc(firestore, 'employees', id);
+    const unsubscribe = onSnapshot(docRef, 
+        (docSnap) => {
+            if (docSnap.exists()) {
+                setEmployee({ id: docSnap.id, ...docSnap.data() } as Employee);
+            } else {
+                setError("Employee not found.");
+                router.push('/dashboard/hr');
+            }
+            setLoading(false);
+        }, 
+        (err) => {
+            console.error(err);
+            setError("Failed to fetch employee data.");
+            setLoading(false);
+        }
+    );
+
+    return () => unsubscribe();
+  }, [id, firestore, router]);
+
 
   if (loading) {
     return (
@@ -98,7 +122,7 @@ export default function EmployeeProfilePage() {
   if (error || !employee) {
     return (
       <div className="text-center py-10">
-        <p className="text-destructive">حدث خطأ أثناء تحميل بيانات الموظف.</p>
+        <p className="text-destructive">{error || 'حدث خطأ أثناء تحميل بيانات الموظف.'}</p>
         <Button onClick={() => router.back()} className="mt-4">
           العودة
         </Button>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -31,8 +30,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
-import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest, Employee } from '@/lib/types';
@@ -88,7 +87,8 @@ export default function LeaveRequestsPage() {
     const [isProcessingReject, setIsProcessingReject] = useState(false);
 
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
-    const [dataLoading, setDataLoading] = useState(true);
+    const [requests, setRequests] = useState<LeaveRequest[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (isReturnConfirmOpen) {
@@ -98,9 +98,9 @@ export default function LeaveRequestsPage() {
     
     useEffect(() => {
         if (!firestore) return;
+        setLoading(true);
 
         const fetchAllEmployees = async () => {
-            setDataLoading(true);
             try {
                 const employeesSnapshot = await getDocs(collection(firestore, 'employees'));
                 const newEmployeesMap = new Map<string, string>();
@@ -116,30 +116,34 @@ export default function LeaveRequestsPage() {
                     title: "خطأ",
                     description: "فشل في جلب بيانات الموظفين.",
                 });
-            } finally {
-                setDataLoading(false);
             }
         };
 
         fetchAllEmployees();
-    }, [firestore, toast]);
 
-
-    const requestsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(
+        const q = query(
             collection(firestore, 'leaveRequests'), 
             where('status', '==', filter),
             orderBy('createdAt', 'desc')
         );
-    }, [firestore, filter]);
 
-    const [snapshot, loading, error] = useCollection(requestsQuery);
+        const unsubscribe = onSnapshot(q, 
+            (querySnapshot) => {
+                const requestsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+                setRequests(requestsData);
+                setLoading(false);
+            },
+            (error) => {
+                console.error(error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب طلبات الإجازة' });
+                setLoading(false);
+            }
+        );
 
-    const requests = useMemo(() => {
-        if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-    }, [snapshot]);
+        return () => {
+            unsubscribe();
+        }
+    }, [firestore, filter, toast]);
 
 
     const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected', employeeId?: string, rejectionReason?: string) => {
@@ -260,8 +264,6 @@ export default function LeaveRequestsPage() {
     return format(d, 'dd/MM/yyyy');
   }
 
-  const isLoading = loading || dataLoading;
-
   return (
     <div className='space-y-6'>
         <Button variant="outline" onClick={() => router.push('/dashboard/hr')}>
@@ -309,26 +311,19 @@ export default function LeaveRequestsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading && Array.from({ length: 3 }).map((_, i) => (
+                            {loading && Array.from({ length: 3 }).map((_, i) => (
                                 <TableRow key={`skel-${i}`}>
                                     <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
                                 </TableRow>
                             ))}
-                            {error && (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center text-destructive">
-                                        حدث خطأ أثناء جلب البيانات.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                            {!isLoading && requests.length === 0 && (
+                            {!loading && requests.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center">
                                         لا توجد طلبات إجازة حالياً.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && requests.map(req => (
+                            {!loading && requests.map(req => (
                                 <TableRow key={req.id}>
                                     <TableCell className='font-medium'>{employeesMap.get(req.employeeId) || req.employeeName}</TableCell>
                                     <TableCell>

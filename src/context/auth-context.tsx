@@ -2,10 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useUser } from '@/firebase';
 import type { Employee, UserProfile } from '@/lib/types';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 
 export interface AuthenticatedUser extends UserProfile {
@@ -24,25 +23,61 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { auth, firestore } = useFirebase();
+  const { user: firebaseUser, loading: authLoading } = useUser();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // This effect now sets a mock user to ensure other parts of the app work.
-    const mockUser: AuthenticatedUser = {
-      uid: 'mock-admin-uid',
-      username: 'admin.user',
-      email: 'admin@bmec-kw.local',
-      role: 'Admin',
-      isActive: true,
-      employeeId: 'emp-admin',
-      fullName: 'المدير العام',
-      avatarUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
-      passwordHash: '',
-    };
-    setUser(mockUser);
-    setLoading(false);
-  }, []);
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!firebaseUser) {
+      setUser(null);
+      setLoading(false);
+      // Optional: redirect to login page if not on it
+      // if (router.pathname !== '/') router.push('/');
+      return;
+    }
+
+    if (!firestore) return;
+
+    const userProfileQuery = query(collection(firestore, 'users'), where('uid', '==', firebaseUser.uid));
+    
+    const unsubscribe = onSnapshot(userProfileQuery, async (snapshot) => {
+      if (!snapshot.empty) {
+        const userDoc = snapshot.docs[0];
+        const userProfileData = userDoc.data() as UserProfile;
+
+        // Fetch employee data
+        const employeeDocRef = doc(firestore, 'employees', userProfileData.employeeId);
+        const employeeSnap = await getDoc(employeeDocRef);
+        const employeeData = employeeSnap.exists() ? (employeeSnap.data() as Employee) : {};
+        
+        setUser({
+          ...userProfileData,
+          ...employeeData,
+          id: userDoc.id,
+          uid: firebaseUser.uid
+        });
+
+      } else {
+         // This case can happen if the user exists in Auth but not in Firestore 'users' collection
+         console.warn(`User profile not found in Firestore for UID: ${firebaseUser.uid}`);
+         setUser(null);
+      }
+      setLoading(false);
+    }, (error) => {
+        console.error("Error fetching user profile:", error);
+        setUser(null);
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+    
+  }, [firebaseUser, authLoading, firestore, router]);
+
 
   const login = async (username: string, password: string) => {
     console.log("Login function is disabled.");
@@ -50,7 +85,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    console.log("Logout function is disabled.");
+    if(auth) {
+        await auth.signOut();
+    }
     setUser(null);
     router.push('/');
   };

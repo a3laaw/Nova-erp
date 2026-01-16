@@ -27,6 +27,4 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
 
 export { initializeFirebase };
 export * from './provider';
-export * from './firestore/use-collection';
-export * from './firestore/use-doc';
-export { useAuth } from './auth/use-user';
+export { useUser } from './auth/use-user';

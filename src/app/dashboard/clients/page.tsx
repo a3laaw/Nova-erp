@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -25,9 +25,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { collection, doc, updateDoc, serverTimestamp, addDoc, query, orderBy, type DocumentData } from 'firebase/firestore';
+import { collection, doc, updateDoc, serverTimestamp, addDoc, query, orderBy, onSnapshot, type DocumentData } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore } from '@/firebase';
 
 
 type ClientStatus = 'new' | 'received' | 'completed' | 'rejected';
@@ -57,18 +57,32 @@ const statusColors: Record<ClientStatus, string> = {
 export default function ClientsPage() {
   const { language } = useLanguage();
   const firestore = useFirestore();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const clientsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'clients'), orderBy('createdAt', 'desc'));
+  useEffect(() => {
+    if (!firestore) return;
+    setLoading(true);
+
+    const q = query(collection(firestore, 'clients'), orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, 
+      (querySnapshot) => {
+        const clientsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+        setClients(clientsData);
+        setLoading(false);
+      }, 
+      (err) => {
+        console.error(err);
+        setError("Failed to fetch clients data.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [firestore]);
 
-  const [snapshot, loading, error] = useCollection(clientsQuery);
-  
-  const clients = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-  }, [snapshot]);
 
   const handleStatusChange = async (clientId: string, newStatus: ClientStatus) => {
     if (!firestore) return;
