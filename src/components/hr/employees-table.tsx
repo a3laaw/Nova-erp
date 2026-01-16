@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -72,7 +71,7 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     
     const daysOfService = differenceInDays(new Date(), hireDate);
     
-    // Accrual starts from day 1.
+    // Accrual starts from day 1. If service is negative or zero, balance is zero.
     if (daysOfService <= 0) {
         return 0;
     }
@@ -84,7 +83,8 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     const carried = employee.carriedLeaveDays || 0;
 
     const balance = totalAccrued + carried - used;
-
+    
+    // Return the floor of the balance, but not less than 0.
     return Math.floor(Math.max(0, balance));
 };
 
