@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -39,7 +40,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
-import { toFirestoreDate } from '@/services/date-converter';
+import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 
 
@@ -252,10 +253,15 @@ export default function LeaveRequestsPage() {
     };
 
 
-  const formatDateDisplay = (date: any) => {
-    const d = toFirestoreDate(date);
-    if (!d) return '-';
-    return format(d, 'dd/MM/yyyy');
+  const formatDateDisplay = (dateValue: any) => {
+    const dateString = fromFirestoreDate(dateValue);
+    if (!dateString) return '-';
+    try {
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+    } catch (e) {
+        return dateString;
+    }
   }
 
   const isLoading = loading || dataLoading;
@@ -448,5 +454,6 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
+    
 
     

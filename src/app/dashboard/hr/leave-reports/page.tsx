@@ -37,7 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import { toFirestoreDate } from '@/services/date-converter';
+import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 // Represents a leave request augmented with the current employee name
 interface AugmentedLeaveRequest extends LeaveRequest {
@@ -71,10 +71,14 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
 
 // Safe date conversion utility, specific for display purposes
 const formatDateForDisplay = (dateValue: any): string => {
-    const d = toFirestoreDate(dateValue);
-    if (!d) return '-';
-    // Use format from date-fns to be consistent
-    return format(d, 'dd/MM/yyyy');
+    const dateString = fromFirestoreDate(dateValue);
+    if (!dateString) return '-';
+    try {
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+    } catch (e) {
+        return dateString;
+    }
 }
 
 
@@ -328,3 +332,5 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
+
+    

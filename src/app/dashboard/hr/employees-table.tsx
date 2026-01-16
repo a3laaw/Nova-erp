@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -42,7 +43,7 @@ import { addMonths, format, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
-import { toFirestoreDate } from '@/services/date-converter';
+import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -69,13 +70,17 @@ const calculateAnnualLeaveBalance = (employee: Employee): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
     
+    // Employee must have been employed for at least 9 months to start accruing leave that can be taken.
+    // However, balance should reflect accrual from day 1 after probation.
     const daysOfService = differenceInDays(new Date(), hireDate);
     
-    if (daysOfService <= 0) {
+    if (daysOfService <= 90) { // Assuming 3 month probation
         return 0;
     }
 
-    const totalAccrued = (daysOfService / 365.25) * 30;
+    // Leave accrues at a rate of 2.5 days per month (30 days/year)
+    const accrualDays = daysOfService - 90;
+    const totalAccrued = (accrualDays / 365.25) * 30;
 
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
@@ -244,13 +249,16 @@ export function EmployeesTable() {
     };
 
     const formatDateCell = (dateValue: any): string => {
-        if (!dateValue) return '-';
+        const dateString = fromFirestoreDate(dateValue); // This gives "yyyy-MM-dd" or ""
+        if (!dateString) return '-';
+        
         try {
-            const d = toFirestoreDate(dateValue);
-            if (!d) return '-';
-            return format(d, 'dd/MM/yyyy');
-        } catch (e) {
-            return '-';
+            const [year, month, day] = dateString.split('-');
+            if (!year || !month || !day) return '-';
+            return `${day}/${month}/${year}`;
+        } catch(e) {
+            console.error("Failed to format date in table:", e);
+            return dateString; // Fallback to yyyy-mm-dd
         }
     }
 
