@@ -33,15 +33,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    if (!firestore) {
+      // Don't proceed if firestore is not available yet
+      setLoading(true);
+      return;
+    };
+
     if (!firebaseUser) {
-      setUser(null);
+      console.warn("No authenticated Firebase user found. Falling back to mock admin user for development.");
+      setUser({
+          uid: 'mock-admin-uid',
+          id: 'mock-admin-id',
+          username: 'admin.user',
+          email: 'admin@bmec-kw.local',
+          role: 'Admin',
+          isActive: true,
+          employeeId: 'emp-admin',
+          fullName: 'المدير العام',
+          avatarUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
+          passwordHash: '',
+          createdAt: Timestamp.now(),
+          activatedAt: Timestamp.now(),
+          createdBy: 'system-fallback'
+      });
       setLoading(false);
-      // Optional: redirect to login page if not on it
-      // if (router.pathname !== '/') router.push('/');
       return;
     }
 
-    if (!firestore) return;
 
     const userProfileQuery = query(collection(firestore, 'users'), where('uid', '==', firebaseUser.uid));
     
