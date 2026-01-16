@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -23,7 +22,7 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, type DocumentData, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, type DocumentData, doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     AlertDialog,
@@ -39,10 +38,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addMonths, format, differenceInYears } from 'date-fns';
+import { addMonths, format, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -56,29 +56,33 @@ const statusColors: Record<Employee['status'], string> = {
   terminated: 'bg-red-100 text-red-800 border-red-200',
 };
 
+const terminationReasons: Record<string, string> = {
+    resignation: 'استقالة',
+    termination: 'إنهاء خدمة (من الشركة)',
+    probation: 'إنهاء فترة التجربة'
+};
+
+
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
     if (!employee.hireDate) return 0;
+
+    const hireDate = toFirestoreDate(employee.hireDate);
+    if (!hireDate) return 0;
     
-    const hireDate = new Date(employee.hireDate);
-    const yearsOfService = differenceInYears(new Date(), hireDate);
+    const daysOfService = differenceInDays(new Date(), hireDate);
     
-    // As per Kuwait law, no leave entitlement in the first year of service
-    if (yearsOfService < 1) {
+    if (daysOfService <= 0) {
         return 0;
     }
-    
-    // Assuming accrual logic has been handled server-side or via a batch job
-    // and stored in the employee document.
-    const accrued = employee.annualLeaveAccrued || 0;
+
+    const totalAccrued = (daysOfService / 365.25) * 30;
+
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;
 
-    // Max carry-over is 15 days, total balance cannot exceed 45 (30 current + 15 carried).
-    const effectiveCarried = Math.min(carried, 15);
-    const totalEntitlement = accrued + effectiveCarried;
-    const balance = totalEntitlement - used;
+    const balance = totalAccrued + carried - used;
     
-    return Math.max(0, Math.min(45, Math.floor(balance)));
+    return Math.floor(Math.max(0, balance));
 };
 
 export function EmployeesTable() {
@@ -96,7 +100,6 @@ export function EmployeesTable() {
     const employees = useMemo(() => {
         if (!snapshot) return [];
         const employeeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-        // Recalculate balance on the client side for display
         return employeeList.map(emp => ({
             ...emp,
             annualLeaveBalance: calculateAnnualLeaveBalance(emp)
@@ -107,7 +110,9 @@ export function EmployeesTable() {
     const [isTerminating, setIsTerminating] = useState(false);
     const [noticeStartDate, setNoticeStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [terminationDate, setTerminationDate] = useState('');
-    const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | ''>('');
+    const [terminationReason, setTerminationReason] = useState<string>('');
+    const [isImmediate, setIsImmediate] = useState(false);
+
 
     const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
     const [isRehiring, setIsRehiring] = useState(false);
@@ -116,15 +121,29 @@ export function EmployeesTable() {
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
 
     useEffect(() => {
-        if (noticeStartDate) {
-            const noticeDate = new Date(noticeStartDate);
+        if (isImmediate || !noticeStartDate) {
+            return;
+        }
+        const noticeDate = toFirestoreDate(noticeStartDate);
+        if (noticeDate) {
             const termDate = addMonths(noticeDate, 3);
             setTerminationDate(format(termDate, 'yyyy-MM-dd'));
         }
-    }, [noticeStartDate]);
-
+    }, [noticeStartDate, isImmediate]);
+    
+     useEffect(() => {
+        if (employeeToTerminate) {
+            const hireDate = toFirestoreDate(employeeToTerminate.hireDate);
+            const isProbation = hireDate ? differenceInDays(new Date(), hireDate) <= 90 : false;
+            
+            setTerminationReason(isProbation ? 'probation' : '');
+            setTerminationDate(new Date().toISOString().split('T')[0]);
+            setIsImmediate(isProbation);
+            setNoticeStartDate(new Date().toISOString().split('T')[0]);
+        }
+    }, [employeeToTerminate]);
+    
     const handleTerminateClick = (employee: Employee) => {
-        setNoticeStartDate(new Date().toISOString().split('T')[0]);
         setEmployeeToTerminate(employee);
     };
     
@@ -136,11 +155,11 @@ export function EmployeesTable() {
     };
 
     const handleTerminationConfirm = async () => {
-        if (!employeeToTerminate || !firestore || !terminationReason || !noticeStartDate) {
+        if (!employeeToTerminate || !firestore || !terminationReason) {
             toast({
                 variant: 'destructive',
                 title: 'خطأ',
-                description: 'الرجاء تعبئة تاريخ بدء الإنذار وسبب إنهاء الخدمة.'
+                description: 'الرجاء اختيار سبب إنهاء الخدمة.'
             });
             return;
         }
@@ -151,8 +170,8 @@ export function EmployeesTable() {
         try {
             await updateDoc(employeeRef, {
                 status: 'terminated',
-                noticeStartDate: new Date(noticeStartDate),
-                terminationDate: new Date(terminationDate),
+                noticeStartDate: isImmediate ? null : toFirestoreDate(noticeStartDate),
+                terminationDate: toFirestoreDate(terminationDate),
                 terminationReason: terminationReason
             });
 
@@ -172,6 +191,7 @@ export function EmployeesTable() {
             setIsTerminating(false);
             setEmployeeToTerminate(null);
             setTerminationReason('');
+            setIsImmediate(false);
         }
     };
     
@@ -187,19 +207,21 @@ export function EmployeesTable() {
             terminationDate: null,
             terminationReason: null,
         };
+        
+        const rehireDate = toFirestoreDate(newHireDate);
 
-        if (rehireType === 'new') {
-            updateData.hireDate = new Date(newHireDate);
+        if (rehireType === 'new' && rehireDate) {
+            updateData.hireDate = rehireDate;
         }
 
-        if (resetLeaveBalance) {
+        if (resetLeaveBalance && rehireDate) {
             updateData.annualLeaveAccrued = 0;
             updateData.annualLeaveUsed = 0;
             updateData.carriedLeaveDays = 0;
             updateData.sickLeaveUsed = 0;
             updateData.emergencyLeaveUsed = 0;
-            updateData.lastLeaveResetDate = new Date(newHireDate);
-            updateData.lastVacationAccrualDate = new Date(newHireDate);
+            updateData.lastLeaveResetDate = rehireDate;
+            updateData.lastVacationAccrualDate = rehireDate;
         }
 
         try {
@@ -224,9 +246,9 @@ export function EmployeesTable() {
     const formatDateCell = (dateValue: any): string => {
         if (!dateValue) return '-';
         try {
-            const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
-            if (isNaN(d.getTime())) return '-';
-            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+            const d = toFirestoreDate(dateValue);
+            if (!d) return '-';
+            return format(d, 'dd/MM/yyyy');
         } catch (e) {
             return '-';
         }
@@ -276,7 +298,7 @@ export function EmployeesTable() {
                     {error && (
                          <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-destructive">
-                                حدث خطأ أثناء جلب البيانات.
+                                {error.message}
                             </TableCell>
                         </TableRow>
                     )}
@@ -348,46 +370,53 @@ export function EmployeesTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
-                            أدخل تاريخ بدء فترة الإنذار. سيتم حساب تاريخ انتهاء الخدمة الفعلي تلقائيًا بعد 3 أشهر.
+                           اختر سبب وتاريخ إنهاء الخدمة للموظف: {employeeToTerminate?.fullName}.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="grid gap-2">
                              <Label htmlFor="terminationReason">سبب إنهاء الخدمة</Label>
-                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v as any)}>
+                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v)}>
                                 <SelectTrigger id="terminationReason">
                                     <SelectValue placeholder="اختر السبب..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="resignation">استقالة</SelectItem>
-                                    <SelectItem value="termination">إنهاء من صاحب العمل</SelectItem>
+                                    {Object.entries(terminationReasons).map(([key, value]) => (
+                                        <SelectItem key={key} value={key}>{value}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="flex items-center space-x-2">
+                           <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
+                           <Label htmlFor="immediate">إنهاء فوري بدون فترة إنذار</Label>
+                        </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="noticeStartDate">تاريخ تقديم الاستقالة / بدء الإنذار</Label>
+                            <Label htmlFor="noticeStartDate" className={isImmediate ? 'text-muted-foreground' : ''}>تاريخ تقديم الاستقالة / بدء الإنذار</Label>
                             <Input
                                 id="noticeStartDate"
                                 type="date"
                                 value={noticeStartDate}
                                 onChange={(e) => setNoticeStartDate(e.target.value)}
+                                disabled={isImmediate}
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="terminationDate">تاريخ إنهاء الخدمة الفعلي (بعد 3 أشهر)</Label>
+                            <Label htmlFor="terminationDate" className={!isImmediate ? 'text-muted-foreground' : ''}>تاريخ إنهاء الخدمة الفعلي</Label>
                             <Input
                                 id="terminationDate"
                                 type="date"
                                 value={terminationDate}
-                                readOnly
-                                disabled
-                                className="bg-muted"
+                                onChange={(e) => setTerminationDate(e.target.value)}
+                                readOnly={!isImmediate}
+                                disabled={!isImmediate}
+                                className={!isImmediate ? 'bg-muted' : ''}
                             />
                         </div>
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating} className='bg-destructive hover:bg-destructive/90'>
+                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating || !terminationReason} className='bg-destructive hover:bg-destructive/90'>
                             {isTerminating ? 'جاري الحفظ...' : 'تأكيد إنهاء الخدمة'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -444,4 +473,6 @@ export function EmployeesTable() {
         </>
     );
 }
+    
+
     

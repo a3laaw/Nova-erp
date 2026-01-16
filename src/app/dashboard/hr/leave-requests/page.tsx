@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -40,6 +39,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
+import { toFirestoreDate } from '@/services/date-converter';
+import { format } from 'date-fns';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -127,7 +128,8 @@ export default function LeaveRequestsPage() {
         if (!firestore) return null;
         return query(
             collection(firestore, 'leaveRequests'), 
-            where('status', '==', filter)
+            where('status', '==', filter),
+            orderBy('createdAt', 'desc')
         );
     }, [firestore, filter]);
 
@@ -135,17 +137,7 @@ export default function LeaveRequestsPage() {
 
     const requests = useMemo(() => {
         if (!snapshot) return [];
-        const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-        // Client-side sorting
-        reqs.sort((a, b) => {
-            const dateA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt)) : 0;
-            const dateB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt)) : 0;
-            if (dateA && dateB) {
-                return dateB.getTime() - dateA.getTime();
-            }
-            return 0;
-        });
-        return reqs;
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
     }, [snapshot]);
 
 
@@ -161,7 +153,6 @@ export default function LeaveRequestsPage() {
             const updateData: DocumentData = {
                 status: newStatus,
                 approvedAt: serverTimestamp(),
-                // approvedBy: currentUser?.uid // In a real app with auth context
             };
             
             if (newStatus === 'rejected') {
@@ -226,7 +217,7 @@ export default function LeaveRequestsPage() {
 
             batch.update(requestRef, {
                 isBackFromLeave: true,
-                actualReturnDate: new Date(actualReturnDate).toISOString(),
+                actualReturnDate: toFirestoreDate(actualReturnDate),
             });
 
             batch.update(employeeRef, {
@@ -261,21 +252,10 @@ export default function LeaveRequestsPage() {
     };
 
 
-  const formatDate = (date: any) => {
-    if (!date) return '-';
-    try {
-        // Handle both ISO strings and Firestore Timestamps
-        const d = typeof date === 'string' ? new Date(date) : date.toDate();
-        if (isNaN(d.getTime())) return '-';
-        return new Intl.DateTimeFormat('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            numberingSystem: 'latn'
-        }).format(d);
-    } catch (e) {
-        return '-';
-    }
+  const formatDateDisplay = (date: any) => {
+    const d = toFirestoreDate(date);
+    if (!d) return '-';
+    return format(d, 'dd/MM/yyyy');
   }
 
   const isLoading = loading || dataLoading;
@@ -354,8 +334,8 @@ export default function LeaveRequestsPage() {
                                             {typeTranslations[req.leaveType]}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{formatDate(req.startDate)}</TableCell>
-                                    <TableCell>{formatDate(req.endDate)}</TableCell>
+                                    <TableCell>{formatDateDisplay(req.startDate)}</TableCell>
+                                    <TableCell>{formatDateDisplay(req.endDate)}</TableCell>
                                     <TableCell className='font-medium'>
                                         {req.workingDays !== undefined ? `${req.workingDays} أيام عمل` : `${req.days} أيام`}
                                     </TableCell>
@@ -390,7 +370,7 @@ export default function LeaveRequestsPage() {
                                                 {req.isBackFromLeave ? (
                                                     <div className='flex items-center justify-center gap-2 text-green-600'>
                                                         <CheckCircle className="h-4 w-4" />
-                                                        <span className='text-xs'>عاد في: {formatDate(req.actualReturnDate)}</span>
+                                                        <span className='text-xs'>عاد في: {formatDateDisplay(req.actualReturnDate)}</span>
                                                     </div>
                                                 ) : (
                                                     <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)}>
@@ -468,3 +448,5 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
+
+    
