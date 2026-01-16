@@ -65,22 +65,23 @@ const terminationReasons: Record<string, string> = {
 
 
 const calculateAnnualLeaveBalance = (employee: Employee): number => {
-    if (!employee.hireDate) return 0;
-
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return 0;
-    
-    // Employee must have been employed for at least 9 months to start accruing leave that can be taken.
-    // However, balance should reflect accrual from day 1 after probation.
-    const daysOfService = differenceInDays(new Date(), hireDate);
-    
-    if (daysOfService <= 90) { // Assuming 3 month probation
+    if (!employee.hireDate) {
         return 0;
     }
 
-    // Leave accrues at a rate of 2.5 days per month (30 days/year)
-    const accrualDays = daysOfService - 90;
-    const totalAccrued = (accrualDays / 365.25) * 30;
+    const hireDate = toFirestoreDate(employee.hireDate);
+    if (!hireDate) {
+        return 0;
+    }
+    
+    const daysOfService = differenceInDays(new Date(), hireDate);
+    
+    if (daysOfService <= 0) {
+        return 0;
+    }
+
+    // Leave accrues at a rate of 30 days per year from the hire date.
+    const totalAccrued = (daysOfService / 365.25) * 30;
 
     const used = employee.annualLeaveUsed || 0;
     const carried = employee.carriedLeaveDays || 0;

@@ -31,19 +31,23 @@ import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 
 type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 
-const calculateAnnualLeaveBalance = (employee: Employee | null): number => {
-    if (!employee || !employee.hireDate) return 0;
-
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return 0;
-
-    const daysOfService = differenceInDays(new Date(), hireDate);
-
-    if (daysOfService <= 0) {
+const calculateAnnualLeaveBalance = (employee: Employee | null, effectiveDate: Date): number => {
+    if (!employee || !employee.hireDate) {
         return 0;
     }
 
-    // Leave accrues at a rate of 30 days per year.
+    const hireDate = toFirestoreDate(employee.hireDate);
+    if (!hireDate) {
+        return 0;
+    }
+
+    if (effectiveDate < hireDate) {
+        return 0;
+    }
+
+    const daysOfService = differenceInDays(effectiveDate, hireDate);
+
+    // Leave accrues at a rate of 30 days per year from the hire date.
     const totalAccrued = (daysOfService / 365.25) * 30;
     
     const used = employee.annualLeaveUsed || 0;
@@ -162,7 +166,7 @@ export function GratuityCalculator() {
     }
     
     // From Article 70 - payment for unused annual leave
-    const leaveBalance = calculateAnnualLeaveBalance(selectedEmployee);
+    const leaveBalance = calculateAnnualLeaveBalance(selectedEmployee, termDate);
     const leavePayout = (basicSalary / 26) * leaveBalance; // Law states paid on basic salary
     
     const totalPayout = gratuity + leavePayout;
