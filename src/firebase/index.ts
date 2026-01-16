@@ -1,7 +1,7 @@
 'use client';
 
 import { initializeApp, getApp, getApps, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { getAuth, type Auth, signInAnonymously } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig: FirebaseOptions = {
@@ -21,6 +21,14 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   const auth = getAuth(app);
   const firestore = getFirestore(app);
+
+  // For development purposes, we sign in anonymously.
+  // This ensures a user is always available for Firestore rules and app logic.
+  if (!auth.currentUser) {
+    signInAnonymously(auth).catch((error) => {
+      console.error("Anonymous sign-in failed:", error);
+    });
+  }
 
   return { app, auth, firestore };
 }
