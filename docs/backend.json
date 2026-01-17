@@ -75,17 +75,32 @@
           "type": "number",
           "description": "The year of the client's file ID."
         },
-        "fullName": {
-          "type": "string",
-          "description": "The full name of the client."
+        "nameAr": {
+            "type": "string",
+            "description": "The full name of the client in Arabic."
+        },
+        "nameEn": {
+            "type": "string",
+            "description": "The full name of the client in English."
         },
         "mobile": {
           "type": "string",
           "description": "The client's mobile phone number."
         },
         "civilId": {
-          "type": "string",
-          "description": "The client's Civil ID number."
+            "type": "string",
+            "description": "The client's Civil ID number."
+        },
+        "address": {
+            "type": "object",
+            "description": "The client's address.",
+            "properties": {
+                "governorate": { "type": "string" },
+                "area": { "type": "string" },
+                "block": { "type": "string" },
+                "street": { "type": "string" },
+                "houseNumber": { "type": "string" }
+            }
         },
         "status": {
           "type": "string",
@@ -115,9 +130,8 @@
         "fileId",
         "fileNumber",
         "fileYear",
-        "fullName",
+        "nameAr",
         "mobile",
-        "civilId",
         "status",
         "createdAt",
         "isActive"

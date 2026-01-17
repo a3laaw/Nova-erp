@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
@@ -36,9 +37,9 @@ type ClientStatus = 'new' | 'received' | 'completed' | 'rejected';
 interface Client extends DocumentData {
   id: string;
   fileId: string;
-  fullName: string;
+  nameAr: string;
+  nameEn?: string;
   mobile: string;
-  civilId: string;
   status: ClientStatus;
 }
 
@@ -152,7 +153,7 @@ export default function ClientsPage() {
               {clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
-                  <TableCell className="font-medium">{client.fullName}</TableCell>
+                  <TableCell className="font-medium">{client.nameAr}</TableCell>
                   <TableCell>{client.mobile}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
