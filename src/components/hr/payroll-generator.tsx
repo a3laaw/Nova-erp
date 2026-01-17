@@ -70,7 +70,7 @@ export function PayrollGenerator() {
         const employeesSnapshot = await getDocs(q);
 
         if (employeesSnapshot.empty) {
-            throw new Error('لم يتم العثور على موظفين مستحقين للراتب (نشطين أو في إجازة) لهذا الشهر.');
+            throw new Error('لم يتم العثور على موظفين نشطين أو في إجازة لإنشاء كشوف رواتب لهم.');
         }
 
         const generatedPayslips: Payslip[] = [];
@@ -152,21 +152,123 @@ export function PayrollGenerator() {
     }
   }
 
+  const totalNetSalary = payslips.reduce((acc, p) => acc + p.netSalary, 0);
+
   const handleExportPDF = () => {
-     const element = document.getElementById('payslips-table');
-     if (element) {
-        import('html2pdf.js').then(module => {
-            const html2pdf = module.default;
-            const opt = {
-                margin:       0.5,
-                filename:     `payslips_${year}-${month}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2 },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-            };
-            html2pdf().from(element).set(opt).save();
-        });
-     }
+    if (!payslips.length || !year || !month) return;
+
+    const tableRows = payslips.map(p => {
+      const totalEarnings = (p.earnings.basicSalary || 0) + (p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0);
+      return `
+      <tr>
+        <td>${p.employeeName}</td>
+        <td class="currency">${formatCurrency(p.earnings.basicSalary)}</td>
+        <td class="currency">${formatCurrency(p.earnings.housingAllowance || 0)}</td>
+        <td class="currency">${formatCurrency(p.earnings.transportAllowance || 0)}</td>
+        <td class="currency" style="font-weight: bold;">${formatCurrency(totalEarnings)}</td>
+        <td class="currency" style="color: #c00;">${formatCurrency(p.deductions.absenceDeduction)}</td>
+        <td class="currency" style="font-weight: bold;">${formatCurrency(p.netSalary)}</td>
+        <td>${p.salaryPaymentType ? paymentTypeTranslations[p.salaryPaymentType] : '-'}</td>
+      </tr>
+    `}).join('');
+
+    const totalRow = `
+      <tr class="total-row">
+        <td colspan="6">الإجمالي</td>
+        <td class="currency" style="font-weight: bold;">${formatCurrency(totalNetSalary)}</td>
+        <td></td>
+      </tr>
+    `;
+
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+          <style>
+            body { 
+              font-family: 'Tajawal', sans-serif; 
+              direction: rtl; 
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              font-size: 10pt; 
+              margin-top: 20px; 
+            }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 8px; 
+              text-align: right; 
+            }
+            th { 
+              background-color: #f4f4f4; 
+              font-weight: bold; 
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 20px; 
+            }
+            .title { 
+              font-size: 18pt; 
+              font-weight: bold; 
+            }
+            .subtitle { 
+              font-size: 14pt; 
+              color: #555; 
+            }
+            .total-row td { 
+              font-weight: bold; 
+              font-size: 11pt; 
+              background-color: #f4f4f4; 
+            }
+            .currency { 
+              font-family: 'Courier New', Courier, monospace; 
+              text-align: left; 
+              direction: ltr; 
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">EmaratiScope Engineering</div>
+            <div class="subtitle">كشف رواتب شهر ${month}/${year}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الموظف</th>
+                <th>الراتب الأساسي</th>
+                <th>بدل السكن</th>
+                <th>بدل النقل</th>
+                <th>إجمالي الراتب</th>
+                <th>خصم الغياب</th>
+                <th>صافي الراتب</th>
+                <th>طريقة الدفع</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+            <tfoot>
+              ${totalRow}
+            </tfoot>
+          </table>
+        </body>
+      </html>
+    `;
+
+    import('html2pdf.js').then(module => {
+        const html2pdf = module.default;
+        const opt = {
+            margin:       0.5,
+            filename:     `payslips_${year}-${month}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, logging: false },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        html2pdf().from(htmlContent).set(opt).save();
+    });
   };
 
   const handleExportExcel = async () => {
@@ -186,8 +288,6 @@ export function PayrollGenerator() {
     XLSX.utils.book_append_sheet(wb, ws, `Payslips ${year}-${month}`);
     XLSX.writeFile(wb, `payslips_${year}-${month}.xlsx`);
   };
-
-  const totalNetSalary = payslips.reduce((acc, p) => acc + p.netSalary, 0);
 
   return (
     <Card>
