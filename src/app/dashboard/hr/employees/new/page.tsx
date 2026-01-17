@@ -41,10 +41,6 @@ export default function NewEmployeePage() {
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
     const [formData, setFormData] = useState<Partial<Employee>>({
         employeeNumber: '',
         fullName: '',
@@ -75,6 +71,42 @@ export default function NewEmployeePage() {
     const [includeHousing, setIncludeHousing] = useState(false);
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
+
+    useEffect(() => {
+        setIsClient(true);
+        if (firestore) {
+            setIsGeneratingNumber(true);
+            const fetchNextEmployeeNumber = async () => {
+                try {
+                    const employeesRef = collection(firestore, 'employees');
+                    const querySnapshot = await getDocs(employeesRef);
+                    let maxNumber = 100; // Start calculation from 100 to get 101 as the first
+                    
+                    querySnapshot.forEach(doc => {
+                         const num = parseInt(doc.data().employeeNumber, 10);
+                         if (!isNaN(num) && num > maxNumber) {
+                             maxNumber = num;
+                         }
+                    });
+                    
+                    const nextNumber = String(maxNumber + 1);
+                    setFormData(prev => ({ ...prev, employeeNumber: nextNumber }));
+                } catch (error) {
+                    console.error("Failed to fetch next employee number:", error);
+                    toast({
+                        variant: 'destructive',
+                        title: 'خطأ',
+                        description: 'فشل توليد الرقم الوظيفي. يرجى المحاولة مرة أخرى.'
+                    });
+                } finally {
+                    setIsGeneratingNumber(false);
+                }
+            };
+            fetchNextEmployeeNumber();
+        }
+    }, [firestore, toast]);
+
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -107,21 +139,17 @@ export default function NewEmployeePage() {
              for (const field of requiredFields) {
                 const value = formData[field];
                 if (value === undefined || value === null || (typeof value !== 'number' && value === '')) {
-                    toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
+                     if (field === 'employeeNumber') {
+                         toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرقم الوظيفي لم يتم توليده بعد. الرجاء الانتظار.` });
+                    } else {
+                        toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرجاء تعبئة حقل "${field}" الأساسي المطلوب.` });
+                    }
                     setIsLoading(false);
                     return;
                 }
             }
             
-            // --- Uniqueness Check for Civil ID, Mobile, and Employee Number ---
-            const employeeNumberQuery = query(collection(firestore, 'employees'), where('employeeNumber', '==', formData.employeeNumber));
-            const employeeNumberSnapshot = await getDocs(employeeNumberQuery);
-            if (!employeeNumberSnapshot.empty) {
-                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرقم الوظيفي هذا مسجل لموظف آخر.' });
-                setIsLoading(false);
-                return;
-            }
-
+            // --- Uniqueness Check for Civil ID and Mobile ---
             const civilIdQuery = query(collection(firestore, 'employees'), where('civilId', '==', formData.civilId));
             const civilIdSnapshot = await getDocs(civilIdQuery);
             if (!civilIdSnapshot.empty) {
@@ -292,8 +320,8 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="employeeNumber">الرقم الوظيفي <span className="text-destructive">*</span></Label>
-                                    <Input id="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} placeholder="e.g., 1001" dir="ltr" required />
+                                    <Label htmlFor="employeeNumber">الرقم الوظيفي</Label>
+                                    <Input id="employeeNumber" value={isGeneratingNumber ? "جاري التوليد..." : formData.employeeNumber} onChange={() => {}} readOnly disabled className="bg-muted/50" />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
@@ -504,7 +532,7 @@ export default function NewEmployeePage() {
                   <Button type="button" variant="outline" onClick={() => router.back()} className="ml-2">
                     إلغاء
                   </Button>
-                  <Button type="submit" disabled={isLoading}>
+                  <Button type="submit" disabled={isLoading || isGeneratingNumber}>
                     <Save className="ml-2 h-4 w-4" />
                     {isLoading ? 'جاري الحفظ...' : 'حفظ الموظف'}
                   </Button>
@@ -517,3 +545,4 @@ export default function NewEmployeePage() {
     
 
     
+
