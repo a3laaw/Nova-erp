@@ -22,10 +22,11 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, ClientTransaction } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
+import { useAuth } from '@/context/auth-context';
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ const transactionTypes = [
 
 export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
@@ -90,7 +92,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTrans
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore) return;
+        if (!firestore || !currentUser) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات أو تحديد المستخدم.' });
+            return;
+        }
 
         if (!transactionType) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار نوع المعاملة.' });
@@ -99,7 +104,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTrans
 
         setIsSaving(true);
         try {
-            const newTransaction: Omit<ClientTransaction, 'id'> = {
+            const batch = writeBatch(firestore);
+            const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
+
+            const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
                 transactionType,
                 description,
@@ -108,11 +116,33 @@ export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTrans
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };
+
+            batch.set(newTransactionRef, newTransactionData);
+
+            // Add creation log event to the transaction's timeline
+            const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
+            const logEventRef = doc(timelineCollectionRef);
+
+            let logContent = `أنشأ المعاملة "${transactionType}".`;
+            if (assignedEngineerId) {
+                const engineer = engineers.find(e => e.id === assignedEngineerId);
+                if (engineer) {
+                    logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
+                }
+            }
+
+            batch.set(logEventRef, {
+                type: 'log',
+                content: logContent,
+                userId: currentUser.uid,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            });
+
+            await batch.commit();
             
-            const transactionsCollection = collection(firestore, `clients/${clientId}/transactions`);
-            await addDoc(transactionsCollection, newTransaction);
-            
-            toast({ title: 'نجاح', description: 'تمت إضافة المعاملة بنجاح.' });
+            toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
             resetForm();
             onClose();
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, getDocs, collection } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -17,6 +17,8 @@ import { ArrowRight, BadgeInfo, Calendar, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
+import type { Employee } from '@/lib/types';
+
 
 // Using the same translation objects from client profile page
 const transactionStatusTranslations: Record<string, string> = {
@@ -51,6 +53,8 @@ export default function TransactionDetailPage() {
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
+  
+  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
   // --- Data Fetching ---
   const transactionRef = useMemo(() => {
@@ -65,6 +69,25 @@ export default function TransactionDetailPage() {
 
   const [transactionSnapshot, transactionLoading, transactionError] = useDoc(transactionRef);
   const [clientSnapshot, clientLoading, clientError] = useDoc(clientRef);
+  
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchEmployees = async () => {
+        try {
+            const querySnapshot = await getDocs(collection(firestore, 'employees'));
+            const newMap = new Map<string, string>();
+            querySnapshot.forEach(doc => {
+                const emp = doc.data() as Employee;
+                newMap.set(doc.id, emp.fullName);
+            });
+            setEmployeesMap(newMap);
+        } catch (error) {
+            console.error("Failed to fetch employees map for transaction detail:", error);
+        }
+    };
+    fetchEmployees();
+  }, [firestore]);
+
 
   const transaction = useMemo(() => {
     if (transactionSnapshot?.exists()) {
@@ -142,7 +165,7 @@ export default function TransactionDetailPage() {
             </CardHeader>
             <CardContent>
                 <div className='grid md:grid-cols-2 gap-6'>
-                    <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? '...' : <span className='text-muted-foreground'>لم يحدد</span>} />
+                    <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? (employeesMap.get(transaction.assignedEngineerId) || 'جاري التحميل...') : <span className='text-muted-foreground'>لم يحدد</span>} />
                     <InfoRow icon={<Calendar />} label="تاريخ الإنشاء" value={formatDate(transaction.createdAt)} />
                 </div>
                 {transaction.description && (
