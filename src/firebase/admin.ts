@@ -1,17 +1,4 @@
-
-import * as admin from 'firebase-admin';
-
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  : undefined;
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: serviceAccount
-      ? admin.credential.cert(serviceAccount)
-      : undefined,
-  });
-}
-
-export const firestore = admin.firestore();
-export const auth = admin.auth();
+// This file is deprecated and its contents have been moved into the
+// specific server actions that require Firebase Admin.
+// Using firebase-admin in a separate file can cause issues with
+// Next.js server/client component bundling.

@@ -1,7 +1,6 @@
 
 'use server';
 
-import { firestore } from '@/firebase/admin';
 import type { Employee, LeaveRequest, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { getDaysInMonth, format } from 'date-fns';
 
@@ -18,6 +17,25 @@ interface ExcelRow {
  * @returns An object with the count of processed records and affected employees.
  */
 export async function processAttendanceData(data: ExcelRow[]) {
+  // --- Start of new Firebase Admin init logic ---
+  const admin = await import('firebase-admin');
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : undefined;
+
+  if (!admin.apps.length) {
+    if (serviceAccount) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } else {
+      console.error("Firebase Admin service account is not available in environment variables.");
+      throw new Error("Firebase Admin service account is not available. Cannot process attendance.");
+    }
+  }
+  const firestore = admin.firestore();
+  // --- End of new Firebase Admin init logic ---
+
   if (!data || data.length === 0) {
     throw new Error('No data provided to process.');
   }

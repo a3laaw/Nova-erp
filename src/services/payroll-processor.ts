@@ -1,9 +1,7 @@
 
 'use server';
 
-import { firestore } from '@/firebase/admin';
 import type { Employee, MonthlyAttendance, Payslip } from '@/lib/types';
-import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Generates payslips for all active employees for a given month and year.
@@ -12,6 +10,27 @@ import { FieldValue } from 'firebase-admin/firestore';
  * @returns An array of the generated Payslip objects.
  */
 export async function generatePayslipsForMonth(year: number, month: number): Promise<Payslip[]> {
+  // --- Start of new Firebase Admin init logic ---
+  const admin = await import('firebase-admin');
+  const { FieldValue } = admin.firestore;
+  
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : undefined;
+
+  if (!admin.apps.length) {
+    if (serviceAccount) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } else {
+      console.error("Firebase Admin service account is not available in environment variables.");
+      throw new Error("Firebase Admin service account is not available. Cannot generate payslips.");
+    }
+  }
+  const firestore = admin.firestore();
+  // --- End of new Firebase Admin init logic ---
+
   // 1. Fetch all active and on-leave employees
   const employeesRef = firestore.collection('employees');
   const q = employeesRef.where('status', 'in', ['active', 'on-leave']);
