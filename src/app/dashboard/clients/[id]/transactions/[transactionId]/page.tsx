@@ -167,7 +167,7 @@ export default function TransactionDetailPage() {
     }
 
     if (engineerChanged) {
-        updateData.assignedEngineerId = newEngineerId || null; // Store null if unassigned
+        updateData.assignedEngineerId = newEngineerId === 'unassign' ? null : newEngineerId;
         const oldEngineerName = transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) || 'غير مسند' : 'غير مسند';
         const newEngineerName = newEngineerId ? employeesMap.get(newEngineerId) || 'غير مسند' : 'غير مسند';
         const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
@@ -283,7 +283,7 @@ export default function TransactionDetailPage() {
                     <Select dir="rtl" value={newEngineerId} onValueChange={setNewEngineerId}>
                         <SelectTrigger id="engineer"><SelectValue placeholder="اختر مهندسا..." /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">إزالة الإسناد</SelectItem>
+                            <SelectItem value="unassign">إزالة الإسناد</SelectItem>
                             {Array.from(employeesMap.entries()).map(([id, name]) => (
                                 <SelectItem key={id} value={id}>{name}</SelectItem>
                             ))}
