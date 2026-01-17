@@ -5,6 +5,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -303,3 +304,15 @@ export type Payslip = {
     createdAt: any;
 };
       
+export type ClientTransaction = {
+    id?: string;
+    clientId: string;
+    transactionType: string;
+    description?: string;
+    status: 'new' | 'in-progress' | 'completed' | 'submitted';
+    assignedEngineerId?: string;
+    createdAt: any;
+    updatedAt?: any;
+    // For display
+    engineerName?: string;
+};

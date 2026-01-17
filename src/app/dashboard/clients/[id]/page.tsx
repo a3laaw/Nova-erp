@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirestore, useDoc } from '@/firebase';
-import { doc, type DocumentData } from 'firebase/firestore';
+import { useFirestore, useDoc, useCollection } from '@/firebase';
+import { doc, collection, query, orderBy, type DocumentData, getDocs } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -10,11 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
+import type { ClientTransaction, Employee } from '@/lib/types';
+import { format } from 'date-fns';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number | null | undefined }) {
     if (!value) return null;
@@ -29,18 +40,32 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
     );
 }
 
-const statusTranslations: Record<string, string> = {
+const clientStatusTranslations: Record<string, string> = {
   new: 'جديد',
   received: 'تم استلامها',
   completed: 'تم إنجازها',
   rejected: 'مرفوضة',
 };
 
-const statusColors: Record<string, string> = {
+const clientStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
   received: 'bg-green-100 text-green-800 border-green-200',
   completed: 'bg-lime-100 text-lime-800 border-lime-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
+};
+
+const transactionStatusTranslations: Record<string, string> = {
+  new: 'جديدة',
+  'in-progress': 'قيد التنفيذ',
+  completed: 'مكتملة',
+  submitted: 'تم تسليمها',
+};
+
+const transactionStatusColors: Record<string, string> = {
+  new: 'bg-blue-100 text-blue-800 border-blue-200',
+  'in-progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  completed: 'bg-green-100 text-green-800 border-green-200',
+  submitted: 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
 
@@ -49,22 +74,55 @@ export default function ClientProfilePage() {
   const router = useRouter();
   const firestore = useFirestore();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
+  // --- Data Fetching ---
   const clientRef = useMemo(() => {
     if (!firestore || !id) return null;
     return doc(firestore, 'clients', id);
   }, [id, firestore]);
   
-  const [snapshot, loading, error] = useDoc(clientRef);
-  const [client, setClient] = useState<DocumentData | null>(null);
+  const transactionsQuery = useMemo(() => {
+    if (!firestore || !id) return null;
+    return query(collection(firestore, 'clients', id, 'transactions'), orderBy('createdAt', 'desc'));
+  }, [firestore, id]);
 
-  useEffect(() => {
-    if (snapshot?.exists()) {
-        setClient({ id: snapshot.id, ...snapshot.data() });
+  const [clientSnapshot, clientLoading, clientError] = useDoc(clientRef);
+  const [transactionsSnapshot, transactionsLoading, transactionsError] = useCollection(transactionsQuery);
+
+  const client = useMemo(() => {
+    if (clientSnapshot?.exists()) {
+        return { id: clientSnapshot.id, ...clientSnapshot.data() };
     }
-  }, [snapshot]);
+    return null;
+  }, [clientSnapshot]);
 
-  if (loading) {
+  const transactions = useMemo(() => {
+      if (!transactionsSnapshot) return [];
+      return transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+  }, [transactionsSnapshot]);
+  
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchEmployees = async () => {
+        const q = query(collection(firestore, 'employees'));
+        const querySnapshot = await getDocs(q);
+        const newMap = new Map<string, string>();
+        querySnapshot.forEach(doc => {
+            const emp = doc.data() as Employee;
+            newMap.set(doc.id, emp.fullName);
+        });
+        setEmployeesMap(newMap);
+    };
+    fetchEmployees();
+  }, [firestore]);
+
+
+  // --- Render Logic ---
+
+  if (clientLoading) {
     return (
         <div className="space-y-6" dir="rtl">
             <Skeleton className="h-9 w-48" />
@@ -85,10 +143,10 @@ export default function ClientProfilePage() {
     );
   }
 
-  if (error || !client) {
+  if (clientError || !client) {
     return (
       <div className="text-center py-10" dir="rtl">
-        <p className="text-destructive">{error ? 'فشل تحميل بيانات العميل.' : 'لم يتم العثور على العميل.'}</p>
+        <p className="text-destructive">{clientError ? 'فشل تحميل بيانات العميل.' : 'لم يتم العثور على العميل.'}</p>
         <Button onClick={() => router.push('/dashboard/clients')} className="mt-4">
           العودة إلى قائمة العملاء
         </Button>
@@ -113,6 +171,12 @@ export default function ClientProfilePage() {
 
 
   return (
+    <>
+    <ClientTransactionForm 
+        isOpen={isFormOpen} 
+        onClose={() => setIsFormOpen(false)}
+        clientId={id}
+    />
     <div className='space-y-6' dir='rtl'>
         <div className='flex justify-between items-center no-print'>
              <Button variant="outline" onClick={() => router.push('/dashboard/clients')}>
@@ -141,8 +205,8 @@ export default function ClientProfilePage() {
                             <Hash className='h-4 w-4'/>
                             <span>{client.fileId}</span>
                         </div>
-                        <Badge variant="outline" className={statusColors[client.status]}>
-                            {statusTranslations[client.status]}
+                        <Badge variant="outline" className={clientStatusColors[client.status]}>
+                            {clientStatusTranslations[client.status]}
                         </Badge>
                     </div>
                 </div>
@@ -167,22 +231,54 @@ export default function ClientProfilePage() {
                         <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
                         <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
                     </div>
-                    <Button>
+                    <Button onClick={() => setIsFormOpen(true)}>
                         <PlusCircle className="ml-2 h-4 w-4" />
                         إضافة معاملة
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                        <Files className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-4 text-lg font-medium">لا توجد معاملات بعد</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            قم بإضافة معاملة جديدة لتظهر هنا.
-                        </p>
-                    </div>
+                    {transactionsLoading && <Skeleton className="h-24 w-full" />}
+                    {!transactionsLoading && transactions.length === 0 && (
+                        <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                            <Files className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <h3 className="mt-4 text-lg font-medium">لا توجد معاملات بعد</h3>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                قم بإضافة معاملة جديدة لتظهر هنا.
+                            </p>
+                        </div>
+                    )}
+                     {!transactionsLoading && transactions.length > 0 && (
+                         <div className="border rounded-lg">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>نوع المعاملة</TableHead>
+                                        <TableHead>المهندس المسؤول</TableHead>
+                                        <TableHead>الحالة</TableHead>
+                                        <TableHead>تاريخ الإنشاء</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transactions.map(tx => (
+                                        <TableRow key={tx.id}>
+                                            <TableCell className="font-medium">{tx.transactionType}</TableCell>
+                                            <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className={transactionStatusColors[tx.status]}>
+                                                    {transactionStatusTranslations[tx.status]}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{format(tx.createdAt.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                         </div>
+                     )}
                 </CardContent>
             </Card>
         </div>
     </div>
+    </>
   );
 }
