@@ -129,11 +129,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const logEventRef = doc(timelineCollectionRef);
 
             let logContent = `أنشأ المعاملة "${transactionType}".`;
-            if (assignedEngineerId) {
-                const engineer = engineers.find(e => e.id === assignedEngineerId);
-                if (engineer) {
-                    logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
-                }
+            const engineer = engineers.find(e => e.id === assignedEngineerId);
+            if (engineer) {
+                logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
             }
 
             batch.set(logEventRef, {
@@ -149,17 +147,30 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             
             toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
             
-            // --- Create Notification ---
+            // --- Notification Logic ---
+            const engineerName = engineer ? engineer.fullName : 'غير مسند';
+
+            // 1. Notify the assigned engineer (if they are not the current user)
             if (assignedEngineerId) {
                 findUserIdByEmployeeId(firestore, assignedEngineerId).then(targetUserId => {
-                    if (targetUserId) {
+                    if (targetUserId && targetUserId !== currentUser.id) {
                         createNotification(firestore, {
                             userId: targetUserId,
                             title: 'تم إسناد معاملة جديدة لك',
-                            body: `تم إسناد المعاملة "${transactionType}" الخاصة بالعميل ${clientName} إليك.`,
+                            body: `أسند إليك ${currentUser.fullName} المعاملة "${transactionType}" للعميل ${clientName}.`,
                             link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
                         });
                     }
+                });
+            }
+
+            // 2. Send a confirmation notification to the current user
+            if (currentUser.id) {
+                 createNotification(firestore, {
+                    userId: currentUser.id,
+                    title: 'تم إنشاء معاملة بنجاح',
+                    body: `لقد أنشأت المعاملة "${transactionType}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`,
+                    link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
                 });
             }
 
