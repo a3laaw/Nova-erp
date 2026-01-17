@@ -138,6 +138,17 @@
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
         "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor"] },
         "department": { "type": "string" },
+        "salaryConfig": {
+          "type": "object",
+          "description": "Configuration for salary calculation.",
+          "properties": {
+            "basicSalary": { "type": "number" },
+            "housingAllowance": { "type": "number" },
+            "transportAllowance": { "type": "number" },
+            "deductForAbsence": { "type": "boolean", "description": "If true, absence days will be deducted from salary." }
+          },
+          "required": ["basicSalary", "deductForAbsence"]
+        },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
         "transportAllowance": { "type": "number" },
@@ -163,7 +174,8 @@
         "hireDate",
         "contractType",
         "basicSalary",
-        "status"
+        "status",
+        "salaryConfig"
       ]
     },
     "LeaveRequest": {
@@ -196,7 +208,7 @@
         "type": "object",
         "properties": {
             "name": { "type": "string", "description": "The name of the holiday." },
-            "date": { "type": "string", "format": "date-time", "description": "The date of the holiday." }
+            "date": { "type": "string", "format": "date", "description": "The date of the holiday." }
         },
         "required": ["name", "date"]
     },
@@ -214,6 +226,73 @@
             "notes": { "type": "string", "description": "Additional notes about the change." }
         },
         "required": ["changeType", "field", "newValue", "effectiveDate", "changedBy"]
+    },
+    "MonthlyAttendance": {
+      "title": "Monthly Attendance",
+      "description": "An employee's attendance records and summary for a specific month.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "year": { "type": "number" },
+        "month": { "type": "number" },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "checkIn": { "type": "string" },
+              "checkOut": { "type": "string" },
+              "status": { "type": "string", "enum": ["present", "absent", "late", "leave"] }
+            },
+            "required": ["date", "status"]
+          }
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "totalDays": { "type": "number" },
+            "presentDays": { "type": "number" },
+            "absentDays": { "type": "number" },
+            "lateDays": { "type": "number" },
+            "leaveDays": { "type": "number" }
+          },
+          "required": ["presentDays", "absentDays", "lateDays", "leaveDays"]
+        }
+      },
+      "required": ["employeeId", "year", "month", "records", "summary"]
+    },
+    "Payslip": {
+      "title": "Payslip",
+      "description": "An employee's payslip for a specific month.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "year": { "type": "number" },
+        "month": { "type": "number" },
+        "attendanceId": { "type": "string", "description": "Reference to the attendance document ID." },
+        "earnings": {
+          "type": "object",
+          "properties": {
+            "basicSalary": { "type": "number" },
+            "housingAllowance": { "type": "number" },
+            "transportAllowance": { "type": "number" }
+          },
+           "required": ["basicSalary"]
+        },
+        "deductions": {
+          "type": "object",
+          "properties": {
+            "absenceDeduction": { "type": "number" },
+            "otherDeductions": { "type": "number" }
+          }
+        },
+        "netSalary": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "processed", "paid"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["employeeId", "year", "month", "earnings", "netSalary", "status", "createdAt"]
     }
   },
   "auth": {
@@ -249,6 +328,14 @@
     "/holidays/{holidayId}": {
         "schema": { "$ref": "#/entities/Holiday" },
         "description": "Stores all official public holidays."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/entities/MonthlyAttendance" },
+      "description": "Stores monthly attendance sheets for employees. The ID is a composite of year-month-employeeId."
+    },
+    "/payroll/{payslipId}": {
+      "schema": { "$ref": "#/entities/Payslip" },
+      "description": "Stores generated monthly payslips for employees. The ID is a composite of year-month-employeeId."
     }
   }
 }

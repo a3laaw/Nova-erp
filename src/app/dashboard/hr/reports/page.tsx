@@ -28,7 +28,6 @@ import { generateReport, ReportData, ReportType, BulkReportData, StandardReportD
 import type { Employee, AuditLog } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
-import html2pdf from 'html2pdf.js';
 
 
 const REPORT_TYPES: { value: ReportType; label: string }[] = [
@@ -181,16 +180,19 @@ export default function ReportsPage() {
         }
 
         if (reportData.type === 'EmployeeRoster') {
-            const htmlContent = generateReportHTML(reportData);
-            const element = document.createElement('div');
-            element.innerHTML = htmlContent;
-             html2pdf().from(element).set({
-                margin:       1,
-                filename:     `${reportData.title}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-            }).save();
+            import('html2pdf.js').then(module => {
+                const html2pdf = module.default;
+                const htmlContent = generateReportHTML(reportData as StandardReportData);
+                const element = document.createElement('div');
+                element.innerHTML = htmlContent;
+                html2pdf().from(element).set({
+                    margin:       1,
+                    filename:     `${(reportData as StandardReportData).title}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true },
+                    jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+                }).save();
+            });
         }
         
         if(reportData.type === 'BulkEmployeeDossiers') {

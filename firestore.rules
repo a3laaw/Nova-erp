@@ -9,5 +9,23 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if true;
     }
+
+    // TODO: Secure collections based on roles
+    // match /users/{userId} {
+    //   allow read: if request.auth != null;
+    //   allow write: if request.auth.token.role == 'Admin';
+    // }
+    // match /employees/{employeeId} {
+    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
+    // }
+    // match /leaveRequests/{leaveRequestId} {
+    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
+    // }
+    // match /attendance/{attendanceId} {
+    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
+    // }
+    // match /payroll/{payslipId} {
+    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'Accountant';
+    // }
   }
 }

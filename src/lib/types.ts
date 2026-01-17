@@ -1,5 +1,6 @@
 
 
+
           
 
 export type MultilingualString = {
@@ -189,6 +190,12 @@ export type Employee = {
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor';
     department: string;
+    salaryConfig?: {
+      basicSalary: number;
+      housingAllowance?: number;
+      transportAllowance?: number;
+      deductForAbsence: boolean;
+    };
     basicSalary: number; // KWD
     housingAllowance?: number;
     transportAllowance?: number;
@@ -250,4 +257,49 @@ export type AuditLog = {
     notes?: string;
 };
 
+export type AttendanceRecord = {
+    date: string; // YYYY-MM-DD
+    checkIn?: string; // HH:MM
+    checkOut?: string; // HH:MM
+    status: 'present' | 'absent' | 'late' | 'leave';
+};
+
+export type AttendanceSummary = {
+    totalDays: number;
+    presentDays: number;
+    absentDays: number;
+    lateDays: number;
+    leaveDays: number;
+};
+
+export type MonthlyAttendance = {
+    id?: string;
+    employeeId: string;
+    year: number;
+    month: number;
+    records: AttendanceRecord[];
+    summary: AttendanceSummary;
+};
+
+export type Payslip = {
+    id?: string;
+    employeeId: string;
+    employeeName: string;
+    year: number;
+    month: number;
+    attendanceId?: string;
+    earnings: {
+        basicSalary: number;
+        housingAllowance?: number;
+        transportAllowance?: number;
+    };
+    deductions: {
+        absenceDeduction: number;
+        otherDeductions: number;
+    };
+    netSalary: number;
+    status: 'draft' | 'processed' | 'paid';
+    createdAt: any;
+};
       
+
