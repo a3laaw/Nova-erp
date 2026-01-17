@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -28,6 +29,12 @@ import { useLanguage } from '@/context/language-context';
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { language } = useLanguage();
+  const [date, setDate] = useState('');
+
+  useEffect(() => {
+    // Set date on client to avoid hydration mismatch
+    setDate(new Date().toISOString().split('T')[0]);
+  }, []);
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -61,7 +68,7 @@ export default function NewCashReceiptPage() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="date">التاريخ</Label>
-                <Input id="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

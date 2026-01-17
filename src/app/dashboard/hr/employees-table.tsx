@@ -88,7 +88,7 @@ export function EmployeesTable() {
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
-    const [noticeStartDate, setNoticeStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [noticeStartDate, setNoticeStartDate] = useState('');
     const [terminationDate, setTerminationDate] = useState('');
     const [terminationReason, setTerminationReason] = useState<string>('');
     const [isImmediate, setIsImmediate] = useState(false);
@@ -97,7 +97,7 @@ export function EmployeesTable() {
     const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
     const [isRehiring, setIsRehiring] = useState(false);
     const [rehireType, setRehireType] = useState<'continue' | 'new'>('continue');
-    const [newHireDate, setNewHireDate] = useState(new Date().toISOString().split('T')[0]);
+    const [newHireDate, setNewHireDate] = useState('');
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
 
     useEffect(() => {
