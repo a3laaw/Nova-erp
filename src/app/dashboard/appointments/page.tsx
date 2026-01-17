@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
 import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments';
 import { useLanguage } from '@/context/language-context';
+import Link from 'next/link';
 
 export default function AppointmentsPage() {
     const { language } = useLanguage();
@@ -28,10 +28,10 @@ export default function AppointmentsPage() {
                             <CardDescription>{t.description}</CardDescription>
                         </div>
                         <Button asChild size="sm" className="gap-1">
-                            
-                                <><PlusCircle className="h-4 w-4" />
-                                {t.new}</>
-                            
+                            <Link href="#">
+                                <PlusCircle className="h-4 w-4" />
+                                {t.new}
+                            </Link>
                         </Button>
                     </div>
                 </CardHeader>
