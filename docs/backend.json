@@ -156,6 +156,40 @@
         },
         "required": ["clientId", "transactionType", "status", "createdAt"]
     },
+    "TransactionTimelineEvent": {
+      "title": "Transaction Timeline Event",
+      "description": "Represents a single event (comment or log) in a transaction's history.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [ "comment", "log" ],
+          "description": "The type of event."
+        },
+        "content": {
+          "type": "string",
+          "description": "The content of the comment or the description of the log."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who created the event."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the user who created the event."
+        },
+        "userAvatar": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the user's avatar image."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [ "type", "content", "userId", "userName", "createdAt" ]
+    },
     "Counter": {
       "title": "Counter",
       "description": "Stores sequential counters for various entities.",
@@ -367,6 +401,12 @@
             "$ref": "#/entities/ClientTransaction"
         },
         "description": "Stores internal transactions/services for a specific client."
+    },
+    "/clients/{clientId}/transactions/{transactionId}/timelineEvents/{eventId}": {
+      "schema": {
+        "$ref": "#/entities/TransactionTimelineEvent"
+      },
+      "description": "Stores the chronological history and comments for a specific transaction."
     },
     "/counters/{counterId}": {
       "schema": {

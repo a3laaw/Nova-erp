@@ -6,6 +6,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -315,4 +316,14 @@ export type ClientTransaction = {
     updatedAt?: any;
     // For display
     engineerName?: string;
+};
+
+export type TransactionTimelineEvent = {
+  id: string;
+  type: 'comment' | 'log';
+  content: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  createdAt: any;
 };

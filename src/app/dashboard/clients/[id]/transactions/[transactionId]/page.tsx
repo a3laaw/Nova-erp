@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, type DocumentData } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -13,9 +13,10 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, MessageSquare, User, Clock } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 
 // Using the same translation objects from client profile page
 const transactionStatusTranslations: Record<string, string> = {
@@ -100,7 +101,7 @@ export default function TransactionDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-32 w-full mt-6" />
                 </CardContent>
             </Card>
         </div>
@@ -153,38 +154,8 @@ export default function TransactionDetailPage() {
             </CardContent>
         </Card>
         
-        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-             <Card className='lg:col-span-2'>
-                <CardHeader>
-                    <CardTitle className='flex items-center gap-2'><MessageSquare className='text-primary'/> التعليقات والمتابعة</CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                        <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-4 text-lg font-medium">نظام التعليقات قيد التطوير</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            سيتم هنا عرض التعليقات بين المهندسين.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-            
-            <Card>
-                <CardHeader>
-                    <CardTitle className='flex items-center gap-2'><Clock className='text-primary'/> سجل التغييرات</CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                        <Clock className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-4 text-lg font-medium">سجل التغييرات قيد التطوير</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                           سيتم عرض جميع التغييرات التي تمت على هذه المعاملة هنا.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+        <TransactionTimeline clientId={clientId} transactionId={transactionId} />
 
-        </div>
     </div>
   );
 }
