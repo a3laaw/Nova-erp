@@ -282,19 +282,19 @@ export default function EditEmployeePage() {
                             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="employeeNumber">الرقم الوظيفي <span className="text-destructive">*</span></Label>
-                                    <Input id="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} placeholder="e.g., 1001" dir="ltr" required />
+                                    <Input id="employeeNumber" value={formData.employeeNumber || ''} onChange={handleInputChange} placeholder="e.g., 1001" dir="ltr" required />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
-                                    <Input id="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />
+                                    <Input id="fullName" value={formData.fullName || ''} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="nameEn">الاسم بالإنجليزية <span className="text-destructive">*</span></Label>
-                                    <Input id="nameEn" value={formData.nameEn} onChange={handleInputChange} placeholder="e.g. Alyaa Alameri" dir="ltr" required />
+                                    <Input id="nameEn" value={formData.nameEn || ''} onChange={handleInputChange} placeholder="e.g. Alyaa Alameri" dir="ltr" required />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="dob">تاريخ الميلاد</Label>
-                                    <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} />
+                                    <Input id="dob" type="date" value={formData.dob || ''} onChange={handleInputChange} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="gender">النوع</Label>
@@ -318,7 +318,7 @@ export default function EditEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label>
-                                <Input id="civilId" value={formData.civilId} onChange={handleInputChange} placeholder="12-digit number" dir="ltr" maxLength={12} required />
+                                <Input id="civilId" value={formData.civilId || ''} onChange={handleInputChange} placeholder="12-digit number" dir="ltr" maxLength={12} required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="visaType">نوع الإقامة / التأشيرة</Label>
@@ -336,7 +336,7 @@ export default function EditEmployeePage() {
                             {formData.visaType !== 'kuwaiti' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} />
+                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry || ''} onChange={handleInputChange} />
                                 </div>
                             )}
                         </div>
@@ -350,15 +350,15 @@ export default function EditEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                                <Input id="mobile" dir="ltr" value={formData.mobile} onChange={handleInputChange} placeholder="+965 XXXX XXXX" required />
+                                <Input id="mobile" dir="ltr" value={formData.mobile || ''} onChange={handleInputChange} placeholder="+965 XXXX XXXX" required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="emergencyContact">رقم طوارئ</Label>
-                                <Input id="emergencyContact" dir="ltr" value={formData.emergencyContact} onChange={handleInputChange} placeholder="+965 XXXX XXXX" />
+                                <Input id="emergencyContact" dir="ltr" value={formData.emergencyContact || ''} onChange={handleInputChange} placeholder="+965 XXXX XXXX" />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="email">البريد الإلكتروني</Label>
-                                <Input id="email" type="email" dir="ltr" value={formData.email} onChange={handleInputChange} placeholder="employee@example.com" />
+                                <Input id="email" type="email" dir="ltr" value={formData.email || ''} onChange={handleInputChange} placeholder="employee@example.com" />
                             </div>
                         </div>
                     </div>
@@ -371,11 +371,11 @@ export default function EditEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Input id="department" value={formData.department} onChange={handleInputChange} placeholder="e.g., هندسة, محاسبة" required />
+                                <Input id="department" value={formData.department || ''} onChange={handleInputChange} placeholder="e.g., هندسة, محاسبة" required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Input id="jobTitle" value={formData.jobTitle} onChange={handleInputChange} placeholder="e.g., مهندس مدني, محاسب عام" required />
+                                <Input id="jobTitle" value={formData.jobTitle || ''} onChange={handleInputChange} placeholder="e.g., مهندس مدني, محاسب عام" required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>
@@ -391,7 +391,7 @@ export default function EditEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                                <Input id="hireDate" type="date" value={formData.hireDate} onChange={handleInputChange} required />
+                                <Input id="hireDate" type="date" value={formData.hireDate || ''} onChange={handleInputChange} required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
@@ -407,7 +407,7 @@ export default function EditEmployeePage() {
                             {(formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
-                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} />
+                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry || ''} onChange={handleInputChange} />
                                 </div>
                             )}
                              <div className="grid gap-2">
@@ -429,7 +429,7 @@ export default function EditEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             <div className="grid gap-2 md:col-span-3">
                                 <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
-                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary} onChange={handleInputChange} placeholder="0.000" required />
+                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary || ''} onChange={handleInputChange} placeholder="0.000" required />
                             </div>
 
                             <div className="items-center flex space-x-2 space-y-2">
@@ -442,7 +442,7 @@ export default function EditEmployeePage() {
                             {includeHousing && (
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="housingAllowance">قيمة بدل السكن</Label>
-                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance} onChange={handleInputChange} placeholder="0.000" />
+                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance || ''} onChange={handleInputChange} placeholder="0.000" />
                                 </div>
                             )}
 
@@ -456,7 +456,7 @@ export default function EditEmployeePage() {
                             {includeTransport && (
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="transportAllowance">قيمة بدل النقل</Label>
-                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance} onChange={handleInputChange} placeholder="0.000" />
+                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance || ''} onChange={handleInputChange} placeholder="0.000" />
                                 </div>
                             )}
                             
@@ -489,7 +489,7 @@ export default function EditEmployeePage() {
                                         </div>
                                         <div className="grid gap-2">
                                             <Label htmlFor="iban">رقم الحساب الدولي (IBAN) <span className="text-destructive">*</span></Label>
-                                            <Input id="iban" value={formData.iban} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
+                                            <Input id="iban" value={formData.iban || ''} onChange={handleInputChange} placeholder="KWXXXXXXXXXXXXXXXXXXXXXXXXXX" dir="ltr" required={formData.salaryPaymentType === 'transfer'} />
                                         </div>
                                     </>
                                 )}
