@@ -3,17 +3,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDocs, collection } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -24,6 +25,10 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import { useAuth } from '@/context/auth-context';
+import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 // Using the same translation objects from client profile page
@@ -56,11 +61,17 @@ export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const firestore = useFirestore();
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+  const [newStatus, setNewStatus] = useState('');
+  const [newEngineerId, setNewEngineerId] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
 
   // --- Data Fetching ---
   const transactionRef = useMemo(() => {
@@ -102,6 +113,13 @@ export default function TransactionDetailPage() {
     return null;
   }, [transactionSnapshot]);
   
+  useEffect(() => {
+    if (transaction) {
+        setNewStatus(transaction.status);
+        setNewEngineerId(transaction.assignedEngineerId || '');
+    }
+  }, [transaction]);
+
   const client = useMemo(() => {
     if (clientSnapshot?.exists()) {
         return { id: clientSnapshot.id, ...clientSnapshot.data() };
@@ -115,6 +133,67 @@ export default function TransactionDetailPage() {
       if (isNaN(date.getTime())) return '-';
       return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
   }
+
+  const handleUpdateTransaction = async () => {
+    if (!firestore || !currentUser || !client || !transaction) return;
+
+    const statusChanged = newStatus !== transaction.status;
+    const engineerChanged = newEngineerId !== (transaction.assignedEngineerId || '');
+
+    if (!statusChanged && !engineerChanged) {
+        toast({ title: 'لا توجد تغييرات', description: 'لم يتم تغيير الحالة أو المهندس المسؤول.' });
+        return;
+    }
+    
+    setIsSaving(true);
+    
+    const batch = writeBatch(firestore);
+    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+    const timelineRef = collection(transactionRef, 'timelineEvents');
+    
+    const updateData: any = { updatedAt: serverTimestamp() };
+
+    if (statusChanged) {
+        updateData.status = newStatus;
+        const logContent = `قام بتغيير حالة المعاملة من "${transactionStatusTranslations[transaction.status]}" إلى "${transactionStatusTranslations[newStatus]}".`;
+        batch.set(doc(timelineRef), {
+            type: 'log',
+            content: logContent,
+            userId: currentUser.uid,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        });
+    }
+
+    if (engineerChanged) {
+        updateData.assignedEngineerId = newEngineerId || null; // Store null if unassigned
+        const oldEngineerName = transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) || 'غير مسند' : 'غير مسند';
+        const newEngineerName = newEngineerId ? employeesMap.get(newEngineerId) || 'غير مسند' : 'غير مسند';
+        const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
+        batch.set(doc(timelineRef), {
+            type: 'log',
+            content: logContent,
+            userId: currentUser.uid,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        });
+    }
+
+    batch.update(transactionRef, updateData);
+    
+    try {
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم تحديث المعاملة بنجاح.' });
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المعاملة.' });
+    } finally {
+        setIsSaving(false);
+    }
+};
+
 
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading;
@@ -181,6 +260,43 @@ export default function TransactionDetailPage() {
                     </div>
                 )}
             </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>إدارة المعاملة</CardTitle>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-6">
+                <div className="grid gap-2">
+                    <Label htmlFor="status">تغيير الحالة</Label>
+                    <Select dir="rtl" value={newStatus} onValueChange={setNewStatus}>
+                        <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            {Object.keys(transactionStatusTranslations).map(key => (
+                                <SelectItem key={key} value={key}>{transactionStatusTranslations[key]}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="engineer">تغيير المهندس المسؤول</Label>
+                    <Select dir="rtl" value={newEngineerId} onValueChange={setNewEngineerId}>
+                        <SelectTrigger id="engineer"><SelectValue placeholder="اختر مهندسا..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">إزالة الإسناد</SelectItem>
+                            {Array.from(employeesMap.entries()).map(([id, name]) => (
+                                <SelectItem key={id} value={id}>{name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+                <Button onClick={handleUpdateTransaction} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                    حفظ التغييرات
+                </Button>
+            </CardFooter>
         </Card>
         
          <Tabs defaultValue="comments" dir="rtl">
