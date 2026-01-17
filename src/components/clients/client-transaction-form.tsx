@@ -152,7 +152,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             // --- Create Notification ---
             if (assignedEngineerId) {
                 findUserIdByEmployeeId(firestore, assignedEngineerId).then(targetUserId => {
-                    if (targetUserId && targetUserId !== currentUser.id) { // Don't notify user of their own action
+                    if (targetUserId) {
                         createNotification(firestore, {
                             userId: targetUserId,
                             title: 'تم إسناد معاملة جديدة لك',
@@ -234,5 +234,3 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         </Dialog>
     );
 }
-
-    
