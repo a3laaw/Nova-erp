@@ -57,6 +57,8 @@ export default function NewEmployeePage() {
         department: '',
         jobTitle: '',
         position: undefined,
+        workStartTime: '08:00',
+        workEndTime: '17:00',
         hireDate: '',
         contractType: 'permanent',
         basicSalary: 0,
@@ -449,6 +451,14 @@ export default function NewEmployeePage() {
                                     <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} required={formData.contractType !== 'permanent'} />
                                 </div>
                             )}
+                            <div className="grid gap-2">
+                                <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
+                                <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="workEndTime">وقت انتهاء الدوام</Label>
+                                <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} />
+                            </div>
                         </div>
                     </div>
 
@@ -545,4 +555,5 @@ export default function NewEmployeePage() {
     
 
     
+
 

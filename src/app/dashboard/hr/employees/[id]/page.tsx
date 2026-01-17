@@ -33,6 +33,7 @@ import {
   Wallet,
   Printer,
   Hash,
+  Clock,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -215,6 +216,7 @@ export default function EmployeeProfilePage() {
                 <CardContent className='space-y-4'>
                     <InfoRow icon={<Briefcase />} label="القسم" value={employee.department} />
                     <InfoRow icon={<User />} label="المنصب" value={employee.position} />
+                    <InfoRow icon={<Clock />} label="وقت الدوام" value={employee.workStartTime && employee.workEndTime ? `${employee.workStartTime} - ${employee.workEndTime}` : 'غير محدد'} />
                     <InfoRow icon={<Calendar />} label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
                     <InfoRow icon={<FileText />} label="نوع العقد" value={employee.contractType} />
                     {employee.contractType !== 'permanent' && <InfoRow icon={<Calendar />} label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />}

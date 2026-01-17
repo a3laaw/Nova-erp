@@ -4,6 +4,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -182,6 +183,8 @@ export type Employee = {
     email?: string;
     jobTitle?: string;
     position?: 'head' | 'employee' | 'assistant' | 'contractor';
+    workStartTime?: string; // e.g., "08:00"
+    workEndTime?: string; // e.g., "17:00"
     salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
     bankName?: string;
     accountNumber?: string;

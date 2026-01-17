@@ -127,6 +127,8 @@
         "email": { "type": "string", "format": "email" },
         "jobTitle": { "type": "string" },
         "position": { "type": "string", "enum": ["head", "employee", "assistant", "contractor"] },
+        "workStartTime": { "type": "string", "description": "The official start time for the employee's shift (e.g., '08:00')." },
+        "workEndTime": { "type": "string", "description": "The official end time for the employee's shift (e.g., '17:00')." },
         "salaryPaymentType": { "type": "string", "enum": ["cash", "cheque", "transfer"] },
         "bankName": { "type": "string" },
         "accountNumber": { "type": "string" },

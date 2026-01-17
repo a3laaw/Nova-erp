@@ -122,7 +122,7 @@ export default function EditEmployeePage() {
             const auditLogs: Partial<AuditLog>[] = [];
             const effectiveDate = new Date();
 
-            const fieldsToCompare: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban', 'hireDate'];
+            const fieldsToCompare: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban', 'hireDate', 'workStartTime', 'workEndTime'];
             
             fieldsToCompare.forEach(field => {
                 const originalValue = originalData[field];
@@ -410,6 +410,14 @@ export default function EditEmployeePage() {
                                     <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} />
                                 </div>
                             )}
+                             <div className="grid gap-2">
+                                <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
+                                <Input id="workStartTime" type="time" value={formData.workStartTime || ''} onChange={handleInputChange} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="workEndTime">وقت انتهاء الدوام</Label>
+                                <Input id="workEndTime" type="time" value={formData.workEndTime || ''} onChange={handleInputChange} />
+                            </div>
                         </div>
                     </div>
 

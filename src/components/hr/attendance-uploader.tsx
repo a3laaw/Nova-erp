@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -29,8 +30,8 @@ interface ExcelRow {
 }
 
 // Configuration for lateness calculation
-const OFFICIAL_START_TIME = '08:00'; // 8:00 AM
 const GRACE_PERIOD_MINUTES = 15; // 15 minutes grace period
+const DEFAULT_START_TIME = '08:00'; // Fallback if not set on employee
 
 export function AttendanceUploader() {
   const { toast } = useToast();
@@ -184,6 +185,7 @@ export function AttendanceUploader() {
                 continue;
             }
             
+            const officialStartTime = employee.workStartTime || DEFAULT_START_TIME;
             data.employeeId = employee.id;
 
             const leavesRef = collection(firestore, 'leaveRequests');
@@ -227,9 +229,9 @@ export function AttendanceUploader() {
                     let currentStatus: AttendanceRecord['status'] = 'present';
                     const checkInStr = record?.['وقت الدخول (HH:MM)'];
 
-                    if (checkInStr && /^\d{2}:\d{2}$/.test(checkInStr)) {
+                    if (checkInStr && /^\d{2}:\d{2}/.test(checkInStr)) {
                          try {
-                            const officialTime = new Date(`1970-01-01T${OFFICIAL_START_TIME}:00`);
+                            const officialTime = new Date(`1970-01-01T${officialStartTime}:00`);
                             officialTime.setMinutes(officialTime.getMinutes() + GRACE_PERIOD_MINUTES);
                             
                             const checkInTime = new Date(`1970-01-01T${checkInStr}:00`);
@@ -243,13 +245,16 @@ export function AttendanceUploader() {
                         }
                     }
 
+                    if (currentStatus === 'present') {
+                        presentDays++;
+                    }
+
                     processedRecords.push({
                         date: dateStr,
                         checkIn: checkInStr,
                         checkOut: record?.['وقت الخروج (HH:MM)'],
                         status: currentStatus
                     });
-                    presentDays++;
                 } else {
                     processedRecords.push({ date: dateStr, status: 'absent' });
                     absentDays++;
