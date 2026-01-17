@@ -137,6 +137,25 @@
         "isActive"
       ]
     },
+    "ClientTransaction": {
+        "title": "Client Transaction",
+        "description": "Represents an internal service or transaction for a client, like a design submission.",
+        "type": "object",
+        "properties": {
+            "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
+            "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
+            "description": { "type": "string", "description": "A brief description of the transaction." },
+            "status": {
+                "type": "string",
+                "description": "The current status of the transaction.",
+                "enum": ["new", "in-progress", "completed", "submitted"]
+            },
+            "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["clientId", "transactionType", "status", "createdAt"]
+    },
     "Counter": {
       "title": "Counter",
       "description": "Stores sequential counters for various entities.",
@@ -343,6 +362,12 @@
       },
       "description": "Stores information about the company's clients."
     },
+    "/clients/{clientId}/transactions/{transactionId}": {
+        "schema": {
+            "$ref": "#/entities/ClientTransaction"
+        },
+        "description": "Stores internal transactions/services for a specific client."
+    },
     "/counters/{counterId}": {
       "schema": {
         "$ref": "#/entities/Counter"
@@ -375,5 +400,3 @@
     }
   }
 }
-
-    

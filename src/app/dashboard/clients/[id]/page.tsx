@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Mail, Home, Hash, BadgeInfo } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
@@ -158,6 +158,28 @@ export default function ClientProfilePage() {
                     <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
                     <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
                     <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader className="flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
+                        <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
+                    </div>
+                    <Button>
+                        <PlusCircle className="ml-2 h-4 w-4" />
+                        إضافة معاملة
+                    </Button>
+                </CardHeader>
+                <CardContent>
+                    <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                        <Files className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-4 text-lg font-medium">لا توجد معاملات بعد</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            قم بإضافة معاملة جديدة لتظهر هنا.
+                        </p>
+                    </div>
                 </CardContent>
             </Card>
         </div>
