@@ -268,7 +268,7 @@ export default function ClientProfilePage() {
                                                     {transactionStatusTranslations[tx.status]}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>{format(tx.createdAt.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell>{formatDate(tx.createdAt)}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
