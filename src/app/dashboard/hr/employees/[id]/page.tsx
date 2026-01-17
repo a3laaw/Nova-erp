@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -137,8 +136,15 @@ export default function EmployeeProfilePage() {
       const dateString = fromFirestoreDate(dateValue);
       if (!dateString) return '-';
       // fromFirestoreDate returns yyyy-MM-dd, so we reformat to dd/MM/yyyy
-      const [year, month, day] = dateString.split('-');
-      return `${day}/${month}/${year}`;
+      try {
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return dateString; // Fallback for unexpected formats
+      } catch (e) {
+        return dateString; // Fallback if split fails
+      }
   }
 
   const formatCurrency = (amount: number | null | undefined) => {
