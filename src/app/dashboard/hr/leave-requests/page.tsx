@@ -127,10 +127,11 @@ export default function LeaveRequestsPage() {
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
+        // The orderBy clause was removed because it requires a composite index in Firestore.
+        // Sorting will be handled on the client-side instead.
         return query(
             collection(firestore, 'leaveRequests'), 
-            where('status', '==', filter),
-            orderBy('createdAt', 'desc')
+            where('status', '==', filter)
         );
     }, [firestore, filter]);
 
@@ -138,7 +139,14 @@ export default function LeaveRequestsPage() {
 
     const requests = useMemo(() => {
         if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+        // Sort client-side to avoid needing a composite index in Firestore
+        data.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis() || 0;
+            const timeB = b.createdAt?.toMillis() || 0;
+            return timeB - timeA;
+        });
+        return data;
     }, [snapshot]);
 
 
