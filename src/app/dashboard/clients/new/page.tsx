@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -74,7 +73,15 @@ export default function NewClientPage() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
+        let sanitizedValue = value;
+        if (id === 'nameAr') {
+            // Allow Arabic letters and spaces only
+            sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
+        } else if (id === 'nameEn') {
+            // Allow English letters and spaces only
+            sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
+        }
+        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -288,5 +295,3 @@ export default function NewClientPage() {
         </Card>
     );
 }
-
-    
