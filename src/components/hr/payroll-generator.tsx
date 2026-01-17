@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Calculator, Loader2, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { generatePayslipsForMonth } from '@/services/payroll-processor';
-import type { Payslip } from '@/lib/types';
+import type { Employee, Payslip } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
+import { useFirestore } from '@/firebase';
+import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+
 
 const generateYears = () => {
   const currentYear = new Date().getFullYear();
@@ -26,6 +28,7 @@ const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export function PayrollGenerator() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [year, setYear] = useState<number | null>(null);
   const [month, setMonth] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -33,7 +36,6 @@ export function PayrollGenerator() {
   const years = generateYears();
 
   useEffect(() => {
-    // Set initial date on the client side to avoid hydration mismatch
     const now = new Date();
     setYear(now.getFullYear());
     setMonth(now.getMonth() + 1);
@@ -48,14 +50,87 @@ export function PayrollGenerator() {
         });
         return;
     }
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+      return;
+    }
     setIsGenerating(true);
     setPayslips([]);
     try {
-        const result = await generatePayslipsForMonth(year, month);
-        setPayslips(result);
+        const employeesRef = collection(firestore, 'employees');
+        const q = query(employeesRef, where('status', 'in', ['active', 'on-leave']));
+        const employeesSnapshot = await getDocs(q);
+
+        if (employeesSnapshot.empty) {
+            throw new Error('لم يتم العثور على موظفين مستحقين للراتب (نشطين أو في إجازة) لهذا الشهر.');
+        }
+
+        const generatedPayslips: Payslip[] = [];
+        const batch = writeBatch(firestore);
+
+        for (const empDoc of employeesSnapshot.docs) {
+            const employee = { id: empDoc.id, ...empDoc.data() } as Employee;
+            
+            const attendanceId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
+            const attendanceRef = doc(firestore, 'attendance', attendanceId);
+            const attendanceSnap = await getDoc(attendanceRef);
+
+            let absenceDeduction = 0;
+            
+            if (attendanceSnap.exists() && employee.salaryConfig?.deductForAbsence) {
+                const attendanceData = attendanceSnap.data();
+                const absentDays = attendanceData?.summary?.absentDays || 0;
+                
+                if (absentDays > 0) {
+                    const dailyRate = (employee.basicSalary || 0) / 30;
+                    absenceDeduction = dailyRate * absentDays;
+                }
+            }
+            
+            const earnings = {
+                basicSalary: employee.basicSalary || 0,
+                housingAllowance: employee.housingAllowance || 0,
+                transportAllowance: employee.transportAllowance || 0,
+            };
+            
+            const totalEarnings = earnings.basicSalary + (earnings.housingAllowance || 0) + (earnings.transportAllowance || 0);
+            const totalDeductions = absenceDeduction;
+            const netSalary = totalEarnings - totalDeductions;
+            
+            const payslipId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
+            
+            const newPayslipForDb = {
+            employeeId: employee.id!,
+            employeeName: employee.fullName,
+            year: year,
+            month: month,
+            attendanceId: attendanceSnap.exists() ? attendanceId : undefined,
+            earnings: earnings,
+            deductions: {
+                absenceDeduction: absenceDeduction,
+                otherDeductions: 0,
+            },
+            netSalary: netSalary,
+            status: 'draft',
+            createdAt: serverTimestamp(),
+            };
+            
+            const payslipRef = doc(firestore, 'payroll', payslipId);
+            batch.set(payslipRef, newPayslipForDb);
+            
+            const payslipForClient: Payslip = {
+            id: payslipId,
+            ...newPayslipForDb,
+            createdAt: new Date(),
+            };
+            generatedPayslips.push(payslipForClient);
+        }
+        
+        await batch.commit();
+        setPayslips(generatedPayslips);
          toast({
             title: 'تم إنشاء كشوف الرواتب',
-            description: `تم إنشاء ${result.length} كشف راتب بنجاح.`
+            description: `تم إنشاء ${generatedPayslips.length} كشف راتب بنجاح.`
         });
     } catch (error) {
         console.error(error);
