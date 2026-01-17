@@ -35,6 +35,7 @@ type ClientStatus = 'new' | 'received' | 'completed' | 'rejected';
 
 interface Client extends DocumentData {
   id: string;
+  fileId: string;
   fullName: string;
   mobile: string;
   civilId: string;
@@ -150,7 +151,7 @@ export default function ClientsPage() {
               {!loading && clients.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">{currentText.noClients}</TableCell></TableRow>}
               {clients.map((client) => (
                 <TableRow key={client.id}>
-                  <TableCell className="font-mono">{client.id.substring(0, 8)}</TableCell>
+                  <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
                   <TableCell className="font-medium">{client.fullName}</TableCell>
                   <TableCell>{client.mobile}</TableCell>
                   <TableCell>

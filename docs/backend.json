@@ -63,6 +63,18 @@
       "description": "Represents a client of the consultancy.",
       "type": "object",
       "properties": {
+        "fileId": {
+          "type": "string",
+          "description": "The client's file ID, in the format 'sequence/year' (e.g., '1/2024')."
+        },
+        "fileNumber": {
+          "type": "number",
+          "description": "The sequential part of the client's file ID for a given year."
+        },
+        "fileYear": {
+          "type": "number",
+          "description": "The year of the client's file ID."
+        },
         "fullName": {
           "type": "string",
           "description": "The full name of the client."
@@ -100,6 +112,9 @@
         }
       },
       "required": [
+        "fileId",
+        "fileNumber",
+        "fileYear",
         "fullName",
         "mobile",
         "civilId",
@@ -111,7 +126,6 @@
     "Employee": {
       "title": "Employee",
       "description": "Represents an employee in the company.",
-      "type": "object",
       "properties": {
         "employeeNumber": { "type": "string", "description": "The unique identifying number for the employee." },
         "fullName": { "type": "string", "description": "Employee's name in Arabic." },
