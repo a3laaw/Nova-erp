@@ -408,6 +408,12 @@
       },
       "description": "Stores the chronological history and comments for a specific transaction."
     },
+    "/clients/{clientId}/history/{eventId}": {
+      "schema": {
+        "$ref": "#/entities/TransactionTimelineEvent"
+      },
+      "description": "Stores the audit history and important events for a client file."
+    },
     "/counters/{counterId}": {
       "schema": {
         "$ref": "#/entities/Counter"

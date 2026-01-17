@@ -15,20 +15,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, updateDoc, query, where, getDocs, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, query, where, getDocs, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/context/auth-context';
 
 export default function EditClientPage() {
     const router = useRouter();
     const params = useParams();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const { language } = useLanguage();
     
+    const [originalData, setOriginalData] = useState<any>(null);
     const [formData, setFormData] = useState({
         nameAr: '',
         nameEn: '',
@@ -57,6 +60,7 @@ export default function EditClientPage() {
 
                 if (clientSnap.exists()) {
                     const data = clientSnap.data();
+                    setOriginalData(data);
                     setFormData({
                         nameAr: data.nameAr || '',
                         nameEn: data.nameEn || '',
@@ -96,8 +100,8 @@ export default function EditClientPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !id) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+        if (!firestore || !id || !currentUser || !originalData) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات أو تحديد المستخدم.' });
             return;
         }
 
@@ -109,7 +113,6 @@ export default function EditClientPage() {
         setIsLoading(true);
 
         try {
-            // --- Uniqueness Check for Mobile on Edit ---
             const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', formData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty && mobileSnapshot.docs[0].id !== id) {
@@ -118,23 +121,63 @@ export default function EditClientPage() {
                 return;
             }
 
+            const batch = writeBatch(firestore);
             const clientRef = doc(firestore, 'clients', id);
-            const updatedData = {
-                nameAr: formData.nameAr,
-                nameEn: formData.nameEn,
-                mobile: formData.mobile,
-                address: {
-                    governorate: formData.governorate,
-                    area: formData.area,
-                    block: formData.block,
-                    street: formData.street,
-                    houseNumber: formData.houseNumber,
-                },
-            };
+            const historyCollectionRef = collection(firestore, `clients/${id}/history`);
             
-            await updateDoc(clientRef, updatedData);
+            const updatedClientData: Record<string, any> = {};
 
-            toast({ title: 'نجاح', description: 'تم تحديث بيانات العميل بنجاح.' });
+            const fieldMappings: { key: keyof typeof formData, label: string }[] = [
+                { key: 'nameAr', label: 'الاسم بالعربية' },
+                { key: 'nameEn', label: 'الاسم بالإنجليزية' },
+                { key: 'mobile', label: 'رقم الجوال' },
+            ];
+
+            fieldMappings.forEach(({ key, label }) => {
+                if (formData[key] !== originalData[key]) {
+                    updatedClientData[key] = formData[key];
+                    const logContent = `قام بتحديث "${label}" من "${originalData[key] || '-'}" إلى "${formData[key]}"`;
+                    batch.set(doc(historyCollectionRef), {
+                        type: 'log',
+                        content: logContent,
+                        userId: currentUser.uid,
+                        userName: currentUser.fullName,
+                        userAvatar: currentUser.avatarUrl,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            });
+            
+            const originalAddress = originalData.address || {};
+            const newAddress = {
+                governorate: formData.governorate,
+                area: formData.area,
+                block: formData.block,
+                street: formData.street,
+                houseNumber: formData.houseNumber,
+            };
+
+            if (JSON.stringify(originalAddress) !== JSON.stringify(newAddress)) {
+                updatedClientData.address = newAddress;
+                const logContent = `قام بتحديث العنوان.`; // Simplified log for address
+                batch.set(doc(historyCollectionRef), {
+                    type: 'log',
+                    content: logContent,
+                    userId: currentUser.uid,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                });
+            }
+
+            if (Object.keys(updatedClientData).length > 0) {
+                batch.update(clientRef, updatedClientData);
+                await batch.commit();
+                toast({ title: 'نجاح', description: 'تم تحديث بيانات العميل بنجاح.' });
+            } else {
+                toast({ title: 'لا توجد تغييرات', description: 'لم يتم إجراء أي تعديلات للحفظ.' });
+            }
+            
             router.push(`/dashboard/clients/${id}`);
 
         } catch (error) {

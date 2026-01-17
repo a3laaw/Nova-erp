@@ -18,14 +18,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import type { ClientTransaction, Employee } from '@/lib/types';
 import { format } from 'date-fns';
+import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number | null | undefined }) {
     if (!value) return null;
@@ -213,8 +220,13 @@ export default function ClientProfilePage() {
             </CardHeader>
         </Card>
 
-        <div className='grid grid-cols-1 gap-6'>
-             <Card>
+        <Tabs defaultValue="profile" dir="rtl">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
+            <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
+          </TabsList>
+          <TabsContent value="profile" className="mt-6 space-y-6">
+            <Card>
                 <CardHeader>
                     <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
                 </CardHeader>
@@ -281,7 +293,11 @@ export default function ClientProfilePage() {
                      )}
                 </CardContent>
             </Card>
-        </div>
+          </TabsContent>
+          <TabsContent value="history" className="mt-6">
+            <ClientHistoryTimeline clientId={id} />
+          </TabsContent>
+        </Tabs>
     </div>
     </>
   );
