@@ -27,11 +27,14 @@ import { useToast } from '@/hooks/use-toast';
 import type { Employee, ClientTransaction } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
   onClose: () => void;
   clientId: string;
+  clientName: string;
 }
 
 const transactionTypes = [
@@ -43,7 +46,7 @@ const transactionTypes = [
     'معاملة أخرى'
 ];
 
-export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTransactionFormProps) {
+export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
@@ -103,9 +106,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTrans
         }
 
         setIsSaving(true);
+        let newTransactionRefId = '';
         try {
             const batch = writeBatch(firestore);
             const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
+            newTransactionRefId = newTransactionRef.id;
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
@@ -143,6 +148,21 @@ export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTrans
             await batch.commit();
             
             toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
+            
+            // --- Create Notification ---
+            if (assignedEngineerId) {
+                findUserIdByEmployeeId(firestore, assignedEngineerId).then(targetUserId => {
+                    if (targetUserId && targetUserId !== currentUser.id) { // Don't notify user of their own action
+                        createNotification(firestore, {
+                            userId: targetUserId,
+                            title: 'تم إسناد معاملة جديدة لك',
+                            body: `تم إسناد المعاملة "${transactionType}" الخاصة بالعميل ${clientName} إليك.`,
+                            link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
+                        });
+                    }
+                });
+            }
+
             resetForm();
             onClose();
 
@@ -214,3 +234,5 @@ export function ClientTransactionForm({ isOpen, onClose, clientId }: ClientTrans
         </Dialog>
     );
 }
+
+    

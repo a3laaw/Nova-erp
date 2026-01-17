@@ -165,7 +165,11 @@ export default function ClientProfilePage() {
       if (!dateValue) return '-';
       const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
       if (isNaN(date.getTime())) return '-';
-      return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+      try {
+        return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+      } catch (e) {
+        return '-';
+      }
   }
 
   const clientAddress = client.address ? [
@@ -185,6 +189,7 @@ export default function ClientProfilePage() {
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)}
         clientId={id}
+        clientName={client.nameAr}
     />
     <div className='space-y-6' dir='rtl'>
         <div className='flex justify-between items-center no-print'>
@@ -305,3 +310,5 @@ export default function ClientProfilePage() {
     </>
   );
 }
+
+    

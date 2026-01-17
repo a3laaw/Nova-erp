@@ -7,6 +7,7 @@ import { Languages } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
+import { Notifications } from './notifications';
 
 const getTitleFromPathname = (pathname: string, lang: 'ar' | 'en') => {
     // Exact matches first
@@ -84,6 +85,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                  <h1 className="text-xl font-semibold font-headline">{title}</h1>
             </div>
             <div className="ml-auto flex items-center gap-2">
+                <Notifications />
                 <Button variant="outline" size="icon" onClick={toggleLanguage} aria-label="Toggle language">
                     <Languages className="h-4 w-4" />
                 </Button>
@@ -92,3 +94,5 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
         </header>
     );
 }
+
+    
