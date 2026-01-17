@@ -28,6 +28,10 @@ interface ExcelRow {
   'وقت الخروج (HH:MM)': string;
 }
 
+// Configuration for lateness calculation
+const OFFICIAL_START_TIME = '08:00'; // 8:00 AM
+const GRACE_PERIOD_MINUTES = 15; // 15 minutes grace period
+
 export function AttendanceUploader() {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -49,7 +53,7 @@ export function AttendanceUploader() {
       {
         'الرقم الوظيفي': 102,
         'التاريخ (YYYY-MM-DD)': format(new Date(), 'yyyy-MM-dd'),
-        'وقت الدخول (HH:MM)': '08:05',
+        'وقت الدخول (HH:MM)': '08:20',
         'وقت الخروج (HH:MM)': '17:03',
       },
     ];
@@ -91,7 +95,6 @@ export function AttendanceUploader() {
         const worksheet = workbook.Sheets[sheetName];
         const json: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
         
-        // Validate headers
         const headers = Object.keys(json[0] || {});
         const requiredHeaders = ['الرقم الوظيفي', 'التاريخ (YYYY-MM-DD)', 'وقت الدخول (HH:MM)', 'وقت الخروج (HH:MM)'];
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
@@ -221,11 +224,30 @@ export function AttendanceUploader() {
                 const isPresent = ignoreCheckIn ? !!record : (record && record['وقت الدخول (HH:MM)'] && record['وقت الدخول (HH:MM)'] !== '-');
                 
                 if (isPresent) {
+                    let currentStatus: AttendanceRecord['status'] = 'present';
+                    const checkInStr = record?.['وقت الدخول (HH:MM)'];
+
+                    if (checkInStr && /^\d{2}:\d{2}$/.test(checkInStr)) {
+                         try {
+                            const officialTime = new Date(`1970-01-01T${OFFICIAL_START_TIME}:00`);
+                            officialTime.setMinutes(officialTime.getMinutes() + GRACE_PERIOD_MINUTES);
+                            
+                            const checkInTime = new Date(`1970-01-01T${checkInStr}:00`);
+
+                            if (checkInTime > officialTime) {
+                                currentStatus = 'late';
+                                lateDays++;
+                            }
+                        } catch(e) {
+                            console.warn("Could not parse time for lateness check:", checkInStr);
+                        }
+                    }
+
                     processedRecords.push({
                         date: dateStr,
-                        checkIn: record?.['وقت الدخول (HH:MM)'],
+                        checkIn: checkInStr,
                         checkOut: record?.['وقت الخروج (HH:MM)'],
-                        status: 'present'
+                        status: currentStatus
                     });
                     presentDays++;
                 } else {
@@ -333,5 +355,3 @@ export function AttendanceUploader() {
     </Card>
   );
 }
-
-    
