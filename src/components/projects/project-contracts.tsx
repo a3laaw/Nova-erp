@@ -8,14 +8,15 @@ import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { Check } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
+import { format } from 'date-fns';
 
 export function ProjectContracts({ project }: { project: Project }) {
   const { language } = useLanguage();
   const contract = contracts.find(c => c.id === project.contractId);
   
   const t = (language === 'ar') ? 
-    { noContract: 'لم يتم العثور على عقد', noContractDesc: 'لم يتم ربط عقد بهذا المشروع بعد.', create: 'إنشاء عقد', milestones: 'دفعات العقد', due: 'تاريخ الاستحقاق', markCompleted: 'تحديد كمكتمل' } : 
-    { noContract: 'No Contract Found', noContractDesc: 'A contract has not been linked to this project yet.', create: 'Create Contract', milestones: 'Payment Milestones', due: 'Due', markCompleted: 'Mark as Completed' };
+    { noContract: 'لم يتم العثور على عقد', noContractDesc: 'لم يتم ربط عقد بهذا المشروع بعد.', create: 'إنشاء عقد', milestones: 'دفعات العقد', due: 'تاريخ الاستحقاق', markCompleted: 'تحديد كمكتمل', contracts: 'العقود' } : 
+    { noContract: 'No Contract Found', noContractDesc: 'A contract has not been linked to this project yet.', create: 'Create Contract', milestones: 'Payment Milestones', due: 'Due', markCompleted: 'Mark as Completed', contracts: 'Contracts' };
 
 
   if (!contract) {
@@ -52,7 +53,7 @@ export function ProjectContracts({ project }: { project: Project }) {
                 <li key={milestone.id} className='flex items-center justify-between p-4 rounded-lg border bg-card'>
                     <div>
                         <p className='font-medium'>{milestone.name[language]} ({milestone.percentage}%)</p>
-                        <p className='text-sm text-muted-foreground'>{t.due}: {new Date(milestone.dueDate).toLocaleDateString()}</p>
+                        <p className='text-sm text-muted-foreground'>{t.due}: {format(new Date(milestone.dueDate), 'dd/MM/yyyy')}</p>
                     </div>
                     <div className='flex items-center gap-4'>
                         <Badge variant={milestone.status === 'Completed' ? 'default' : 'secondary'}>{milestone.status}</Badge>

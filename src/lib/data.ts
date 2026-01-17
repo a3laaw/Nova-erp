@@ -103,8 +103,8 @@ export const projects: Project[] = [
 ];
 
 export const appointments: Appointment[] = [
-  { id: 'appt-1', title: { ar: 'زيارة موقع الفيلا', en: 'Villa Site Visit' }, date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), clientId: 'client-1', projectId: 'proj-1', engineerId: 'user-2', notes: { ar: 'التحقق من تقدم الأساسات.', en: 'Check foundation progress.' } },
-  { id: 'appt-2', title: { ar: 'مراجعة تصميم البرج', en: 'Tower Design Review' }, date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), clientId: 'client-2', projectId: 'proj-2', engineerId: 'user-5', notes: { ar: 'مراجعة أحدث المسودات المعمارية مع العميل.', en: 'Reviewing the latest architectural drafts with the client.' } },
+  { id: 'appt-1', title: { ar: 'زيارة موقع الفيلا', en: 'Villa Site Visit' }, date: '2025-08-01T10:00:00.000Z', clientId: 'client-1', projectId: 'proj-1', engineerId: 'user-2', notes: { ar: 'التحقق من تقدم الأساسات.', en: 'Check foundation progress.' } },
+  { id: 'appt-2', title: { ar: 'مراجعة تصميم البرج', en: 'Tower Design Review' }, date: '2025-08-04T14:30:00.000Z', clientId: 'client-2', projectId: 'proj-2', engineerId: 'user-5', notes: { ar: 'مراجعة أحدث المسودات المعمارية مع العميل.', en: 'Reviewing the latest architectural drafts with the client.' } },
 ];
 
 export const contracts: Contract[] = [

@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
+import { format } from 'date-fns';
 
 
 const statusStyles: Record<InvoiceStatus, string> = {
@@ -76,8 +77,8 @@ export default function AccountingPage() {
                             <TableRow key={invoice.id}>
                                 <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                                 <TableCell>{client?.name[language]}</TableCell>
-                                <TableCell>{new Date(invoice.issueDate).toLocaleDateString('en-GB')}</TableCell>
-                                <TableCell>{new Date(invoice.dueDate).toLocaleDateString('en-GB')}</TableCell>
+                                <TableCell>{format(new Date(invoice.issueDate), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell>{format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={cn(statusStyles[invoice.status])}>{invoice.status}</Badge>
                                 </TableCell>

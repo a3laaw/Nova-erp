@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { CheckCircle, Milestone, MessageSquare, Construction, Plus } from 'lucide-react';
 import { DelayReportGenerator } from './delay-report-generator';
 import { useLanguage } from '@/context/language-context';
+import { format } from 'date-fns';
 
 const eventIcons = {
   Milestone: <Milestone className="h-5 w-5 text-purple-500" />,
@@ -49,7 +50,7 @@ export function ProjectTimeline({ project }: { project: Project }) {
               <div className="ml-4 flex-1">
                 <div className="flex items-center justify-between">
                   <p className="font-semibold">{event.title[language]}</p>
-                  <time className="text-sm text-muted-foreground">{new Date(event.date).toLocaleDateString()}</time>
+                  <time className="text-sm text-muted-foreground">{format(new Date(event.date), 'dd/MM/yyyy')}</time>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{event.description[language]}</p>
               </div>

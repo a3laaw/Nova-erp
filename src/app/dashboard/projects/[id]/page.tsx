@@ -27,6 +27,7 @@ import { ProjectContracts } from '@/components/projects/project-contracts';
 import { ProjectFiles } from '@/components/projects/project-files';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/language-context';
+import { format } from 'date-fns';
 
 const statusStyles: Record<ProjectStatus, string> = {
     'In Progress': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -89,7 +90,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <span><strong>{t.timeline}:</strong> {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}</span>
+                  <span><strong>{t.timeline}:</strong> {format(new Date(project.startDate), 'dd/MM/yyyy')} - {format(new Date(project.endDate), 'dd/MM/yyyy')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <BadgeDollarSign className="h-4 w-4" />
