@@ -13,6 +13,7 @@ import type { Employee, Payslip } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const generateYears = () => {
@@ -33,6 +34,7 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [applyDeductions, setApplyDeductions] = useState(true);
   const years = generateYears();
 
   useEffect(() => {
@@ -71,19 +73,21 @@ export function PayrollGenerator() {
         for (const empDoc of employeesSnapshot.docs) {
             const employee = { id: empDoc.id, ...empDoc.data() } as Employee;
             
-            const attendanceId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
-            const attendanceRef = doc(firestore, 'attendance', attendanceId);
-            const attendanceSnap = await getDoc(attendanceRef);
-
             let absenceDeduction = 0;
+            const attendanceId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
             
-            if (attendanceSnap.exists() && employee.salaryConfig?.deductForAbsence) {
-                const attendanceData = attendanceSnap.data();
-                const absentDays = attendanceData?.summary?.absentDays || 0;
-                
-                if (absentDays > 0) {
-                    const dailyRate = (employee.basicSalary || 0) / 30;
-                    absenceDeduction = dailyRate * absentDays;
+            if (applyDeductions) {
+                const attendanceRef = doc(firestore, 'attendance', attendanceId);
+                const attendanceSnap = await getDoc(attendanceRef);
+
+                if (attendanceSnap.exists()) {
+                    const attendanceData = attendanceSnap.data();
+                    const absentDays = attendanceData?.summary?.absentDays || 0;
+                    
+                    if (absentDays > 0) {
+                        const dailyRate = (employee.basicSalary || 0) / 30;
+                        absenceDeduction = dailyRate * absentDays;
+                    }
                 }
             }
             
@@ -104,7 +108,7 @@ export function PayrollGenerator() {
             employeeName: employee.fullName,
             year: year,
             month: month,
-            attendanceId: attendanceSnap.exists() ? attendanceId : undefined,
+            attendanceId: attendanceId,
             earnings: earnings,
             deductions: {
                 absenceDeduction: absenceDeduction,
@@ -210,6 +214,12 @@ export function PayrollGenerator() {
                     {isGenerating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Calculator className="ml-2 h-4 w-4" />}
                     {isGenerating ? 'جاري الإنشاء...' : 'إنشاء كشوف الرواتب'}
                 </Button>
+            </div>
+            <div className="flex items-center space-x-2 mt-4" dir="rtl">
+                <Checkbox id="applyDeductions" checked={applyDeductions} onCheckedChange={(checked) => setApplyDeductions(checked as boolean)} />
+                <Label htmlFor="applyDeductions" className="cursor-pointer">
+                    تطبيق خصم الغياب حسب سجل الحضور
+                </Label>
             </div>
         </div>
 

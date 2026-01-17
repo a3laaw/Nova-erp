@@ -18,6 +18,7 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, LeaveRequest, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { getDaysInMonth, format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 interface ExcelRow {
@@ -34,6 +35,7 @@ export function AttendanceUploader() {
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [parsedData, setParsedData] = useState<ExcelRow[]>([]);
+  const [ignoreCheckIn, setIgnoreCheckIn] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -192,11 +194,13 @@ export function AttendanceUploader() {
                 }
 
                 const record = recordsByDate.get(dateStr);
-                if (record && record['وقت الدخول (HH:MM)'] && record['وقت الدخول (HH:MM)'] !== '-') {
+                const isPresent = ignoreCheckIn ? !!record : (record && record['وقت الدخول (HH:MM)'] && record['وقت الدخول (HH:MM)'] !== '-');
+                
+                if (isPresent) {
                     processedRecords.push({
                         date: dateStr,
-                        checkIn: record['وقت الدخول (HH:MM)'],
-                        checkOut: record['وقت الخروج (HH:MM)'],
+                        checkIn: record?.['وقت الدخول (HH:MM)'],
+                        checkOut: record?.['وقت الخروج (HH:MM)'],
                         status: 'present'
                     });
                     presentDays++;
@@ -254,6 +258,14 @@ export function AttendanceUploader() {
           <Input id="attendance-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" disabled={isParsing || isSaving} />
           <p className="text-xs text-muted-foreground">تأكد من أن الملف يحتوي على الأعمدة: الرقم المدني، التاريخ، وقت الدخول، وقت الخروج.</p>
         </div>
+        
+        <div className="flex items-center space-x-2" dir="rtl">
+            <Checkbox id="ignoreCheckIn" checked={ignoreCheckIn} onCheckedChange={(checked) => setIgnoreCheckIn(checked as boolean)} />
+            <Label htmlFor="ignoreCheckIn" className="cursor-pointer">
+                اعتبار الموظف حاضرًا بمجرد وجود سجل له في اليوم (تجاهل وقت الدخول)
+            </Label>
+        </div>
+
 
         {parsedData.length > 0 && (
           <div className='space-y-4'>
