@@ -15,6 +15,7 @@ import { AlertTriangle, Bot, X } from 'lucide-react';
 import { generateDelayReport } from '@/ai/flows/generate-delay-reports';
 import { Skeleton } from '../ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { format } from 'date-fns';
 
 export function DelayReportGenerator({ project }: { project: Project }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,7 +36,7 @@ export function DelayReportGenerator({ project }: { project: Project }) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       // const result = await generateDelayReport(input);
       const mockResult = {
-        delayReport: `**Delay Report for ${project.name} as of ${new Date().toLocaleDateString()}**
+        delayReport: `**Delay Report for ${project.name['en']} as of ${format(new Date(), 'dd/MM/yyyy')}**
 
 **1. Delayed Phases:**
 - **Structural - Structural drawings:** This phase was due on 2024-02-01 but is still 'In Progress'. The delay is approximately 1 month.
@@ -73,7 +74,7 @@ export function DelayReportGenerator({ project }: { project: Project }) {
             <Bot /> AI-Powered Delay Analysis
           </DialogTitle>
           <DialogDescription>
-            Analyzing '{project.name}' timeline for potential delays and risks.
+            Analyzing '{project.name['en']}' timeline for potential delays and risks.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">

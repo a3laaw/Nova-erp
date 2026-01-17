@@ -79,6 +79,12 @@ export function EmployeeSnapshotReport({ employeeId, reportDate }: ReportProps) 
   const [eosb, setEosb] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+      // Set date on client-side to avoid hydration mismatch
+      setCurrentDate(new Date());
+  }, []);
 
   useEffect(() => {
     if (!firestore || !employeeId) {
@@ -218,7 +224,7 @@ export function EmployeeSnapshotReport({ employeeId, reportDate }: ReportProps) 
                 </div>
                 <div className="text-left text-xs text-muted-foreground">
                     <p>تاريخ التقرير: {formatDate(reportDate)}</p>
-                    <p>تاريخ الطباعة: {formatDate(new Date())}</p>
+                    {currentDate && <p>تاريخ الطباعة: {formatDate(currentDate)}</p>}
                 </div>
             </header>
 
@@ -306,7 +312,9 @@ export function EmployeeSnapshotReport({ employeeId, reportDate }: ReportProps) 
 
             {/* Footer */}
             <footer className="text-center pt-4 mt-4 border-t">
-                <p className="text-xs text-muted-foreground">هذا التقرير تم إنشاؤه بواسطة نظام EmaratiScope. جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
+                 <p className="text-xs text-muted-foreground">
+                    هذا التقرير تم إنشاؤه بواسطة نظام EmaratiScope. جميع الحقوق محفوظة © {currentDate ? currentDate.getFullYear() : '...'}
+                </p>
             </footer>
         </div>
     </div>

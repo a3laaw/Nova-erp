@@ -1,7 +1,6 @@
-
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Employee, AuditLog } from '@/lib/types';
 import { format, intervalToDuration } from 'date-fns';
 import { Logo } from '../layout/logo';
@@ -55,6 +54,13 @@ function InfoItem({ label, value, className = '' }: { label: string, value: Reac
 
 
 export function EmployeeDossier({ employee, reportDate }: DossierProps) {
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    // Set the date on the client side to avoid hydration mismatch.
+    setCurrentDate(new Date());
+  }, []);
+  
   const hireDate = fromFirestoreDate(employee.hireDate) ? new Date(fromFirestoreDate(employee.hireDate)) : null;
   const serviceDuration = employee.serviceDuration;
   const totalSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
@@ -88,7 +94,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                 </div>
                 <div className="text-left text-xs text-muted-foreground">
                     <p>تاريخ التقرير: {formatDate(reportDate)}</p>
-                    <p className="print:hidden">تاريخ الطباعة: {formatDate(new Date())}</p>
+                    {currentDate && <p className="print:hidden">تاريخ الطباعة: {formatDate(currentDate)}</p>}
                 </div>
             </header>
 
@@ -181,11 +187,11 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
             </main>
 
             <footer className="text-center pt-4 mt-4 border-t print:mt-8">
-                <p className="text-xs text-muted-foreground">هذا التقرير تم إنشاؤه بواسطة نظام EmaratiScope. جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
+                <p className="text-xs text-muted-foreground">
+                    هذا التقرير تم إنشاؤه بواسطة نظام EmaratiScope. جميع الحقوق محفوظة © {currentDate ? currentDate.getFullYear() : '...'}
+                </p>
             </footer>
         </div>
     </div>
   );
 }
-
-    
