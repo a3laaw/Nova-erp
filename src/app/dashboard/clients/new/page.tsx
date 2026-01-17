@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,16 +48,15 @@ export default function NewClientPage() {
         const generateFileId = async () => {
             setIsGeneratingId(true);
             try {
-                const currentYear = new Date().getFullYear();
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('fileYear', '==', currentYear), orderBy('fileNumber', 'desc'), limit(1));
+                const currentYear = String(new Date().getFullYear());
+                const counterRef = doc(firestore, 'counters', 'clientFiles');
                 
-                const querySnapshot = await getDocs(q);
+                const counterDoc = await getDoc(counterRef);
                 let nextNumber = 1;
 
-                if (!querySnapshot.empty) {
-                    const lastClient = querySnapshot.docs[0].data();
-                    nextNumber = (lastClient.fileNumber || 0) + 1;
+                if (counterDoc.exists()) {
+                    const counts = counterDoc.data()?.counts || {};
+                    nextNumber = (counts[currentYear] || 0) + 1;
                 }
 
                 setFileId(`${nextNumber}/${currentYear}`);
@@ -108,17 +107,21 @@ export default function NewClientPage() {
             }
 
             await runTransaction(firestore, async (transaction) => {
-                const currentYear = new Date().getFullYear();
-                const clientsRef = collection(firestore, 'clients');
+                const currentYear = String(new Date().getFullYear());
+                const counterRef = doc(firestore, 'counters', 'clientFiles');
                 
-                const q = query(clientsRef, where('fileYear', '==', currentYear), orderBy('fileNumber', 'desc'), limit(1));
-                const querySnapshot = await transaction.get(q);
+                const counterDoc = await transaction.get(counterRef);
                 
                 let nextNumber = 1;
-                if (!querySnapshot.empty) {
-                    const lastClient = querySnapshot.docs[0].data();
-                    nextNumber = (lastClient.fileNumber || 0) + 1;
+                if (counterDoc.exists()) {
+                    const counts = counterDoc.data()?.counts || {};
+                    nextNumber = (counts[currentYear] || 0) + 1;
                 }
+                
+                // Atomically update the counter
+                transaction.set(counterRef, { 
+                    counts: { [currentYear]: nextNumber } 
+                }, { merge: true });
 
                 const newFileId = `${nextNumber}/${currentYear}`;
                 
@@ -135,13 +138,13 @@ export default function NewClientPage() {
                     },
                     fileId: newFileId,
                     fileNumber: nextNumber,
-                    fileYear: currentYear,
+                    fileYear: parseInt(currentYear, 10),
                     status: 'new' as const,
                     createdAt: serverTimestamp(),
                     isActive: true,
                 };
 
-                const newClientRef = doc(clientsRef); // Creates a ref with a new auto-generated ID
+                const newClientRef = doc(collection(firestore, 'clients'));
                 transaction.set(newClientRef, clientData);
             });
 
@@ -285,3 +288,5 @@ export default function NewClientPage() {
         </Card>
     );
 }
+
+    

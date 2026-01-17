@@ -137,6 +137,17 @@
         "isActive"
       ]
     },
+    "Counter": {
+      "title": "Counter",
+      "description": "Stores sequential counters for various entities.",
+      "type": "object",
+      "properties": {
+        "counts": {
+          "type": "object",
+          "description": "A map of keys (e.g., years) to their current count."
+        }
+      }
+    },
     "Employee": {
       "title": "Employee",
       "description": "Represents an employee in the company.",
@@ -332,6 +343,12 @@
       },
       "description": "Stores information about the company's clients."
     },
+    "/counters/{counterId}": {
+      "schema": {
+        "$ref": "#/entities/Counter"
+      },
+      "description": "Stores shared counters. e.g., counterId = 'clientFiles'."
+    },
     "/employees/{employeeId}": {
         "schema": { "$ref": "#/entities/Employee" },
         "description": "Stores HR information about company employees."
@@ -358,3 +375,5 @@
     }
   }
 }
+
+    
