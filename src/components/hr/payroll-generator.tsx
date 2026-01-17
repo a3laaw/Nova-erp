@@ -245,10 +245,9 @@ export function PayrollGenerator() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>اسم الموظف</TableHead>
-                            <TableHead>الراتب الأساسي</TableHead>
-                            <TableHead>البدلات</TableHead>
-                            <TableHead>خصم الغياب</TableHead>
-                            <TableHead>صافي الراتب</TableHead>
+                            <TableHead>تفاصيل الراتب</TableHead>
+                            <TableHead>الخصومات</TableHead>
+                            <TableHead className="font-bold">صافي الراتب</TableHead>
                             <TableHead>طريقة الدفع</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -256,18 +255,23 @@ export function PayrollGenerator() {
                         {payslips.map(p => (
                             <TableRow key={p.id}>
                                 <TableCell className="font-medium">{p.employeeName}</TableCell>
-                                <TableCell>{formatCurrency(p.earnings.basicSalary)}</TableCell>
-                                <TableCell>{formatCurrency((p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0))}</TableCell>
-                                <TableCell className='text-destructive'>{formatCurrency(p.deductions.absenceDeduction)}</TableCell>
-                                <TableCell className="font-bold">{formatCurrency(p.netSalary)}</TableCell>
+                                <TableCell>
+                                    <div className="grid gap-0.5">
+                                        <div className="font-mono text-sm">{formatCurrency(p.earnings.basicSalary)} <span className="text-xs text-muted-foreground">(أساسي)</span></div>
+                                        <div className="font-mono text-xs text-muted-foreground">{formatCurrency((p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0))} <span className="text-xs">(بدلات)</span></div>
+                                    </div>
+                                </TableCell>
+                                <TableCell className='text-destructive font-mono'>{formatCurrency(p.deductions.absenceDeduction)}</TableCell>
+                                <TableCell className="font-bold font-mono">{formatCurrency(p.netSalary)}</TableCell>
                                 <TableCell>{p.salaryPaymentType ? paymentTypeTranslations[p.salaryPaymentType] : '-'}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                     <TableFooter>
                         <TableRow>
-                            <TableCell colSpan={5} className="font-bold text-lg">إجمالي صافي الرواتب</TableCell>
-                            <TableCell className="font-bold text-lg">{formatCurrency(totalNetSalary)}</TableCell>
+                            <TableCell colSpan={3} className="font-bold text-lg">إجمالي صافي الرواتب</TableCell>
+                            <TableCell className="font-bold text-lg font-mono">{formatCurrency(totalNetSalary)}</TableCell>
+                            <TableCell />
                         </TableRow>
                     </TableFooter>
                 </Table>
