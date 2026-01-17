@@ -1,6 +1,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -191,9 +192,6 @@ export type Employee = {
     contractType: 'permanent' | 'temporary' | 'subcontractor';
     department: string;
     salaryConfig?: {
-      basicSalary: number;
-      housingAllowance?: number;
-      transportAllowance?: number;
       deductForAbsence: boolean;
     };
     basicSalary: number; // KWD

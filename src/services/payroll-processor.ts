@@ -12,13 +12,13 @@ import { FieldValue } from 'firebase-admin/firestore';
  * @returns An array of the generated Payslip objects.
  */
 export async function generatePayslipsForMonth(year: number, month: number): Promise<Payslip[]> {
-  // 1. Fetch all active employees
+  // 1. Fetch all active and on-leave employees
   const employeesRef = firestore.collection('employees');
-  const q = employeesRef.where('status', '==', 'active');
+  const q = employeesRef.where('status', 'in', ['active', 'on-leave']);
   const employeesSnapshot = await q.get();
 
   if (employeesSnapshot.empty) {
-    throw new Error('No active employees found to generate payroll for.');
+    throw new Error('لم يتم العثور على موظفين نشطين أو في إجازة لإنشاء كشوف الرواتب لهم.');
   }
 
   const generatedPayslips: Payslip[] = [];
@@ -35,21 +35,22 @@ export async function generatePayslipsForMonth(year: number, month: number): Pro
     let absenceDeduction = 0;
     
     // 3. Calculate deductions if attendance exists and deduction is enabled for the employee
+    // Using top-level basicSalary for calculation.
     if (attendanceSnap.exists() && employee.salaryConfig?.deductForAbsence) {
         const attendanceData = attendanceSnap.data() as MonthlyAttendance;
         const absentDays = attendanceData.summary.absentDays || 0;
         
         if (absentDays > 0) {
-            const dailyRate = (employee.salaryConfig.basicSalary || 0) / 30;
+            const dailyRate = (employee.basicSalary || 0) / 30; // Corrected: use top-level basicSalary
             absenceDeduction = dailyRate * absentDays;
         }
     }
     
-    // 4. Construct the payslip object
+    // 4. Construct the payslip object using top-level salary fields
     const earnings = {
-        basicSalary: employee.salaryConfig?.basicSalary || 0,
-        housingAllowance: employee.salaryConfig?.housingAllowance || 0,
-        transportAllowance: employee.salaryConfig?.transportAllowance || 0,
+        basicSalary: employee.basicSalary || 0,
+        housingAllowance: employee.housingAllowance || 0,
+        transportAllowance: employee.transportAllowance || 0,
     };
     
     const totalEarnings = earnings.basicSalary + earnings.housingAllowance + earnings.transportAllowance;

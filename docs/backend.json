@@ -142,12 +142,9 @@
           "type": "object",
           "description": "Configuration for salary calculation.",
           "properties": {
-            "basicSalary": { "type": "number" },
-            "housingAllowance": { "type": "number" },
-            "transportAllowance": { "type": "number" },
             "deductForAbsence": { "type": "boolean", "description": "If true, absence days will be deducted from salary." }
           },
-          "required": ["basicSalary", "deductForAbsence"]
+          "required": ["deductForAbsence"]
         },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
