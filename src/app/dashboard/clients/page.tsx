@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { collection, doc, updateDoc, serverTimestamp, addDoc, query, orderBy, type DocumentData } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, type DocumentData } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirestore, useCollection } from '@/firebase';
 
@@ -82,23 +83,6 @@ export default function ClientsPage() {
     }
   };
   
-  // This is a temporary function to add sample data.
-  const addSampleClient = async () => {
-    if (!firestore) return;
-    try {
-      await addDoc(collection(firestore, 'clients'), {
-        fullName: 'نموذج عميل',
-        mobile: '0501234567',
-        civilId: '784-1234-567890-1',
-        status: 'new',
-        createdAt: serverTimestamp(),
-        isActive: true,
-      });
-    } catch (error) {
-      console.error("Error adding sample client: ", error);
-    }
-  };
-
   const t = {
     ar: {
       title: 'إدارة العملاء',
@@ -137,9 +121,11 @@ export default function ClientsPage() {
             <CardDescription>{currentText.description}</CardDescription>
           </div>
           <div className="flex gap-2">
-             <Button onClick={addSampleClient} size="sm" className="gap-1">
-                <PlusCircle className="h-4 w-4" />
-                {currentText.addClient} (عينة)
+             <Button asChild size="sm" className="gap-1">
+                <Link href="/dashboard/clients/new">
+                    <PlusCircle className="h-4 w-4" />
+                    {currentText.addClient}
+                </Link>
             </Button>
           </div>
         </div>
