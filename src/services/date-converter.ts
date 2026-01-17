@@ -72,23 +72,29 @@ export function toFirestoreDate(dateInput: any): Date | null {
     return isNaN(d.getTime()) ? null : d;
   }
   
-  // Handle string (e.g., from <input type="date"> which is "yyyy-MM-dd")
-  // or number (milliseconds from epoch)
-  if (typeof dateInput === 'string' || typeof dateInput === 'number') {
-    try {
-      // For strings, adding 'T00:00:00' helps prevent timezone-related off-by-one day errors
-      // during local-to-UTC conversion by the Date constructor.
-      const sanitizedInput = typeof dateInput === 'string' ? `${dateInput}T00:00:00` : dateInput;
-      const d = new Date(sanitizedInput);
-      return isNaN(d.getTime()) ? null : d;
-    } catch (e) {
-      console.error("Failed to convert input to Date object:", dateInput, e);
-      return null;
+  // Handle string formats
+  if (typeof dateInput === 'string') {
+    let d: Date;
+    // Check for "dd/MM/yyyy" or "dd-MM-yyyy"
+    const dayFirstMatch = dateInput.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dayFirstMatch) {
+      // d = new Date(year, month - 1, day)
+      d = new Date(parseInt(dayFirstMatch[3]), parseInt(dayFirstMatch[2]) - 1, parseInt(dayFirstMatch[1]));
+    } else {
+      // Fallback to let the browser parse it (handles "yyyy-MM-dd", ISO strings, etc.)
+      // Adding T00:00:00 for "yyyy-MM-dd" to avoid timezone issues.
+      const sanitizedInput = /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? `${dateInput}T00:00:00` : dateInput;
+      d = new Date(sanitizedInput);
     }
+    return isNaN(d.getTime()) ? null : d;
+  }
+  
+  // Handle number (milliseconds from epoch)
+  if (typeof dateInput === 'number') {
+      const d = new Date(dateInput);
+      return isNaN(d.getTime()) ? null : d;
   }
 
   // If the type is unknown or invalid, return null.
   return null;
 }
-
-    
