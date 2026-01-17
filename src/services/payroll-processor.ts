@@ -20,7 +20,7 @@ export async function generatePayslipsForMonth(year: number, month: number): Pro
   const employeesSnapshot = await getDocs(q);
 
   if (employeesSnapshot.empty) {
-    throw new Error('لم يتم العثور على موظفين نشطين أو في إجازة لإنشاء كشوف الرواتب لهم.');
+    throw new Error('لم يتم العثور على موظفين مستحقين للراتب (نشطين أو في إجازة) لهذا الشهر.');
   }
 
   const generatedPayslips: Payslip[] = [];

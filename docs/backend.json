@@ -143,8 +143,7 @@
           "description": "Configuration for salary calculation.",
           "properties": {
             "deductForAbsence": { "type": "boolean", "description": "If true, absence days will be deducted from salary." }
-          },
-          "required": ["deductForAbsence"]
+          }
         },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
@@ -171,8 +170,7 @@
         "hireDate",
         "contractType",
         "basicSalary",
-        "status",
-        "salaryConfig"
+        "status"
       ]
     },
     "LeaveRequest": {
