@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -27,11 +26,12 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, addDoc, updateDoc, doc, serverTimestamp, getDocs, type DocumentData, Timestamp } from 'firebase/firestore';
 import type { Employee, LeaveRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInCalendarDays, format, differenceInDays } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -118,27 +118,16 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     const currentBalance = useMemo(() => {
         if (!selectedEmployee) return 0;
 
-        const hireDate = toFirestoreDate(selectedEmployee.hireDate);
-        if (!hireDate) return 0;
-
-        const daysOfService = differenceInDays(new Date(), hireDate);
-        
-        if (daysOfService <= 0) {
-            return 0;
-        }
-        
-        const totalAccrued = (daysOfService / 365.25) * 30;
-
-        const used = selectedEmployee.annualLeaveUsed || 0;
-        const carried = selectedEmployee.carriedLeaveDays || 0;
+        const balance = calculateAnnualLeaveBalance(selectedEmployee);
 
         // If we are editing a previously approved request, we need to temporarily add its days back
         // to the balance to show the correct state *before* this request is (re)submitted.
         const daysToExclude = isEditing && requestToEdit?.leaveType === 'Annual' && requestToEdit?.status === 'approved' && requestToEdit?.workingDays ? requestToEdit.workingDays : 0;
+        
+        // The balance from the central function already accounts for used days.
+        // So we add back the days of the request being edited.
+        return balance + daysToExclude;
 
-        const balance = totalAccrued + carried - (used - daysToExclude);
-
-        return Math.floor(Math.max(0, balance));
     }, [selectedEmployee, isEditing, requestToEdit]);
 
     const remainingBalance = useMemo(() => {
@@ -373,7 +362,3 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     </Dialog>
   );
 }
-
-    
-
-    

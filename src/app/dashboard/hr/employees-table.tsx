@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -44,6 +43,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -63,33 +63,6 @@ const terminationReasons: Record<string, string> = {
     probation: 'إنهاء فترة التجربة'
 };
 
-
-const calculateAnnualLeaveBalance = (employee: Employee): number => {
-    if (!employee.hireDate) {
-        return 0;
-    }
-
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) {
-        return 0;
-    }
-    
-    const daysOfService = differenceInDays(new Date(), hireDate);
-    
-    if (daysOfService <= 0) {
-        return 0;
-    }
-
-    // Leave accrues at a rate of 30 days per year from the hire date.
-    const totalAccrued = (daysOfService / 365.25) * 30;
-
-    const used = employee.annualLeaveUsed || 0;
-    const carried = employee.carriedLeaveDays || 0;
-
-    const balance = totalAccrued + carried - used;
-    
-    return Math.floor(Math.max(0, balance));
-};
 
 export function EmployeesTable() {
     const firestore = useFirestore();
@@ -327,7 +300,7 @@ export function EmployeesTable() {
                         <TableCell>{employee.department}</TableCell>
                         <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
                         <TableCell className='font-medium'>
-                            {employee.annualLeaveBalance !== undefined ? `${employee.annualLeaveBalance} يوم` : '...'}
+                            {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
                         </TableCell>
                         <TableCell>
                             <Badge variant={'outline'} className={statusColors[employee.status]}>
@@ -482,8 +455,3 @@ export function EmployeesTable() {
         </>
     );
 }
-    
-
-    
-
-    

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -25,38 +24,12 @@ import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
-import { intervalToDuration, differenceInDays } from 'date-fns';
+import { intervalToDuration } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 
 
 type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
-
-const calculateAnnualLeaveBalance = (employee: Employee | null, effectiveDate: Date): number => {
-    if (!employee || !employee.hireDate) {
-        return 0;
-    }
-
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) {
-        return 0;
-    }
-
-    if (effectiveDate < hireDate) {
-        return 0;
-    }
-
-    const daysOfService = differenceInDays(effectiveDate, hireDate);
-
-    // Leave accrues at a rate of 30 days per year from the hire date.
-    const totalAccrued = (daysOfService / 365.25) * 30;
-    
-    const used = employee.annualLeaveUsed || 0;
-    const carried = employee.carriedLeaveDays || 0;
-
-    const totalBalance = totalAccrued + carried - used;
-    
-    return Math.floor(Math.max(0, totalBalance));
-};
 
 
 export function GratuityCalculator() {
@@ -296,7 +269,3 @@ export function GratuityCalculator() {
     </Card>
   );
 }
-
-    
-
-    
