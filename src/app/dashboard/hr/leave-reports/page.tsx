@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -90,10 +89,17 @@ export default function LeaveReportsPage() {
     const [allRequests, setAllRequests] = useState<AugmentedLeaveRequest[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     
-    const [dateFrom, setDateFrom] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-    const [dateTo, setDateTo] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [dateFrom, setDateFrom] = useState<string>('');
+    const [dateTo, setDateTo] = useState<string>('');
     const [statusFilter, setStatusFilter] = useState<'all' | LeaveRequest['status']>('all');
     const [employeeFilter, setEmployeeFilter] = useState<'all' | string>('all');
+
+    useEffect(() => {
+        // Set initial date on the client side to avoid hydration mismatch
+        const now = new Date();
+        setDateFrom(format(startOfMonth(now), 'yyyy-MM-dd'));
+        setDateTo(format(endOfMonth(now), 'yyyy-MM-dd'));
+    }, []);
 
     // Fetch all data once on component mount
     useEffect(() => {
@@ -137,7 +143,7 @@ export default function LeaveReportsPage() {
     }, [firestore, toast]);
 
     const reportData = useMemo(() => {
-        if (isFetching) return [];
+        if (isFetching || !dateFrom || !dateTo) return [];
 
         let reportStart: Date, reportEnd: Date;
         try {

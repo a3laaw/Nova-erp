@@ -38,7 +38,7 @@ export function GratuityCalculator() {
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   
-  const [terminationDate, setTerminationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [terminationDate, setTerminationDate] = useState<string>('');
   const [terminationReason, setTerminationReason] = useState<TerminationReason>(null);
 
   useEffect(() => {
@@ -69,19 +69,21 @@ export function GratuityCalculator() {
     return employees.find((emp) => emp.id === selectedEmployeeId) || null;
   }, [selectedEmployeeId, employees]);
 
-  // Effect to update form when a terminated employee is selected
+  // Effect to update form when a an employee is selected or deselected
    useEffect(() => {
     if (selectedEmployee && selectedEmployee.status === 'terminated') {
-        // Use the safe converter
         const termDateStr = fromFirestoreDate(selectedEmployee.terminationDate);
         if (termDateStr) {
              setTerminationDate(termDateStr);
         }
         setTerminationReason(selectedEmployee.terminationReason);
-    } else if (selectedEmployee && selectedEmployee.status === 'active') {
-        // Reset to defaults for active employees
+    } else {
+        // For active employees OR no employee selected yet, default to today's date.
+        // This runs on the client-side, so new Date() is safe here.
         setTerminationDate(new Date().toISOString().split('T')[0]);
-        setTerminationReason(null);
+        if (selectedEmployee && selectedEmployee.status === 'active') {
+             setTerminationReason(null);
+        }
     }
   }, [selectedEmployee]);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,13 +27,28 @@ const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export function PayrollGenerator() {
   const { toast } = useToast();
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [year, setYear] = useState<number | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const years = generateYears();
+
+  useEffect(() => {
+    // Set initial date on the client side to avoid hydration mismatch
+    const now = new Date();
+    setYear(now.getFullYear());
+    setMonth(now.getMonth() + 1);
+  }, []);
   
   const handleGenerate = async () => {
+    if (!year || !month) {
+        toast({
+            variant: 'destructive',
+            title: 'الرجاء الانتظار',
+            description: 'جاري تحميل بيانات التاريخ. حاول مرة أخرى بعد لحظات.'
+        });
+        return;
+    }
     setIsGenerating(true);
     setPayslips([]);
     try {
@@ -54,17 +69,19 @@ export function PayrollGenerator() {
 
   const handleExportPDF = () => {
      const element = document.getElementById('payslips-table');
-     import('html2pdf.js').then(module => {
-        const html2pdf = module.default;
-        const opt = {
-            margin:       0.5,
-            filename:     `payslips_${year}-${month}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-        };
-        html2pdf().from(element).set(opt).save();
-     });
+     if (element) {
+        import('html2pdf.js').then(module => {
+            const html2pdf = module.default;
+            const opt = {
+                margin:       0.5,
+                filename:     `payslips_${year}-${month}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().from(element).set(opt).save();
+        });
+     }
   };
 
   const handleExportExcel = () => {
@@ -98,7 +115,7 @@ export function PayrollGenerator() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                 <div className="grid gap-2">
                     <Label htmlFor="year">السنة</Label>
-                    <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                    <Select value={year ? String(year) : ''} onValueChange={(v) => setYear(Number(v))} disabled={!year}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                             {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
@@ -107,14 +124,14 @@ export function PayrollGenerator() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="month">الشهر</Label>
-                    <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+                    <Select value={month ? String(month) : ''} onValueChange={(v) => setMonth(Number(v))} disabled={!month}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                             {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
-                 <Button onClick={handleGenerate} disabled={isGenerating} className="w-full sm:w-auto">
+                 <Button onClick={handleGenerate} disabled={isGenerating || !year || !month} className="w-full sm:w-auto">
                     {isGenerating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Calculator className="ml-2 h-4 w-4" />}
                     {isGenerating ? 'جاري الإنشاء...' : 'إنشاء كشوف الرواتب'}
                 </Button>
