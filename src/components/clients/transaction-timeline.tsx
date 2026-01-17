@@ -27,6 +27,10 @@ interface TimelineEvent {
 interface TransactionTimelineProps {
   clientId: string;
   transactionId: string;
+  filterType: 'comment' | 'log';
+  showInput?: boolean;
+  title: string;
+  icon: React.ReactNode;
 }
 
 const formatDate = (dateValue: any): string => {
@@ -36,7 +40,7 @@ const formatDate = (dateValue: any): string => {
     return formatDistanceToNow(date, { addSuffix: true, locale: ar });
 }
 
-export function TransactionTimeline({ clientId, transactionId }: TransactionTimelineProps) {
+export function TransactionTimeline({ clientId, transactionId, filterType, showInput = false, title, icon }: TransactionTimelineProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -53,8 +57,10 @@ export function TransactionTimeline({ clientId, transactionId }: TransactionTime
 
   const timelineEvents = useMemo(() => {
     if (!timelineSnapshot) return [];
-    return timelineSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TimelineEvent));
-  }, [timelineSnapshot]);
+    return timelineSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as TimelineEvent))
+        .filter(event => event.type === filterType);
+  }, [timelineSnapshot, filterType]);
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !currentUser || !firestore) return;
@@ -82,30 +88,32 @@ export function TransactionTimeline({ clientId, transactionId }: TransactionTime
   return (
     <Card className='lg:col-span-3'>
       <CardHeader>
-        <CardTitle className='flex items-center gap-2'><History className='text-primary'/> سجل المعاملة والتعليقات</CardTitle>
+        <CardTitle className='flex items-center gap-2'>{icon}{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Comment Input Form */}
-        <div className="flex items-start gap-4">
-          <Avatar className="h-9 w-9 border">
-            <AvatarImage src={currentUser?.avatarUrl} />
-            <AvatarFallback>{currentUser?.fullName?.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 space-y-2">
-            <Textarea
-              placeholder="أكتب تعليقاً أو تحديثاً..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              rows={3}
-            />
-            <div className="flex justify-end">
-              <Button onClick={handlePostComment} disabled={isPosting || !newComment.trim()}>
-                <Send className="ml-2 h-4 w-4" />
-                {isPosting ? 'جاري الإرسال...' : 'إرسال'}
-              </Button>
+        {showInput && currentUser && (
+          <div className="flex items-start gap-4">
+            <Avatar className="h-9 w-9 border">
+              <AvatarImage src={currentUser?.avatarUrl} />
+              <AvatarFallback>{currentUser?.fullName?.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 space-y-2">
+              <Textarea
+                placeholder="أكتب تعليقاً أو تحديثاً..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={3}
+              />
+              <div className="flex justify-end">
+                <Button onClick={handlePostComment} disabled={isPosting || !newComment.trim()}>
+                  <Send className="ml-2 h-4 w-4" />
+                  {isPosting ? 'جاري الإرسال...' : 'إرسال'}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Timeline Events */}
         <div className="space-y-6">
@@ -119,11 +127,11 @@ export function TransactionTimeline({ clientId, transactionId }: TransactionTime
                 </div>
             ))}
              {!loading && error && (
-                <p className="text-center text-destructive">فشل تحميل سجل المعاملة.</p>
+                <p className="text-center text-destructive">فشل تحميل السجل.</p>
             )}
             {!loading && timelineEvents.length === 0 && (
                 <div className="text-center text-muted-foreground pt-8">
-                    <p>لا توجد تعليقات أو تحديثات بعد. كن أول من يضيف تعليقاً.</p>
+                  <p>{filterType === 'comment' ? 'لا توجد تعليقات بعد. كن أول من يضيف تعليقاً.' : 'لا توجد أحداث مسجلة في السجل.'}</p>
                 </div>
             )}
           {timelineEvents.map((event) => (

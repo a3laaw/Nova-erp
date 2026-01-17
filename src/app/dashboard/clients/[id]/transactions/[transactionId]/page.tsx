@@ -13,11 +13,17 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import type { Employee } from '@/lib/types';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 
 
 // Using the same translation objects from client profile page
@@ -177,7 +183,32 @@ export default function TransactionDetailPage() {
             </CardContent>
         </Card>
         
-        <TransactionTimeline clientId={clientId} transactionId={transactionId} />
+         <Tabs defaultValue="comments" dir="rtl">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="comments">التعليقات والمتابعة</TabsTrigger>
+                <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
+            </TabsList>
+            <TabsContent value="comments" className="mt-6">
+                <TransactionTimeline
+                  clientId={clientId}
+                  transactionId={transactionId}
+                  filterType="comment"
+                  showInput={true}
+                  title="التعليقات والمتابعة"
+                  icon={<MessageSquare className="text-primary" />}
+                />
+            </TabsContent>
+            <TabsContent value="history" className="mt-6">
+                <TransactionTimeline
+                  clientId={clientId}
+                  transactionId={transactionId}
+                  filterType="log"
+                  showInput={false}
+                  title="سجل التغييرات"
+                  icon={<History className="text-primary" />}
+                />
+            </TabsContent>
+        </Tabs>
 
     </div>
   );
