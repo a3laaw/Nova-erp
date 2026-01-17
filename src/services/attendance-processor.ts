@@ -2,7 +2,6 @@
 'use server';
 
 import { firestore } from '@/firebase/admin';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, LeaveRequest, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { getDaysInMonth, format } from 'date-fns';
 
@@ -55,9 +54,9 @@ export async function processAttendanceData(data: ExcelRow[]) {
   }
   
   // 2. Fetch all relevant employees in one go
-  const employeesRef = collection(firestore, 'employees');
-  const q = query(employeesRef, where('civilId', 'in', Array.from(civilIds)));
-  const employeesSnapshot = await getDocs(q);
+  const employeesRef = firestore.collection('employees');
+  const q = employeesRef.where('civilId', 'in', Array.from(civilIds));
+  const employeesSnapshot = await q.get();
 
   const civilIdToEmployeeMap = new Map<string, Employee>();
   employeesSnapshot.forEach(doc => {
@@ -66,7 +65,7 @@ export async function processAttendanceData(data: ExcelRow[]) {
   });
   
   // 3. Start a batch write to Firestore
-  const batch = writeBatch(firestore);
+  const batch = firestore.batch();
 
   for (const [key, data] of monthlyData.entries()) {
     const employee = civilIdToEmployeeMap.get(data.civilId);
@@ -79,9 +78,9 @@ export async function processAttendanceData(data: ExcelRow[]) {
     data.employeeId = employee.id;
 
     // 4. Fetch employee's approved leaves for this month
-    const leavesRef = collection(firestore, 'leaveRequests');
-    const leavesQuery = query(leavesRef, where('employeeId', '==', employee.id), where('status', '==', 'approved'));
-    const leavesSnapshot = await getDocs(leavesQuery);
+    const leavesRef = firestore.collection('leaveRequests');
+    const leavesQuery = leavesRef.where('employeeId', '==', employee.id).where('status', '==', 'approved');
+    const leavesSnapshot = await leavesQuery.get();
     const approvedLeaveDays = new Set<string>();
     leavesSnapshot.forEach(doc => {
         const leave = doc.data() as LeaveRequest;
@@ -141,7 +140,7 @@ export async function processAttendanceData(data: ExcelRow[]) {
     };
     
     const docId = `${data.year}-${String(data.month).padStart(2, '0')}-${data.employeeId}`;
-    const docRef = doc(firestore, 'attendance', docId);
+    const docRef = firestore.collection('attendance').doc(docId);
     
     // Use set with merge to create or update
     batch.set(docRef, attendanceDoc, { merge: true });

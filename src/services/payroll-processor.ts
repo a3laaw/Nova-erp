@@ -2,9 +2,8 @@
 'use server';
 
 import { firestore } from '@/firebase/admin';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip } from '@/lib/types';
-import { serverTimestamp } from 'firebase/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Generates payslips for all active employees for a given month and year.
@@ -14,24 +13,24 @@ import { serverTimestamp } from 'firebase/firestore';
  */
 export async function generatePayslipsForMonth(year: number, month: number): Promise<Payslip[]> {
   // 1. Fetch all active employees
-  const employeesRef = collection(firestore, 'employees');
-  const q = query(employeesRef, where('status', '==', 'active'));
-  const employeesSnapshot = await getDocs(q);
+  const employeesRef = firestore.collection('employees');
+  const q = employeesRef.where('status', '==', 'active');
+  const employeesSnapshot = await q.get();
 
   if (employeesSnapshot.empty) {
     throw new Error('No active employees found to generate payroll for.');
   }
 
   const generatedPayslips: Payslip[] = [];
-  const batch = writeBatch(firestore);
+  const batch = firestore.batch();
 
   for (const empDoc of employeesSnapshot.docs) {
     const employee = { id: empDoc.id, ...empDoc.data() } as Employee;
     
     // 2. Fetch the corresponding attendance record for the employee and month
     const attendanceId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
-    const attendanceRef = doc(firestore, 'attendance', attendanceId);
-    const attendanceSnap = await getDoc(attendanceRef);
+    const attendanceRef = firestore.collection('attendance').doc(attendanceId);
+    const attendanceSnap = await attendanceRef.get();
 
     let absenceDeduction = 0;
     
@@ -59,7 +58,7 @@ export async function generatePayslipsForMonth(year: number, month: number): Pro
     
     const payslipId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
     
-    const newPayslip: Omit<Payslip, 'id'> = {
+    const newPayslipForDb = {
       employeeId: employee.id!,
       employeeName: employee.fullName,
       year: year,
@@ -72,14 +71,20 @@ export async function generatePayslipsForMonth(year: number, month: number): Pro
       },
       netSalary: netSalary,
       status: 'draft',
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     };
     
     // 5. Add the new payslip to the batch write
-    const payslipRef = doc(firestore, 'payroll', payslipId);
-    batch.set(payslipRef, newPayslip);
+    const payslipRef = firestore.collection('payroll').doc(payslipId);
+    batch.set(payslipRef, newPayslipForDb);
     
-    generatedPayslips.push({ id: payslipId, ...newPayslip });
+    // Create a serializable version for the client
+    const payslipForClient: Payslip = {
+      id: payslipId,
+      ...newPayslipForDb,
+      createdAt: new Date(), // Use current date as a placeholder for the client
+    };
+    generatedPayslips.push(payslipForClient);
   }
   
   // 6. Commit the batch write to Firestore
