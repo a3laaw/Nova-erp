@@ -18,7 +18,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Select,
   SelectContent,
@@ -27,9 +45,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { collection, doc, updateDoc, query, orderBy, type DocumentData } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, type DocumentData, deleteDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirestore, useCollection } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 type ClientStatus = 'new' | 'received' | 'completed' | 'rejected';
@@ -60,6 +80,7 @@ const statusColors: Record<ClientStatus, string> = {
 export default function ClientsPage() {
   const { language } = useLanguage();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const clientsQuery = useMemo(() => {
     if (!firestore) return null;
@@ -67,6 +88,8 @@ export default function ClientsPage() {
   }, [firestore]);
 
   const [snapshot, loading, error] = useCollection(clientsQuery);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const clients = useMemo(() => {
     if (!snapshot) return [];
@@ -81,7 +104,22 @@ export default function ClientsPage() {
       await updateDoc(clientDoc, { status: newStatus });
     } catch (e) {
       console.error("Error updating status: ", e);
-      // You can add a toast notification here to inform the user
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الملف.' });
+    }
+  };
+  
+  const handleDeleteClient = async () => {
+    if (!clientToDelete || !firestore) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(firestore, 'clients', clientToDelete.id));
+      toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
+    } catch (e) {
+      console.error("Error deleting client: ", e);
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل.' });
+    } finally {
+      setIsDeleting(false);
+      setClientToDelete(null);
     }
   };
   
@@ -96,7 +134,15 @@ export default function ClientsPage() {
       status: 'الحالة',
       loading: 'جاري تحميل البيانات...',
       error: 'حدث خطأ أثناء جلب البيانات.',
-      noClients: 'لا يوجد عملاء لعرضهم حالياً.'
+      noClients: 'لا يوجد عملاء لعرضهم حالياً.',
+      actions: 'الإجراءات',
+      viewProfile: 'عرض الملف',
+      edit: 'تعديل',
+      delete: 'حذف',
+      deleteConfirmTitle: 'هل أنت متأكد؟',
+      deleteConfirmDesc: 'سيتم حذف ملف العميل بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
+      cancel: 'إلغاء',
+      confirmDelete: 'نعم، قم بالحذف'
     },
     en: {
       title: 'Client Management',
@@ -108,13 +154,22 @@ export default function ClientsPage() {
       status: 'Status',
       loading: 'Loading data...',
       error: 'An error occurred while fetching data.',
-      noClients: 'No clients to display at the moment.'
+      noClients: 'No clients to display at the moment.',
+      actions: 'Actions',
+      viewProfile: 'View Profile',
+      edit: 'Edit',
+      delete: 'Delete',
+      deleteConfirmTitle: 'Are you sure?',
+      deleteConfirmDesc: 'This will permanently delete the client file. This action cannot be undone.',
+      cancel: 'Cancel',
+      confirmDelete: 'Yes, delete'
     }
   }
   const currentText = t[language];
 
 
   return (
+    <>
     <Card dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -147,13 +202,21 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={5} className="text-center">{currentText.loading}</TableCell></TableRow>}
+              {loading && Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                  </TableRow>
+              ))}
               {error && <TableRow><TableCell colSpan={5} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
-              {!loading && clients.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">{currentText.noClients}</TableCell></TableRow>}
+              {!loading && clients.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">{currentText.noClients}</TableCell></TableRow>}
               {clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
-                  <TableCell className="font-medium">{client.nameAr}</TableCell>
+                  <TableCell className="font-medium"><Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link></TableCell>
                   <TableCell>{client.mobile}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -177,10 +240,28 @@ export default function ClientsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Toggle menu</span>
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                            <DropdownMenuLabel>{currentText.actions}</DropdownMenuLabel>
+                            <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/clients/${client.id}`}>{currentText.viewProfile}</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/clients/${client.id}/edit`}>{currentText.edit}</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => setClientToDelete(client)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                {currentText.delete}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
@@ -189,5 +270,23 @@ export default function ClientsPage() {
         </div>
       </CardContent>
     </Card>
+
+    <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>{currentText.deleteConfirmTitle}</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {currentText.deleteConfirmDesc}
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>{currentText.cancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting ? 'جاري الحذف...' : currentText.confirmDelete}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
