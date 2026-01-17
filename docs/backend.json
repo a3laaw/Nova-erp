@@ -138,13 +138,6 @@
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
         "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor"] },
         "department": { "type": "string" },
-        "salaryConfig": {
-          "type": "object",
-          "description": "Configuration for salary calculation.",
-          "properties": {
-            "deductForAbsence": { "type": "boolean", "description": "If true, absence days will be deducted from salary." }
-          }
-        },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
         "transportAllowance": { "type": "number" },
@@ -267,6 +260,7 @@
         "year": { "type": "number" },
         "month": { "type": "number" },
         "attendanceId": { "type": "string", "description": "Reference to the attendance document ID." },
+        "salaryPaymentType": { "type": "string", "enum": ["cash", "cheque", "transfer"] },
         "earnings": {
           "type": "object",
           "properties": {

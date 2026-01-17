@@ -3,6 +3,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -192,9 +193,6 @@ export type Employee = {
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor';
     department: string;
-    salaryConfig?: {
-      deductForAbsence: boolean;
-    };
     basicSalary: number; // KWD
     housingAllowance?: number;
     transportAllowance?: number;
@@ -297,6 +295,7 @@ export type Payslip = {
         otherDeductions: number;
     };
     netSalary: number;
+    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
     status: 'draft' | 'processed' | 'paid';
     createdAt: any;
 };

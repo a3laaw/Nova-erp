@@ -27,6 +27,12 @@ const generateYears = () => {
 
 const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
+const paymentTypeTranslations: Record<string, string> = {
+    cash: 'كاش',
+    cheque: 'شيك',
+    transfer: 'تحويل بنكي'
+};
+
 export function PayrollGenerator() {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -84,8 +90,8 @@ export function PayrollGenerator() {
                     const attendanceData = attendanceSnap.data();
                     const absentDays = attendanceData?.summary?.absentDays || 0;
                     
-                    if (absentDays > 0) {
-                        const dailyRate = (employee.basicSalary || 0) / 30;
+                    if (absentDays > 0 && employee.basicSalary > 0) {
+                        const dailyRate = employee.basicSalary / 30;
                         absenceDeduction = dailyRate * absentDays;
                     }
                 }
@@ -103,29 +109,30 @@ export function PayrollGenerator() {
             
             const payslipId = `${year}-${String(month).padStart(2, '0')}-${employee.id}`;
             
-            const newPayslipForDb = {
-            employeeId: employee.id!,
-            employeeName: employee.fullName,
-            year: year,
-            month: month,
-            attendanceId: attendanceId,
-            earnings: earnings,
-            deductions: {
-                absenceDeduction: absenceDeduction,
-                otherDeductions: 0,
-            },
-            netSalary: netSalary,
-            status: 'draft',
-            createdAt: serverTimestamp(),
+            const newPayslipForDb: Omit<Payslip, 'id' | 'createdAt'> & { createdAt: any } = {
+                employeeId: employee.id!,
+                employeeName: employee.fullName,
+                year: year,
+                month: month,
+                attendanceId: attendanceId,
+                salaryPaymentType: employee.salaryPaymentType,
+                earnings: earnings,
+                deductions: {
+                    absenceDeduction: absenceDeduction,
+                    otherDeductions: 0,
+                },
+                netSalary: netSalary,
+                status: 'draft',
+                createdAt: serverTimestamp(),
             };
             
             const payslipRef = doc(firestore, 'payroll', payslipId);
             batch.set(payslipRef, newPayslipForDb);
             
             const payslipForClient: Payslip = {
-            id: payslipId,
-            ...newPayslipForDb,
-            createdAt: new Date(),
+                id: payslipId,
+                ...newPayslipForDb,
+                createdAt: new Date(),
             };
             generatedPayslips.push(payslipForClient);
         }
@@ -172,6 +179,7 @@ export function PayrollGenerator() {
         'خصم الغياب': p.deductions.absenceDeduction,
         'خصومات أخرى': p.deductions.otherDeductions,
         'صافي الراتب': p.netSalary,
+        'طريقة الدفع': p.salaryPaymentType ? paymentTypeTranslations[p.salaryPaymentType] : 'غير محدد',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -241,6 +249,7 @@ export function PayrollGenerator() {
                             <TableHead>البدلات</TableHead>
                             <TableHead>خصم الغياب</TableHead>
                             <TableHead>صافي الراتب</TableHead>
+                            <TableHead>طريقة الدفع</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -251,12 +260,13 @@ export function PayrollGenerator() {
                                 <TableCell>{formatCurrency((p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0))}</TableCell>
                                 <TableCell className='text-destructive'>{formatCurrency(p.deductions.absenceDeduction)}</TableCell>
                                 <TableCell className="font-bold">{formatCurrency(p.netSalary)}</TableCell>
+                                <TableCell>{p.salaryPaymentType ? paymentTypeTranslations[p.salaryPaymentType] : '-'}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                     <TableFooter>
                         <TableRow>
-                            <TableCell colSpan={4} className="font-bold text-lg">إجمالي صافي الرواتب</TableCell>
+                            <TableCell colSpan={5} className="font-bold text-lg">إجمالي صافي الرواتب</TableCell>
                             <TableCell className="font-bold text-lg">{formatCurrency(totalNetSalary)}</TableCell>
                         </TableRow>
                     </TableFooter>
