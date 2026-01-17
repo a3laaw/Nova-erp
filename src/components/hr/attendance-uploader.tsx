@@ -11,18 +11,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, File, Loader2, Save } from 'lucide-react';
+import { Upload, File, Loader2, Save, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import type { Employee, LeaveRequest, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
+import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { getDaysInMonth, format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 
 
 interface ExcelRow {
-  'الرقم المدني': string;
+  'الرقم الوظيفي': string;
   'التاريخ (YYYY-MM-DD)': string;
   'وقت الدخول (HH:MM)': string;
   'وقت الخروج (HH:MM)': string;
@@ -36,6 +36,28 @@ export function AttendanceUploader() {
   const [isSaving, setIsSaving] = useState(false);
   const [parsedData, setParsedData] = useState<ExcelRow[]>([]);
   const [ignoreCheckIn, setIgnoreCheckIn] = useState(false);
+
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx');
+    const sampleData = [
+      {
+        'الرقم الوظيفي': 101,
+        'التاريخ (YYYY-MM-DD)': format(new Date(), 'yyyy-MM-dd'),
+        'وقت الدخول (HH:MM)': '08:00',
+        'وقت الخروج (HH:MM)': '17:00',
+      },
+      {
+        'الرقم الوظيفي': 102,
+        'التاريخ (YYYY-MM-DD)': format(new Date(), 'yyyy-MM-dd'),
+        'وقت الدخول (HH:MM)': '08:05',
+        'وقت الخروج (HH:MM)': '17:03',
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+    XLSX.writeFile(wb, 'AttendanceTemplate.xlsx');
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -71,7 +93,7 @@ export function AttendanceUploader() {
         
         // Validate headers
         const headers = Object.keys(json[0] || {});
-        const requiredHeaders = ['الرقم المدني', 'التاريخ (YYYY-MM-DD)', 'وقت الدخول (HH:MM)', 'وقت الخروج (HH:MM)'];
+        const requiredHeaders = ['الرقم الوظيفي', 'التاريخ (YYYY-MM-DD)', 'وقت الدخول (HH:MM)', 'وقت الخروج (HH:MM)'];
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
 
         if (missingHeaders.length > 0) {
@@ -108,25 +130,25 @@ export function AttendanceUploader() {
     }
     setIsSaving(true);
     try {
-        const monthlyData = new Map<string, { employeeId: string; year: number; month: number; civilId: string; records: ExcelRow[] }>();
-        const civilIds = new Set<string>();
+        const monthlyData = new Map<string, { employeeId: string; year: number; month: number; employeeNumber: string; records: ExcelRow[] }>();
+        const employeeNumbers = new Set<string>();
 
         parsedData.forEach(row => {
-            const civilId = String(row['الرقم المدني']);
+            const employeeNumber = String(row['الرقم الوظيفي']);
             const dateStr = row['التاريخ (YYYY-MM-DD)'];
             
-            if (!civilId || !dateStr) return;
+            if (!employeeNumber || !dateStr) return;
 
             try {
             const date = new Date(dateStr);
             const year = date.getFullYear();
             const month = date.getMonth() + 1;
-            const key = `${year}-${month}-${civilId}`;
+            const key = `${year}-${month}-${employeeNumber}`;
 
-            civilIds.add(civilId);
+            employeeNumbers.add(employeeNumber);
 
             if (!monthlyData.has(key)) {
-                monthlyData.set(key, { employeeId: '', year, month, civilId, records: [] });
+                monthlyData.set(key, { employeeId: '', year, month, employeeNumber, records: [] });
             }
             monthlyData.get(key)!.records.push(row);
             } catch(e) {
@@ -134,27 +156,29 @@ export function AttendanceUploader() {
             }
         });
 
-        if (civilIds.size === 0) {
-            throw new Error("No valid records with Civil IDs found in the file.");
+        if (employeeNumbers.size === 0) {
+            throw new Error("لم يتم العثور على سجلات صالحة تحتوي على أرقام وظيفية في الملف.");
         }
         
         const employeesRef = collection(firestore, 'employees');
-        const q = query(employeesRef, where('civilId', 'in', Array.from(civilIds)));
+        const q = query(employeesRef, where('employeeNumber', 'in', Array.from(employeeNumbers)));
         const employeesSnapshot = await getDocs(q);
 
-        const civilIdToEmployeeMap = new Map<string, Employee>();
+        const employeeNumberToEmployeeMap = new Map<string, Employee>();
         employeesSnapshot.forEach(doc => {
             const emp = { id: doc.id, ...doc.data() } as Employee;
-            civilIdToEmployeeMap.set(emp.civilId, emp);
+            if (emp.employeeNumber) {
+                employeeNumberToEmployeeMap.set(emp.employeeNumber, emp);
+            }
         });
         
         const batch = writeBatch(firestore);
 
         for (const [key, data] of monthlyData.entries()) {
-            const employee = civilIdToEmployeeMap.get(data.civilId);
+            const employee = employeeNumberToEmployeeMap.get(data.employeeNumber);
             if (!employee || !employee.id) {
-            console.warn(`No employee found for Civil ID: ${data.civilId}. Skipping ${data.records.length} records.`);
-            continue;
+                console.warn(`لم يتم العثور على موظف للرقم الوظيفي: ${data.employeeNumber}. سيتم تخطي ${data.records.length} سجل.`);
+                continue;
             }
             
             data.employeeId = employee.id;
@@ -244,10 +268,18 @@ export function AttendanceUploader() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>رفع سجلات الحضور</CardTitle>
-        <CardDescription>
-          ارفع ملف Excel يحتوي على سجلات الحضور والانصراف اليومية للموظفين.
-        </CardDescription>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>رفع سجلات الحضور</CardTitle>
+            <CardDescription>
+              ارفع ملف Excel يحتوي على سجلات الحضور والانصراف اليومية للموظفين.
+            </CardDescription>
+          </div>
+          <Button onClick={handleDownloadTemplate} variant="outline">
+            <Download className="ml-2 h-4 w-4" />
+            تحميل النموذج
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="border-2 border-dashed rounded-lg p-8 text-center space-y-4">
@@ -256,7 +288,7 @@ export function AttendanceUploader() {
             {isParsing ? 'جاري قراءة الملف...' : (file ? `الملف المحدد: ${file.name}` : 'اختر ملف Excel (.xlsx, .xls)')}
           </Label>
           <Input id="attendance-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" disabled={isParsing || isSaving} />
-          <p className="text-xs text-muted-foreground">تأكد من أن الملف يحتوي على الأعمدة: الرقم المدني، التاريخ، وقت الدخول، وقت الخروج.</p>
+          <p className="text-xs text-muted-foreground">تأكد من أن الملف يحتوي على الأعمدة: الرقم الوظيفي، التاريخ، وقت الدخول، وقت الخروج.</p>
         </div>
         
         <div className="flex items-center space-x-2" dir="rtl">
@@ -301,3 +333,5 @@ export function AttendanceUploader() {
     </Card>
   );
 }
+
+    
