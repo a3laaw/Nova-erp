@@ -122,7 +122,7 @@ export default function EditEmployeePage() {
             const auditLogs: Partial<AuditLog>[] = [];
             const effectiveDate = new Date();
 
-            const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban'];
+            const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban', 'hireDate'];
             
             fieldsToCompare.forEach(field => {
                 const originalValue = originalData[field];
@@ -183,7 +183,7 @@ export default function EditEmployeePage() {
 
             // Remove null date fields to avoid Firestore errors
             Object.keys(updatedEmployeeData).forEach(key => {
-                if (updatedEmployeeData[key] === null && ['dob', 'residencyExpiry', 'contractExpiry'].includes(key)) {
+                if (updatedEmployeeData[key] === null && ['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(key)) {
                    delete updatedEmployeeData[key];
                 }
             });
