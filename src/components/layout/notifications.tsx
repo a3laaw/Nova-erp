@@ -14,7 +14,7 @@ import { Button } from '../ui/button';
 import { Bell, Circle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, limit, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { useCollection } from '@/firebase';
 import { formatDistanceToNow } from 'date-fns';
@@ -48,11 +48,12 @@ export function Notifications() {
   const notificationsQuery = useMemo(() => {
     if (!firestore || !user?.id) return null;
     // We use user.id which is the Firestore document ID for our internal user management
+    // Removing orderBy to prevent needing a composite index. Sorting will be done on the client.
     return query(
       collection(firestore, 'notifications'),
       where('userId', '==', user.id),
-      orderBy('createdAt', 'desc'),
-      limit(10)
+      // orderBy('createdAt', 'desc'), // This requires a composite index
+      limit(20) // Fetch a bit more to sort on the client, then slice
     );
   }, [firestore, user?.id]);
 
@@ -60,7 +61,16 @@ export function Notifications() {
 
   const notifications = useMemo(() => {
     if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+    
+    // Sort client-side since we removed orderBy from the query
+    data.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis() || 0;
+        const timeB = b.createdAt?.toMillis() || 0;
+        return timeB - timeA;
+    });
+
+    return data.slice(0, 10); // Now limit to 10
   }, [snapshot]);
 
   const unreadCount = useMemo(() => {
@@ -113,5 +123,3 @@ export function Notifications() {
     </DropdownMenu>
   );
 }
-
-    
