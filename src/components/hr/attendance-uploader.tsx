@@ -1,8 +1,6 @@
-
 'use client';
 
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
 import {
   Card,
   CardContent,
@@ -55,8 +53,9 @@ export function AttendanceUploader() {
     setIsParsing(true);
     setParsedData([]);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx');
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         const sheetName = workbook.SheetNames[0];

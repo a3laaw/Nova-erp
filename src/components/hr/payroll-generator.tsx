@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { generatePayslipsForMonth } from '@/services/payroll-processor';
 import type { Payslip } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import * as XLSX from 'xlsx';
 
 const generateYears = () => {
   const currentYear = new Date().getFullYear();
@@ -84,7 +83,8 @@ export function PayrollGenerator() {
      }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const XLSX = await import('xlsx');
     const data = payslips.map(p => ({
         'اسم الموظف': p.employeeName,
         'الراتب الأساسي': p.earnings.basicSalary,
