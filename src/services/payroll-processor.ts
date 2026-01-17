@@ -1,9 +1,28 @@
 
 'use server';
 
-import { initializeFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip } from '@/lib/types';
+import { initializeApp, getApp, getApps, type FirebaseOptions } from 'firebase/app';
+import { getFirestore, collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import type { Employee, Payslip } from '@/lib/types';
+
+
+// Server-side Firebase initialization
+const firebaseConfig: FirebaseOptions = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+function getFirestoreInstance() {
+    if (!firebaseConfig.projectId) {
+        throw new Error("Firebase project ID is missing. Please check your environment variables.");
+    }
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    return getFirestore(app);
+}
 
 /**
  * Generates payslips for all active employees for a given month and year.
@@ -12,7 +31,7 @@ import type { Employee, MonthlyAttendance, Payslip } from '@/lib/types';
  * @returns An array of the generated Payslip objects.
  */
 export async function generatePayslipsForMonth(year: number, month: number): Promise<Payslip[]> {
-  const { firestore } = initializeFirebase();
+  const firestore = getFirestoreInstance();
 
   // 1. Fetch all active and on-leave employees
   const employeesRef = collection(firestore, 'employees');
@@ -38,8 +57,8 @@ export async function generatePayslipsForMonth(year: number, month: number): Pro
     
     // 3. Calculate deductions if attendance exists and deduction is enabled for the employee
     if (attendanceSnap.exists() && employee.salaryConfig?.deductForAbsence) {
-        const attendanceData = attendanceSnap.data() as MonthlyAttendance;
-        const absentDays = attendanceData.summary.absentDays || 0;
+        const attendanceData = attendanceSnap.data();
+        const absentDays = attendanceData?.summary?.absentDays || 0;
         
         if (absentDays > 0) {
             const dailyRate = (employee.basicSalary || 0) / 30;

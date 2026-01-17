@@ -1,8 +1,8 @@
 
 'use server';
 
-import { initializeFirebase } from '@/firebase';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { initializeApp, getApp, getApps, type FirebaseOptions } from 'firebase/app';
+import { getFirestore, collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, LeaveRequest, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { getDaysInMonth, format } from 'date-fns';
 
@@ -13,13 +13,31 @@ interface ExcelRow {
   'وقت الخروج (HH:MM)': string;
 }
 
+// Server-side Firebase initialization
+const firebaseConfig: FirebaseOptions = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+function getFirestoreInstance() {
+    if (!firebaseConfig.projectId) {
+        throw new Error("Firebase project ID is missing. Please check your environment variables.");
+    }
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    return getFirestore(app);
+}
+
 /**
  * Processes attendance data from an uploaded Excel file and saves it to Firestore.
  * @param data The parsed data from the Excel file.
  * @returns An object with the count of processed records and affected employees.
  */
 export async function processAttendanceData(data: ExcelRow[]) {
-  const { firestore } = initializeFirebase();
+  const firestore = getFirestoreInstance();
 
   if (!data || data.length === 0) {
     throw new Error('No data provided to process.');
@@ -86,14 +104,14 @@ export async function processAttendanceData(data: ExcelRow[]) {
     const leavesSnapshot = await getDocs(leavesQuery);
     const approvedLeaveDays = new Set<string>();
     leavesSnapshot.forEach(doc => {
-        const leave = doc.data() as LeaveRequest;
-        // Simplified: just add all days in the range to a set for easy lookup
-        // A more robust solution would handle part-of-the-month leaves.
-        const startDate = leave.startDate.toDate();
-        const endDate = leave.endDate.toDate();
-        for (let d = startDate; d <= endDate; d.setDate(d.getDate() + 1)) {
-            if(d.getFullYear() === data.year && d.getMonth() + 1 === data.month) {
-                approvedLeaveDays.add(format(d, 'yyyy-MM-dd'));
+        const leave = doc.data();
+        if (leave.startDate && leave.endDate) {
+            const startDate = leave.startDate.toDate();
+            const endDate = leave.endDate.toDate();
+            for (let d = startDate; d <= endDate; d.setDate(d.getDate() + 1)) {
+                if(d.getFullYear() === data.year && d.getMonth() + 1 === data.month) {
+                    approvedLeaveDays.add(format(d, 'yyyy-MM-dd'));
+                }
             }
         }
     });
