@@ -1,5 +1,6 @@
 
 'use client';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -22,13 +23,19 @@ import { Badge } from '@/components/ui/badge';
 import { appointments, clients, projects, users } from '@/lib/data';
 import { format } from 'date-fns';
 import { useLanguage } from '@/context/language-context';
+import type { Appointment } from '@/lib/types';
 
 export function UpcomingAppointments() {
   const { language } = useLanguage();
-  const upcoming = appointments
-    .filter((a) => new Date(a.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+  const [upcoming, setUpcoming] = useState<Appointment[]>([]);
+
+  useEffect(() => {
+    const upcomingAppointments = appointments
+      .filter((a) => new Date(a.date) >= new Date())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5);
+    setUpcoming(upcomingAppointments);
+  }, []);
     
   const t = (language === 'ar') ? 
     { title: 'المواعيد القادمة', description: 'زياراتك الميدانية واجتماعاتك المجدولة التالية.', viewAll: 'عرض الكل', clientProject: 'العميل والمشروع', engineer: 'المهندس', dateTime: 'التاريخ والوقت', purpose: 'الغرض' } : 
