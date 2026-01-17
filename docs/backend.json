@@ -113,6 +113,7 @@
       "description": "Represents an employee in the company.",
       "type": "object",
       "properties": {
+        "employeeNumber": { "type": "string", "description": "The unique identifying number for the employee." },
         "fullName": { "type": "string", "description": "Employee's name in Arabic." },
         "nameEn": { "type": "string", "description": "Employee's name in English." },
         "dob": { "type": "string", "format": "date", "description": "Date of birth." },
@@ -152,6 +153,7 @@
         "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." }
       },
       "required": [
+        "employeeNumber",
         "fullName",
         "nameEn",
         "civilId",

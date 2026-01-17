@@ -1,4 +1,5 @@
 
+
           
 
 export type MultilingualString = {
@@ -163,6 +164,7 @@ export type InventoryItem = {
 
 export type Employee = {
     id?: string;
+    employeeNumber?: string;
     fullName: string; 
     nameEn?: string;
     dob?: string;

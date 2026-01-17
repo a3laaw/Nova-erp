@@ -122,7 +122,7 @@ export default function EditEmployeePage() {
             const auditLogs: Partial<AuditLog>[] = [];
             const effectiveDate = new Date();
 
-            const fieldsToCompare: (keyof Employee)[] = ['fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban', 'hireDate'];
+            const fieldsToCompare: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban', 'hireDate'];
             
             fieldsToCompare.forEach(field => {
                 const originalValue = originalData[field];
@@ -280,6 +280,10 @@ export default function EditEmployeePage() {
                                 <Button type="button" variant="outline" size="sm">تغيير الصورة</Button>
                             </div>
                             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="employeeNumber">الرقم الوظيفي <span className="text-destructive">*</span></Label>
+                                    <Input id="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} placeholder="e.g., 1001" dir="ltr" required />
+                                </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
                                     <Input id="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />

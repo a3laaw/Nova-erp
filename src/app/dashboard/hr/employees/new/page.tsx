@@ -46,6 +46,7 @@ export default function NewEmployeePage() {
     }, []);
 
     const [formData, setFormData] = useState<Partial<Employee>>({
+        employeeNumber: '',
         fullName: '',
         nameEn: '',
         dob: '',
@@ -102,7 +103,7 @@ export default function NewEmployeePage() {
         
         try {
             // --- Validation ---
-            const requiredFields: (keyof Employee)[] = ['fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
+            const requiredFields: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
              for (const field of requiredFields) {
                 const value = formData[field];
                 if (value === undefined || value === null || (typeof value !== 'number' && value === '')) {
@@ -112,7 +113,15 @@ export default function NewEmployeePage() {
                 }
             }
             
-            // --- Uniqueness Check for Civil ID and Mobile ---
+            // --- Uniqueness Check for Civil ID, Mobile, and Employee Number ---
+            const employeeNumberQuery = query(collection(firestore, 'employees'), where('employeeNumber', '==', formData.employeeNumber));
+            const employeeNumberSnapshot = await getDocs(employeeNumberQuery);
+            if (!employeeNumberSnapshot.empty) {
+                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرقم الوظيفي هذا مسجل لموظف آخر.' });
+                setIsLoading(false);
+                return;
+            }
+
             const civilIdQuery = query(collection(firestore, 'employees'), where('civilId', '==', formData.civilId));
             const civilIdSnapshot = await getDocs(civilIdQuery);
             if (!civilIdSnapshot.empty) {
@@ -282,6 +291,10 @@ export default function NewEmployeePage() {
                                 <Button type="button" variant="outline" size="sm">رفع صورة شخصية</Button>
                             </div>
                             <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="employeeNumber">الرقم الوظيفي <span className="text-destructive">*</span></Label>
+                                    <Input id="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} placeholder="e.g., 1001" dir="ltr" required />
+                                </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="fullName">الاسم بالعربية <span className="text-destructive">*</span></Label>
                                     <Input id="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="مثال: علياء العامري" required />

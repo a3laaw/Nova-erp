@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -295,6 +296,7 @@ export function EmployeesTable() {
                         <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
                         <TableCell className="font-medium">
                             {employee.fullName}
+                            <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
                             <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                         </TableCell>
                         <TableCell>{employee.department}</TableCell>

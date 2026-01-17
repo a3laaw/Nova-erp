@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -31,6 +32,7 @@ import {
   User,
   Wallet,
   Printer,
+  Hash,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -178,6 +180,12 @@ export default function EmployeeProfilePage() {
                 <div className='space-y-1'>
                     <CardTitle className='text-3xl'>{employee.fullName}</CardTitle>
                     <CardDescription className='text-md'>{employee.jobTitle}</CardDescription>
+                    {employee.employeeNumber && (
+                        <div className='flex items-center gap-2 text-sm text-muted-foreground font-mono'>
+                            <Hash className='h-4 w-4'/>
+                            <span>{employee.employeeNumber}</span>
+                        </div>
+                    )}
                     <Badge variant="outline" className={statusColors[employee.status]}>
                         {statusTranslations[employee.status]}
                     </Badge>
