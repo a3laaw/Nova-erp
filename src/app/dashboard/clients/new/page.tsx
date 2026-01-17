@@ -20,6 +20,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { Employee } from '@/lib/types';
+
 
 export default function NewClientPage() {
     const router = useRouter();
@@ -40,6 +49,9 @@ export default function NewClientPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [fileId, setFileId] = useState('جاري التوليد...');
     const [isGeneratingId, setIsGeneratingId] = useState(true);
+    const [assignedEngineerId, setAssignedEngineerId] = useState('');
+    const [engineers, setEngineers] = useState<Employee[]>([]);
+    const [engineersLoading, setEngineersLoading] = useState(true);
 
     useEffect(() => {
         if (!firestore) return;
@@ -69,6 +81,29 @@ export default function NewClientPage() {
         };
 
         generateFileId();
+    }, [firestore, toast]);
+    
+    useEffect(() => {
+        if (!firestore) return;
+    
+        const fetchEngineers = async () => {
+            setEngineersLoading(true);
+            try {
+                const q = query(collection(firestore, 'employees'), where('department', '==', 'هندسة'));
+                const querySnapshot = await getDocs(q);
+                const fetchedEngineers: Employee[] = [];
+                querySnapshot.forEach(doc => {
+                    fetchedEngineers.push({ id: doc.id, ...doc.data() } as Employee);
+                });
+                setEngineers(fetchedEngineers);
+            } catch (error) {
+                console.error("Failed to fetch engineers:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المهندسين.' });
+            } finally {
+                setEngineersLoading(false);
+            }
+        };
+        fetchEngineers();
     }, [firestore, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,6 +182,7 @@ export default function NewClientPage() {
                     fileNumber: nextNumber,
                     fileYear: parseInt(currentYear, 10),
                     status: 'new' as const,
+                    assignedEngineer: assignedEngineerId || null,
                     createdAt: serverTimestamp(),
                     isActive: true,
                 };
@@ -178,6 +214,8 @@ export default function NewClientPage() {
         nameEnPlaceholder: 'e.g., Jassim Mohammed',
         mobile: 'رقم الجوال',
         mobilePlaceholder: '+965 1234 5678',
+        engineer: 'المهندس المسؤول (اختياري)',
+        engineerPlaceholder: 'اختر مهندسًا من قسم المعماري...',
         address: 'عنوان العميل',
         governorate: 'المحافظة',
         governoratePlaceholder: 'مثال: حولي',
@@ -202,6 +240,8 @@ export default function NewClientPage() {
         nameEnPlaceholder: 'e.g., Jassim Mohammed',
         mobile: 'Mobile Number',
         mobilePlaceholder: '+965 1234 5678',
+        engineer: 'Assigned Engineer (Optional)',
+        engineerPlaceholder: 'Select an architect...',
         address: 'Client Address',
         governorate: 'Governorate',
         governoratePlaceholder: 'e.g., Hawalli',
@@ -249,6 +289,20 @@ export default function NewClientPage() {
                     <div className="grid gap-2">
                         <Label htmlFor="mobile">{t.mobile} <span className="text-destructive">*</span></Label>
                         <Input id="mobile" dir="ltr" value={formData.mobile} onChange={handleInputChange} placeholder={t.mobilePlaceholder} required />
+                    </div>
+
+                     <div className="grid gap-2">
+                        <Label htmlFor="assignedEngineerId">{t.engineer}</Label>
+                        <Select dir="rtl" value={assignedEngineerId} onValueChange={setAssignedEngineerId} disabled={engineersLoading}>
+                            <SelectTrigger id="assignedEngineerId">
+                                <SelectValue placeholder={engineersLoading ? "تحميل..." : t.engineerPlaceholder} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {engineers.map(eng => (
+                                    <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <Separator className="my-6" />

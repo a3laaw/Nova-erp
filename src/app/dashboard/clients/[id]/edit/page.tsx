@@ -21,6 +21,14 @@ import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/auth-context';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { Employee } from '@/lib/types';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -41,10 +49,41 @@ export default function EditClientPage() {
         block: '',
         street: '',
         houseNumber: '',
+        assignedEngineerId: '',
     });
     const [fileId, setFileId] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
+
+    const [engineers, setEngineers] = useState<Employee[]>([]);
+    const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+    const [engineersLoading, setEngineersLoading] = useState(true);
+
+    useEffect(() => {
+        if (!firestore) return;
+        const fetchAllEmployees = async () => {
+            setEngineersLoading(true);
+            try {
+                const querySnapshot = await getDocs(collection(firestore, 'employees'));
+                const fetchedEmployees: Employee[] = [];
+                const newMap = new Map<string, string>();
+                querySnapshot.forEach(doc => {
+                    const emp = { id: doc.id, ...doc.data() } as Employee;
+                    fetchedEmployees.push(emp);
+                    newMap.set(doc.id, emp.fullName);
+                });
+                setEmployeesMap(newMap);
+                const archEngineers = fetchedEmployees.filter(emp => emp.department === 'هندسة');
+                setEngineers(archEngineers);
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
+            } finally {
+                setEngineersLoading(false);
+            }
+        };
+        fetchAllEmployees();
+    }, [firestore, toast]);
 
     useEffect(() => {
         if (!id || !firestore) {
@@ -70,6 +109,7 @@ export default function EditClientPage() {
                         block: data.address?.block || '',
                         street: data.address?.street || '',
                         houseNumber: data.address?.houseNumber || '',
+                        assignedEngineerId: data.assignedEngineer || '',
                     });
                     setFileId(data.fileId || 'N/A');
                 } else {
@@ -87,7 +127,7 @@ export default function EditClientPage() {
         fetchClient();
     }, [id, firestore, router, toast]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
         if (id === 'nameAr') {
@@ -97,6 +137,11 @@ export default function EditClientPage() {
         }
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
+
+    const handleSelectChange = (id: string, value: string) => {
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -127,7 +172,7 @@ export default function EditClientPage() {
             
             const updatedClientData: Record<string, any> = {};
 
-            const fieldMappings: { key: keyof typeof formData, label: string }[] = [
+            const fieldMappings: { key: keyof typeof formData; label: string }[] = [
                 { key: 'nameAr', label: 'الاسم بالعربية' },
                 { key: 'nameEn', label: 'الاسم بالإنجليزية' },
                 { key: 'mobile', label: 'رقم الجوال' },
@@ -170,6 +215,23 @@ export default function EditClientPage() {
                 });
             }
 
+            const originalEngineerId = originalData.assignedEngineer || '';
+            if (formData.assignedEngineerId !== originalEngineerId) {
+                updatedClientData.assignedEngineer = formData.assignedEngineerId || null;
+                const oldEngineerName = originalEngineerId ? employeesMap.get(originalEngineerId) || 'غير معروف' : 'غير مسند';
+                const newEngineerName = formData.assignedEngineerId ? employeesMap.get(formData.assignedEngineerId) || 'غير معروف' : 'غير مسند';
+                const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
+                batch.set(doc(historyCollectionRef), {
+                    type: 'log',
+                    content: logContent,
+                    userId: currentUser.uid,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                });
+            }
+
+
             if (Object.keys(updatedClientData).length > 0) {
                 batch.update(clientRef, updatedClientData);
                 await batch.commit();
@@ -196,6 +258,7 @@ export default function EditClientPage() {
         nameAr: 'اسم العميل (بالعربية)',
         nameEn: 'اسم العميل (بالإنجليزية)',
         mobile: 'رقم الجوال',
+        engineer: 'المهندس المسؤول',
         address: 'عنوان العميل',
         governorate: 'المحافظة',
         area: 'المنطقة',
@@ -212,6 +275,7 @@ export default function EditClientPage() {
         nameAr: 'Client Name (Arabic)',
         nameEn: 'Client Name (English)',
         mobile: 'Mobile Number',
+        engineer: 'Assigned Engineer',
         address: 'Client Address',
         governorate: 'Governorate',
         area: 'Area',
@@ -240,6 +304,7 @@ export default function EditClientPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+                    <Skeleton className="h-10" />
                     <Skeleton className="h-10" />
                     <Separator />
                     <Skeleton className="h-4 w-24" />
@@ -285,6 +350,20 @@ export default function EditClientPage() {
                     <div className="grid gap-2">
                         <Label htmlFor="mobile">{t.mobile} <span className="text-destructive">*</span></Label>
                         <Input id="mobile" dir="ltr" value={formData.mobile} onChange={handleInputChange} required />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="assignedEngineerId">{t.engineer}</Label>
+                        <Select dir="rtl" value={formData.assignedEngineerId} onValueChange={(v) => handleSelectChange('assignedEngineerId', v)} disabled={engineersLoading}>
+                            <SelectTrigger id="assignedEngineerId">
+                                <SelectValue placeholder={engineersLoading ? "تحميل..." : "اختر مهندسًا..."} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {engineers.map(eng => (
+                                    <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <Separator className="my-6" />

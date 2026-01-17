@@ -34,14 +34,14 @@ import type { ClientTransaction, Employee } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number | null | undefined }) {
+function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
     return (
         <div className="flex items-start gap-4 text-sm">
             <div className="flex-shrink-0 text-muted-foreground pt-1">{icon}</div>
             <div className="flex-1">
                 <p className="font-semibold">{label}</p>
-                <p className="text-muted-foreground break-words">{value}</p>
+                <div className="text-muted-foreground break-words">{value}</div>
             </div>
         </div>
     );
@@ -175,6 +175,8 @@ export default function ClientProfilePage() {
       `شارع ${client.address.street}`, 
       `منزل ${client.address.houseNumber}`
     ].filter(Boolean).join('، ') : 'غير محدد';
+  
+  const assignedEngineerName = client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : null;
 
 
   return (
@@ -231,6 +233,7 @@ export default function ClientProfilePage() {
                     <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
                 </CardHeader>
                 <CardContent className='space-y-4'>
+                    <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
                     <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
                     <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
                     <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
