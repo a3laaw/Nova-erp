@@ -260,7 +260,11 @@ export default function ClientProfilePage() {
                                 </TableHeader>
                                 <TableBody>
                                     {transactions.map(tx => (
-                                        <TableRow key={tx.id}>
+                                        <TableRow 
+                                            key={tx.id}
+                                            onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}
+                                            className="cursor-pointer"
+                                        >
                                             <TableCell className="font-medium">{tx.transactionType}</TableCell>
                                             <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
                                             <TableCell>
