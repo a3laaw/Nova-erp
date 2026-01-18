@@ -21,7 +21,7 @@ import {
 
 export interface ComboboxOption {
     value: string;
-    label: React.ReactNode;
+    label: string;
 }
 
 interface ComboboxProps {
@@ -76,12 +76,15 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
-                  onSelect={(currentValue) => {
+                  value={option.label}
+                  onSelect={(currentLabel) => {
+                    const newlySelectedOption = options.find(o => o.label === currentLabel);
+                    const newId = newlySelectedOption ? newlySelectedOption.value : "";
+                    
                     if (onValueChange) {
-                        onValueChange(currentValue === value ? "" : currentValue)
+                        onValueChange(newId === value ? "" : newId);
                     }
-                    setOpen(false)
+                    setOpen(false);
                   }}
                 >
                   <Check
