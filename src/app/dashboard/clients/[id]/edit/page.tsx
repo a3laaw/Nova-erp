@@ -73,7 +73,7 @@ export default function EditClientPage() {
                     newMap.set(doc.id, emp.fullName);
                 });
                 setEmployeesMap(newMap);
-                const archEngineers = fetchedEmployees.filter(emp => emp.department === 'هندسة');
+                const archEngineers = fetchedEmployees.filter(emp => (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect')));
                 setEngineers(archEngineers);
             } catch (error) {
                 console.error("Error fetching employees:", error);

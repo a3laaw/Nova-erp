@@ -89,11 +89,15 @@ export default function NewClientPage() {
         const fetchEngineers = async () => {
             setEngineersLoading(true);
             try {
-                const q = query(collection(firestore, 'employees'), where('department', '==', 'هندسة'));
+                // Fetch active employees and filter for engineers on the client
+                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEngineers: Employee[] = [];
                 querySnapshot.forEach(doc => {
-                    fetchedEngineers.push({ id: doc.id, ...doc.data() } as Employee);
+                    const employee = { id: doc.id, ...doc.data() } as Employee;
+                    if (employee.jobTitle?.includes('مهندس') || employee.jobTitle?.toLowerCase().includes('architect')) {
+                        fetchedEngineers.push(employee);
+                    }
                 });
                 setEngineers(fetchedEngineers);
             } catch (error) {
@@ -215,7 +219,7 @@ export default function NewClientPage() {
         mobile: 'رقم الجوال',
         mobilePlaceholder: '+965 1234 5678',
         engineer: 'المهندس المسؤول (اختياري)',
-        engineerPlaceholder: 'اختر مهندسًا من قسم المعماري...',
+        engineerPlaceholder: 'اختر مهندسًا...',
         address: 'عنوان العميل',
         governorate: 'المحافظة',
         governoratePlaceholder: 'مثال: حولي',
@@ -241,7 +245,7 @@ export default function NewClientPage() {
         mobile: 'Mobile Number',
         mobilePlaceholder: '+965 1234 5678',
         engineer: 'Assigned Engineer (Optional)',
-        engineerPlaceholder: 'Select an architect...',
+        engineerPlaceholder: 'Select an engineer...',
         address: 'Client Address',
         governorate: 'Governorate',
         governoratePlaceholder: 'e.g., Hawalli',
