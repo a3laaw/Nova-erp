@@ -50,7 +50,7 @@ export function Combobox({
   const selectedLabel = options.find((option) => option.value === value)?.label
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -63,16 +63,7 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
-        onInteractOutside={(e) => {
-          const target = e.target as HTMLElement;
-          // Allow interaction with cmdk elements without closing
-          if (target.closest('[cmdk-list]') || target.closest('[cmdk-input]')) {
-            e.preventDefault();
-          }
-        }}
-      >
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
