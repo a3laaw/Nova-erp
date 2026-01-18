@@ -73,13 +73,9 @@ export function Combobox({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onSelect={(currentLabel) => {
-                    // البحث عن الخيار بناءً على label المُرجع
-                    const selectedOption = options.find(
-                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
-                    );
-                    if (selectedOption && onValueChange) {
-                      onValueChange(selectedOption.value);
+                  onSelect={() => {
+                    if (onValueChange) {
+                      onValueChange(option.value);
                     }
                     setOpen(false);
                   }}
