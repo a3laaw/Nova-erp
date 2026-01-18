@@ -137,7 +137,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             batch.set(logEventRef, {
                 type: 'log',
                 content: logContent,
-                userId: currentUser.uid,
+                userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
@@ -147,30 +147,38 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             
             toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
             
-            // --- Await Notification Logic ---
+            // --- Notification Logic ---
             const engineerName = engineer ? engineer.fullName : 'غير مسند';
+            const recipients = new Set<string>();
 
-            // 1. Send confirmation notification to the creator
+            // 1. Add creator to recipients
             if (currentUser.id) {
-                 await createNotification(firestore, {
-                    userId: currentUser.id,
-                    title: 'تم إنشاء معاملة بنجاح',
-                    body: `لقد أنشأت المعاملة "${transactionType}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`,
-                    link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
-                });
+                recipients.add(currentUser.id);
             }
 
-            // 2. Notify the assigned engineer (if they are not the creator)
+            // 2. Add assignee to recipients
             if (assignedEngineerId) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, assignedEngineerId);
-                if (targetUserId && targetUserId !== currentUser.id) {
-                    await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: 'تم إسناد معاملة جديدة لك',
-                        body: `أسند إليك ${currentUser.fullName} المعاملة "${transactionType}" للعميل ${clientName}.`,
-                        link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
-                    });
+                if (targetUserId) {
+                    recipients.add(targetUserId);
                 }
+            }
+            
+            // 3. Send notifications to all unique recipients
+            for (const recipientId of recipients) {
+                const isCreator = recipientId === currentUser.id;
+                
+                const title = isCreator ? 'تم إنشاء معاملة بنجاح' : 'تم إسناد معاملة جديدة لك';
+                const body = isCreator 
+                    ? `لقد أنشأت المعاملة "${transactionType}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`
+                    : `أسند إليك ${currentUser.fullName} المعاملة "${transactionType}" للعميل ${clientName}.`;
+                
+                await createNotification(firestore, {
+                    userId: recipientId,
+                    title,
+                    body,
+                    link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
+                });
             }
             
             resetForm();

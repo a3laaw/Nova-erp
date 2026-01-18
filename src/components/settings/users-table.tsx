@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -148,7 +147,7 @@ export function UsersTable() {
                     email: `${userData.username}@bmec-kw.local`,
                     isActive: false, // Always created as inactive
                     createdAt: serverTimestamp(),
-                    createdBy: currentUser.uid,
+                    createdBy: currentUser.id,
                 });
                 toast({ 
                     title: 'نجاح!', 
@@ -239,7 +238,7 @@ export function UsersTable() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                   {currentUser?.uid !== user.id && (
+                                   {currentUser?.id !== user.id && (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button aria-haspopup="true" size="icon" variant="ghost">

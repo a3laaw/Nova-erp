@@ -185,7 +185,7 @@ export default function EditClientPage() {
                     batch.set(doc(historyCollectionRef), {
                         type: 'log',
                         content: logContent,
-                        userId: currentUser.uid,
+                        userId: currentUser.id,
                         userName: currentUser.fullName,
                         userAvatar: currentUser.avatarUrl,
                         createdAt: serverTimestamp(),
@@ -208,7 +208,7 @@ export default function EditClientPage() {
                 batch.set(doc(historyCollectionRef), {
                     type: 'log',
                     content: logContent,
-                    userId: currentUser.uid,
+                    userId: currentUser.id,
                     userName: currentUser.fullName,
                     userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
@@ -224,7 +224,7 @@ export default function EditClientPage() {
                 batch.set(doc(historyCollectionRef), {
                     type: 'log',
                     content: logContent,
-                    userId: currentUser.uid,
+                    userId: currentUser.id,
                     userName: currentUser.fullName,
                     userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),

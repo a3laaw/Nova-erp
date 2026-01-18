@@ -159,7 +159,7 @@ export default function TransactionDetailPage() {
         batch.set(doc(timelineRef), {
             type: 'log',
             content: logContent,
-            userId: currentUser.uid,
+            userId: currentUser.id,
             userName: currentUser.fullName,
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
@@ -174,7 +174,7 @@ export default function TransactionDetailPage() {
         batch.set(doc(timelineRef), {
             type: 'log',
             content: logContent,
-            userId: currentUser.uid,
+            userId: currentUser.id,
             userName: currentUser.fullName,
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
