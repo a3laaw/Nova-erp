@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -66,27 +65,29 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
 
 
   const primaryQuery = useMemo(() => firestore ? query(collection(firestore, primaryCollectionName), orderBy('name')) : null, [firestore, primaryCollectionName]);
-  const [primarySnapshot, primaryLoading] = useCollection(primaryQuery);
+  const [primarySnapshot, primaryLoading, primaryError] = useCollection(primaryQuery);
 
   useEffect(() => {
     setLoadingPrimary(primaryLoading);
+    if(primaryError) {
+        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: primaryError.message });
+    }
     if (primarySnapshot) {
       const items = primarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
       setPrimaryItems(items);
     }
-  }, [primarySnapshot, primaryLoading]);
+  }, [primarySnapshot, primaryLoading, primaryError, primaryTitle, toast]);
   
   useEffect(() => {
-    if (selectedPrimary && primaryItems.find(p => p.id === selectedPrimary.id)) {
-        // If selected primary still exists, keep it selected.
-    } else if (primaryItems.length > 0) {
+    const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
+    if (!primaryExists && primaryItems.length > 0) {
         handleSelectPrimary(primaryItems[0]);
-    } else {
+    } else if (primaryItems.length === 0) {
         setSelectedPrimary(null);
         setSecondaryItems([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [primaryItems]);
+  }, [primaryItems, selectedPrimary]);
 
 
   const handleSelectPrimary = async (item: T) => {
@@ -182,7 +183,7 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
         <div>
           <h4 className="font-semibold mb-2 text-center">{primaryTitle}</h4>
           <ScrollArea className="h-72 border rounded-md p-2">
-            {loadingPrimary ? <p>جاري التحميل...</p> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+            {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
               primaryItems.map(item => (
                 <div key={item.id} onClick={() => handleSelectPrimary(item)}
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
@@ -206,7 +207,7 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
              <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2" /> إضافة {secondaryTitle.slice(0, -1)}</Button>
           </div>
           <ScrollArea className="h-72 border rounded-md p-2">
-            {loadingSecondary ? <Loader2 className="animate-spin mx-auto my-10" /> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+            {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
               secondaryItems.map(item => (
                 <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
                   <span>{item.name}</span>
@@ -260,6 +261,70 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
 }
 
 export function ReferenceDataManager() {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedData = async () => {
+    if (!firestore) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+        return;
+    }
+    setIsSeeding(true);
+
+    try {
+        const batch = writeBatch(firestore);
+
+        // --- Departments and Jobs ---
+        const departmentsData = [
+            { name: 'قسم الهندسة', jobs: ['مهندس معماري', 'مهندس إنشائي', 'مهندس كهرباء', 'مهندس ميكانيكا', 'مهندس مساحة', 'رسام أوتوكاد'] },
+            { name: 'قسم إدارة المشاريع', jobs: ['مدير مشروع', 'مساعد مدير مشروع', 'منسق مشروع'] },
+            { name: 'قسم المحاسبة والمالية', jobs: ['محاسب', 'مدير مالي'] },
+            { name: 'قسم الموارد البشرية والإدارية', jobs: ['مسؤول موارد بشرية', 'مدير إداري', 'سكرتارية'] },
+            { name: 'قسم المشتريات', jobs: ['مسؤول مشتريات'] },
+            { name: 'قسم السلامة', jobs: ['مسؤول سلامة'] }
+        ];
+
+        for (const dept of departmentsData) {
+            const deptRef = doc(collection(firestore, 'departments'));
+            batch.set(deptRef, { name: dept.name });
+            for (const job of dept.jobs) {
+                const jobRef = doc(collection(firestore, `departments/${deptRef.id}/jobs`));
+                batch.set(jobRef, { name: job });
+            }
+        }
+        
+        // --- Governorates and Areas ---
+        const locationsData = [
+            { name: 'محافظة العاصمة', areas: ['مدينة الكويت', 'الدسمة', 'الشرق', 'الصوابر', 'المرقاب', 'القبلة', 'الصالحية', 'ضاحية عبد الله السالم', 'الشويخ'] },
+            { name: 'محافظة حولي', areas: ['حولي', 'السالمية', 'الجابرية', 'الرميثية', 'سلوى', 'بيان', 'مشرف'] },
+            { name: 'محافظة الفروانية', areas: ['الفروانية', 'خيطان', 'الأندلس', 'الرابية', 'جليب الشيوخ'] },
+            { name: 'محافظة الأحمدي', areas: ['الأحمدي', 'الفنطاس', 'المهبولة', 'أبو حليفة', 'المنقف', 'صباح الأحمد'] },
+            { name: 'محافظة الجهراء', areas: ['الجهراء', 'الصليبية', 'تيماء', 'النسيم', 'العيون'] },
+            { name: 'محافظة مبارك الكبير', areas: ['مبارك الكبير', 'صباح السالم', 'العدان', 'القصور', 'القرين'] }
+        ];
+
+        for (const gov of locationsData) {
+            const govRef = doc(collection(firestore, 'governorates'));
+            batch.set(govRef, { name: gov.name });
+            for (const area of gov.areas) {
+                const areaRef = doc(collection(firestore, `governorates/${govRef.id}/areas`));
+                batch.set(areaRef, { name: area });
+            }
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تمت إضافة البيانات المرجعية الافتراضية بنجاح. سيتم تحديث القوائم تلقائياً بعد لحظات.' });
+        // The useCollection hooks will automatically refresh the data, no manual refresh needed.
+    } catch(e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في إضافة البيانات الافتراضية. قد تكون البيانات موجودة مسبقًا.' });
+    } finally {
+        setIsSeeding(false);
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <Card>
@@ -269,6 +334,16 @@ export function ReferenceDataManager() {
             تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام، مثل الأقسام والوظائف والمواقع الجغرافية.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+            <div className="mb-6 p-4 border-dashed border-2 rounded-lg bg-muted/50">
+                <h4 className="font-semibold">إضافة بيانات افتراضية</h4>
+                <p className="text-sm text-muted-foreground mt-1">هل تريد البدء بقائمة شائعة من الأقسام والوظائف والمواقع الجغرافية؟ اضغط على الزر أدناه لإضافتها. يمكنك تعديلها أو حذفها لاحقًا.</p>
+                <Button onClick={handleSeedData} disabled={isSeeding} className="mt-2">
+                    {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />}
+                    {isSeeding ? 'جاري الإضافة...' : 'إضافة بيانات افتراضية'}
+                </Button>
+            </div>
+        </CardContent>
       </Card>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <DataManager<Department, Job> 
