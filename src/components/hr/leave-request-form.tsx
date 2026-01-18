@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
@@ -114,6 +115,10 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     const selectedEmployee = useMemo(() => {
         return employees.find(emp => emp.id === employeeId) || null;
     }, [employeeId, employees]);
+
+    const employeeOptions = useMemo(() => 
+        employees.map(emp => ({ value: emp.id!, label: emp.fullName }))
+    , [employees]);
     
     const currentBalance = useMemo(() => {
         if (!selectedEmployee) return 0;
@@ -252,16 +257,15 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                     <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
-                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} disabled={isEditing || employeesLoading}>
-                        <SelectTrigger>
-                            <SelectValue placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."} />
-                        </SelectTrigger>
-                        <SelectContent>
-                             {employees.map(emp => (
-                                <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <Combobox
+                        options={employeeOptions}
+                        value={employeeId}
+                        onValueChange={setEmployeeId}
+                        placeholder={employeesLoading ? "تحميل..." : "اختر موظفًا..."}
+                        searchPlaceholder="ابحث عن موظف..."
+                        notFoundMessage="لم يتم العثور على موظف."
+                        disabled={isEditing || employeesLoading}
+                    />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="leaveType">نوع الإجازة <span className="text-destructive">*</span></Label>

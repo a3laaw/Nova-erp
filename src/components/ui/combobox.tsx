@@ -74,13 +74,12 @@ export function Combobox({
                   key={option.value}
                   value={option.label}
                   onSelect={(currentLabel) => {
-                    // Find the option based on the label that was selected
+                    // البحث عن الخيار بناءً على label المُرجع
                     const selectedOption = options.find(
                       (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
                     );
                     if (selectedOption && onValueChange) {
-                      // If the same value is selected, toggle it off. Otherwise, set the new value.
-                      onValueChange(selectedOption.value === value ? "" : selectedOption.value);
+                      onValueChange(selectedOption.value);
                     }
                     setOpen(false);
                   }}
