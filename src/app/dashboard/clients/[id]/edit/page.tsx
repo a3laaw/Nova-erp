@@ -59,16 +59,15 @@ export default function EditClientPage() {
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
-    const [engineersLoading, setEngineersLoading] = useState(true);
     
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
-    const [locationsLoading, setLocationsLoading] = useState(true);
+    const [refDataLoading, setRefDataLoading] = useState(true);
 
     // Fetch Reference Data
     useEffect(() => {
         if (!firestore) return;
-
+        setRefDataLoading(true);
         const fetchRefData = async () => {
             try {
                 // Fetch Employees (engineers)
@@ -83,19 +82,17 @@ export default function EditClientPage() {
                 });
                 setEmployeesMap(newMap);
                 setEngineers(fetchedEmployees.filter(emp => emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect')));
-                setEngineersLoading(false);
 
                 // Fetch Governorates
                 const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
                 const govSnapshot = await getDocs(govQuery);
                 setGovernorates(govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Governorate)));
-                setLocationsLoading(false);
 
             } catch (error) {
                 console.error("Error fetching reference data:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
-                setEngineersLoading(false);
-                setLocationsLoading(false);
+            } finally {
+                setRefDataLoading(false);
             }
         };
         
@@ -104,8 +101,8 @@ export default function EditClientPage() {
     
     // Fetch Client Data
     useEffect(() => {
-        if (!id || !firestore) {
-            if(!id) router.push('/dashboard/clients');
+        if (!id || !firestore || refDataLoading) {
+            if(!id && !refDataLoading) router.push('/dashboard/clients');
             return;
         }
 
@@ -131,7 +128,12 @@ export default function EditClientPage() {
                     });
                     setFileId(data.fileId || 'N/A');
                      if (data.address?.governorate) {
-                        handleGovernorateChange(data.address.governorate, true);
+                        const initialGov = governorates.find(g => g.name === data.address.governorate);
+                        if (initialGov && firestore) {
+                            const areasQuery = query(collection(firestore, `governorates/${initialGov.id}/areas`), orderBy('name'));
+                            const areasSnapshot = await getDocs(areasQuery);
+                            setAreas(areasSnapshot.docs.map(areaDoc => ({ id: areaDoc.id, ...areaDoc.data() } as Area)));
+                        }
                     }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على العميل.' });
@@ -146,8 +148,7 @@ export default function EditClientPage() {
         };
 
         fetchClient();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, firestore, router, toast]);
+    }, [id, firestore, refDataLoading, router, toast, governorates]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
         const { id, value } = e.target;
@@ -164,16 +165,26 @@ export default function EditClientPage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleGovernorateChange = async (value: string, isInitialLoad = false) => {
-        const selectedGov = governorates.find(g => g.name === value);
-        if (!isInitialLoad) {
-             setFormData(prev => ({ ...prev, governorate: selectedGov?.name || '', area: '' }));
+    const handleGovernorateChange = async (govId: string) => {
+        if (!govId) {
+            setFormData(prev => ({ ...prev, governorate: '', area: '' }));
+            setAreas([]);
+            return;
         }
+        const selectedGov = governorates.find(g => g.id === govId);
+        setFormData(prev => ({ ...prev, governorate: selectedGov?.name || '', area: '' }));
         setAreas([]);
         if (selectedGov && firestore) {
-            const areasQuery = query(collection(firestore, `governorates/${selectedGov.id}/areas`), orderBy('name'));
-            const areasSnapshot = await getDocs(areasQuery);
-            setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
+            setRefDataLoading(true);
+            try {
+                const areasQuery = query(collection(firestore, `governorates/${selectedGov.id}/areas`), orderBy('name'));
+                const areasSnapshot = await getDocs(areasQuery);
+                setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المناطق.' });
+            } finally {
+                setRefDataLoading(false);
+            }
         }
     };
 
@@ -322,7 +333,11 @@ export default function EditClientPage() {
         saving: 'Saving...'
     };
 
-    if (isFetching || locationsLoading) {
+    const selectedGovernorateId = useMemo(() => {
+        return governorates.find(g => g.name === formData.governorate)?.id || '';
+    }, [formData.governorate, governorates]);
+
+    if (isFetching || refDataLoading) {
         return (
              <Card className="max-w-2xl mx-auto" dir="rtl">
                 <CardHeader>
@@ -393,10 +408,10 @@ export default function EditClientPage() {
                             options={engineers.map(eng => ({ value: eng.id!, label: eng.fullName }))}
                             value={formData.assignedEngineerId}
                             onValueChange={(v) => handleSelectChange('assignedEngineerId', v)}
-                            placeholder={engineersLoading ? "تحميل..." : "اختر مهندسًا..."}
+                            placeholder={refDataLoading ? "تحميل..." : "اختر مهندسًا..."}
                             searchPlaceholder="ابحث عن مهندس..."
                             notFoundMessage="لم يتم العثور على مهندس."
-                            disabled={engineersLoading}
+                            disabled={refDataLoading}
                         />
                     </div>
 
@@ -408,12 +423,13 @@ export default function EditClientPage() {
                             <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
                                 <Combobox
-                                    options={governorates.map(gov => ({ value: gov.name, label: gov.name }))}
-                                    value={formData.governorate}
+                                    options={governorates.map(gov => ({ value: gov.id, label: gov.name }))}
+                                    value={selectedGovernorateId}
                                     onValueChange={handleGovernorateChange}
                                     placeholder="اختر محافظة..."
                                     searchPlaceholder="ابحث عن محافظة..."
                                     notFoundMessage="لم يتم العثور على محافظة."
+                                    disabled={refDataLoading}
                                 />
                             </div>
                             <div className="grid gap-2">
@@ -425,7 +441,7 @@ export default function EditClientPage() {
                                     placeholder="اختر منطقة..."
                                     searchPlaceholder="ابحث عن منطقة..."
                                     notFoundMessage="لم يتم العثور على منطقة."
-                                    disabled={!formData.governorate}
+                                    disabled={!formData.governorate || refDataLoading}
                                 />
                             </div>
                         </div>
