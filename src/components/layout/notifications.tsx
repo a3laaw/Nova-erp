@@ -20,7 +20,6 @@ import { useCollection } from '@/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import Link from 'next/link';
-import { mockNotifications } from '@/lib/data';
 
 interface Notification {
   id: string;
@@ -59,26 +58,19 @@ export function Notifications() {
   const [snapshot, loading] = useCollection(notificationsQuery);
 
   const notifications = useMemo(() => {
-    if (loading) return [];
+    if (!snapshot) return [];
     
-    let data: Notification[] = [];
-    
-    if (snapshot && !snapshot.empty) {
-        data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-    } else {
-        // If firestore is empty, use mock data
-        data = mockNotifications.filter(n => n.userId === user?.id || n.userId === 'mock-admin-id');
-    }
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
     
     // Sort client-side
     data.sort((a, b) => {
-        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
-        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
+        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
         return timeB - timeA;
     });
 
     return data.slice(0, 10);
-  }, [snapshot, loading, user?.id]);
+  }, [snapshot]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.isRead).length;
@@ -87,8 +79,7 @@ export function Notifications() {
   const handleNotificationClick = async (notification: Notification) => {
     if (!firestore) return;
 
-    // Only try to update if it's not a mock notification (i.e., it came from a non-empty snapshot)
-    if (!notification.isRead && snapshot && !snapshot.empty) {
+    if (!notification.isRead && notification.id) {
       const notifRef = doc(firestore, 'notifications', notification.id);
       try {
         await updateDoc(notifRef, { isRead: true });

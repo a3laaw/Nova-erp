@@ -26,7 +26,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/lib/types';
-import { mockNotifications } from '@/lib/data';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return { date: '-', time: '-'};
@@ -59,32 +58,22 @@ export default function SystemAlertsPage() {
     const [snapshot, loading, error] = useCollection(notificationsQuery);
 
     const notifications = useMemo(() => {
-        if (loading) {
-            return [];
-        }
-        
-        let data: Notification[] = [];
-    
-        if (snapshot && !snapshot.empty) {
-            data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        } else if (user) {
-            // Fallback to mock data if Firestore is empty for this user.
-            data = mockNotifications.filter(n => n.userId === user?.id || n.userId === 'mock-admin-id');
-        }
+        if (!snapshot) return [];
+
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
 
         // Sort client-side
         data.sort((a, b) => {
-            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
-            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
+            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
             return timeB - timeA;
         });
 
         return data;
-    }, [snapshot, loading, user]);
+    }, [snapshot]);
     
     const handleMarkAsRead = async (notificationId: string) => {
-        // Prevent updating mock notifications
-        if (!firestore || !notificationId || notificationId.startsWith('notif-')) return;
+        if (!firestore || !notificationId) return;
         
         const notifRef = doc(firestore, 'notifications', notificationId);
         try {
