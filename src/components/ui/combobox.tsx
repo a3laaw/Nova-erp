@@ -63,10 +63,7 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
-        onPointerDownOutside={(e) => e.preventDefault()}
-      >
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -75,13 +72,12 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} 
-                  onSelect={(currentLabel) => {
-                    const selectedOption = options.find(
-                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
-                    );
-                    if (selectedOption && onValueChange) {
-                      onValueChange(selectedOption.value);
+                  // ✅ الحل 1: استخدم label للبحث
+                  value={option.label}
+                  // ✅ الحل 2: استخدم option.value مباشرة من closure
+                  onSelect={() => {
+                    if (onValueChange) {
+                      onValueChange(option.value === value ? "" : option.value);
                     }
                     setOpen(false);
                   }}
