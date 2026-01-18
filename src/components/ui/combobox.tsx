@@ -78,7 +78,7 @@ export function Combobox({
                     if (onValueChange) {
                       onValueChange(currentValue);
                     }
-                    setOpen(false)
+                    setOpen(false);
                   }}
                 >
                   <Check
