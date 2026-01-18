@@ -16,7 +16,7 @@ export function useNotifications() {
     // Memoize the Firestore query to prevent re-running on every render
     const notificationsQuery = useMemo(() => {
         if (!firestore || !user?.id) return null;
-        // Query for notifications for the current user
+        // Query for notifications for the current user, ordered by creation date
         return query(
             collection(firestore, 'notifications'),
             where('userId', '==', user.id)
