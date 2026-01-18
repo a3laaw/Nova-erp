@@ -63,7 +63,10 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -72,9 +75,8 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
+                  value={option.label} 
                   onSelect={(currentLabel) => {
-                    // البحث عن الخيار بناءً على label المُرجع
                     const selectedOption = options.find(
                       (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
                     );
