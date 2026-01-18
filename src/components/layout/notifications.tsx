@@ -19,6 +19,7 @@ import { useAuth } from '@/context/auth-context';
 import { useCollection } from '@/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import Link from 'next/link';
 
 interface Notification {
   id: string;
@@ -103,7 +104,11 @@ export function Notifications() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80" dir="rtl">
-        <DropdownMenuLabel>الإشعارات</DropdownMenuLabel>
+        <DropdownMenuLabel>
+          <Link href="/dashboard/notifications" className="hover:underline">
+            الإشعارات
+          </Link>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {loading && <DropdownMenuItem>جاري تحميل الإشعارات...</DropdownMenuItem>}
         {!loading && notifications.length === 0 && (

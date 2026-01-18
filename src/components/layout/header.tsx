@@ -54,6 +54,7 @@ const titles = {
         '/dashboard/warehouse': 'المستودع',
         '/dashboard/hr': 'الموارد البشرية',
         '/dashboard/settings': 'الإعدادات',
+        '/dashboard/notifications': 'الإشعارات',
     },
     en: {
         '/dashboard': 'Dashboard',
@@ -64,6 +65,7 @@ const titles = {
         '/dashboard/warehouse': 'Warehouse',
         '/dashboard/hr': 'Human Resources',
         '/dashboard/settings': 'Settings',
+        '/dashboard/notifications': 'Notifications',
     }
 };
 
@@ -94,5 +96,3 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
         </header>
     );
 }
-
-    
