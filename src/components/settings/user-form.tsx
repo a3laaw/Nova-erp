@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -26,7 +25,6 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Combobox } from '../ui/combobox';
 
 
 interface UserFormProps {
@@ -174,15 +172,16 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                     <Label htmlFor="employeeId">اختيار الموظف <span className="text-destructive">*</span></Label>
-                    <Combobox
-                        options={currentEmployeeSelection.map(emp => ({ value: emp.id!, label: `${emp.fullName} (${emp.civilId})` }))}
-                        value={formData.employeeId}
-                        onValueChange={(v) => handleSelectChange('employeeId', v)}
-                        placeholder="اختر موظفًا..."
-                        searchPlaceholder="ابحث بالاسم أو الرقم المدني..."
-                        notFoundMessage="لم يتم العثور على موظف."
-                        disabled={isEditing}
-                    />
+                    <Select dir="rtl" value={formData.employeeId} onValueChange={(v) => handleSelectChange('employeeId', v)} disabled={isEditing}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="اختر موظفًا..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {currentEmployeeSelection.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id!}>{`${emp.fullName} (${emp.civilId})`}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="username">اسم المستخدم <span className="text-destructive">*</span></Label>

@@ -32,7 +32,6 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { Combobox } from '../ui/combobox';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -44,7 +43,7 @@ type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
 
 
 export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveRequestFormProps) {
-    const firestore = useFirestore();
+    const firestore = useFirebase();
     const { toast } = useToast();
     
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -253,15 +252,16 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                     <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
-                    <Combobox
-                        options={employees.map(emp => ({ value: emp.id!, label: emp.fullName }))}
-                        value={employeeId}
-                        onValueChange={setEmployeeId}
-                        placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."}
-                        searchPlaceholder="ابحث عن موظف..."
-                        notFoundMessage="لم يتم العثور على موظف."
-                        disabled={isEditing || employeesLoading}
-                    />
+                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} disabled={isEditing || employeesLoading}>
+                        <SelectTrigger>
+                            <SelectValue placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."} />
+                        </SelectTrigger>
+                        <SelectContent>
+                             {employees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="leaveType">نوع الإجازة <span className="text-destructive">*</span></Label>

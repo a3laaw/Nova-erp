@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,7 +22,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/auth-context';
 import type { Employee, Governorate, Area } from '@/lib/types';
-import { Combobox } from '@/components/ui/combobox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -399,15 +404,16 @@ export default function EditClientPage() {
 
                     <div className="grid gap-2">
                         <Label htmlFor="assignedEngineerId">{t.engineer}</Label>
-                        <Combobox
-                            options={engineers.map(eng => ({ value: eng.id!, label: eng.fullName }))}
-                            value={formData.assignedEngineerId}
-                            onValueChange={(v) => handleSelectChange('assignedEngineerId', v)}
-                            placeholder={refDataLoading ? "تحميل..." : "اختر مهندسًا..."}
-                            searchPlaceholder="ابحث عن مهندس..."
-                            notFoundMessage="لم يتم العثور على مهندس."
-                            disabled={refDataLoading}
-                        />
+                        <Select dir="rtl" value={formData.assignedEngineerId} onValueChange={(v) => handleSelectChange('assignedEngineerId', v)} disabled={refDataLoading}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={refDataLoading ? "تحميل..." : "اختر مهندسًا..."} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {engineers.map(eng => (
+                                    <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <Separator className="my-6" />
@@ -417,27 +423,29 @@ export default function EditClientPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
-                                <Combobox
-                                    options={governorates.map(gov => ({ value: gov.id, label: gov.name }))}
-                                    value={formData.governorateId}
-                                    onValueChange={handleGovernorateChange}
-                                    placeholder="اختر محافظة..."
-                                    searchPlaceholder="ابحث عن محافظة..."
-                                    notFoundMessage="لم يتم العثور على محافظة."
-                                    disabled={refDataLoading}
-                                />
+                                <Select dir="rtl" value={formData.governorateId} onValueChange={handleGovernorateChange} disabled={refDataLoading}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="اختر محافظة..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {governorates.map(gov => (
+                                            <SelectItem key={gov.id} value={gov.id}>{gov.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="area">{t.area}</Label>
-                                 <Combobox
-                                    options={areas.map(area => ({ value: area.name, label: area.name }))}
-                                    value={formData.area}
-                                    onValueChange={(v) => handleSelectChange('area', v)}
-                                    placeholder={isAreaLoading ? "تحميل المناطق..." : "اختر منطقة..."}
-                                    searchPlaceholder="ابحث عن منطقة..."
-                                    notFoundMessage="لم يتم العثور على منطقة."
-                                    disabled={!formData.governorateId || isAreaLoading}
-                                />
+                                 <Select dir="rtl" value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!formData.governorateId || isAreaLoading}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={isAreaLoading ? "تحميل المناطق..." : "اختر منطقة..."} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {areas.map(area => (
+                                            <SelectItem key={area.id} value={area.name}>{area.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
