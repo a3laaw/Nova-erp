@@ -35,7 +35,6 @@ interface ComboboxProps {
     className?: string;
 }
 
-
 export function Combobox({
     options,
     value,
@@ -48,7 +47,7 @@ export function Combobox({
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
-  const selectedOption = options.find((option) => option.value === value)
+  const selectedLabel = options.find((option) => option.value === value)?.label
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -57,14 +56,14 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
+          className={cn("w-full justify-between font-normal", !value && "text-muted-foreground", className)}
           disabled={disabled}
         >
-          {selectedOption?.label || placeholder}
+          {selectedLabel || placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
+      <PopoverContent 
         className="w-[--radix-popover-trigger-width] p-0"
         onPointerDownOutside={(e) => e.preventDefault()}
       >
@@ -77,12 +76,9 @@ export function Combobox({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onSelect={(currentLabel) => {
-                    const newlySelectedOption = options.find(o => o.label === currentLabel);
-                    const newId = newlySelectedOption ? newlySelectedOption.value : "";
-                    
+                  onSelect={() => {
                     if (onValueChange) {
-                        onValueChange(newId === value ? "" : newId);
+                      onValueChange(option.value);
                     }
                     setOpen(false);
                   }}
