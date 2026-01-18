@@ -63,9 +63,15 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
+      <PopoverContent
         className="w-[--radix-popover-trigger-width] p-0"
-        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          // Allow interaction with cmdk elements without closing
+          if (target.closest('[cmdk-list]') || target.closest('[cmdk-input]')) {
+            e.preventDefault();
+          }
+        }}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
