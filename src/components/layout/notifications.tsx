@@ -20,6 +20,7 @@ import { useCollection } from '@/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import Link from 'next/link';
+import { mockNotifications } from '@/lib/data';
 
 interface Notification {
   id: string;
@@ -48,31 +49,36 @@ export function Notifications() {
 
   const notificationsQuery = useMemo(() => {
     if (!firestore || !user?.id) return null;
-    // We use user.id which is the Firestore document ID for our internal user management
-    // Removing orderBy to prevent needing a composite index. Sorting will be done on the client.
     return query(
       collection(firestore, 'notifications'),
       where('userId', '==', user.id),
-      // orderBy('createdAt', 'desc'), // This requires a composite index
-      limit(20) // Fetch a bit more to sort on the client, then slice
+      limit(20)
     );
   }, [firestore, user?.id]);
 
   const [snapshot, loading] = useCollection(notificationsQuery);
 
   const notifications = useMemo(() => {
-    if (!snapshot) return [];
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+    if (loading) return [];
     
-    // Sort client-side since we removed orderBy from the query
+    let data: Notification[] = [];
+    
+    if (snapshot && !snapshot.empty) {
+        data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+    } else {
+        // If firestore is empty, use mock data
+        data = mockNotifications.filter(n => n.userId === user?.id || n.userId === 'mock-admin-id');
+    }
+    
+    // Sort client-side
     data.sort((a, b) => {
-        const timeA = a.createdAt?.toMillis() || 0;
-        const timeB = b.createdAt?.toMillis() || 0;
+        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
         return timeB - timeA;
     });
 
-    return data.slice(0, 10); // Now limit to 10
-  }, [snapshot]);
+    return data.slice(0, 10);
+  }, [snapshot, loading, user?.id]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.isRead).length;
@@ -81,7 +87,8 @@ export function Notifications() {
   const handleNotificationClick = async (notification: Notification) => {
     if (!firestore) return;
 
-    if (!notification.isRead) {
+    // Only try to update if it's not a mock notification (i.e., it came from a non-empty snapshot)
+    if (!notification.isRead && snapshot && !snapshot.empty) {
       const notifRef = doc(firestore, 'notifications', notification.id);
       try {
         await updateDoc(notifRef, { isRead: true });

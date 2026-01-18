@@ -1,4 +1,4 @@
-import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile, MultilingualString } from './types';
+import type { Client, Project, Appointment, Contract, Invoice, InventoryItem, CashReceipt, UserProfile, MultilingualString, Notification } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
 const getUserAvatar = (id: string) => PlaceHolderImages.find(p => p.id === id)?.imageUrl || '';
@@ -20,6 +20,46 @@ export const appointments: Appointment[] = [];
 export const contracts: Contract[] = [];
 export const invoices: Invoice[] = [];
 export const cashReceipts: CashReceipt[] = [];
+
+// Mock notifications for demonstration when Firestore is empty.
+export const mockNotifications: Notification[] = [
+  {
+    id: 'notif-1',
+    userId: 'mock-admin-id',
+    title: 'تم تحويل معاملة إليك',
+    body: 'حول إليك علي أحمد معاملة "تصميم بلدية" الخاصة بالعميل "شركة المشاريع المتحدة".',
+    link: '#',
+    isRead: false,
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(),
+  },
+  {
+    id: 'notif-2',
+    userId: 'mock-admin-id',
+    title: 'تعليق جديد على معاملة',
+    body: 'أضافت فاطمة المنصوري تعليقًا على معاملة "تصميم كهرباء" للعميل "مؤسسة البناء الحديث".',
+    link: '#',
+    isRead: false,
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
+  },
+  {
+    id: 'notif-3',
+    userId: 'mock-admin-id',
+    title: 'تمت الموافقة على طلب الإجازة',
+    body: 'تمت الموافقة على طلب الإجازة السنوية الذي قدمته.',
+    link: '#',
+    isRead: true,
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(),
+  },
+    {
+    id: 'notif-4',
+    userId: 'mock-admin-id',
+    title: 'مهمة جديدة: مراجعة المخططات',
+    body: 'تم إسناد مهمة جديدة لك لمراجعة المخططات المعمارية لمشروع "برج خليفة الجديد".',
+    link: '#',
+    isRead: true,
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString(),
+  },
+];
 
 
 export const inventory: InventoryItem[] = [

@@ -26,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/lib/types';
+import { mockNotifications } from '@/lib/data';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return { date: '-', time: '-'};
@@ -58,14 +59,20 @@ export default function SystemAlertsPage() {
     const [snapshot, loading, error] = useCollection(notificationsQuery);
 
     const notifications = useMemo(() => {
+        if (loading) return [];
+        if (snapshot?.empty) {
+            // If firestore is empty, use mock data for the current user
+            return mockNotifications.filter(n => n.userId === user?.id || n.userId === 'mock-admin-id');
+        }
         if (!snapshot) return [];
+        
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
         data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
         return data;
-    }, [snapshot]);
+    }, [snapshot, loading, user?.id]);
     
     const handleMarkAsRead = async (notificationId: string) => {
-        if (!firestore) return;
+        if (!firestore || snapshot?.empty) return; // Don't try to update mock data
         const notifRef = doc(firestore, 'notifications', notificationId);
         try {
             await updateDoc(notifRef, { isRead: true });
