@@ -63,10 +63,7 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
-        align="start"
-      >
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -75,11 +72,14 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} // هذا ضروري لكي يعمل البحث على الاسم
-                  onSelect={() => {
-                    if (onValueChange) {
-                      // نستخدم option.value مباشرة من الـ closure لضمان دقة الاختيار
-                      onValueChange(option.value);
+                  value={option.label}
+                  onSelect={(currentLabel) => {
+                    // البحث عن الخيار بناءً على label المُرجع
+                    const selectedOption = options.find(
+                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
+                    );
+                    if (selectedOption && onValueChange) {
+                      onValueChange(selectedOption.value);
                     }
                     setOpen(false);
                   }}
