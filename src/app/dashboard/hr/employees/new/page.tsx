@@ -32,6 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
+import { Combobox } from '@/components/ui/combobox';
 
 
 export default function NewEmployeePage() {
@@ -435,25 +436,26 @@ export default function NewEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" onValueChange={handleDepartmentChange} required disabled={refDataLoading}>
-                                    <SelectTrigger id="department"><SelectValue placeholder="اختر القسم..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {departments.map(dept => (
-                                            <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    options={departments.map(dept => ({ value: dept.id, label: dept.name }))}
+                                    onValueChange={handleDepartmentChange}
+                                    placeholder="اختر القسم..."
+                                    searchPlaceholder="ابحث عن قسم..."
+                                    notFoundMessage="لم يتم العثور على قسم."
+                                    disabled={refDataLoading}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} required disabled={!formData.department}>
-                                    <SelectTrigger id="jobTitle"><SelectValue placeholder="اختر الوظيفة..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {jobs.map(job => (
-                                            <SelectItem key={job.id} value={job.name}>{job.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    options={jobs.map(job => ({ value: job.name, label: job.name }))}
+                                    value={formData.jobTitle}
+                                    onValueChange={(v) => handleSelectChange('jobTitle', v)}
+                                    placeholder="اختر الوظيفة..."
+                                    searchPlaceholder="ابحث عن وظيفة..."
+                                    notFoundMessage="لم يتم العثور على وظيفة."
+                                    disabled={!formData.department || jobs.length === 0}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>
@@ -592,6 +594,7 @@ export default function NewEmployeePage() {
     
 
     
+
 
 
 

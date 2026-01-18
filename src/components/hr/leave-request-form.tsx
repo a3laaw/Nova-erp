@@ -22,7 +22,7 @@ import {
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, addDoc, updateDoc, doc, serverTimestamp, getDocs, type DocumentData, Timestamp } from 'firebase/firestore';
 import type { Employee, LeaveRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { Combobox } from '../ui/combobox';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -252,21 +253,15 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                     <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
-                    <Select dir="rtl" value={employeeId} onValueChange={setEmployeeId} required disabled={isEditing}>
-                        <SelectTrigger id="employee" disabled={employeesLoading || isEditing}>
-                            <SelectValue placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {employeesLoading && <div className='p-2'><Skeleton className='h-8 w-full' /></div>}
-                            {!employeesLoading && employees.length === 0 ? (
-                                <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون نشطون حالياً.</p>
-                            ) : (
-                                employees.map(emp => (
-                                    <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
+                    <Combobox
+                        options={employees.map(emp => ({ value: emp.id!, label: emp.fullName }))}
+                        value={employeeId}
+                        onValueChange={setEmployeeId}
+                        placeholder={employeesLoading ? "تحميل..." : "اختر الموظف..."}
+                        searchPlaceholder="ابحث عن موظف..."
+                        notFoundMessage="لم يتم العثور على موظف."
+                        disabled={isEditing || employeesLoading}
+                    />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="leaveType">نوع الإجازة <span className="text-destructive">*</span></Label>

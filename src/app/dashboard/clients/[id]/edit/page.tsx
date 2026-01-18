@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Employee, Governorate, Area } from '@/lib/types';
+import { Combobox } from '@/components/ui/combobox';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -388,16 +389,15 @@ export default function EditClientPage() {
 
                     <div className="grid gap-2">
                         <Label htmlFor="assignedEngineerId">{t.engineer}</Label>
-                        <Select dir="rtl" value={formData.assignedEngineerId} onValueChange={(v) => handleSelectChange('assignedEngineerId', v)} disabled={engineersLoading}>
-                            <SelectTrigger id="assignedEngineerId">
-                                <SelectValue placeholder={engineersLoading ? "تحميل..." : "اختر مهندسًا..."} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {engineers.map(eng => (
-                                    <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Combobox
+                            options={engineers.map(eng => ({ value: eng.id!, label: eng.fullName }))}
+                            value={formData.assignedEngineerId}
+                            onValueChange={(v) => handleSelectChange('assignedEngineerId', v)}
+                            placeholder={engineersLoading ? "تحميل..." : "اختر مهندسًا..."}
+                            searchPlaceholder="ابحث عن مهندس..."
+                            notFoundMessage="لم يتم العثور على مهندس."
+                            disabled={engineersLoading}
+                        />
                     </div>
 
                     <Separator className="my-6" />
@@ -407,29 +407,26 @@ export default function EditClientPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
-                                <Select dir="rtl" value={formData.governorate} onValueChange={handleGovernorateChange}>
-                                    <SelectTrigger id="governorate">
-                                        <SelectValue placeholder="اختر محافظة..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {governorates.map(gov => (
-                                            <SelectItem key={gov.id} value={gov.name}>{gov.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    options={governorates.map(gov => ({ value: gov.name, label: gov.name }))}
+                                    value={formData.governorate}
+                                    onValueChange={handleGovernorateChange}
+                                    placeholder="اختر محافظة..."
+                                    searchPlaceholder="ابحث عن محافظة..."
+                                    notFoundMessage="لم يتم العثور على محافظة."
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="area">{t.area}</Label>
-                                 <Select dir="rtl" value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!formData.governorate}>
-                                    <SelectTrigger id="area">
-                                        <SelectValue placeholder="اختر منطقة..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {areas.map(area => (
-                                            <SelectItem key={area.id} value={area.name}>{area.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                 <Combobox
+                                    options={areas.map(area => ({ value: area.name, label: area.name }))}
+                                    value={formData.area}
+                                    onValueChange={(v) => handleSelectChange('area', v)}
+                                    placeholder="اختر منطقة..."
+                                    searchPlaceholder="ابحث عن منطقة..."
+                                    notFoundMessage="لم يتم العثور على منطقة."
+                                    disabled={!formData.governorate}
+                                />
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -26,6 +26,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { Combobox } from '../ui/combobox';
 
 
 interface UserFormProps {
@@ -173,25 +174,15 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                     <Label htmlFor="employeeId">اختيار الموظف <span className="text-destructive">*</span></Label>
-                    <Select 
-                        dir="rtl" 
-                        value={formData.employeeId} 
+                    <Combobox
+                        options={currentEmployeeSelection.map(emp => ({ value: emp.id!, label: `${emp.fullName} (${emp.civilId})` }))}
+                        value={formData.employeeId}
                         onValueChange={(v) => handleSelectChange('employeeId', v)}
+                        placeholder="اختر موظفًا..."
+                        searchPlaceholder="ابحث بالاسم أو الرقم المدني..."
+                        notFoundMessage="لم يتم العثور على موظف."
                         disabled={isEditing}
-                    >
-                        <SelectTrigger id="employeeId">
-                            <SelectValue placeholder="اختر موظفًا غير مرتبط بحساب..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {currentEmployeeSelection.map(emp => (
-                                <SelectItem key={emp.id} value={emp.id!}>
-                                    <span className="font-medium">{emp.fullName}</span>
-                                    <span className="text-muted-foreground text-xs ml-2">({emp.civilId})</span>
-                                </SelectItem>
-                            ))}
-                            {currentEmployeeSelection.length === 0 && !isEditing && <p className="p-2 text-xs text-muted-foreground">لا يوجد موظفون متاحون لإنشاء حسابات.</p>}
-                        </SelectContent>
-                    </Select>
+                    />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="username">اسم المستخدم <span className="text-destructive">*</span></Label>

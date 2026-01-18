@@ -28,6 +28,7 @@ import type { Employee, ClientTransaction } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { Combobox } from '../ui/combobox';
 
 
 interface ClientTransactionFormProps {
@@ -218,17 +219,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="assignedEngineerId">إسناد إلى مهندس (اختياري)</Label>
-                            <Select dir="rtl" value={assignedEngineerId} onValueChange={setAssignedEngineerId}>
-                                <SelectTrigger id="assignedEngineerId" disabled={engineersLoading}>
-                                    <SelectValue placeholder={engineersLoading ? "تحميل المهندسين..." : "اختر مهندسًا..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {engineersLoading && <SelectItem value="loading" disabled><Skeleton className="h-6 w-full" /></SelectItem>}
-                                    {!engineersLoading && engineers.map(eng => (
-                                        <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Combobox
+                                options={engineers.map(eng => ({ value: eng.id!, label: eng.fullName }))}
+                                value={assignedEngineerId}
+                                onValueChange={setAssignedEngineerId}
+                                placeholder={engineersLoading ? "تحميل المهندسين..." : "اختر مهندسًا..."}
+                                searchPlaceholder="ابحث عن مهندس..."
+                                notFoundMessage="لم يتم العثور على مهندس."
+                                disabled={engineersLoading}
+                            />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="description">وصف المعاملة</Label>
