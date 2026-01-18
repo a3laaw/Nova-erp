@@ -15,20 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
-import { useFirebase, useCollection } from '@/firebase';
-import { doc, getDoc, updateDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { doc, getDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/auth-context';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import type { Employee, Governorate, Area } from '@/lib/types';
 import { Combobox } from '@/components/ui/combobox';
 
@@ -63,6 +56,7 @@ export default function EditClientPage() {
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
+    const [isAreaLoading, setIsAreaLoading] = useState(false);
 
     // Fetch Reference Data
     useEffect(() => {
@@ -104,7 +98,7 @@ export default function EditClientPage() {
             setAreas([]);
             return;
         }
-        setRefDataLoading(true);
+        setIsAreaLoading(true);
         try {
             const areasQuery = query(collection(firestore, `governorates/${governorateId}/areas`), orderBy('name'));
             const areasSnapshot = await getDocs(areasQuery);
@@ -113,7 +107,7 @@ export default function EditClientPage() {
             console.error("Error fetching areas:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المناطق.' });
         } finally {
-            setRefDataLoading(false);
+            setIsAreaLoading(false);
         }
     }, [firestore, toast]);
     
@@ -439,10 +433,10 @@ export default function EditClientPage() {
                                     options={areas.map(area => ({ value: area.name, label: area.name }))}
                                     value={formData.area}
                                     onValueChange={(v) => handleSelectChange('area', v)}
-                                    placeholder="اختر منطقة..."
+                                    placeholder={isAreaLoading ? "تحميل المناطق..." : "اختر منطقة..."}
                                     searchPlaceholder="ابحث عن منطقة..."
                                     notFoundMessage="لم يتم العثور على منطقة."
-                                    disabled={!formData.governorateId || refDataLoading}
+                                    disabled={!formData.governorateId || isAreaLoading}
                                 />
                             </div>
                         </div>
@@ -476,3 +470,5 @@ export default function EditClientPage() {
         </Card>
     );
 }
+
+    
