@@ -65,7 +65,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
   const pathname = usePathname();
   const { language } = useLanguage();
   
-  const currentNavItems = navItems[language].filter(item => currentUser.role && item.roles.includes(item.role));
+  const currentNavItems = navItems[language].filter(item => currentUser.role && item.roles.includes(currentUser.role));
   const currentSettingsItem = settingsItem[language];
   const canViewSettings = currentUser.role && currentSettingsItem.roles.includes(currentUser.role);
 
@@ -119,7 +119,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
               <div className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none transition-colors text-muted-foreground">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
-                    <AvatarFallback>{currentUser.fullName.charAt(0)}</AvatarFallback>
+                    <AvatarFallback>{currentUser.fullName?.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-sm">
                     <span className="font-semibold text-foreground">{currentUser.fullName}</span>
