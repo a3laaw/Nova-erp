@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -14,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
-import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc } from 'firebase/firestore';
+import { useFirebase, useCollection } from '@/firebase';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,8 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Employee } from '@/lib/types';
-import { kuwaitGovernorates } from '@/lib/reference-data';
+import type { Employee, Governorate, Area } from '@/lib/types';
 
 
 export default function NewClientPage() {
@@ -51,11 +51,15 @@ export default function NewClientPage() {
     const [fileId, setFileId] = useState('جاري التوليد...');
     const [isGeneratingId, setIsGeneratingId] = useState(true);
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
+    
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
+    
+    const [governorates, setGovernorates] = useState<Governorate[]>([]);
+    const [areas, setAreas] = useState<Area[]>([]);
+    const [locationsLoading, setLocationsLoading] = useState(true);
 
-    const [areas, setAreas] = useState<string[]>([]);
-
+    // Fetch File ID
     useEffect(() => {
         if (!firestore) return;
 
@@ -86,41 +90,49 @@ export default function NewClientPage() {
         generateFileId();
     }, [firestore, toast]);
     
+    // Fetch Reference Data (Engineers, Governorates)
     useEffect(() => {
         if (!firestore) return;
     
-        const fetchEngineers = async () => {
+        const fetchReferenceData = async () => {
             setEngineersLoading(true);
+            setLocationsLoading(true);
             try {
-                // Fetch active employees and filter for engineers on the client
-                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const querySnapshot = await getDocs(q);
+                // Fetch engineers
+                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const engSnapshot = await getDocs(engQuery);
                 const fetchedEngineers: Employee[] = [];
-                querySnapshot.forEach(doc => {
+                engSnapshot.forEach(doc => {
                     const employee = { id: doc.id, ...doc.data() } as Employee;
                     if (employee.jobTitle?.includes('مهندس') || employee.jobTitle?.toLowerCase().includes('architect')) {
                         fetchedEngineers.push(employee);
                     }
                 });
                 setEngineers(fetchedEngineers);
-            } catch (error) {
-                console.error("Failed to fetch engineers:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المهندسين.' });
-            } finally {
                 setEngineersLoading(false);
+
+                // Fetch Governorates
+                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
+                const govSnapshot = await getDocs(govQuery);
+                setGovernorates(govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Governorate)));
+                setLocationsLoading(false);
+
+            } catch (error) {
+                console.error("Failed to fetch reference data:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
+                setEngineersLoading(false);
+                setLocationsLoading(false);
             }
         };
-        fetchEngineers();
+        fetchReferenceData();
     }, [firestore, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
         if (id === 'nameAr') {
-            // Allow Arabic letters and spaces only
             sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
         } else if (id === 'nameEn') {
-            // Allow English letters and spaces only
             sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         }
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
@@ -130,11 +142,16 @@ export default function NewClientPage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleGovernorateChange = (value: string) => {
-        handleSelectChange('governorate', value);
-        handleSelectChange('area', ''); // Reset area
-        const gov = kuwaitGovernorates.find(g => g.name === value);
-        setAreas(gov ? gov.areas : []);
+    const handleGovernorateChange = async (value: string) => {
+        const selectedGov = governorates.find(g => g.id === value);
+        handleSelectChange('governorate', selectedGov?.name || '');
+        handleSelectChange('area', '');
+        setAreas([]);
+        if (selectedGov && firestore) {
+            const areasQuery = query(collection(firestore, `governorates/${selectedGov.id}/areas`), orderBy('name'));
+            const areasSnapshot = await getDocs(areasQuery);
+            setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
+        }
     };
 
 
@@ -158,7 +175,6 @@ export default function NewClientPage() {
         setIsLoading(true);
 
         try {
-            // --- Uniqueness Check for Mobile ---
             const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', formData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {
@@ -179,7 +195,6 @@ export default function NewClientPage() {
                     nextNumber = (counts[currentYear] || 0) + 1;
                 }
                 
-                // Atomically update the counter
                 transaction.set(counterRef, { 
                     counts: { [currentYear]: nextNumber } 
                 }, { merge: true });
@@ -331,11 +346,11 @@ export default function NewClientPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
-                                <Select dir="rtl" onValueChange={handleGovernorateChange}>
-                                    <SelectTrigger id="governorate"><SelectValue placeholder={t.governoratePlaceholder} /></SelectTrigger>
+                                <Select dir="rtl" onValueChange={handleGovernorateChange} disabled={locationsLoading}>
+                                    <SelectTrigger id="governorate"><SelectValue placeholder={locationsLoading ? "تحميل..." : t.governoratePlaceholder} /></SelectTrigger>
                                     <SelectContent>
-                                        {kuwaitGovernorates.map(gov => (
-                                            <SelectItem key={gov.name} value={gov.name}>{gov.name}</SelectItem>
+                                        {governorates.map(gov => (
+                                            <SelectItem key={gov.id} value={gov.id}>{gov.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -346,7 +361,7 @@ export default function NewClientPage() {
                                     <SelectTrigger id="area"><SelectValue placeholder={t.areaPlaceholder} /></SelectTrigger>
                                     <SelectContent>
                                         {areas.map(area => (
-                                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                                            <SelectItem key={area.id} value={area.name}>{area.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

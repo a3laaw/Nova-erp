@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -23,15 +24,14 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
-import type { Employee } from '@/lib/types';
-import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import type { Employee, Department, Job } from '@/lib/types';
+import { useFirebase, useCollection } from '@/firebase';
+import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs, writeBatch, doc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
-import { departments } from '@/lib/reference-data';
 
 
 export default function NewEmployeePage() {
@@ -74,11 +74,15 @@ export default function NewEmployeePage() {
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
-    const [jobs, setJobs] = useState<string[]>([]);
+    
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [jobs, setJobs] = useState<Job[]>([]);
+    const [refDataLoading, setRefDataLoading] = useState(true);
 
     useEffect(() => {
         setIsClient(true);
         if (firestore) {
+            // Fetch next employee number
             setIsGeneratingNumber(true);
             const fetchNextEmployeeNumber = async () => {
                 try {
@@ -96,17 +100,27 @@ export default function NewEmployeePage() {
                     const nextNumber = String(maxNumber + 1);
                     setFormData(prev => ({ ...prev, employeeNumber: nextNumber }));
                 } catch (error) {
-                    console.error("Failed to fetch next employee number:", error);
-                    toast({
-                        variant: 'destructive',
-                        title: 'خطأ',
-                        description: 'فشل توليد الرقم الوظيفي. الرجاء المحاولة مرة أخرى.'
-                    });
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'فشل توليد الرقم الوظيفي.' });
                 } finally {
                     setIsGeneratingNumber(false);
                 }
             };
             fetchNextEmployeeNumber();
+
+            // Fetch departments
+            setRefDataLoading(true);
+            const fetchDepartments = async () => {
+                try {
+                    const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
+                    const deptsSnapshot = await getDocs(deptsQuery);
+                    setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+                } catch(e) {
+                     toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب الأقسام.' });
+                } finally {
+                    setRefDataLoading(false);
+                }
+            };
+            fetchDepartments();
         }
     }, [firestore, toast]);
 
@@ -115,10 +129,8 @@ export default function NewEmployeePage() {
         const { id, value } = e.target;
         let sanitizedValue = value;
         if (id === 'fullName') {
-            // Allow Arabic letters and spaces only
             sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
         } else if (id === 'nameEn') {
-            // Allow English letters and spaces only
             sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         }
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
@@ -128,10 +140,19 @@ export default function NewEmployeePage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
     
-    const handleDepartmentChange = (value: string) => {
-        setFormData(prev => ({ ...prev, department: value, jobTitle: '' }));
-        const dept = departments.find(d => d.name === value);
-        setJobs(dept ? dept.jobs : []);
+    const handleDepartmentChange = async (value: string) => {
+        const selectedDept = departments.find(d => d.id === value);
+        if (!selectedDept || !firestore) return;
+
+        setFormData(prev => ({ ...prev, department: selectedDept.name, jobTitle: '' }));
+        setJobs([]);
+        try {
+            const jobsQuery = query(collection(firestore, `departments/${selectedDept.id}/jobs`), orderBy('name'));
+            const jobsSnapshot = await getDocs(jobsQuery);
+            setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Error fetching jobs' });
+        }
     };
 
 
@@ -144,7 +165,6 @@ export default function NewEmployeePage() {
         setIsLoading(true);
         
         try {
-            // --- Validation ---
             const requiredFields: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
              for (const field of requiredFields) {
                 const value = formData[field];
@@ -159,7 +179,6 @@ export default function NewEmployeePage() {
                 }
             }
             
-            // --- Uniqueness Check for Civil ID and Mobile ---
             const civilIdQuery = query(collection(firestore, 'employees'), where('civilId', '==', formData.civilId));
             const civilIdSnapshot = await getDocs(civilIdQuery);
             if (!civilIdSnapshot.empty) {
@@ -191,7 +210,6 @@ export default function NewEmployeePage() {
                 return;
             }
 
-            // --- Data Sanitization & Preparation ---
             const employeeData: DocumentData = {
                 ...formData,
                 hireDate: hireDate,
@@ -213,24 +231,21 @@ export default function NewEmployeePage() {
                 lastLeaveResetDate: hireDate,
             };
 
-            // Convert all date strings to Date objects or remove if empty
             const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry'];
             dateFields.forEach(field => {
                 const dateValue = toFirestoreDate(formData[field] as string);
                 if (dateValue) {
                     employeeData[field] = dateValue;
                 } else {
-                    delete employeeData[field]; // Remove field if date is null/invalid
+                    delete employeeData[field]; 
                 }
             });
 
-            // Ensure contractExpiry is null if not a relevant contract type
             if (formData.contractType === 'permanent') {
                 delete employeeData.contractExpiry;
             }
             
 
-            // --- Use a write batch to add employee and initial audit log ---
             const batch = writeBatch(firestore);
 
             const newEmployeeRef = doc(collection(firestore, 'employees'));
@@ -420,11 +435,11 @@ export default function NewEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" onValueChange={handleDepartmentChange} required>
+                                <Select dir="rtl" onValueChange={handleDepartmentChange} required disabled={refDataLoading}>
                                     <SelectTrigger id="department"><SelectValue placeholder="اختر القسم..." /></SelectTrigger>
                                     <SelectContent>
                                         {departments.map(dept => (
-                                            <SelectItem key={dept.name} value={dept.name}>{dept.name}</SelectItem>
+                                            <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -435,7 +450,7 @@ export default function NewEmployeePage() {
                                     <SelectTrigger id="jobTitle"><SelectValue placeholder="اختر الوظيفة..." /></SelectTrigger>
                                     <SelectContent>
                                         {jobs.map(job => (
-                                            <SelectItem key={job} value={job}>{job}</SelectItem>
+                                            <SelectItem key={job.id} value={job.name}>{job.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -577,6 +592,7 @@ export default function NewEmployeePage() {
     
 
     
+
 
 
 

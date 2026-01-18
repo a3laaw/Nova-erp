@@ -6,6 +6,10 @@
       "description": "Represents a user's login account in the system.",
       "type": "object",
       "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique user ID from Firebase Authentication."
+        },
         "username": {
           "type": "string",
           "description": "The user's unique username for login."
@@ -376,6 +380,68 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["employeeId", "year", "month", "earnings", "netSalary", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Represents a notification for a user about an event in the system.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the user to whom the notification is sent." },
+        "title": { "type": "string", "description": "A short, bolded title for the notification." },
+        "body": { "type": "string", "description": "The main content of the notification message." },
+        "link": { "type": "string", "description": "The URL the user will be redirected to upon clicking the notification." },
+        "isRead": { "type": "boolean", "description": "Whether the user has read the notification." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "body", "link", "isRead", "createdAt"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Represents a department in the company.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the department."
+        }
+      },
+      "required": ["name"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "Represents a job title within a department.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the job."
+        }
+      },
+      "required": ["name"]
+    },
+    "Governorate": {
+      "title": "Governorate",
+      "description": "Represents a governorate in the country.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the governorate."
+        }
+      },
+      "required": ["name"]
+    },
+    "Area": {
+      "title": "Area",
+      "description": "Represents an area within a governorate.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the area."
+        }
+      },
+      "required": ["name"]
     }
   },
   "auth": {
@@ -443,6 +509,28 @@
     "/payroll/{payslipId}": {
       "schema": { "$ref": "#/entities/Payslip" },
       "description": "Stores generated monthly payslips for employees. The ID is a composite of year-month-employeeId."
+    },
+    "/notifications/{notificationId}": {
+      "schema": {
+        "$ref": "#/entities/Notification"
+      },
+      "description": "Stores notifications for all users."
+    },
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/Department" },
+      "description": "Stores company departments."
+    },
+    "/departments/{departmentId}/jobs/{jobId}": {
+        "schema": { "$ref": "#/entities/Job" },
+        "description": "Stores job titles for a specific department."
+    },
+    "/governorates/{governorateId}": {
+      "schema": { "$ref": "#/entities/Governorate" },
+      "description": "Stores country governorates."
+    },
+    "/governorates/{governorateId}/areas/{areaId}": {
+        "schema": { "$ref": "#/entities/Area" },
+        "description": "Stores areas for a specific governorate."
     }
   }
 }

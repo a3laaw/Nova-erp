@@ -7,6 +7,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -327,3 +328,20 @@ export type TransactionTimelineEvent = {
   userAvatar?: string;
   createdAt: any;
 };
+
+export interface Department {
+    id: string;
+    name: string;
+}
+export interface Job {
+    id: string;
+    name: string;
+}
+export interface Governorate {
+    id: string;
+    name: string;
+}
+export interface Area {
+    id: string;
+    name: string;
+}

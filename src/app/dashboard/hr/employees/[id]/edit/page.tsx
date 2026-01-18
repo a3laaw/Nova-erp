@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -23,15 +24,14 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Save } from 'lucide-react';
-import type { Employee, AuditLog } from '@/lib/types';
-import { useFirebase } from '@/firebase';
-import { doc, getDoc, writeBatch, collection, Timestamp } from 'firebase/firestore';
+import type { Employee, AuditLog, Department, Job } from '@/lib/types';
+import { useFirebase, useCollection } from '@/firebase';
+import { doc, getDoc, writeBatch, collection, Timestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { fromFirestoreDate, toFirestoreDate } from '@/services/date-converter';
-import { departments } from '@/lib/reference-data';
 
 
 export default function EditEmployeePage() {
@@ -48,7 +48,42 @@ export default function EditEmployeePage() {
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
-    const [jobs, setJobs] = useState<string[]>([]);
+    
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [jobs, setJobs] = useState<Job[]>([]);
+    const [refDataLoading, setRefDataLoading] = useState(true);
+
+     useEffect(() => {
+        if (!firestore) return;
+        setRefDataLoading(true);
+        const fetchDepartments = async () => {
+            try {
+                const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
+                const deptsSnapshot = await getDocs(deptsQuery);
+                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+            } catch (e) {
+                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الأقسام.' });
+            } finally {
+                setRefDataLoading(false);
+            }
+        };
+        fetchDepartments();
+    }, [firestore, toast]);
+    
+    const fetchJobsForDepartment = async (departmentName: string) => {
+        if (!firestore || !departmentName) return;
+        const dept = departments.find(d => d.name === departmentName);
+        if (!dept) return;
+
+        try {
+            const jobsQuery = query(collection(firestore, `departments/${dept.id}/jobs`), orderBy('name'));
+            const jobsSnapshot = await getDocs(jobsQuery);
+            setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الوظائف.' });
+        }
+    }
+
 
     useEffect(() => {
         if (!id || !firestore) {
@@ -76,10 +111,7 @@ export default function EditEmployeePage() {
                     setIncludeHousing(!!data.housingAllowance && data.housingAllowance > 0);
                     setIncludeTransport(!!data.transportAllowance && data.transportAllowance > 0);
                     if (data.department) {
-                        const dept = departments.find(d => d.name === data.department);
-                        if (dept) {
-                            setJobs(dept.jobs);
-                        }
+                        fetchJobsForDepartment(data.department);
                     }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموظف.' });
@@ -93,8 +125,11 @@ export default function EditEmployeePage() {
             }
         };
 
-        fetchEmployee();
-    }, [id, firestore, router, toast]);
+        if (departments.length > 0) {
+            fetchEmployee();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, firestore, router, toast, departments]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -114,9 +149,13 @@ export default function EditEmployeePage() {
     };
     
     const handleDepartmentChange = (value: string) => {
-        setFormData(prev => prev ? ({ ...prev, department: value, jobTitle: '' }) : null);
-        const dept = departments.find(d => d.name === value);
-        setJobs(dept ? dept.jobs : []);
+        const selectedDept = departments.find(d => d.name === value);
+        setFormData(prev => prev ? ({ ...prev, department: selectedDept?.name || '', jobTitle: '' }) : null);
+        if (selectedDept) {
+            fetchJobsForDepartment(selectedDept.name);
+        } else {
+            setJobs([]);
+        }
     };
 
 
@@ -231,7 +270,7 @@ export default function EditEmployeePage() {
     };
 
 
-    if (isFetching || !formData) {
+    if (isFetching || !formData || refDataLoading) {
         return (
             <Card dir="rtl">
                 <CardHeader>
@@ -389,7 +428,7 @@ export default function EditEmployeePage() {
                                     <SelectTrigger id="department"><SelectValue placeholder="اختر القسم..." /></SelectTrigger>
                                     <SelectContent>
                                         {departments.map(dept => (
-                                            <SelectItem key={dept.name} value={dept.name}>{dept.name}</SelectItem>
+                                            <SelectItem key={dept.id} value={dept.name}>{dept.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -400,7 +439,7 @@ export default function EditEmployeePage() {
                                     <SelectTrigger id="jobTitle"><SelectValue placeholder="اختر الوظيفة..." /></SelectTrigger>
                                     <SelectContent>
                                         {jobs.map(job => (
-                                            <SelectItem key={job} value={job}>{job}</SelectItem>
+                                            <SelectItem key={job.id} value={job.name}>{job.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

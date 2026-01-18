@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Card,
@@ -14,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
-import { useFirebase } from '@/firebase';
-import { doc, getDoc, updateDoc, query, where, getDocs, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { useFirebase, useCollection } from '@/firebase';
+import { doc, getDoc, updateDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,8 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Employee } from '@/lib/types';
-import { kuwaitGovernorates } from '@/lib/reference-data';
+import type { Employee, Governorate, Area } from '@/lib/types';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -59,35 +59,49 @@ export default function EditClientPage() {
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
     const [engineersLoading, setEngineersLoading] = useState(true);
-    const [areas, setAreas] = useState<string[]>([]);
+    
+    const [governorates, setGovernorates] = useState<Governorate[]>([]);
+    const [areas, setAreas] = useState<Area[]>([]);
+    const [locationsLoading, setLocationsLoading] = useState(true);
 
+    // Fetch Reference Data
     useEffect(() => {
         if (!firestore) return;
-        const fetchAllEmployees = async () => {
-            setEngineersLoading(true);
+
+        const fetchRefData = async () => {
             try {
-                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const querySnapshot = await getDocs(q);
+                // Fetch Employees (engineers)
+                const empQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const empSnapshot = await getDocs(empQuery);
                 const fetchedEmployees: Employee[] = [];
                 const newMap = new Map<string, string>();
-                querySnapshot.forEach(doc => {
+                empSnapshot.forEach(doc => {
                     const emp = { id: doc.id, ...doc.data() } as Employee;
                     fetchedEmployees.push(emp);
                     newMap.set(doc.id, emp.fullName);
                 });
                 setEmployeesMap(newMap);
-                const archEngineers = fetchedEmployees.filter(emp => (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect')));
-                setEngineers(archEngineers);
-            } catch (error) {
-                console.error("Error fetching employees:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
-            } finally {
+                setEngineers(fetchedEmployees.filter(emp => emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect')));
                 setEngineersLoading(false);
+
+                // Fetch Governorates
+                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
+                const govSnapshot = await getDocs(govQuery);
+                setGovernorates(govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Governorate)));
+                setLocationsLoading(false);
+
+            } catch (error) {
+                console.error("Error fetching reference data:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
+                setEngineersLoading(false);
+                setLocationsLoading(false);
             }
         };
-        fetchAllEmployees();
+        
+        fetchRefData();
     }, [firestore, toast]);
-
+    
+    // Fetch Client Data
     useEffect(() => {
         if (!id || !firestore) {
             if(!id) router.push('/dashboard/clients');
@@ -115,11 +129,8 @@ export default function EditClientPage() {
                         assignedEngineerId: data.assignedEngineer || '',
                     });
                     setFileId(data.fileId || 'N/A');
-                    if (data.address?.governorate) {
-                        const gov = kuwaitGovernorates.find(g => g.name === data.address.governorate);
-                        if (gov) {
-                            setAreas(gov.areas);
-                        }
+                     if (data.address?.governorate) {
+                        handleGovernorateChange(data.address.governorate, true);
                     }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على العميل.' });
@@ -134,6 +145,7 @@ export default function EditClientPage() {
         };
 
         fetchClient();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, firestore, router, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
@@ -151,10 +163,17 @@ export default function EditClientPage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleGovernorateChange = (value: string) => {
-        setFormData(prev => ({ ...prev, governorate: value, area: '' })); // Reset area
-        const gov = kuwaitGovernorates.find(g => g.name === value);
-        setAreas(gov ? gov.areas : []);
+    const handleGovernorateChange = async (value: string, isInitialLoad = false) => {
+        const selectedGov = governorates.find(g => g.name === value);
+        if (!isInitialLoad) {
+             setFormData(prev => ({ ...prev, governorate: selectedGov?.name || '', area: '' }));
+        }
+        setAreas([]);
+        if (selectedGov && firestore) {
+            const areasQuery = query(collection(firestore, `governorates/${selectedGov.id}/areas`), orderBy('name'));
+            const areasSnapshot = await getDocs(areasQuery);
+            setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
+        }
     };
 
 
@@ -302,7 +321,7 @@ export default function EditClientPage() {
         saving: 'Saving...'
     };
 
-    if (isFetching) {
+    if (isFetching || locationsLoading) {
         return (
              <Card className="max-w-2xl mx-auto" dir="rtl">
                 <CardHeader>
@@ -393,8 +412,8 @@ export default function EditClientPage() {
                                         <SelectValue placeholder="اختر محافظة..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {kuwaitGovernorates.map(gov => (
-                                            <SelectItem key={gov.name} value={gov.name}>{gov.name}</SelectItem>
+                                        {governorates.map(gov => (
+                                            <SelectItem key={gov.id} value={gov.name}>{gov.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -407,7 +426,7 @@ export default function EditClientPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {areas.map(area => (
-                                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                                            <SelectItem key={area.id} value={area.name}>{area.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
