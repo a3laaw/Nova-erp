@@ -72,12 +72,15 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  // ✅ الحل 1: استخدم label للبحث
                   value={option.label}
-                  // ✅ الحل 2: استخدم option.value مباشرة من closure
-                  onSelect={() => {
-                    if (onValueChange) {
-                      onValueChange(option.value === value ? "" : option.value);
+                  onSelect={(currentLabel) => {
+                    // Find the option based on the label that was selected
+                    const selectedOption = options.find(
+                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
+                    );
+                    if (selectedOption && onValueChange) {
+                      // If the same value is selected, toggle it off. Otherwise, set the new value.
+                      onValueChange(selectedOption.value === value ? "" : selectedOption.value);
                     }
                     setOpen(false);
                   }}
