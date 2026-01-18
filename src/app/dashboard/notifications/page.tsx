@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Circle, MailOpen } from 'lucide-react';
 import { useFirebase, useCollection } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, query, where, orderBy, writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -57,10 +57,10 @@ export default function NotificationsPage() {
 
     const notificationsQuery = useMemo(() => {
         if (!firestore || !user?.id) return null;
+        // The orderBy is removed to avoid needing a composite index. Sorting is handled client-side.
         return query(
           collection(firestore, 'notifications'),
-          where('userId', '==', user.id),
-          orderBy('createdAt', 'desc')
+          where('userId', '==', user.id)
         );
     }, [firestore, user?.id]);
 
@@ -68,7 +68,14 @@ export default function NotificationsPage() {
 
     const notifications = useMemo(() => {
         if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        // Client-side sorting
+        data.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis() || 0;
+            const timeB = b.createdAt?.toMillis() || 0;
+            return timeB - timeA;
+        });
+        return data;
     }, [snapshot]);
     
     const unreadCount = useMemo(() => {
@@ -150,7 +157,7 @@ export default function NotificationsPage() {
                             )}
                             {!loading && notifications.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center h-24">لا توجد إشعارات لعرضها.</TableCell>
+                                    <TableCell colSpan={3} className="text-center h-24">لا يوجد إشعارات لعرضها.</TableCell>
                                 </TableRow>
                             )}
                             {!loading && notifications.map(notif => (
