@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Employee } from '@/lib/types';
+import { kuwaitGovernorates } from '@/lib/reference-data';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -58,13 +59,15 @@ export default function EditClientPage() {
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
     const [engineersLoading, setEngineersLoading] = useState(true);
+    const [areas, setAreas] = useState<string[]>([]);
 
     useEffect(() => {
         if (!firestore) return;
         const fetchAllEmployees = async () => {
             setEngineersLoading(true);
             try {
-                const querySnapshot = await getDocs(collection(firestore, 'employees'));
+                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const querySnapshot = await getDocs(q);
                 const fetchedEmployees: Employee[] = [];
                 const newMap = new Map<string, string>();
                 querySnapshot.forEach(doc => {
@@ -112,6 +115,12 @@ export default function EditClientPage() {
                         assignedEngineerId: data.assignedEngineer || '',
                     });
                     setFileId(data.fileId || 'N/A');
+                    if (data.address?.governorate) {
+                        const gov = kuwaitGovernorates.find(g => g.name === data.address.governorate);
+                        if (gov) {
+                            setAreas(gov.areas);
+                        }
+                    }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على العميل.' });
                     router.push('/dashboard/clients');
@@ -140,6 +149,12 @@ export default function EditClientPage() {
 
     const handleSelectChange = (id: string, value: string) => {
         setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
+    const handleGovernorateChange = (value: string) => {
+        setFormData(prev => ({ ...prev, governorate: value, area: '' })); // Reset area
+        const gov = kuwaitGovernorates.find(g => g.name === value);
+        setAreas(gov ? gov.areas : []);
     };
 
 
@@ -371,13 +386,31 @@ export default function EditClientPage() {
                     <div className="space-y-4">
                         <Label className="font-semibold">{t.address}</Label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div className="grid gap-2">
+                            <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
-                                <Input id="governorate" value={formData.governorate} onChange={handleInputChange} />
+                                <Select dir="rtl" value={formData.governorate} onValueChange={handleGovernorateChange}>
+                                    <SelectTrigger id="governorate">
+                                        <SelectValue placeholder="اختر محافظة..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {kuwaitGovernorates.map(gov => (
+                                            <SelectItem key={gov.name} value={gov.name}>{gov.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                             <div className="grid gap-2">
+                            <div className="grid gap-2">
                                 <Label htmlFor="area">{t.area}</Label>
-                                <Input id="area" value={formData.area} onChange={handleInputChange} />
+                                 <Select dir="rtl" value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!formData.governorate}>
+                                    <SelectTrigger id="area">
+                                        <SelectValue placeholder="اختر منطقة..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {areas.map(area => (
+                                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -32,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { fromFirestoreDate, toFirestoreDate } from '@/services/date-converter';
+import { departments } from '@/lib/reference-data';
 
 
 export default function EditEmployeePage() {
@@ -48,6 +48,7 @@ export default function EditEmployeePage() {
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
+    const [jobs, setJobs] = useState<string[]>([]);
 
     useEffect(() => {
         if (!id || !firestore) {
@@ -74,6 +75,12 @@ export default function EditEmployeePage() {
                     setFormData(formattedData);
                     setIncludeHousing(!!data.housingAllowance && data.housingAllowance > 0);
                     setIncludeTransport(!!data.transportAllowance && data.transportAllowance > 0);
+                    if (data.department) {
+                        const dept = departments.find(d => d.name === data.department);
+                        if (dept) {
+                            setJobs(dept.jobs);
+                        }
+                    }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموظف.' });
                     router.push('/dashboard/hr');
@@ -105,6 +112,13 @@ export default function EditEmployeePage() {
     const handleSelectChange = (id: keyof Employee, value: any) => {
         setFormData(prev => prev ? ({ ...prev, [id]: value }) : null);
     };
+    
+    const handleDepartmentChange = (value: string) => {
+        setFormData(prev => prev ? ({ ...prev, department: value, jobTitle: '' }) : null);
+        const dept = departments.find(d => d.name === value);
+        setJobs(dept ? dept.jobs : []);
+    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -371,11 +385,25 @@ export default function EditEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Input id="department" value={formData.department || ''} onChange={handleInputChange} placeholder="e.g., هندسة, محاسبة" required />
+                                <Select dir="rtl" value={formData.department} onValueChange={handleDepartmentChange} required>
+                                    <SelectTrigger id="department"><SelectValue placeholder="اختر القسم..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {departments.map(dept => (
+                                            <SelectItem key={dept.name} value={dept.name}>{dept.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Input id="jobTitle" value={formData.jobTitle || ''} onChange={handleInputChange} placeholder="e.g., مهندس مدني, محاسب عام" required />
+                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} required disabled={!formData.department}>
+                                    <SelectTrigger id="jobTitle"><SelectValue placeholder="اختر الوظيفة..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {jobs.map(job => (
+                                            <SelectItem key={job} value={job}>{job}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>

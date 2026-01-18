@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
+import { departments } from '@/lib/reference-data';
 
 
 export default function NewEmployeePage() {
@@ -74,6 +74,7 @@ export default function NewEmployeePage() {
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
+    const [jobs, setJobs] = useState<string[]>([]);
 
     useEffect(() => {
         setIsClient(true);
@@ -99,7 +100,7 @@ export default function NewEmployeePage() {
                     toast({
                         variant: 'destructive',
                         title: 'خطأ',
-                        description: 'فشل توليد الرقم الوظيفي. يرجى المحاولة مرة أخرى.'
+                        description: 'فشل توليد الرقم الوظيفي. الرجاء المحاولة مرة أخرى.'
                     });
                 } finally {
                     setIsGeneratingNumber(false);
@@ -126,6 +127,13 @@ export default function NewEmployeePage() {
     const handleSelectChange = (id: keyof Employee, value: any) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
+    
+    const handleDepartmentChange = (value: string) => {
+        setFormData(prev => ({ ...prev, department: value, jobTitle: '' }));
+        const dept = departments.find(d => d.name === value);
+        setJobs(dept ? dept.jobs : []);
+    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -412,11 +420,25 @@ export default function NewEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Input id="department" value={formData.department} onChange={handleInputChange} placeholder="e.g., هندسة, محاسبة" required />
+                                <Select dir="rtl" onValueChange={handleDepartmentChange} required>
+                                    <SelectTrigger id="department"><SelectValue placeholder="اختر القسم..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {departments.map(dept => (
+                                            <SelectItem key={dept.name} value={dept.name}>{dept.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Input id="jobTitle" value={formData.jobTitle} onChange={handleInputChange} placeholder="e.g., مهندس مدني, محاسب عام" required />
+                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} required disabled={!formData.department}>
+                                    <SelectTrigger id="jobTitle"><SelectValue placeholder="اختر الوظيفة..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {jobs.map(job => (
+                                            <SelectItem key={job} value={job}>{job}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>
@@ -555,5 +577,6 @@ export default function NewEmployeePage() {
     
 
     
+
 
 

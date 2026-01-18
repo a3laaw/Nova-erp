@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Employee } from '@/lib/types';
+import { kuwaitGovernorates } from '@/lib/reference-data';
 
 
 export default function NewClientPage() {
@@ -52,6 +53,8 @@ export default function NewClientPage() {
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
+
+    const [areas, setAreas] = useState<string[]>([]);
 
     useEffect(() => {
         if (!firestore) return;
@@ -122,6 +125,18 @@ export default function NewClientPage() {
         }
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
+
+    const handleSelectChange = (id: string, value: string) => {
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
+    const handleGovernorateChange = (value: string) => {
+        handleSelectChange('governorate', value);
+        handleSelectChange('area', ''); // Reset area
+        const gov = kuwaitGovernorates.find(g => g.name === value);
+        setAreas(gov ? gov.areas : []);
+    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -222,9 +237,9 @@ export default function NewClientPage() {
         engineerPlaceholder: 'اختر مهندسًا...',
         address: 'عنوان العميل',
         governorate: 'المحافظة',
-        governoratePlaceholder: 'مثال: حولي',
+        governoratePlaceholder: 'اختر المحافظة...',
         area: 'المنطقة',
-        areaPlaceholder: 'مثال: السالمية',
+        areaPlaceholder: 'اختر المنطقة...',
         block: 'القطعة',
         blockPlaceholder: 'مثال: 5',
         street: 'الشارع',
@@ -248,9 +263,9 @@ export default function NewClientPage() {
         engineerPlaceholder: 'Select an engineer...',
         address: 'Client Address',
         governorate: 'Governorate',
-        governoratePlaceholder: 'e.g., Hawalli',
+        governoratePlaceholder: 'Select Governorate...',
         area: 'Area',
-        areaPlaceholder: 'e.g., Salmiya',
+        areaPlaceholder: 'Select Area...',
         block: 'Block',
         blockPlaceholder: 'e.g., 5',
         street: 'Street',
@@ -316,11 +331,25 @@ export default function NewClientPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
-                                <Input id="governorate" value={formData.governorate} onChange={handleInputChange} placeholder={t.governoratePlaceholder} />
+                                <Select dir="rtl" onValueChange={handleGovernorateChange}>
+                                    <SelectTrigger id="governorate"><SelectValue placeholder={t.governoratePlaceholder} /></SelectTrigger>
+                                    <SelectContent>
+                                        {kuwaitGovernorates.map(gov => (
+                                            <SelectItem key={gov.name} value={gov.name}>{gov.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="area">{t.area}</Label>
-                                <Input id="area" value={formData.area} onChange={handleInputChange} placeholder={t.areaPlaceholder} />
+                                <Select dir="rtl" value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!formData.governorate}>
+                                    <SelectTrigger id="area"><SelectValue placeholder={t.areaPlaceholder} /></SelectTrigger>
+                                    <SelectContent>
+                                        {areas.map(area => (
+                                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
