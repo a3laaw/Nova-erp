@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -35,7 +35,7 @@ export default function NewClientPage() {
         nameAr: '',
         nameEn: '',
         mobile: '',
-        governorate: '',
+        governorateId: '',
         area: '',
         block: '',
         street: '',
@@ -136,17 +136,15 @@ export default function NewClientPage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleGovernorateChange = async (value: string) => {
-        const selectedGov = governorates.find(g => g.id === value);
-        handleSelectChange('governorate', selectedGov?.name || '');
-        handleSelectChange('area', '');
+    const handleGovernorateChange = useCallback(async (govId: string) => {
+        setFormData(prev => ({ ...prev, governorateId: govId, area: '' }));
         setAreas([]);
-        if (selectedGov && firestore) {
-            const areasQuery = query(collection(firestore, `governorates/${selectedGov.id}/areas`), orderBy('name'));
+        if (govId && firestore) {
+            const areasQuery = query(collection(firestore, `governorates/${govId}/areas`), orderBy('name'));
             const areasSnapshot = await getDocs(areasQuery);
             setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
         }
-    };
+    }, [firestore]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -195,12 +193,14 @@ export default function NewClientPage() {
 
                 const newFileId = `${nextNumber}/${currentYear}`;
                 
+                const selectedGov = governorates.find(g => g.id === formData.governorateId);
+
                 const clientData = {
                     nameAr: formData.nameAr,
                     nameEn: formData.nameEn,
                     mobile: formData.mobile,
                     address: {
-                        governorate: formData.governorate,
+                        governorate: selectedGov?.name || '',
                         area: formData.area,
                         block: formData.block,
                         street: formData.street,
@@ -341,6 +341,7 @@ export default function NewClientPage() {
                                 <Label htmlFor="governorate">{t.governorate}</Label>
                                 <Combobox
                                     options={governorates.map(gov => ({ value: gov.id, label: gov.name }))}
+                                    value={formData.governorateId}
                                     onValueChange={handleGovernorateChange}
                                     placeholder={locationsLoading ? "تحميل..." : t.governoratePlaceholder}
                                     searchPlaceholder="ابحث عن محافظة..."
@@ -357,7 +358,7 @@ export default function NewClientPage() {
                                     placeholder={t.areaPlaceholder}
                                     searchPlaceholder="ابحث عن منطقة..."
                                     notFoundMessage="لم يتم العثور على منطقة."
-                                    disabled={!formData.governorate}
+                                    disabled={!formData.governorateId}
                                 />
                             </div>
                         </div>

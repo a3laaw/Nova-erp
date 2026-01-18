@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -42,7 +42,7 @@ export default function NewEmployeePage() {
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
-    const [formData, setFormData] = useState<Partial<Employee>>({
+    const [formData, setFormData] = useState<Partial<Employee> & { departmentId?: string }>({
         employeeNumber: '',
         fullName: '',
         nameEn: '',
@@ -55,7 +55,7 @@ export default function NewEmployeePage() {
         mobile: '',
         emergencyContact: '',
         email: '',
-        department: '',
+        departmentId: '',
         jobTitle: '',
         position: undefined,
         workStartTime: '08:00',
@@ -141,20 +141,19 @@ export default function NewEmployeePage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
     
-    const handleDepartmentChange = async (value: string) => {
-        const selectedDept = departments.find(d => d.id === value);
-        if (!selectedDept || !firestore) return;
+    const handleDepartmentChange = useCallback(async (deptId: string) => {
+        if (!deptId || !firestore) return;
 
-        setFormData(prev => ({ ...prev, department: selectedDept.name, jobTitle: '' }));
+        setFormData(prev => ({ ...prev, departmentId: deptId, jobTitle: '' }));
         setJobs([]);
         try {
-            const jobsQuery = query(collection(firestore, `departments/${selectedDept.id}/jobs`), orderBy('name'));
+            const jobsQuery = query(collection(firestore, `departments/${deptId}/jobs`), orderBy('name'));
             const jobsSnapshot = await getDocs(jobsQuery);
             setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
         } catch (e) {
             toast({ variant: 'destructive', title: 'Error fetching jobs' });
         }
-    };
+    }, [firestore, toast]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -166,9 +165,12 @@ export default function NewEmployeePage() {
         setIsLoading(true);
         
         try {
+            const selectedDept = departments.find(d => d.id === formData.departmentId);
+            const departmentName = selectedDept?.name || '';
+            
             const requiredFields: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'civilId', 'mobile', 'department', 'jobTitle', 'hireDate', 'basicSalary'];
              for (const field of requiredFields) {
-                const value = formData[field];
+                const value = field === 'department' ? departmentName : formData[field];
                 if (value === undefined || value === null || (typeof value !== 'number' && value === '')) {
                      if (field === 'employeeNumber') {
                          toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: `الرقم الوظيفي لم يتم توليده بعد. الرجاء الانتظار.` });
@@ -213,6 +215,7 @@ export default function NewEmployeePage() {
 
             const employeeData: DocumentData = {
                 ...formData,
+                department: departmentName,
                 hireDate: hireDate,
                 basicSalary: Number(formData.basicSalary) || 0,
                 housingAllowance: includeHousing ? Number(formData.housingAllowance) || 0 : 0,
@@ -231,6 +234,7 @@ export default function NewEmployeePage() {
                 lastVacationAccrualDate: hireDate,
                 lastLeaveResetDate: hireDate,
             };
+            delete employeeData.departmentId; // Remove temporary field before saving
 
             const dateFields: (keyof Employee)[] = ['dob', 'residencyExpiry', 'contractExpiry'];
             dateFields.forEach(field => {
@@ -438,6 +442,7 @@ export default function NewEmployeePage() {
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
                                 <Combobox
                                     options={departments.map(dept => ({ value: dept.id, label: dept.name }))}
+                                    value={formData.departmentId}
                                     onValueChange={handleDepartmentChange}
                                     placeholder="اختر القسم..."
                                     searchPlaceholder="ابحث عن قسم..."
@@ -454,7 +459,7 @@ export default function NewEmployeePage() {
                                     placeholder="اختر الوظيفة..."
                                     searchPlaceholder="ابحث عن وظيفة..."
                                     notFoundMessage="لم يتم العثور على وظيفة."
-                                    disabled={!formData.department || jobs.length === 0}
+                                    disabled={!formData.departmentId || jobs.length === 0}
                                 />
                             </div>
                             <div className="grid gap-2">
@@ -590,12 +595,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
-
-    
-
-
-
-
-

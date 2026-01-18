@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Card,
@@ -43,8 +43,10 @@ export default function EditEmployeePage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
+    // Use a more specific type for formData to manage departmentId
+    const [formData, setFormData] = useState<Partial<Employee> & { departmentId?: string } | null>(null);
     const [originalData, setOriginalData] = useState<Partial<Employee> | null>(null);
-    const [formData, setFormData] = useState<Partial<Employee> | null>(null);
+    
     const [includeHousing, setIncludeHousing] = useState(false);
     const [includeTransport, setIncludeTransport] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -71,19 +73,20 @@ export default function EditEmployeePage() {
         fetchDepartments();
     }, [firestore, toast]);
     
-    const fetchJobsForDepartment = async (departmentName: string) => {
-        if (!firestore || !departmentName) return;
-        const dept = departments.find(d => d.name === departmentName);
-        if (!dept) return;
+    const fetchJobsForDepartment = useCallback(async (departmentId: string) => {
+        if (!firestore || !departmentId) {
+            setJobs([]);
+            return;
+        };
 
         try {
-            const jobsQuery = query(collection(firestore, `departments/${dept.id}/jobs`), orderBy('name'));
+            const jobsQuery = query(collection(firestore, `departments/${departmentId}/jobs`), orderBy('name'));
             const jobsSnapshot = await getDocs(jobsQuery);
             setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الوظائف.' });
         }
-    }
+    }, [firestore, toast]);
 
 
     useEffect(() => {
@@ -100,19 +103,22 @@ export default function EditEmployeePage() {
 
                 if (employeeSnap.exists()) {
                     const data = employeeSnap.data() as Employee;
+                    const initialDept = departments.find(d => d.name === data.department);
+
                     const formattedData = {
                         ...data,
                         dob: fromFirestoreDate(data.dob),
                         hireDate: fromFirestoreDate(data.hireDate),
                         residencyExpiry: fromFirestoreDate(data.residencyExpiry),
                         contractExpiry: fromFirestoreDate(data.contractExpiry),
+                        departmentId: initialDept?.id || '',
                     };
                     setOriginalData(data); // Store original data for comparison
                     setFormData(formattedData);
                     setIncludeHousing(!!data.housingAllowance && data.housingAllowance > 0);
                     setIncludeTransport(!!data.transportAllowance && data.transportAllowance > 0);
-                    if (data.department) {
-                        fetchJobsForDepartment(data.department);
+                    if (initialDept?.id) {
+                        fetchJobsForDepartment(initialDept.id);
                     }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموظف.' });
@@ -129,8 +135,7 @@ export default function EditEmployeePage() {
         if (departments.length > 0) {
             fetchEmployee();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, firestore, router, toast, departments]);
+    }, [id, firestore, router, toast, departments, fetchJobsForDepartment]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -149,14 +154,9 @@ export default function EditEmployeePage() {
         setFormData(prev => prev ? ({ ...prev, [id]: value }) : null);
     };
     
-    const handleDepartmentChange = (value: string) => {
-        const selectedDept = departments.find(d => d.name === value);
-        setFormData(prev => prev ? ({ ...prev, department: selectedDept?.name || '', jobTitle: '' }) : null);
-        if (selectedDept) {
-            fetchJobsForDepartment(selectedDept.name);
-        } else {
-            setJobs([]);
-        }
+    const handleDepartmentChange = (deptId: string) => {
+        setFormData(prev => prev ? ({ ...prev, departmentId: deptId, jobTitle: '' }) : null);
+        fetchJobsForDepartment(deptId);
     };
 
 
@@ -175,12 +175,17 @@ export default function EditEmployeePage() {
             const updatedEmployeeData: Record<string, any> = {};
             const auditLogs: Partial<AuditLog>[] = [];
             const effectiveDate = new Date();
+            
+            const selectedDept = departments.find(d => d.id === formData.departmentId);
+            if(selectedDept) {
+                formData.department = selectedDept.name;
+            }
 
             const fieldsToCompare: (keyof Employee)[] = ['employeeNumber', 'fullName', 'nameEn', 'dob', 'gender', 'civilId', 'visaType', 'residencyExpiry', 'contractExpiry', 'mobile', 'emergencyContact', 'email', 'jobTitle', 'position', 'department', 'contractType', 'basicSalary', 'housingAllowance', 'transportAllowance', 'salaryPaymentType', 'bankName', 'iban', 'hireDate', 'workStartTime', 'workEndTime'];
             
             fieldsToCompare.forEach(field => {
-                const originalValue = originalData[field];
-                const formValue = formData[field];
+                let originalValue = originalData[field];
+                let formValue = formData[field];
                 let isChanged = false;
 
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
@@ -195,6 +200,9 @@ export default function EditEmployeePage() {
                     isChanged = originalNumValue !== formNumValue;
                     if (isChanged) updatedEmployeeData[field] = formNumValue;
                 } else {
+                     if (field === 'department' && selectedDept) {
+                         formValue = selectedDept.name;
+                     }
                      isChanged = formValue !== originalValue;
                      if (isChanged) updatedEmployeeData[field] = formValue;
                 }
@@ -205,6 +213,10 @@ export default function EditEmployeePage() {
                         changeType = 'SalaryChange';
                     } else if (field === 'jobTitle' || field === 'department' || field === 'position') {
                         changeType = 'JobChange';
+                    }
+                    
+                    if (field === 'department') {
+                        originalValue = originalData.department;
                     }
 
                     auditLogs.push({
@@ -426,8 +438,8 @@ export default function EditEmployeePage() {
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
                                 <Combobox
-                                    options={departments.map(dept => ({ value: dept.name, label: dept.name }))}
-                                    value={formData.department}
+                                    options={departments.map(dept => ({ value: dept.id, label: dept.name }))}
+                                    value={formData.departmentId}
                                     onValueChange={handleDepartmentChange}
                                     placeholder="اختر القسم..."
                                     searchPlaceholder="ابحث عن قسم..."
@@ -443,7 +455,7 @@ export default function EditEmployeePage() {
                                     placeholder="اختر الوظيفة..."
                                     searchPlaceholder="ابحث عن وظيفة..."
                                     notFoundMessage="لم يتم العثور على وظيفة."
-                                    disabled={!formData.department || jobs.length === 0}
+                                    disabled={!formData.departmentId || jobs.length === 0}
                                 />
                             </div>
                             <div className="grid gap-2">

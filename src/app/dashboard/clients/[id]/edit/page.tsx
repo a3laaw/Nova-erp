@@ -46,7 +46,7 @@ export default function EditClientPage() {
         nameAr: '',
         nameEn: '',
         mobile: '',
-        governorate: '',
+        governorateId: '',
         area: '',
         block: '',
         street: '',
@@ -99,6 +99,24 @@ export default function EditClientPage() {
         fetchRefData();
     }, [firestore, toast]);
     
+    const fetchAreasForGovernorate = useCallback(async (governorateId: string) => {
+        if (!governorateId || !firestore) {
+            setAreas([]);
+            return;
+        }
+        setRefDataLoading(true);
+        try {
+            const areasQuery = query(collection(firestore, `governorates/${governorateId}/areas`), orderBy('name'));
+            const areasSnapshot = await getDocs(areasQuery);
+            setAreas(areasSnapshot.docs.map(areaDoc => ({ id: areaDoc.id, ...areaDoc.data() } as Area)));
+        } catch (error) {
+            console.error("Error fetching areas:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المناطق.' });
+        } finally {
+            setRefDataLoading(false);
+        }
+    }, [firestore, toast]);
+    
     // Fetch Client Data
     useEffect(() => {
         if (!id || !firestore || refDataLoading) {
@@ -115,11 +133,16 @@ export default function EditClientPage() {
                 if (clientSnap.exists()) {
                     const data = clientSnap.data();
                     setOriginalData(data);
+                    
+                    const initialGovName = data.address?.governorate || '';
+                    const initialGov = governorates.find(g => g.name === initialGovName);
+                    const initialGovId = initialGov?.id || '';
+
                     setFormData({
                         nameAr: data.nameAr || '',
                         nameEn: data.nameEn || '',
                         mobile: data.mobile || '',
-                        governorate: data.address?.governorate || '',
+                        governorateId: initialGovId,
                         area: data.address?.area || '',
                         block: data.address?.block || '',
                         street: data.address?.street || '',
@@ -127,13 +150,8 @@ export default function EditClientPage() {
                         assignedEngineerId: data.assignedEngineer || '',
                     });
                     setFileId(data.fileId || 'N/A');
-                     if (data.address?.governorate) {
-                        const initialGov = governorates.find(g => g.name === data.address.governorate);
-                        if (initialGov && firestore) {
-                            const areasQuery = query(collection(firestore, `governorates/${initialGov.id}/areas`), orderBy('name'));
-                            const areasSnapshot = await getDocs(areasQuery);
-                            setAreas(areasSnapshot.docs.map(areaDoc => ({ id: areaDoc.id, ...areaDoc.data() } as Area)));
-                        }
+                     if (initialGovId) {
+                        await fetchAreasForGovernorate(initialGovId);
                     }
                 } else {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على العميل.' });
@@ -146,9 +164,12 @@ export default function EditClientPage() {
                 setIsFetching(false);
             }
         };
-
-        fetchClient();
-    }, [id, firestore, refDataLoading, router, toast, governorates]);
+        
+        // This check ensures we have governorates before we try to match them.
+        if (!refDataLoading) {
+            fetchClient();
+        }
+    }, [id, firestore, refDataLoading, router, toast, governorates, fetchAreasForGovernorate]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
         const { id, value } = e.target;
@@ -165,27 +186,9 @@ export default function EditClientPage() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleGovernorateChange = async (govId: string) => {
-        if (!govId) {
-            setFormData(prev => ({ ...prev, governorate: '', area: '' }));
-            setAreas([]);
-            return;
-        }
-        const selectedGov = governorates.find(g => g.id === govId);
-        setFormData(prev => ({ ...prev, governorate: selectedGov?.name || '', area: '' }));
-        setAreas([]);
-        if (selectedGov && firestore) {
-            setRefDataLoading(true);
-            try {
-                const areasQuery = query(collection(firestore, `governorates/${selectedGov.id}/areas`), orderBy('name'));
-                const areasSnapshot = await getDocs(areasQuery);
-                setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المناطق.' });
-            } finally {
-                setRefDataLoading(false);
-            }
-        }
+    const handleGovernorateChange = (govId: string) => {
+        setFormData(prev => ({ ...prev, governorateId: govId, area: '' }));
+        fetchAreasForGovernorate(govId);
     };
 
 
@@ -225,9 +228,9 @@ export default function EditClientPage() {
             ];
 
             fieldMappings.forEach(({ key, label }) => {
-                if (formData[key] !== originalData[key]) {
-                    updatedClientData[key] = formData[key];
-                    const logContent = `قام بتحديث "${label}" من "${originalData[key] || '-'}" إلى "${formData[key]}"`;
+                if (formData[key as 'nameAr' | 'nameEn' | 'mobile'] !== originalData[key]) {
+                    updatedClientData[key] = formData[key as 'nameAr' | 'nameEn' | 'mobile'];
+                    const logContent = `قام بتحديث "${label}" من "${originalData[key] || '-'}" إلى "${formData[key as 'nameAr' | 'nameEn' | 'mobile']}"`;
                     batch.set(doc(historyCollectionRef), {
                         type: 'log',
                         content: logContent,
@@ -239,9 +242,11 @@ export default function EditClientPage() {
                 }
             });
             
+            const selectedGov = governorates.find(g => g.id === formData.governorateId);
+
             const originalAddress = originalData.address || {};
             const newAddress = {
-                governorate: formData.governorate,
+                governorate: selectedGov?.name || '',
                 area: formData.area,
                 block: formData.block,
                 street: formData.street,
@@ -333,10 +338,6 @@ export default function EditClientPage() {
         saving: 'Saving...'
     };
 
-    const selectedGovernorateId = useMemo(() => {
-        return governorates.find(g => g.name === formData.governorate)?.id || '';
-    }, [formData.governorate, governorates]);
-
     if (isFetching || refDataLoading) {
         return (
              <Card className="max-w-2xl mx-auto" dir="rtl">
@@ -424,7 +425,7 @@ export default function EditClientPage() {
                                 <Label htmlFor="governorate">{t.governorate}</Label>
                                 <Combobox
                                     options={governorates.map(gov => ({ value: gov.id, label: gov.name }))}
-                                    value={selectedGovernorateId}
+                                    value={formData.governorateId}
                                     onValueChange={handleGovernorateChange}
                                     placeholder="اختر محافظة..."
                                     searchPlaceholder="ابحث عن محافظة..."
@@ -441,7 +442,7 @@ export default function EditClientPage() {
                                     placeholder="اختر منطقة..."
                                     searchPlaceholder="ابحث عن منطقة..."
                                     notFoundMessage="لم يتم العثور على منطقة."
-                                    disabled={!formData.governorate || refDataLoading}
+                                    disabled={!formData.governorateId || refDataLoading}
                                 />
                             </div>
                         </div>
