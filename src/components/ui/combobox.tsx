@@ -65,13 +65,7 @@ export function Combobox({
       </PopoverTrigger>
       <PopoverContent
         className="w-[--radix-popover-trigger-width] p-0"
-        onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            // Allow interaction with command list items and input without closing
-            if (target.closest('[cmdk-list]') || target.closest('[cmdk-input]')) {
-              e.preventDefault();
-            }
-        }}
+        align="start"
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
@@ -81,14 +75,11 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} // Search by label
-                  onSelect={(selectedLabel) => {
+                  value={option.label} // هذا ضروري لكي يعمل البحث على الاسم
+                  onSelect={() => {
                     if (onValueChange) {
-                      // Find the option with the matching label to get its value
-                      const selectedOption = options.find(opt => opt.label === selectedLabel);
-                      if (selectedOption) {
-                        onValueChange(selectedOption.value);
-                      }
+                      // نستخدم option.value مباشرة من الـ closure لضمان دقة الاختيار
+                      onValueChange(option.value);
                     }
                     setOpen(false);
                   }}
