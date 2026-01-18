@@ -26,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/lib/types';
+import { mockNotifications } from '@/lib/data';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return { date: '-', time: '-'};
@@ -58,20 +59,33 @@ export default function SystemAlertsPage() {
     const [snapshot, loading, error] = useCollection(notificationsQuery);
 
     const notifications = useMemo(() => {
-        if (loading || !snapshot) {
-          return [];
+        if (loading) {
+            return [];
         }
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        
+        let data: Notification[] = [];
+    
+        if (snapshot && !snapshot.empty) {
+            data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        } else if (user) {
+            // Fallback to mock data if Firestore is empty for this user.
+            data = mockNotifications.filter(n => n.userId === user?.id || n.userId === 'mock-admin-id');
+        }
+
+        // Sort client-side
         data.sort((a, b) => {
-            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
+            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
             return timeB - timeA;
         });
+
         return data;
-    }, [snapshot, loading, user?.id]);
+    }, [snapshot, loading, user]);
     
     const handleMarkAsRead = async (notificationId: string) => {
-        if (!firestore || !notificationId) return;
+        // Prevent updating mock notifications
+        if (!firestore || !notificationId || notificationId.startsWith('notif-')) return;
+        
         const notifRef = doc(firestore, 'notifications', notificationId);
         try {
             await updateDoc(notifRef, { isRead: true });
