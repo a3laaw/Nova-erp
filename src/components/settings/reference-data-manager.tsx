@@ -261,69 +261,6 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
 }
 
 export function ReferenceDataManager() {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-  const [isSeeding, setIsSeeding] = useState(false);
-
-  const handleSeedData = async () => {
-    if (!firestore) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
-        return;
-    }
-    setIsSeeding(true);
-
-    try {
-        const batch = writeBatch(firestore);
-
-        // --- Departments and Jobs ---
-        const departmentsData = [
-            { name: 'قسم الهندسة', jobs: ['مهندس معماري', 'مهندس إنشائي', 'مهندس كهرباء', 'مهندس ميكانيكا', 'مهندس مساحة', 'رسام أوتوكاد'] },
-            { name: 'قسم إدارة المشاريع', jobs: ['مدير مشروع', 'مساعد مدير مشروع', 'منسق مشروع'] },
-            { name: 'قسم المحاسبة والمالية', jobs: ['محاسب', 'مدير مالي'] },
-            { name: 'قسم الموارد البشرية والإدارية', jobs: ['مسؤول موارد بشرية', 'مدير إداري', 'سكرتارية'] },
-            { name: 'قسم المشتريات', jobs: ['مسؤول مشتريات'] },
-            { name: 'قسم السلامة', jobs: ['مسؤول سلامة'] }
-        ];
-
-        for (const dept of departmentsData) {
-            const deptRef = doc(collection(firestore, 'departments'));
-            batch.set(deptRef, { name: dept.name });
-            for (const job of dept.jobs) {
-                const jobRef = doc(collection(firestore, `departments/${deptRef.id}/jobs`));
-                batch.set(jobRef, { name: job });
-            }
-        }
-        
-        // --- Governorates and Areas ---
-        const locationsData = [
-            { name: 'محافظة العاصمة', areas: ['مدينة الكويت', 'الدسمة', 'الدعية', 'الشرق', 'الصوابر', 'المرقاب', 'القبلة', 'الصالحية', 'الوطية', 'بنيد القار', 'كيفان', 'المنصورية', 'ضاحية عبد الله السالم', 'النزهة', 'الفيحاء', 'الشامية', 'الروضة', 'العديلية', 'الخالدية', 'القادسية', 'قرطبة', 'اليرموك', 'الشويخ', 'الشويخ الصناعية', 'الشويخ التعليمية', 'الشويخ الصحية', 'الري', 'غرناطة', 'الصليبخات', 'الدوحة', 'النهضة', 'جزيرة فيلكا'] },
-            { name: 'محافظة حولي', areas: ['حولي', 'الشعب', 'السالمية', 'الجابرية', 'الرميثية', 'سلوى', 'بيان', 'مشرف', 'ميدان حولي', 'النقرة', 'ضاحية مبارك العبدالله الجابر', 'جنوب السرة', 'الزهراء', 'الصديق', 'حطين', 'السلام', 'الشهداء'] },
-            { name: 'محافظة الفروانية', areas: ['الفروانية', 'خيطان', 'الأندلس', 'الرابية', 'العارضية', 'العارضية الصناعية', 'الرحاب', 'إشبيلية', 'جليب الشيوخ', 'ضاحية صباح الناصر', 'ضاحية عبد الله المبارك', 'الضجيج'] },
-            { name: 'محافظة الأحمدي', areas: ['الأحمدي', 'الفنطاس', 'العقيلة', 'الظهر', 'هدية', 'الرقة', 'المنقف', 'الصباحية', 'أبو حليفة', 'الفحيحيل', 'علي صباح السالم (أم الهيمان)', 'ميناء عبد الله', 'الشعيبة', 'الوفرة', 'الزور', 'الخيران', 'بنيدر', 'الجليعة', 'الضباعية', 'الوفرة الزراعية', 'مدينة صباح الأحمد', 'مدينة صباح الأحمد البحرية'] },
-            { name: 'محافظة الجهراء', areas: ['الجهراء', 'الصليبية', 'تيماء', 'النسيم', 'العيون', 'القصر', 'الواحة', 'سعد العبد الله', 'الجهراء الصناعية', 'العبدلي', 'السالمي', 'المطلاع', 'كاظمة', 'مدينة الحرير', 'جزيرة بوبيان', 'جزيرة وربة'] },
-            { name: 'محافظة مبارك الكبير', areas: ['مبارك الكبير', 'صباح السالم', 'العدان', 'القصور', 'القرين', 'المسيلة', 'أبو فطيرة', 'صبحان', 'الفنيطيس', 'أبو الحصانية'] }
-        ];
-
-        for (const gov of locationsData) {
-            const govRef = doc(collection(firestore, 'governorates'));
-            batch.set(govRef, { name: gov.name });
-            for (const area of gov.areas) {
-                const areaRef = doc(collection(firestore, `governorates/${govRef.id}/areas`));
-                batch.set(areaRef, { name: area });
-            }
-        }
-
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تمت إضافة البيانات المرجعية الافتراضية بنجاح. سيتم تحديث القوائم تلقائياً بعد لحظات.' });
-        // The useCollection hooks will automatically refresh the data, no manual refresh needed.
-    } catch(e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في إضافة البيانات الافتراضية. قد تكون البيانات موجودة مسبقًا.' });
-    } finally {
-        setIsSeeding(false);
-    }
-  };
-
 
   return (
     <div className="space-y-6">
@@ -334,16 +271,6 @@ export function ReferenceDataManager() {
             تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام، مثل الأقسام والوظائف والمواقع الجغرافية.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-            <div className="mb-6 p-4 border-dashed border-2 rounded-lg bg-muted/50">
-                <h4 className="font-semibold">إضافة بيانات افتراضية</h4>
-                <p className="text-sm text-muted-foreground mt-1">هل تريد البدء بقائمة شائعة من الأقسام والوظائف والمواقع الجغرافية؟ اضغط على الزر أدناه لإضافتها. يمكنك تعديلها أو حذفها لاحقًا.</p>
-                <Button onClick={handleSeedData} disabled={isSeeding} className="mt-2">
-                    {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />}
-                    {isSeeding ? 'جاري الإضافة...' : 'إضافة بيانات افتراضية'}
-                </Button>
-            </div>
-        </CardContent>
       </Card>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <DataManager<Department, Job> 
