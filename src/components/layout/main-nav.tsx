@@ -32,7 +32,7 @@ import { useLanguage } from '@/context/language-context';
 const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { href: '/dashboard/notifications', label: 'الإشعارات', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard/notifications', label: 'تنبيهات النظام', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
@@ -42,7 +42,7 @@ const navItems = {
   ],
   en: [
       { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-      { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+      { href: '/dashboard/notifications', label: 'System Alerts', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
       { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
       { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
       { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },

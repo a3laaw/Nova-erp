@@ -54,7 +54,7 @@ const titles = {
         '/dashboard/warehouse': 'المستودع',
         '/dashboard/hr': 'الموارد البشرية',
         '/dashboard/settings': 'الإعدادات',
-        '/dashboard/notifications': 'الإشعارات',
+        '/dashboard/notifications': 'تنبيهات النظام',
     },
     en: {
         '/dashboard': 'Dashboard',
@@ -65,7 +65,7 @@ const titles = {
         '/dashboard/warehouse': 'Warehouse',
         '/dashboard/hr': 'Human Resources',
         '/dashboard/settings': 'Settings',
-        '/dashboard/notifications': 'Notifications',
+        '/dashboard/notifications': 'System Alerts',
     }
 };
 
