@@ -63,7 +63,14 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        onPointerDownOutside={(e) => {
+          // This is the crucial part for modals.
+          // It prevents the dialog from closing the popover.
+          e.preventDefault();
+        }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -72,10 +79,11 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    if (onValueChange) {
-                      onValueChange(option.value);
+                  value={option.label} // Use label for searching
+                  onSelect={(currentLabel) => {
+                    const selectedOption = options.find(opt => opt.label.toLowerCase() === currentLabel.toLowerCase());
+                    if (selectedOption && onValueChange) {
+                      onValueChange(selectedOption.value);
                     }
                     setOpen(false);
                   }}
