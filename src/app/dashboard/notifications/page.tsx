@@ -59,20 +59,17 @@ export default function SystemAlertsPage() {
     const [snapshot, loading, error] = useCollection(notificationsQuery);
 
     const notifications = useMemo(() => {
-        if (loading) return [];
-        if (snapshot?.empty) {
-            // If firestore is empty, use mock data for the current user
-            return mockNotifications.filter(n => n.userId === user?.id || n.userId === 'mock-admin-id');
+        if (loading || !snapshot) {
+          return [];
         }
-        if (!snapshot) return [];
-        
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
         data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
         return data;
-    }, [snapshot, loading, user?.id]);
+    }, [snapshot, loading]);
     
     const handleMarkAsRead = async (notificationId: string) => {
-        if (!firestore || snapshot?.empty) return; // Don't try to update mock data
+        // This check is important because we don't have IDs for mock data to update.
+        if (!firestore || !notificationId) return;
         const notifRef = doc(firestore, 'notifications', notificationId);
         try {
             await updateDoc(notifRef, { isRead: true });
@@ -84,8 +81,8 @@ export default function SystemAlertsPage() {
     };
     
     const handleNotificationClick = (notification: Notification) => {
-        if (!notification.isRead) {
-            handleMarkAsRead(notification.id!);
+        if (!notification.isRead && notification.id) {
+            handleMarkAsRead(notification.id);
         }
         if (notification.link) {
             router.push(notification.link);
