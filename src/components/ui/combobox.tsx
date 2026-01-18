@@ -74,9 +74,9 @@ export function Combobox({
                 <CommandItem
                   key={option.value}
                   value={option.value}
-                  onSelect={() => {
+                  onSelect={(currentValue) => {
                     if (onValueChange) {
-                        onValueChange(option.value === value ? "" : option.value)
+                        onValueChange(currentValue)
                     }
                     setOpen(false)
                   }}
