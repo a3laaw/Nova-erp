@@ -16,17 +16,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BellRing, ArrowRight } from 'lucide-react';
+import { BellRing } from 'lucide-react';
 import { format } from 'date-fns';
-import { useFirebase, useCollection, useAuth } from '@/firebase';
-import { collection, query, where, doc, updateDoc } from 'firebase/firestore';
+import { useFirebase, useAuth } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/hooks/use-notifications'; // Use the new hook
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return { date: '-', time: '-'};
@@ -44,37 +43,19 @@ const formatDate = (dateValue: any) => {
 
 export default function SystemAlertsPage() {
     const { firestore } = useFirebase();
-    const { user } = useAuth();
     const router = useRouter();
-    const { toast } = useToast();
+    const { notifications, loading, error } = useNotifications(); // Replaced old fetching logic
 
-    const notificationsQuery = useMemo(() => {
-        if (!firestore || !user?.id) return null;
-        return query(
-            collection(firestore, 'notifications'),
-            where('userId', '==', user.id)
-        );
-    }, [firestore, user?.id]);
-
-    const [snapshot, loading, error] = useCollection(notificationsQuery);
-
-    const notifications = useMemo(() => {
-        if (!snapshot) return [];
-
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-
-        // Sort client-side: unread first, then by date descending.
-        data.sort((a, b) => {
+    // Add secondary sorting to put unread items first
+    const sortedNotifications = useMemo(() => {
+        return [...notifications].sort((a, b) => {
             if (a.isRead !== b.isRead) {
                 return a.isRead ? 1 : -1;
             }
-            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-            return timeB - timeA;
+            // The hook already sorts by date, so we just need to maintain that order
+            return 0;
         });
-
-        return data;
-    }, [snapshot]);
+    }, [notifications]);
     
     const handleMarkAsRead = async (notificationId: string) => {
         if (!firestore || !notificationId) return;
@@ -136,7 +117,7 @@ export default function SystemAlertsPage() {
                       <TableCell colSpan={3} className="text-center h-24 text-destructive">فشل تحميل التنبيهات.</TableCell>
                   </TableRow>
               )}
-               {!loading && notifications.length === 0 && (
+               {!loading && sortedNotifications.length === 0 && (
                     <TableRow>
                         <TableCell colSpan={3} className="h-48 text-center text-muted-foreground">
                             <div className="flex flex-col items-center gap-4">
@@ -147,7 +128,7 @@ export default function SystemAlertsPage() {
                         </TableCell>
                     </TableRow>
               )}
-              {!loading && notifications.map((alert) => {
+              {!loading && sortedNotifications.map((alert) => {
                   const {date, time} = formatDate(alert.createdAt);
                   return (
                     <TableRow 

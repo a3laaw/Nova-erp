@@ -14,22 +14,12 @@ import { Button } from '../ui/button';
 import { Bell, Circle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, limit, doc, updateDoc } from 'firebase/firestore';
-import { useAuth } from '@/context/auth-context';
-import { useCollection } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import Link from 'next/link';
-
-interface Notification {
-  id: string;
-  title: string;
-  body: string;
-  link: string;
-  isRead: boolean;
-  createdAt: any;
-  userId: string;
-}
+import type { Notification } from '@/lib/types';
+import { useNotifications } from '@/hooks/use-notifications'; // Use the new hook
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return '';
@@ -42,35 +32,9 @@ const formatDate = (dateValue: any) => {
 };
 
 export function Notifications() {
-  const { firestore } = useFirebase();
-  const { user } = useAuth();
+  const { notifications, loading } = useNotifications(); // Replaced old fetching logic
   const router = useRouter();
-
-  const notificationsQuery = useMemo(() => {
-    if (!firestore || !user?.id) return null;
-    return query(
-      collection(firestore, 'notifications'),
-      where('userId', '==', user.id),
-      limit(20)
-    );
-  }, [firestore, user?.id]);
-
-  const [snapshot, loading] = useCollection(notificationsQuery);
-
-  const notifications = useMemo(() => {
-    if (!snapshot) return [];
-    
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-    
-    // Sort client-side
-    data.sort((a, b) => {
-        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-        return timeB - timeA;
-    });
-
-    return data.slice(0, 10);
-  }, [snapshot]);
+  const { firestore } = useFirebase();
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.isRead).length;
@@ -112,7 +76,7 @@ export function Notifications() {
         {!loading && notifications.length === 0 && (
           <DropdownMenuItem disabled className="text-center">لا توجد إشعارات جديدة.</DropdownMenuItem>
         )}
-        {!loading && notifications.map(notif => (
+        {!loading && notifications.slice(0, 10).map(notif => ( // slice to show only latest
           <DropdownMenuItem key={notif.id} className="flex items-start gap-2 cursor-pointer p-2" onClick={() => handleNotificationClick(notif)}>
             {!notif.isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary flex-shrink-0" />}
             <div className={`flex-1 ${notif.isRead ? 'ml-4' : ''}`}>
