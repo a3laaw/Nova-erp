@@ -51,7 +51,7 @@ export function Combobox({
   const selectedOption = options.find((option) => option.value === value)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -66,7 +66,6 @@ export function Combobox({
       </PopoverTrigger>
       <PopoverContent 
         className="w-[--radix-popover-trigger-width] p-0"
-        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
