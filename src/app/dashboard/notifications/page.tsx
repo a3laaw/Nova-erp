@@ -26,7 +26,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/lib/types';
-import { mockNotifications } from '@/lib/data';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return { date: '-', time: '-'};
@@ -63,12 +62,15 @@ export default function SystemAlertsPage() {
           return [];
         }
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+        data.sort((a, b) => {
+            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+            return timeB - timeA;
+        });
         return data;
-    }, [snapshot, loading]);
+    }, [snapshot, loading, user?.id]);
     
     const handleMarkAsRead = async (notificationId: string) => {
-        // This check is important because we don't have IDs for mock data to update.
         if (!firestore || !notificationId) return;
         const notifRef = doc(firestore, 'notifications', notificationId);
         try {
