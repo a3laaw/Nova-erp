@@ -17,15 +17,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Check, X, FileWarning } from 'lucide-react';
-import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { BellRing, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { useFirebase, useCollection, useAuth } from '@/firebase';
-import { collection, query, where, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return { date: '-', time: '-'};
@@ -62,8 +63,11 @@ export default function SystemAlertsPage() {
 
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
 
-        // Sort client-side
+        // Sort client-side: unread first, then by date descending.
         data.sort((a, b) => {
+            if (a.isRead !== b.isRead) {
+                return a.isRead ? 1 : -1;
+            }
             const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
             const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
             return timeB - timeA;
@@ -78,10 +82,9 @@ export default function SystemAlertsPage() {
         const notifRef = doc(firestore, 'notifications', notificationId);
         try {
             await updateDoc(notifRef, { isRead: true });
-            toast({ title: 'نجاح', description: 'تم تحديد الإشعار كمقروء.' });
         } catch (err) {
             console.error(err);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الإشعار.' });
+            // Don't show toast here to not distract from navigation
         }
     };
     
@@ -106,7 +109,7 @@ export default function SystemAlertsPage() {
             </CardDescription>
           </div>
           <div className="text-sm text-muted-foreground">
-            عرض {notifications.length} من {notifications.length} نتيجة
+            {loading ? 'جاري التحميل...' : `عرض ${notifications.length} تنبيه`}
           </div>
         </div>
       </CardHeader>
@@ -115,42 +118,47 @@ export default function SystemAlertsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>#</TableHead>
-                <TableHead>العنوان</TableHead>
-                <TableHead>التفاصيل</TableHead>
-                <TableHead>تاريخ التنبيه</TableHead>
-                <TableHead className="text-center">مقروء</TableHead>
-                <TableHead className="text-center">الإجراء</TableHead>
+                <TableHead className="w-[65%]">التنبيه</TableHead>
+                <TableHead>التاريخ</TableHead>
+                <TableHead className="text-center">الحالة</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && Array.from({length: 3}).map((_, i) => (
+              {loading && Array.from({length: 5}).map((_, i) => (
                   <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-5" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-5 mx-auto rounded-full" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 mx-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-16 mx-auto rounded-full" /></TableCell>
                   </TableRow>
               ))}
               {!loading && error && (
                   <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24 text-destructive">فشل تحميل التنبيهات.</TableCell>
+                      <TableCell colSpan={3} className="text-center h-24 text-destructive">فشل تحميل التنبيهات.</TableCell>
                   </TableRow>
               )}
                {!loading && notifications.length === 0 && (
-                  <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">لا توجد تنبيهات لعرضها.</TableCell>
-                  </TableRow>
+                    <TableRow>
+                        <TableCell colSpan={3} className="h-48 text-center text-muted-foreground">
+                            <div className="flex flex-col items-center gap-4">
+                                <BellRing className="h-16 w-16" />
+                                <h3 className="text-xl font-semibold">صندوق الوارد نظيف</h3>
+                                <p>لا توجد تنبيهات جديدة في الوقت الحالي.</p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
               )}
-              {!loading && notifications.map((alert, index) => {
+              {!loading && notifications.map((alert) => {
                   const {date, time} = formatDate(alert.createdAt);
                   return (
-                    <TableRow key={alert.id} className={!alert.isRead ? 'bg-primary/5' : ''}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{alert.title}</TableCell>
-                      <TableCell>{alert.body}</TableCell>
+                    <TableRow 
+                        key={alert.id} 
+                        className={cn("cursor-pointer", !alert.isRead && 'bg-primary/5 font-semibold')}
+                        onClick={() => handleNotificationClick(alert)}
+                    >
+                      <TableCell>
+                        <p>{alert.title}</p>
+                        <p className={cn("text-sm", !alert.isRead ? "text-foreground/80" : "text-muted-foreground")}>{alert.body}</p>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
                             <span>{date}</span>
@@ -158,12 +166,9 @@ export default function SystemAlertsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {alert.isRead ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <X className="h-5 w-5 text-red-500 mx-auto" />}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button variant="ghost" size="icon" onClick={() => handleNotificationClick(alert)}>
-                            <FileWarning className="h-5 w-5 text-primary mx-auto" />
-                        </Button>
+                        <Badge variant={alert.isRead ? "secondary" : "default"}>
+                            {alert.isRead ? "مقروء" : "جديد"}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   )
