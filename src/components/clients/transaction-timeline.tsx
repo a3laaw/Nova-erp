@@ -13,6 +13,7 @@ import { MessageSquare, Send, History } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 interface TimelineEvent {
   id: string;
@@ -31,6 +32,8 @@ interface TransactionTimelineProps {
   showInput?: boolean;
   title: string;
   icon: React.ReactNode;
+  client: any;
+  transaction: any;
 }
 
 const formatDate = (dateValue: any): string => {
@@ -40,7 +43,7 @@ const formatDate = (dateValue: any): string => {
     return formatDistanceToNow(date, { addSuffix: true, locale: ar });
 }
 
-export function TransactionTimeline({ clientId, transactionId, filterType, showInput = false, title, icon }: TransactionTimelineProps) {
+export function TransactionTimeline({ clientId, transactionId, filterType, showInput = false, title, icon, client, transaction }: TransactionTimelineProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -71,12 +74,50 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
       await addDoc(timelineCollection, {
         type: 'comment',
         content: newComment,
-        userId: currentUser.uid,
+        userId: currentUser.id,
         userName: currentUser.fullName,
         userAvatar: currentUser.avatarUrl,
         createdAt: serverTimestamp(),
       });
+      
+
+      // --- Notification Logic ---
+      const recipients = new Set<string>();
+      const clientName = client?.nameAr || 'عميل';
+      const transactionType = transaction?.transactionType || 'معاملة';
+      
+      // 1. Add self for confirmation
+      recipients.add(currentUser.id);
+
+      // 2. Add assignee to recipients if they are not the commenter
+      if (transaction?.assignedEngineerId) {
+          const assigneeUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
+          if (assigneeUserId && assigneeUserId !== currentUser.id) {
+              recipients.add(assigneeUserId);
+          }
+      }
+
+      // 3. Send notifications
+      for (const recipientId of recipients) {
+          const isCreator = recipientId === currentUser.id;
+          const title = isCreator 
+              ? 'تم إرسال تعليقك' 
+              : `تعليق جديد من ${currentUser.fullName}`;
+          const body = isCreator
+              ? `تم إرسال تعليقك على معاملة العميل ${clientName} بنجاح.`
+              : `أضاف ${currentUser.fullName} تعليقًا على المعاملة "${transactionType}" للعميل ${clientName}.`;
+          
+          createNotification(firestore, {
+              userId: recipientId,
+              title,
+              body,
+              link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
+          });
+      }
+      
       setNewComment('');
+      toast({ title: 'نجاح', description: 'تم إرسال التعليق بنجاح.' });
+
     } catch (err) {
       console.error('Failed to post comment:', err);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إرسال التعليق.' });

@@ -167,7 +167,7 @@ export default function TransactionDetailPage() {
     }
 
     if (engineerChanged) {
-        updateData.assignedEngineerId = newEngineerId === 'unassign' ? null : newEngineerId;
+        updateData.assignedEngineerId = newEngineerId;
         const oldEngineerName = transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) || 'غير مسند' : 'غير مسند';
         const newEngineerName = newEngineerId ? employeesMap.get(newEngineerId) || 'غير مسند' : 'غير مسند';
         const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
@@ -312,6 +312,8 @@ export default function TransactionDetailPage() {
                   showInput={true}
                   title="التعليقات والمتابعة"
                   icon={<MessageSquare className="text-primary" />}
+                  client={client}
+                  transaction={transaction}
                 />
             </TabsContent>
             <TabsContent value="history" className="mt-6">
@@ -322,6 +324,8 @@ export default function TransactionDetailPage() {
                   showInput={false}
                   title="سجل التغييرات"
                   icon={<History className="text-primary" />}
+                  client={client}
+                  transaction={transaction}
                 />
             </TabsContent>
         </Tabs>
