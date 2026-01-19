@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -251,9 +251,15 @@ export default function TransactionDetailPage() {
                 <div className='flex justify-between items-start'>
                     <div className='flex items-center gap-4'>
                         <CardTitle className='text-2xl'>{transaction.transactionType}</CardTitle>
-                        <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
-                            <FileText className="ml-2 h-4 w-4" />
-                            إدارة بنود العقد
+                         <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
+                            <Pencil className="ml-2 h-4 w-4" />
+                            تعديل بنود العقد
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={`/dashboard/clients/${clientId}/transactions/${transactionId}/contract`}>
+                                <Printer className="ml-2 h-4 w-4" />
+                                عرض وطباعة العقد
+                            </Link>
                         </Button>
                     </div>
                     <Badge variant="outline" className={transactionStatusColors[transaction.status]}>

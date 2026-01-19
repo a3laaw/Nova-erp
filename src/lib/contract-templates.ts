@@ -15,5 +15,15 @@ export const contractTemplates: ContractTemplate[] = [
       { id: 5, name: 'الدفعة الخامسة: عند استلام رخصة البناء', amount: 100, status: 'غير مستحقة' },
     ]
   },
-  // We can add more templates here in the future
+  {
+    id: 'supply-install-contract',
+    transactionTypes: ['عقد توريد وتركيب'],
+    title: 'عقد توريد وتركيب',
+    totalAmount: 1500,
+    clauses: [
+      { id: 1, name: 'توريد و تركيب مواد صحية', amount: 500, status: 'مستحقة' },
+      { id: 2, name: 'توريد و تركيب مواد كهربائية', amount: 500, status: 'غير مستحقة' },
+      { id: 3, name: 'توريد و تركيب رخام', amount: 500, status: 'غير مستحقة' },
+    ]
+  }
 ];
