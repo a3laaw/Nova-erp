@@ -111,6 +111,7 @@
           "description": "The current status of the client's file.",
           "enum": [
             "new",
+            "contracted",
             "received",
             "completed",
             "rejected"

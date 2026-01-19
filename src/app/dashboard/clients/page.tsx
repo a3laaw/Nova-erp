@@ -52,7 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
-type ClientStatus = 'new' | 'received' | 'completed' | 'rejected';
+type ClientStatus = 'new' | 'contracted' | 'received' | 'completed' | 'rejected';
 
 interface Client extends DocumentData {
   id: string;
@@ -65,6 +65,7 @@ interface Client extends DocumentData {
 
 const statusTranslations: Record<ClientStatus, string> = {
   new: 'جديد',
+  contracted: 'تم التعاقد',
   received: 'تم استلامها',
   completed: 'تم إنجازها',
   rejected: 'مرفوضة',
@@ -72,6 +73,7 @@ const statusTranslations: Record<ClientStatus, string> = {
 
 const statusColors: Record<ClientStatus, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
+  contracted: 'bg-purple-100 text-purple-800 border-purple-200',
   received: 'bg-green-100 text-green-800 border-green-200',
   completed: 'bg-lime-100 text-lime-800 border-lime-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',

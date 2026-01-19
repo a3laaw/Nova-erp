@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -51,6 +52,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 
 const clientStatusTranslations: Record<string, string> = {
   new: 'جديد',
+  contracted: 'تم التعاقد',
   received: 'تم استلامها',
   completed: 'تم إنجازها',
   rejected: 'مرفوضة',
@@ -58,6 +60,7 @@ const clientStatusTranslations: Record<string, string> = {
 
 const clientStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
+  contracted: 'bg-purple-100 text-purple-800 border-purple-200',
   received: 'bg-green-100 text-green-800 border-green-200',
   completed: 'bg-lime-100 text-lime-800 border-lime-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
@@ -130,11 +133,18 @@ export default function ClientProfilePage() {
     fetchEmployees();
   }, [firestore]);
 
-  const handleViewContract = (transactionType: string) => {
-    const template = contractTemplates.find(t => t.transactionTypes.includes(transactionType));
-    setContractToShow(template || null);
+  const handleViewContract = () => {
+    // If there are transactions, use the type of the first (latest) one to find the contract.
+    if (transactions.length > 0) {
+        const firstTransactionType = transactions[0].transactionType;
+        const template = contractTemplates.find(t => t.transactionTypes.includes(firstTransactionType));
+        setContractToShow(template || null);
+    } else {
+        // If no transactions, there's no contract to show.
+        setContractToShow(null);
+    }
     setIsContractOpen(true);
-  };
+};
 
 
   // --- Render Logic ---
@@ -214,6 +224,14 @@ export default function ClientProfilePage() {
                 العودة إلى قائمة العملاء
             </Button>
             <div className='flex gap-2'>
+                <Button
+                    onClick={handleViewContract}
+                    disabled={client.status !== 'contracted'}
+                    variant="outline"
+                >
+                    <FileText className="ml-2 h-4 w-4" />
+                    عرض العقد
+                </Button>
                 <Button asChild>
                     <Link href={`/dashboard/clients/${id}/edit`}>
                         <Pencil className="ml-2 h-4 w-4" />
@@ -292,7 +310,6 @@ export default function ClientProfilePage() {
                                         <TableHead>المهندس المسؤول</TableHead>
                                         <TableHead>الحالة</TableHead>
                                         <TableHead>تاريخ الإنشاء</TableHead>
-                                        <TableHead>العقد</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -311,12 +328,6 @@ export default function ClientProfilePage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>{formatDate(tx.createdAt)}</TableCell>
-                                            <TableCell>
-                                                <Button variant="outline" size="sm" onClick={() => handleViewContract(tx.transactionType)}>
-                                                    <FileText className="ml-2 h-4 w-4" />
-                                                    عرض العقد
-                                                </Button>
-                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
