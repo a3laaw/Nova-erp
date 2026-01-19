@@ -52,7 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
-type ClientStatus = 'new' | 'contracted' | 'received' | 'completed' | 'rejected';
+type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
 
 interface Client extends DocumentData {
   id: string;
@@ -66,17 +66,15 @@ interface Client extends DocumentData {
 const statusTranslations: Record<ClientStatus, string> = {
   new: 'جديد',
   contracted: 'تم التعاقد',
-  received: 'تم استلامها',
-  completed: 'تم إنجازها',
-  rejected: 'مرفوضة',
+  cancelled: 'ملغي',
+  reContracted: 'معاد تعاقده',
 };
 
 const statusColors: Record<ClientStatus, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
   contracted: 'bg-purple-100 text-purple-800 border-purple-200',
-  received: 'bg-green-100 text-green-800 border-green-200',
-  completed: 'bg-lime-100 text-lime-800 border-lime-200',
-  rejected: 'bg-red-100 text-red-800 border-red-200',
+  cancelled: 'bg-red-100 text-red-800 border-red-200',
+  reContracted: 'bg-yellow-100 text-yellow-800 border-yellow-200',
 };
 
 export default function ClientsPage() {
@@ -235,7 +233,7 @@ export default function ClientsPage() {
                             </SelectTrigger>
                             <SelectContent>
                               {Object.keys(statusTranslations).map(key => (
-                                <SelectItem key={key} value={key}>{statusTranslations[key as ClientStatus]}</SelectItem>
+                                <SelectItem key={key} value={key} disabled={key === 'new'}>{statusTranslations[key as ClientStatus]}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

@@ -53,17 +53,15 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 const clientStatusTranslations: Record<string, string> = {
   new: 'جديد',
   contracted: 'تم التعاقد',
-  received: 'تم استلامها',
-  completed: 'تم إنجازها',
-  rejected: 'مرفوضة',
+  cancelled: 'ملغي',
+  reContracted: 'معاد تعاقده',
 };
 
 const clientStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
   contracted: 'bg-purple-100 text-purple-800 border-purple-200',
-  received: 'bg-green-100 text-green-800 border-green-200',
-  completed: 'bg-lime-100 text-lime-800 border-lime-200',
-  rejected: 'bg-red-100 text-red-800 border-red-200',
+  cancelled: 'bg-red-100 text-red-800 border-red-200',
+  reContracted: 'bg-yellow-100 text-yellow-800 border-yellow-200',
 };
 
 const transactionStatusTranslations: Record<string, string> = {
@@ -226,7 +224,7 @@ export default function ClientProfilePage() {
             <div className='flex gap-2'>
                 <Button
                     onClick={handleViewContract}
-                    disabled={client.status !== 'contracted'}
+                    disabled={!['contracted', 'reContracted'].includes(client.status)}
                     variant="outline"
                 >
                     <FileText className="ml-2 h-4 w-4" />

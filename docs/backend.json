@@ -112,9 +112,8 @@
           "enum": [
             "new",
             "contracted",
-            "received",
-            "completed",
-            "rejected"
+            "cancelled",
+            "reContracted"
           ]
         },
         "assignedEngineer": {
