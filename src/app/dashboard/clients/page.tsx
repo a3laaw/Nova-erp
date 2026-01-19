@@ -77,6 +77,24 @@ const statusColors: Record<ClientStatus, string> = {
   reContracted: 'bg-yellow-100 text-yellow-800 border-yellow-200',
 };
 
+const isStatusChangeDisabled = (targetStatus: ClientStatus, currentStatus: ClientStatus): boolean => {
+    if (targetStatus === 'new') return true; // Cannot manually select 'new'.
+    if (targetStatus === currentStatus) return false; // Can always re-select the current status.
+
+    switch (currentStatus) {
+        case 'new':
+            return !['contracted', 'cancelled'].includes(targetStatus);
+        case 'contracted':
+            return targetStatus !== 'cancelled';
+        case 'cancelled':
+            return targetStatus !== 'reContracted';
+        case 'reContracted':
+            return targetStatus !== 'cancelled';
+        default:
+            return true;
+    }
+};
+
 export default function ClientsPage() {
   const { language } = useLanguage();
   const firestore = useFirestore();
@@ -232,9 +250,14 @@ export default function ClientsPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {Object.keys(statusTranslations).map(key => (
-                                <SelectItem key={key} value={key} disabled={key === 'new'}>{statusTranslations[key as ClientStatus]}</SelectItem>
-                              ))}
+                              {Object.keys(statusTranslations).map(key => {
+                                const targetStatus = key as ClientStatus;
+                                return (
+                                    <SelectItem key={key} value={key} disabled={isStatusChangeDisabled(targetStatus, client.status)}>
+                                        {statusTranslations[targetStatus]}
+                                    </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                     </div>
