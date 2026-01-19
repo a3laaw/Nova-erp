@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
-import html2pdf from 'html2pdf.js';
 import { Printer } from 'lucide-react';
 
 interface ClientData {
@@ -65,15 +64,19 @@ export function ContractForm({ client }: { client: ClientData }) {
   }, [financialClauses]);
   
   const handleExport = () => {
-    const element = document.getElementById('contract-content');
-    const opt = {
-      margin:       0.5,
-      filename:     `BMEC_Contract_${client.nameAr}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
-    html2pdf().from(element).set(opt).save();
+    // Dynamically import html2pdf.js only on the client-side
+    import('html2pdf.js').then(module => {
+        const html2pdf = module.default;
+        const element = document.getElementById('contract-content');
+        const opt = {
+          margin:       0.5,
+          filename:     `BMEC_Contract_${client.nameAr}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().from(element).set(opt).save();
+    });
   };
 
   const clientAddress = client.address ? [

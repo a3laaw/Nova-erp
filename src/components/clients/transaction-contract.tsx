@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
-import html2pdf from 'html2pdf.js';
 import { Printer, Save, Loader2, ArrowRight } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -85,15 +84,18 @@ export function TransactionContract({ client, transaction }: TransactionContract
     };
     
     const handleExport = () => {
-        const element = document.getElementById('contract-content');
-        const opt = {
-        margin:       0.5,
-        filename:     `BMEC_Contract_${client.nameAr}_${transaction.transactionType}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().from(element).set(opt).save();
+        import('html2pdf.js').then(module => {
+            const html2pdf = module.default;
+            const element = document.getElementById('contract-content');
+            const opt = {
+            margin:       0.5,
+            filename:     `BMEC_Contract_${client.nameAr}_${transaction.transactionType}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().from(element).set(opt).save();
+        });
     };
 
     const clientAddress = client.address ? [
