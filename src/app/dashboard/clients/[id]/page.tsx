@@ -26,13 +26,14 @@ import {
 } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import type { ClientTransaction, Employee } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
+import { ContractViewer } from '@/components/clients/contract-viewer';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
@@ -83,6 +84,7 @@ export default function ClientProfilePage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isContractOpen, setIsContractOpen] = useState(false);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
   // --- Data Fetching ---
@@ -185,6 +187,11 @@ export default function ClientProfilePage() {
 
   return (
     <>
+    <ContractViewer 
+        isOpen={isContractOpen} 
+        onClose={() => setIsContractOpen(false)}
+        clientName={client.nameAr}
+    />
     <ClientTransactionForm 
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)}
@@ -276,16 +283,18 @@ export default function ClientProfilePage() {
                                         <TableHead>المهندس المسؤول</TableHead>
                                         <TableHead>الحالة</TableHead>
                                         <TableHead>تاريخ الإنشاء</TableHead>
+                                        <TableHead>العقد</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {transactions.map(tx => (
-                                        <TableRow 
-                                            key={tx.id}
-                                            onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}
-                                            className="cursor-pointer"
-                                        >
-                                            <TableCell className="font-medium">{tx.transactionType}</TableCell>
+                                        <TableRow key={tx.id}>
+                                            <TableCell 
+                                                className="font-medium hover:underline cursor-pointer"
+                                                onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}
+                                            >
+                                                {tx.transactionType}
+                                            </TableCell>
                                             <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className={transactionStatusColors[tx.status]}>
@@ -293,6 +302,12 @@ export default function ClientProfilePage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>{formatDate(tx.createdAt)}</TableCell>
+                                            <TableCell>
+                                                <Button variant="outline" size="sm" onClick={() => setIsContractOpen(true)}>
+                                                    <FileText className="ml-2 h-4 w-4" />
+                                                    عرض العقد
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -310,5 +325,3 @@ export default function ClientProfilePage() {
     </>
   );
 }
-
-    
