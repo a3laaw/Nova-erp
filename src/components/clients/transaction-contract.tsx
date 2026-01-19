@@ -126,7 +126,10 @@ export function TransactionContract({ client, transaction }: TransactionContract
     return (
         <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
             <div className="print:hidden mb-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold">نموذج العقد الإلكتروني للمعاملة</h2>
+                 <Button variant="outline" onClick={() => router.back()}>
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                    العودة إلى تفاصيل المعاملة
+                </Button>
                 <div className="flex gap-2">
                      <Button onClick={handleSave} disabled={isSaving}>
                         {isSaving ? <Loader2 className="animate-spin" /> : <Save />}

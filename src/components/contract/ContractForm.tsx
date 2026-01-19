@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
-import { Printer } from 'lucide-react';
+import { Printer, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface ClientData {
   nameAr?: string;
@@ -34,6 +35,7 @@ const initialFinancialClauses: ContractItem[] = [
 ];
 
 export function ContractForm({ client }: { client: ClientData }) {
+  const router = useRouter();
   const [financialClauses, setFinancialClauses] = useState<ContractItem[]>(initialFinancialClauses);
   const [hasDiscount, setHasDiscount] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
@@ -92,7 +94,10 @@ export function ContractForm({ client }: { client: ClientData }) {
     <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
         {/* Toolbar - hidden in print */}
         <div className="print:hidden mb-6 flex justify-between items-center">
-            <h2 className="text-xl font-bold">نموذج العقد الإلكتروني</h2>
+            <Button variant="outline" onClick={() => router.back()}>
+                <ArrowRight className="ml-2 h-4 w-4" />
+                العودة إلى ملف العميل
+            </Button>
             <Button onClick={handleExport}><Printer className="ml-2 h-4 w-4" /> تصدير PDF</Button>
         </div>
 
