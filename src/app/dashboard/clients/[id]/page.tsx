@@ -34,8 +34,6 @@ import { ClientTransactionForm } from '@/components/clients/client-transaction-f
 import type { ClientTransaction, Employee, ContractTemplate } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
-import { ContractViewer } from '@/components/clients/contract-viewer';
-import { contractTemplates } from '@/lib/contract-templates';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
@@ -86,8 +84,6 @@ export default function ClientProfilePage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isContractOpen, setIsContractOpen] = useState(false);
-  const [contractToShow, setContractToShow] = useState<ContractTemplate | null>(null);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
   // --- Data Fetching ---
@@ -130,19 +126,6 @@ export default function ClientProfilePage() {
     };
     fetchEmployees();
   }, [firestore]);
-
-  const handleViewContract = () => {
-    // If there are transactions, use the type of the first (latest) one to find the contract.
-    if (transactions.length > 0) {
-        const firstTransactionType = transactions[0].transactionType;
-        const template = contractTemplates.find(t => t.transactionTypes.includes(firstTransactionType));
-        setContractToShow(template || null);
-    } else {
-        // If no transactions, there's no contract to show.
-        setContractToShow(null);
-    }
-    setIsContractOpen(true);
-};
 
 
   // --- Render Logic ---
@@ -203,12 +186,6 @@ export default function ClientProfilePage() {
 
   return (
     <>
-    <ContractViewer 
-        isOpen={isContractOpen} 
-        onClose={() => setIsContractOpen(false)}
-        clientName={client.nameAr}
-        contract={contractToShow}
-    />
     <ClientTransactionForm 
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)}
@@ -223,12 +200,14 @@ export default function ClientProfilePage() {
             </Button>
             <div className='flex gap-2'>
                 <Button
-                    onClick={handleViewContract}
+                    asChild
                     disabled={!['contracted', 'reContracted'].includes(client.status)}
                     variant="outline"
                 >
-                    <FileText className="ml-2 h-4 w-4" />
-                    عرض العقد
+                    <Link href={`/contracts/${id}`}>
+                      <FileText className="ml-2 h-4 w-4" />
+                      عرض العقد
+                    </Link>
                 </Button>
                 <Button asChild>
                     <Link href={`/dashboard/clients/${id}/edit`}>
