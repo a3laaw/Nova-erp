@@ -1,3 +1,4 @@
+
 export type MultilingualString = {
     ar: string;
     en: string;
@@ -23,13 +24,24 @@ export type UserProfile = {
 
 export type Client = {
   id: string;
-  name: MultilingualString;
-  contactPerson: MultilingualString;
-  email: string;
-  phone: string;
-  address: MultilingualString;
-  totalVisits: number;
-  projectIds: string[];
+  nameAr: string;
+  nameEn?: string;
+  mobile: string;
+  civilId?: string;
+  plotNumber?: string;
+  address?: {
+    governorate: string;
+    area: string;
+    block: string;
+    street: string;
+    houseNumber: string;
+  };
+  fileId: string;
+  status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
+  assignedEngineer?: string;
+  createdAt: any;
+  isActive: boolean;
+  projectIds?: string[];
 };
 
 export type ProjectStatus = 'Planning' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';

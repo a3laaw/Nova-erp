@@ -45,9 +45,9 @@ export default function NewCashReceiptPage() {
                 <CardDescription>CRV-2024-002 : رقم السند</CardDescription>
             </div>
             <div className='text-left'>
-                <p className='font-semibold'>EmaratiScope Engineering</p>
-                <p className='text-sm text-muted-foreground'>Dubai, UAE</p>
-                <p className='text-sm text-muted-foreground'>TRN: 100XXXXXXX</p>
+                <p className='font-semibold'>Dar Belaih Al-Mesfir Engineering Consultants</p>
+                <p className='text-sm text-muted-foreground'>Kuwait City, Kuwait</p>
+                <p className='text-sm text-muted-foreground'>CR: 123456</p>
             </div>
         </div>
       </CardHeader>

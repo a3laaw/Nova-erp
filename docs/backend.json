@@ -95,6 +95,10 @@
             "type": "string",
             "description": "The client's Civil ID number."
         },
+        "plotNumber": {
+            "type": "string",
+            "description": "The client's plot number for contracts."
+        },
         "address": {
             "type": "object",
             "description": "The client's address.",

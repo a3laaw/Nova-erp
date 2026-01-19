@@ -89,7 +89,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <Logo className="h-16 w-16 !p-3 print:hidden" />
                     <div>
                         <h1 className="text-2xl font-bold font-headline print:text-xl">ملف الموظف الشامل</h1>
-                        <p className="text-muted-foreground print:text-sm">EmaratiScope Engineering</p>
+                        <p className="text-muted-foreground print:text-sm">Dar Belaih Al-Mesfir Engineering Consultants</p>
                     </div>
                 </div>
                 <div className="text-left text-xs text-muted-foreground">
@@ -188,7 +188,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
 
             <footer className="text-center pt-4 mt-4 border-t print:mt-8">
                 <p className="text-xs text-muted-foreground">
-                    هذا التقرير تم إنشاؤه بواسطة نظام EmaratiScope. جميع الحقوق محفوظة © {currentDate ? currentDate.getFullYear() : '...'}
+                    هذا التقرير تم إنشاؤه بواسطة نظام BMEC. جميع الحقوق محفوظة © {currentDate ? currentDate.getFullYear() : '...'}
                 </p>
             </footer>
         </div>
