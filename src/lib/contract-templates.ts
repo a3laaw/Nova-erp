@@ -5,14 +5,14 @@ export const contractTemplates: ContractTemplate[] = [
     id: 'architectural-design-contract',
     // These match the types in client-transaction-form.tsx
     transactionTypes: ['تصميم بلدية (سكن خاص)', 'تصميم بلدية (تجاري)'], 
-    title: 'عقد تصميم وإشراف لمشروع فيلا سكنية',
-    totalAmount: 5000,
+    title: 'اتفاقية تصميم سكن خاص',
+    totalAmount: 800,
     clauses: [
-      { id: 1, name: 'البند الأول: تقديم المخططات الأولية واعتمادها من المالك', amount: 1000, status: 'مدفوعة' },
-      { id: 2, name: 'البند الثاني: تسليم مخططات البلدية والحصول على رخصة البناء', amount: 1500, status: 'مدفوعة' },
-      { id: 3, name: 'البند الثالث: تسليم مخططات الكهرباء والماء وخدمات الدولة', amount: 1000, status: 'مستحقة' },
-      { id: 4, name: 'البند الرابع: عند الانتهاء من صب سقف الدور الأول', amount: 750, status: 'غير مستحقة' },
-      { id: 5, name: 'البند الخامس: عند التسليم النهائي للمشروع وإيصال التيار الكهربائي', amount: 750, status: 'غير مستحقة' },
+      { id: 1, name: 'الدفعة الأولى: عند توقيع العقد', amount: 300, status: 'مستحقة' },
+      { id: 2, name: 'الدفعة الثانية: عند الانتهاء من الأرضي', amount: 150, status: 'غير مستحقة' },
+      { id: 3, name: 'الدفعة الثالثة: عند الانتهاء من الدور الأول', amount: 150, status: 'غير مستحقة' },
+      { id: 4, name: 'الدفعة الرابعة: عند الانتهاء من الدور الثاني', amount: 100, status: 'غير مستحقة' },
+      { id: 5, name: 'الدفعة الخامسة: عند استلام رخصة البناء', amount: 100, status: 'غير مستحقة' },
     ]
   },
   // We can add more templates here in the future
