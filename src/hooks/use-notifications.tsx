@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase, useCollection, useAuth } from '@/firebase';
+import { useFirebase, useCollection } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { Notification } from '@/lib/types';
 

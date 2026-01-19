@@ -19,7 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BellRing } from 'lucide-react';
 import { format } from 'date-fns';
-import { useFirebase, useAuth } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
