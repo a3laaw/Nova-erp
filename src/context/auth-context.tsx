@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => unsubscribe();
     
-  }, [firebaseUser, authLoading, firestore, router]);
+  }, [firebaseUser, authLoading, firestore]);
 
 
   const login = async (username: string, password: string) => {
