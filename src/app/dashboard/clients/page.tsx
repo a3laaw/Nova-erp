@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
@@ -45,11 +44,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { collection, doc, updateDoc, query, orderBy, type DocumentData, deleteDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, type DocumentData, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirestore, useCollection } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/context/auth-context';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
@@ -78,8 +78,7 @@ const statusColors: Record<ClientStatus, string> = {
 };
 
 const isStatusChangeDisabled = (targetStatus: ClientStatus, currentStatus: ClientStatus): boolean => {
-    if (targetStatus === 'new') return true; // Cannot manually select 'new'.
-    if (targetStatus === currentStatus) return false; // Can always re-select the current status.
+    if (targetStatus === currentStatus) return true;
 
     switch (currentStatus) {
         case 'new':
@@ -99,6 +98,7 @@ export default function ClientsPage() {
   const { language } = useLanguage();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   const clientsQuery = useMemo(() => {
     if (!firestore) return null;
@@ -109,20 +109,46 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  const [statusChangeInfo, setStatusChangeInfo] = useState<{ client: Client; newStatus: ClientStatus } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  
   const clients = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
   }, [snapshot]);
 
 
-  const handleStatusChange = async (clientId: string, newStatus: ClientStatus) => {
-    if (!firestore) return;
-    const clientDoc = doc(firestore, 'clients', clientId);
+  const handleConfirmStatusChange = async () => {
+    if (!statusChangeInfo || !firestore || !currentUser) return;
+    setIsUpdatingStatus(true);
+    
+    const { client, newStatus } = statusChangeInfo;
+    const clientRef = doc(firestore, 'clients', client.id);
+    const historyCollectionRef = collection(firestore, `clients/${client.id}/history`);
+    
+    const batch = writeBatch(firestore);
+
+    batch.update(clientRef, { status: newStatus });
+
+    const logContent = `قام بتغيير حالة الملف من "${statusTranslations[client.status]}" إلى "${statusTranslations[newStatus]}".`;
+    batch.set(doc(historyCollectionRef), {
+        type: 'log',
+        content: logContent,
+        userId: currentUser.id,
+        userName: currentUser.fullName,
+        userAvatar: currentUser.avatarUrl,
+        createdAt: serverTimestamp(),
+    });
+
     try {
-      await updateDoc(clientDoc, { status: newStatus });
+      await batch.commit();
+      toast({ title: 'نجاح', description: 'تم تحديث حالة الملف بنجاح.' });
     } catch (e) {
       console.error("Error updating status: ", e);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الملف.' });
+    } finally {
+      setIsUpdatingStatus(false);
+      setStatusChangeInfo(null);
     }
   };
   
@@ -160,7 +186,11 @@ export default function ClientsPage() {
       deleteConfirmTitle: 'هل أنت متأكد؟',
       deleteConfirmDesc: 'سيتم حذف ملف العميل بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
       cancel: 'إلغاء',
-      confirmDelete: 'نعم، قم بالحذف'
+      confirmDelete: 'نعم، قم بالحذف',
+      statusConfirmTitle: 'تأكيد تغيير الحالة',
+      statusConfirmDesc: (clientName: string, from: string, to: string) => `هل أنت متأكد من رغبتك في تغيير حالة ملف العميل "${clientName}" من "${from}" إلى "${to}"؟ سيتم تسجيل هذا الإجراء في سجل العميل.`,
+      confirmStatusChange: 'نعم، قم بالتغيير',
+      updating: 'جاري التحديث...'
     },
     en: {
       title: 'Client Management',
@@ -180,7 +210,11 @@ export default function ClientsPage() {
       deleteConfirmTitle: 'Are you sure?',
       deleteConfirmDesc: 'This will permanently delete the client file. This action cannot be undone.',
       cancel: 'Cancel',
-      confirmDelete: 'Yes, delete'
+      confirmDelete: 'Yes, delete',
+      statusConfirmTitle: 'Confirm Status Change',
+      statusConfirmDesc: (clientName: string, from: string, to: string) => `Are you sure you want to change the status for "${clientName}" from "${from}" to "${to}"? This action will be logged.`,
+      confirmStatusChange: 'Yes, change',
+      updating: 'Updating...'
     }
   }
   const currentText = t[language];
@@ -243,7 +277,11 @@ export default function ClientsPage() {
                         </Badge>
                          <Select
                             value={client.status}
-                            onValueChange={(value) => handleStatusChange(client.id, value as ClientStatus)}
+                            onValueChange={(newStatus) => {
+                                if (client.status !== newStatus && !isStatusChangeDisabled(newStatus as ClientStatus, client.status)) {
+                                    setStatusChangeInfo({ client, newStatus: newStatus as ClientStatus });
+                                }
+                            }}
                             dir="rtl"
                           >
                             <SelectTrigger className="h-8 w-[140px] text-xs">
@@ -306,6 +344,23 @@ export default function ClientsPage() {
                 <AlertDialogCancel disabled={isDeleting}>{currentText.cancel}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
                     {isDeleting ? 'جاري الحذف...' : currentText.confirmDelete}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={!!statusChangeInfo} onOpenChange={(open) => !open && setStatusChangeInfo(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>{currentText.statusConfirmTitle}</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {statusChangeInfo && currentText.statusConfirmDesc(statusChangeInfo.client.nameAr, statusTranslations[statusChangeInfo.client.status], statusTranslations[statusChangeInfo.newStatus])}
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isUpdatingStatus}>{currentText.cancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmStatusChange} disabled={isUpdatingStatus}>
+                    {isUpdatingStatus ? currentText.updating : currentText.confirmStatusChange}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
