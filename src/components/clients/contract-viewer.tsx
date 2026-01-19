@@ -21,20 +21,19 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
-// Placeholder data as per user's request to think about the structure.
+// Updated contract data based on the provided images
 const mockContract = {
   title: 'عقد تصميم وإشراف لمشروع فيلا سكنية',
-  clientName: 'شركة المشاريع المتحدة',
-  projectName: 'مشروع فيلا دبي',
   totalAmount: 5000,
   clauses: [
-    { id: 1, name: 'تقديم المخططات الأولية', amount: 1000, status: 'مدفوعة' },
-    { id: 2, name: 'تسليم مخططات البلدية', amount: 1500, status: 'مدفوعة' },
-    { id: 3, name: 'تسليم مخططات الكهرباء والماء', amount: 1000, status: 'مستحقة' },
-    { id: 4, name: 'عند الانتهاء من صب السقف الأول', amount: 750, status: 'غير مستحقة' },
-    { id: 5, name: 'عند التسليم النهائي للمشروع', amount: 750, status: 'غير مستحقة' },
+    { id: 1, name: 'البند الأول: تقديم المخططات الأولية واعتمادها من المالك', amount: 1000, status: 'مدفوعة' },
+    { id: 2, name: 'البند الثاني: تسليم مخططات البلدية والحصول على رخصة البناء', amount: 1500, status: 'مدفوعة' },
+    { id: 3, name: 'البند الثالث: تسليم مخططات الكهرباء والماء وخدمات الدولة', amount: 1000, status: 'مستحقة' },
+    { id: 4, name: 'البند الرابع: عند الانتهاء من صب سقف الدور الأول', amount: 750, status: 'غير مستحقة' },
+    { id: 5, name: 'البند الخامس: عند التسليم النهائي للمشروع وإيصال التيار الكهربائي', amount: 750, status: 'غير مستحقة' },
   ]
 };
+
 
 const statusColors: Record<string, string> = {
   'مدفوعة': 'bg-green-100 text-green-800 border-green-200',
