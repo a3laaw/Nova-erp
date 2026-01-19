@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -14,11 +15,11 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2 } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee } from '@/lib/types';
+import type { Employee, ClientTransaction } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -29,6 +30,7 @@ import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 
 
 // Using the same translation objects from client profile page
@@ -71,6 +73,7 @@ export default function TransactionDetailPage() {
   const [newStatus, setNewStatus] = useState('');
   const [newEngineerId, setNewEngineerId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isContractFormOpen, setIsContractFormOpen] = useState(false);
 
 
   // --- Data Fetching ---
@@ -108,7 +111,7 @@ export default function TransactionDetailPage() {
 
   const transaction = useMemo(() => {
     if (transactionSnapshot?.exists()) {
-        return { id: transactionSnapshot.id, ...transactionSnapshot.data() };
+        return { id: transactionSnapshot.id, ...transactionSnapshot.data() } as ClientTransaction;
     }
     return null;
   }, [transactionSnapshot]);
@@ -228,6 +231,15 @@ export default function TransactionDetailPage() {
   }
   
   return (
+    <>
+    {transaction && (
+        <ContractClausesForm
+            isOpen={isContractFormOpen}
+            onClose={() => setIsContractFormOpen(false)}
+            transaction={transaction}
+            clientId={clientId}
+        />
+    )}
     <div className='space-y-6' dir='rtl'>
         <Button variant="outline" onClick={() => router.push(`/dashboard/clients/${clientId}`)}>
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -237,16 +249,20 @@ export default function TransactionDetailPage() {
         <Card>
             <CardHeader>
                 <div className='flex justify-between items-start'>
-                    <div>
+                    <div className='flex items-center gap-4'>
                         <CardTitle className='text-2xl'>{transaction.transactionType}</CardTitle>
-                        <CardDescription>
-                            معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link>
-                        </CardDescription>
+                        <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
+                            <FileText className="ml-2 h-4 w-4" />
+                            إدارة بنود العقد
+                        </Button>
                     </div>
                     <Badge variant="outline" className={transactionStatusColors[transaction.status]}>
                         {transactionStatusTranslations[transaction.status]}
                     </Badge>
                 </div>
+                 <CardDescription>
+                    معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link>
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className='grid md:grid-cols-2 gap-6'>
@@ -331,5 +347,6 @@ export default function TransactionDetailPage() {
         </Tabs>
 
     </div>
+    </>
   );
 }

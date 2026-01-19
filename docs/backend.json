@@ -156,7 +156,28 @@
             },
             "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },
-            "updatedAt": { "type": "string", "format": "date-time" }
+            "updatedAt": { "type": "string", "format": "date-time" },
+            "contract": {
+                "type": "object",
+                "description": "Stores the customized contract clauses and total amount for this specific transaction.",
+                "properties": {
+                    "clauses": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "number" },
+                                "name": { "type": "string" },
+                                "amount": { "type": "number" },
+                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] }
+                            },
+                            "required": ["id", "name", "amount", "status"]
+                        }
+                    },
+                    "totalAmount": { "type": "number" }
+                },
+                "required": ["clauses", "totalAmount"]
+            }
         },
         "required": ["clientId", "transactionType", "status", "createdAt"]
     },

@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-          
-
 export type MultilingualString = {
     ar: string;
     en: string;
@@ -318,6 +305,10 @@ export type ClientTransaction = {
     updatedAt?: any;
     // For display
     engineerName?: string;
+    contract?: {
+        clauses: ContractClause[];
+        totalAmount: number;
+    };
 };
 
 export type TransactionTimelineEvent = {
