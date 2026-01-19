@@ -3,8 +3,8 @@ import type { ContractTemplate } from './types';
 export const contractTemplates: ContractTemplate[] = [
   {
     id: 'architectural-design-contract',
-    // These match the types in client-transaction-form.tsx
-    transactionTypes: ['تصميم بلدية (سكن خاص)', 'تصميم بلدية (تجاري)'], 
+    // This template is now specific to private residence architectural design
+    transactionTypes: ['تصميم بلدية (سكن خاص)'], 
     title: 'اتفاقية تصميم سكن خاص',
     totalAmount: 800,
     clauses: [
