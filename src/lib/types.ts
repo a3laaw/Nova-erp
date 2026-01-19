@@ -8,6 +8,7 @@
 
 
 
+
           
 
 export type MultilingualString = {
@@ -345,3 +346,18 @@ export interface Area {
     id: string;
     name: string;
 }
+
+export type ContractClause = {
+  id: number;
+  name: string;
+  amount: number;
+  status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; // Paid, Due, Not Due
+};
+
+export type ContractTemplate = {
+  id: string; // e.g., 'architectural-design-private'
+  transactionTypes: string[]; // Match against ClientTransaction.transactionType
+  title: string;
+  clauses: ContractClause[];
+  totalAmount: number;
+};

@@ -30,10 +30,11 @@ import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCirc
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
-import type { ClientTransaction, Employee } from '@/lib/types';
+import type { ClientTransaction, Employee, ContractTemplate } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 import { ContractViewer } from '@/components/clients/contract-viewer';
+import { contractTemplates } from '@/lib/contract-templates';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
@@ -85,6 +86,7 @@ export default function ClientProfilePage() {
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isContractOpen, setIsContractOpen] = useState(false);
+  const [contractToShow, setContractToShow] = useState<ContractTemplate | null>(null);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
   // --- Data Fetching ---
@@ -127,6 +129,12 @@ export default function ClientProfilePage() {
     };
     fetchEmployees();
   }, [firestore]);
+
+  const handleViewContract = (transactionType: string) => {
+    const template = contractTemplates.find(t => t.transactionTypes.includes(transactionType));
+    setContractToShow(template || null);
+    setIsContractOpen(true);
+  };
 
 
   // --- Render Logic ---
@@ -191,6 +199,7 @@ export default function ClientProfilePage() {
         isOpen={isContractOpen} 
         onClose={() => setIsContractOpen(false)}
         clientName={client.nameAr}
+        contract={contractToShow}
     />
     <ClientTransactionForm 
         isOpen={isFormOpen} 
@@ -303,7 +312,7 @@ export default function ClientProfilePage() {
                                             </TableCell>
                                             <TableCell>{formatDate(tx.createdAt)}</TableCell>
                                             <TableCell>
-                                                <Button variant="outline" size="sm" onClick={() => setIsContractOpen(true)}>
+                                                <Button variant="outline" size="sm" onClick={() => handleViewContract(tx.transactionType)}>
                                                     <FileText className="ml-2 h-4 w-4" />
                                                     عرض العقد
                                                 </Button>

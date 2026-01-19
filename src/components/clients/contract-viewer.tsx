@@ -20,19 +20,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-
-// Updated contract data based on the provided images
-const mockContract = {
-  title: 'عقد تصميم وإشراف لمشروع فيلا سكنية',
-  totalAmount: 5000,
-  clauses: [
-    { id: 1, name: 'البند الأول: تقديم المخططات الأولية واعتمادها من المالك', amount: 1000, status: 'مدفوعة' },
-    { id: 2, name: 'البند الثاني: تسليم مخططات البلدية والحصول على رخصة البناء', amount: 1500, status: 'مدفوعة' },
-    { id: 3, name: 'البند الثالث: تسليم مخططات الكهرباء والماء وخدمات الدولة', amount: 1000, status: 'مستحقة' },
-    { id: 4, name: 'البند الرابع: عند الانتهاء من صب سقف الدور الأول', amount: 750, status: 'غير مستحقة' },
-    { id: 5, name: 'البند الخامس: عند التسليم النهائي للمشروع وإيصال التيار الكهربائي', amount: 750, status: 'غير مستحقة' },
-  ]
-};
+import type { ContractTemplate } from '@/lib/types';
+import { AlertCircle } from 'lucide-react';
 
 
 const statusColors: Record<string, string> = {
@@ -45,47 +34,70 @@ interface ContractViewerProps {
   isOpen: boolean;
   onClose: () => void;
   clientName: string;
+  contract: ContractTemplate | null;
 }
 
-export function ContractViewer({ isOpen, onClose, clientName }: ContractViewerProps) {
+export function ContractViewer({ isOpen, onClose, clientName, contract }: ContractViewerProps) {
+  
+  const content = () => {
+    if (!contract) {
+      return (
+         <div className="py-8 text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-medium">لا يوجد عقد لهذه المعاملة</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+                لم يتم تحديد نموذج عقد مطابق لنوع هذه المعاملة.
+            </p>
+        </div>
+      )
+    }
+
+    return (
+        <>
+            <DialogHeader>
+            <DialogTitle>{contract.title}</DialogTitle>
+            <DialogDescription>
+                عقد متعلق بالعميل: {clientName}
+            </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+            <Table>
+                <TableHeader>
+                <TableRow>
+                    <TableHead>البند</TableHead>
+                    <TableHead className="text-left">الدفعة</TableHead>
+                    <TableHead>الحالة</TableHead>
+                </TableRow>
+                </TableHeader>
+                <TableBody>
+                {contract.clauses.map((clause) => (
+                    <TableRow key={clause.id}>
+                    <TableCell className="font-medium">{clause.name}</TableCell>
+                    <TableCell className="text-left font-mono">{formatCurrency(clause.amount)}</TableCell>
+                    <TableCell>
+                        <Badge variant="outline" className={statusColors[clause.status]}>{clause.status}</Badge>
+                    </TableCell>
+                    </TableRow>
+                ))}
+                </TableBody>
+                <TableFooter>
+                    <TableRow>
+                        <TableCell className='font-bold'>الإجمالي</TableCell>
+                        <TableCell className='text-left font-bold font-mono'>{formatCurrency(contract.totalAmount)}</TableCell>
+                        <TableCell></TableCell>
+                    </TableRow>
+                </TableFooter>
+            </Table>
+            </div>
+        </>
+    );
+  }
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl" dir="rtl">
-        <DialogHeader>
-          <DialogTitle>{mockContract.title}</DialogTitle>
-          <DialogDescription>
-            عقد متعلق بالعميل: {clientName}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>البند</TableHead>
-                <TableHead className="text-left">الدفعة</TableHead>
-                <TableHead>الحالة</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockContract.clauses.map((clause) => (
-                <TableRow key={clause.id}>
-                  <TableCell className="font-medium">{clause.name}</TableCell>
-                  <TableCell className="text-left font-mono">{formatCurrency(clause.amount)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={statusColors[clause.status]}>{clause.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-                <TableRow>
-                    <TableCell className='font-bold'>الإجمالي</TableCell>
-                    <TableCell className='text-left font-bold font-mono'>{formatCurrency(mockContract.totalAmount)}</TableCell>
-                    <TableCell></TableCell>
-                </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
+        {content()}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             إغلاق
