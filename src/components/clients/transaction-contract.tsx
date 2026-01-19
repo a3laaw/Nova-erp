@@ -164,7 +164,7 @@ export function TransactionContract({ client, transaction }: TransactionContract
                         <div>
                             <p className="font-semibold">الطرف الثاني:</p>
                             <p>السيد/ {client.nameAr}</p>
-                            <p>الرقم المدني: {client.civilId}</p>
+                            <p>الرقم المدني: {(client as any).civilId}</p>
                             <p>العنوان: {clientAddress}</p>
                         </div>
                     </div>
