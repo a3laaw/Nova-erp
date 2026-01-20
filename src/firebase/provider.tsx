@@ -1,32 +1,42 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
+import { initializeFirebase } from './index';
 
-// This defines the shape of the context data.
+// This function ensures Firebase is initialized only once.
+const getFirebaseServices = (() => {
+  let firebase: ReturnType<typeof initializeFirebase> | null = null;
+  let initialized = false;
+  return () => {
+    if (!initialized) {
+      firebase = initializeFirebase();
+      initialized = true;
+    }
+    return firebase;
+  };
+})();
+
+
 interface FirebaseContextType {
   app: FirebaseApp | null;
   auth: Auth | null;
   firestore: Firestore | null;
 }
 
-// Create the context with an undefined initial value.
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
-/**
- * The provider component that makes Firebase services available to the component tree.
- * It takes the initialized services as a value prop.
- */
-export function FirebaseProvider({
-  children,
-  value,
-}: {
-  children: ReactNode;
-  value: FirebaseContextType;
-}) {
-  return <FirebaseContext.Provider value={value}>{children}</FirebaseContext.Provider>;
+export function FirebaseProvider({ children }: { children: ReactNode }) {
+  const services = useMemo(() => getFirebaseServices(), []);
+  const value = services ?? { app: null, auth: null, firestore: null };
+
+  return (
+    <FirebaseContext.Provider value={value}>
+      {children}
+    </FirebaseContext.Provider>
+  );
 }
 
 /**
