@@ -63,14 +63,7 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0"
-        // هذه الخاصية هي مفتاح حل مشكلة الإغلاق التلقائي داخل النوافذ المنبثقة
-        // تمنع النافذة الخلفية من "سرقة" النقرة
-        onPointerDownOutside={(e) => {
-          e.preventDefault();
-        }}
-      >
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -81,6 +74,7 @@ export function Combobox({
                   key={option.value}
                   // يتم البحث باستخدام النص الظاهر للمستخدم
                   value={option.label}
+                  // 10. عند اختيار عنصر، نقوم بتحديث القيمة وإغلاق القائمة
                   onSelect={(currentLabel) => {
                     // عند الاختيار، نبحث عن الخيار المطابق لتحديد القيمة الصحيحة
                     const selectedOption = options.find(

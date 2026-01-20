@@ -246,7 +246,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg" dir="rtl">
+      <DialogContent className="sm:max-w-lg" dir="rtl" onPointerDownOutside={(e) => e.preventDefault()}>
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}</DialogTitle>
