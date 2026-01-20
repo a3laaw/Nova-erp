@@ -197,31 +197,51 @@ export default function NewOtherAppointmentPage() {
             const windowEnd = new Date(appointmentDateTime.getTime() + 59 * 60 * 1000);
             const appointmentsRef = collection(firestore, 'appointments');
 
-            const roomQuery = query(appointmentsRef, where('meetingRoom', '==', meetingRoom), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
-            const engineerQuery = query(appointmentsRef, where('engineerId', '==', engineerId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
-            const clientQuery = query(appointmentsRef, where('clientId', '==', clientId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
-            
-            const [roomSnap, engineerSnap, clientSnap] = await Promise.all([
-                getDocs(roomQuery),
-                getDocs(engineerQuery),
-                getDocs(clientQuery),
-            ]);
+            // --- Conflict Validation ---
 
-            if (!roomSnap.empty) {
-                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'قاعة الاجتماعات محجوزة في هذا الوقت. الرجاء اختيار وقت أو قاعة أخرى.'});
+            // Check for meeting room conflict
+            const roomQuery = query(appointmentsRef, where('meetingRoom', '==', meetingRoom));
+            const roomSnap = await getDocs(roomQuery);
+            const roomHasConflict = roomSnap.docs.some(doc => {
+                const appt = doc.data();
+                const apptDate = appt.appointmentDate.toDate();
+                return apptDate >= windowStart && apptDate <= windowEnd;
+            });
+            if (roomHasConflict) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'قاعة الاجتماعات محجوزة في هذا الوقت. الرجاء اختيار وقت أو قاعة أخرى.' });
                 setIsSaving(false);
                 return;
             }
-            if (!engineerSnap.empty) {
+
+            // Check for engineer conflict
+            const engineerQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
+            const engineerSnap = await getDocs(engineerQuery);
+            const engineerHasConflict = engineerSnap.docs.some(doc => {
+                const appt = doc.data();
+                const apptDate = appt.appointmentDate.toDate();
+                return apptDate >= windowStart && apptDate <= windowEnd;
+            });
+            if (engineerHasConflict) {
                 toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.' });
                 setIsSaving(false);
                 return;
             }
-            if (!clientSnap.empty) {
+
+            // Check for client conflict
+            const clientQuery = query(appointmentsRef, where('clientId', '==', clientId));
+            const clientSnap = await getDocs(clientQuery);
+            const clientHasConflict = clientSnap.docs.some(doc => {
+                const appt = doc.data();
+                const apptDate = appt.appointmentDate.toDate();
+                return apptDate >= windowStart && apptDate <= windowEnd;
+            });
+            if (clientHasConflict) {
                 toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.' });
                 setIsSaving(false);
                 return;
             }
+            
+            // --- End of Conflict Validation ---
 
             const newAppointment = {
                 clientId,
