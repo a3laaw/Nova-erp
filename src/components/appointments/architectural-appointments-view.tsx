@@ -22,8 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 
 // --- Constants & Helpers ---
-const morningSlots = Array.from({ length: 12 }, (_, i) => format(addMinutes(setHours(new Date(), 7), i * 30), 'HH:mm'));
-const eveningSlots = Array.from({ length: 10 }, (_, i) => format(addMinutes(setHours(new Date(), 14), i * 30), 'HH:mm'));
+const morningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 7), i * 30), 'HH:mm'));
+const eveningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 14), i * 30), 'HH:mm'));
 
 function getVisitColor(visit: Partial<Appointment>) {
   if (visit.visitCount === 1) return "#facc15"; // yellow-400
