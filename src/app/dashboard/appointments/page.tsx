@@ -22,7 +22,7 @@ import type { Appointment, Client, Employee } from '@/lib/types';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة العرض'];
-const timeSlots = Array.from({ length: 28 }, (_, i) => { // 7 AM to 8:30 PM (14 hours * 2 slots/hr)
+const timeSlots = Array.from({ length: 8 }, (_, i) => { // From 7 AM, 8 slots (until 10:30 AM)
   const totalMinutes = 7 * 60 + i * 30;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -213,7 +213,7 @@ export default function AppointmentsCalendarPage() {
             </div>
 
             <div className="overflow-x-auto border rounded-lg">
-                <div className="grid grid-cols-[6rem_repeat(28,8rem)]">
+                <div className="grid grid-cols-[6rem_repeat(8,8rem)]">
                     {/* Header Row */}
                     <div className="sticky top-0 left-0 bg-muted p-2 z-10 font-semibold text-center">القاعة</div>
                     {timeSlots.map(time => (
@@ -360,4 +360,3 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         </Dialog>
     );
 }
-
