@@ -53,6 +53,7 @@ export function TransactionContract({ client, transaction }: TransactionContract
     }, [clauses]);
     
     const handleExport = () => {
+        // Dynamic import to ensure it runs only on the client
         import('html2pdf.js').then(module => {
             const html2pdf = module.default;
             const element = document.getElementById('contract-content');
