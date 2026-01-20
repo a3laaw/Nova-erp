@@ -282,7 +282,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogContent dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[cmdk-root]')) { e.preventDefault(); } }}>
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>حجز موعد جديد</DialogTitle>

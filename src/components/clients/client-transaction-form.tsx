@@ -196,7 +196,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetForm(); onClose(); } }}>
-            <DialogContent className="sm:max-w-lg" dir="rtl" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogContent className="sm:max-w-lg" dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[cmdk-root]')) { e.preventDefault(); } }}>
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>إضافة معاملة داخلية جديدة</DialogTitle>
