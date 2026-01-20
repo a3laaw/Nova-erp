@@ -74,7 +74,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
         <div className="flex items-center gap-2">
             <Logo />
             <div className="flex flex-col">
-                <span className="text-lg font-semibold font-headline tracking-tighter">BMEC</span>
+                <span className="text-lg font-semibold font-headline tracking-tighter">scoop</span>
                 <span className="text-xs text-muted-foreground">
                     {language === 'ar' ? 'للاستشارات الهندسية' : 'Engineering Consultants'}
                 </span>

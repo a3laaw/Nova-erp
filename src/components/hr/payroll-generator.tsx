@@ -231,7 +231,7 @@ export function PayrollGenerator() {
         </head>
         <body>
           <div class="header">
-            <div class="title">Dar Belaih Al-Mesfir Engineering Consultants</div>
+            <div class="title">scoop Engineering Consultants</div>
             <div class="subtitle">كشف رواتب شهر ${month}/${year}</div>
           </div>
           <table>

@@ -26,7 +26,7 @@ const mockAdminUser: AuthenticatedUser = {
     uid: 'mock-admin-uid',
     id: 'mock-admin-id',
     username: 'admin.user',
-    email: 'admin@bmec-kw.local',
+    email: 'admin@scoop.local',
     role: 'Admin',
     isActive: true,
     employeeId: 'emp-admin',

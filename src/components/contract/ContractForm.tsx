@@ -75,7 +75,7 @@ export function ContractForm({ client }: { client: ClientData }) {
         const element = document.getElementById('contract-content');
         const opt = {
           margin:       0.5,
-          filename:     `BMEC_Contract_${client.nameAr}.pdf`,
+          filename:     `scoop_Contract_${client.nameAr}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
           html2canvas:  { scale: 2, useCORS: true },
           jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -109,8 +109,8 @@ export function ContractForm({ client }: { client: ClientData }) {
                 <div className="flex items-center gap-4">
                     <Logo className="h-20 w-20 !p-3" />
                     <div>
-                        <h1 className="text-xl font-bold">دار بليه المسفر للإستشارات الهندسية</h1>
-                        <p className="text-sm text-gray-500">Dar Belaih Al-Mesfir Engineering Consultants</p>
+                        <h1 className="text-xl font-bold">سكوب للإستشارات الهندسية</h1>
+                        <p className="text-sm text-gray-500">scoop Engineering Consultants</p>
                         <p className="text-xs text-gray-500 mt-2">الكويت - شرق - شارع عبدالعزيز حمد الصقر - الدور 23 - مركز الراية - مكتب رقم 2 - نقال 99389650</p>
                     </div>
                 </div>
@@ -126,9 +126,9 @@ export function ContractForm({ client }: { client: ClientData }) {
                 <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
                     <div>
                         <p className="font-semibold">الطرف الأول (المهندس):</p>
-                        <p>دار بليه المسفر للاستشارات الهندسية (BMEC)، ويمثله السيد/ بليه المسفر.</p>
+                        <p>سكوب للاستشارات الهندسية (scoop)، ويمثله السيد/ بليه المسفر.</p>
                         <p>العنوان: الكويت - شرق - شارع عبد العزيز حمد الصقر - مركز الراية - الدور 23 - مكتب رقم 2.</p>
-                         <p>بيانات الاتصال: نقال: 99389650، هاتف: 22626893، بريد إلكتروني: info@bmec-kw.com.</p>
+                         <p>بيانات الاتصال: نقال: 99389650، هاتف: 22626893، بريد إلكتروني: info@scoop-kw.com.</p>
                     </div>
                      <div>
                         <p className="font-semibold">الطرف الثاني (المالك):</p>

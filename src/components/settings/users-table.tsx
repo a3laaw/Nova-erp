@@ -144,7 +144,7 @@ export function UsersTable() {
             } else { // Creating new user
                 await addDoc(collection(firestore, 'users'), {
                     ...userData,
-                    email: `${userData.username}@bmec-kw.local`,
+                    email: `${userData.username}@scoop.local`,
                     isActive: false, // Always created as inactive
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,

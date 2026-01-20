@@ -195,7 +195,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     />
                     {usernameError && <p className="text-xs text-destructive">{usernameError}</p>}
                      <p className="text-xs text-muted-foreground">
-                        سيتم إنشاء بريد إلكتروني داخلي: <span dir='ltr' className='font-mono'>{formData.username || '...'}@bmec-kw.local</span>
+                        سيتم إنشاء بريد إلكتروني داخلي: <span dir='ltr' className='font-mono'>{formData.username || '...'}@scoop.local</span>
                      </p>
                 </div>
                  <div className="grid gap-2">
