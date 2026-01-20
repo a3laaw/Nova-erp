@@ -161,14 +161,10 @@ export default function AppointmentsPage() {
         fetchData();
     }, [firestore]);
     
-    const { architecturalAppointments, structuralAppointments, otherAppointments } = useMemo(() => {
+    const { architecturalAppointments, otherAppointments } = useMemo(() => {
         const architectural = allAppointments.filter(appt => appt.engineerDepartment?.includes('المعماري'));
-        const structural = allAppointments.filter(appt => appt.engineerDepartment?.includes('انشائي'));
-        const other = allAppointments.filter(appt => 
-            !appt.engineerDepartment || 
-            (!appt.engineerDepartment.includes('المعماري') && !appt.engineerDepartment.includes('انشائي'))
-        );
-        return { architecturalAppointments: architectural, structuralAppointments: structural, otherAppointments: other };
+        const other = allAppointments.filter(appt => !appt.engineerDepartment?.includes('المعماري'));
+        return { architecturalAppointments: architectural, otherAppointments: other };
     }, [allAppointments]);
 
     return (
@@ -200,16 +196,12 @@ export default function AppointmentsPage() {
                 </CardHeader>
                 <CardContent>
                     <Tabs defaultValue="architectural">
-                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="architectural">القسم المعماري</TabsTrigger>
-                            <TabsTrigger value="structural">القسم الإنشائي</TabsTrigger>
                             <TabsTrigger value="other">الأقسام الأخرى</TabsTrigger>
                         </TabsList>
                         <TabsContent value="architectural" className="mt-4">
                             <AppointmentsTable appointments={architecturalAppointments} loading={loading} />
-                        </TabsContent>
-                        <TabsContent value="structural" className="mt-4">
-                            <AppointmentsTable appointments={structuralAppointments} loading={loading} />
                         </TabsContent>
                         <TabsContent value="other" className="mt-4">
                             <AppointmentsTable appointments={otherAppointments} loading={loading} />
