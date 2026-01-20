@@ -15,6 +15,12 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Table,
   TableBody,
   TableCell,
@@ -156,8 +162,8 @@ export default function AppointmentsPage() {
     }, [firestore]);
     
     const { architecturalAppointments, otherAppointments } = useMemo(() => {
-        const architectural = allAppointments.filter(appt => appt.engineerDepartment?.includes('المعماري'));
-        const other = allAppointments.filter(appt => !appt.engineerDepartment?.includes('المعماري'));
+        const architectural = allAppointments.filter(appt => appt.engineerDepartment === 'القسم المعماري');
+        const other = allAppointments.filter(appt => appt.engineerDepartment !== 'القسم المعماري');
         return { architecturalAppointments: architectural, otherAppointments: other };
     }, [allAppointments]);
 
@@ -170,12 +176,22 @@ export default function AppointmentsPage() {
                             <CardTitle>المواعيد</CardTitle>
                             <CardDescription>جدولة وإدارة جميع اجتماعات العملاء والزيارات الميدانية.</CardDescription>
                         </div>
-                        <Button asChild size="sm" className="gap-1">
-                            <Link href="/dashboard/appointments/new">
-                                <PlusCircle className="h-4 w-4" />
-                                موعد جديد
-                            </Link>
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="gap-1">
+                                    <PlusCircle className="h-4 w-4" />
+                                    موعد جديد
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" dir="rtl">
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/appointments/new">موعد للقسم المعماري</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/appointments/new-other">موعد لقسم آخر</Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </CardHeader>
                 <CardContent>

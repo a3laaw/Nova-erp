@@ -29,7 +29,7 @@ import type { Employee, Client } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
-export default function NewArchitecturalAppointmentPage() {
+export default function NewOtherAppointmentPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -65,8 +65,8 @@ export default function NewArchitecturalAppointmentPage() {
                 setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                const architecturalEngineers = allEmployees.filter(emp => emp.department === 'القسم المعماري');
-                setEngineers(architecturalEngineers);
+                const otherEngineers = allEmployees.filter(emp => emp.department !== 'القسم المعماري' && (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('engineer')));
+                setEngineers(otherEngineers);
 
             } catch (error) {
                 console.error("Error fetching data: ", error);
@@ -132,9 +132,9 @@ export default function NewArchitecturalAppointmentPage() {
         <Card className="max-w-2xl mx-auto" dir="rtl">
             <form onSubmit={handleSubmit}>
                 <CardHeader>
-                    <CardTitle>إنشاء موعد جديد (القسم المعماري)</CardTitle>
+                    <CardTitle>إنشاء موعد جديد (الأقسام الأخرى)</CardTitle>
                     <CardDescription>
-                        جدولة موعد جديد مع عميل لأحد مهندسي القسم المعماري.
+                        جدولة موعد جديد مع عميل لأحد مهندسي الأقسام الأخرى.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
