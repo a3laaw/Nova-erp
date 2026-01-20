@@ -25,6 +25,14 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, FileText } from 'lucide-react';
@@ -199,16 +207,36 @@ export default function ClientProfilePage() {
                 العودة إلى قائمة العملاء
             </Button>
             <div className='flex gap-2'>
-                <Button
-                    asChild
-                    disabled={!['contracted', 'reContracted'].includes(client.status)}
-                    variant="outline"
-                >
-                    <Link href={`/contracts/${id}`}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={!['contracted', 'reContracted'].includes(client.status)}
+                    >
                       <FileText className="ml-2 h-4 w-4" />
-                      عرض العقد
-                    </Link>
-                </Button>
+                      عرض العقود
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" dir="rtl">
+                    <DropdownMenuLabel>قائمة العقود</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href={`/contracts/${id}`}>العقد الأساسي</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {transactions.map(tx => (
+                      <DropdownMenuItem key={tx.id} asChild>
+                        <Link href={`/dashboard/clients/${id}/transactions/${tx.id}/contract`}>
+                          {`عقد معاملة: ${tx.transactionType}`}
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                     {transactions.length === 0 && (
+                      <DropdownMenuItem disabled>لا توجد عقود معاملات</DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <Button asChild>
                     <Link href={`/dashboard/clients/${id}/edit`}>
                         <Pencil className="ml-2 h-4 w-4" />
