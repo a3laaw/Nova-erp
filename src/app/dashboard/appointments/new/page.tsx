@@ -52,7 +52,8 @@ export default function NewAppointmentPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('nameAr'));
+                // The composite index was removed from this query.
+                const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
                 const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
 
                 const [clientSnap, engSnap] = await Promise.all([
@@ -60,7 +61,10 @@ export default function NewAppointmentPage() {
                     getDocs(engQuery)
                 ]);
 
-                setClients(clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
+                // Sorting is now done on the client-side.
+                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+                fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
+                setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
                 setEngineers(allEmployees.filter(emp => emp.jobTitle?.includes('مهندس')));
