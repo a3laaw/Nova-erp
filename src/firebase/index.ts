@@ -13,9 +13,10 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore } {
+function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore } | null {
   if (!firebaseConfig.projectId) {
-    throw new Error("Firebase project ID is missing. Please check your environment variables.");
+    console.warn("Firebase projectId is missing in config. Firebase will not be initialized.");
+    return null;
   }
   
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();

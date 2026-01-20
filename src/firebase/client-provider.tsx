@@ -7,9 +7,11 @@ import { initializeFirebase } from './index';
 // This function ensures Firebase is initialized only once.
 const getFirebaseServices = (() => {
   let firebase: ReturnType<typeof initializeFirebase> | null = null;
+  let initialized = false;
   return () => {
-    if (!firebase) {
+    if (!initialized) {
       firebase = initializeFirebase();
+      initialized = true;
     }
     return firebase;
   };
@@ -20,7 +22,7 @@ export function FirebaseClientProvider({ children }: { children: React.Node }) {
   const services = useMemo(() => getFirebaseServices(), []);
 
   return (
-    <FirebaseProvider value={services}>
+    <FirebaseProvider value={services ?? { app: null, auth: null, firestore: null }}>
       {children}
     </FirebaseProvider>
   );
