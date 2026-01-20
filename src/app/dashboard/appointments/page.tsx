@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -21,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 
 // --- Constants ---
-const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة العرض'];
+const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 const timeSlots = Array.from({ length: 8 }, (_, i) => { // From 7 AM, 8 slots (until 10:30 AM)
   const totalMinutes = 7 * 60 + i * 30;
   const hours = Math.floor(totalMinutes / 60);

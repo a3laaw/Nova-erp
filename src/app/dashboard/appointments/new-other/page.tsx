@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -33,7 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
-const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة العرض'];
+const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
 export default function NewOtherAppointmentPage() {
     const router = useRouter();
