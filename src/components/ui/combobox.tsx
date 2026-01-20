@@ -72,17 +72,14 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  // يتم البحث باستخدام النص الظاهر للمستخدم
                   value={option.label}
-                  // 10. عند اختيار عنصر، نقوم بتحديث القيمة وإغلاق القائمة
                   onSelect={(currentLabel) => {
-                    // عند الاختيار، نبحث عن الخيار المطابق لتحديد القيمة الصحيحة
                     const selectedOption = options.find(
                       (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
                     );
                     
                     if (selectedOption && onValueChange) {
-                       onValueChange(selectedOption.value);
+                       onValueChange(selectedOption.value === value ? "" : selectedOption.value);
                     }
                     setOpen(false);
                   }}
