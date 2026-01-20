@@ -416,19 +416,19 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent
-              dir="rtl"
-              onPointerDownOutside={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
-                  e.preventDefault();
-                }
-              }}
-              onInteractOutside={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
-                  e.preventDefault();
-                }
-              }}
+                dir="rtl"
+                onPointerDownOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
+                        e.preventDefault();
+                    }
+                }}
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
+                        e.preventDefault();
+                    }
+                }}
             >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>

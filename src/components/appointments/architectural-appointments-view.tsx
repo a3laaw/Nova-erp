@@ -283,19 +283,19 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent
-              dir="rtl"
-              onPointerDownOutside={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[cmdk-root]')) {
-                  e.preventDefault();
-                }
-              }}
-              onInteractOutside={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[cmdk-root]')) {
-                  e.preventDefault();
-                }
-              }}
+                dir="rtl"
+                onPointerDownOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
+                        e.preventDefault();
+                    }
+                }}
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
+                        e.preventDefault();
+                    }
+                }}
             >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>

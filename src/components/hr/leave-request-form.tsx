@@ -250,10 +250,10 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         className="sm:max-w-lg"
         dir="rtl"
         onPointerDownOutside={(e) => {
-          const target = e.target as HTMLElement;
-          if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
-            e.preventDefault();
-          }
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
+                e.preventDefault();
+            }
         }}
         onInteractOutside={(e) => {
             const target = e.target as HTMLElement;

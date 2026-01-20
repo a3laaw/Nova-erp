@@ -162,10 +162,10 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
         className="sm:max-w-md"
         dir="rtl"
         onPointerDownOutside={(e) => {
-          const target = e.target as HTMLElement;
-          if (target.closest('[data-radix-select-content]')) {
-            e.preventDefault();
-          }
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-radix-select-content]')) {
+                e.preventDefault();
+            }
         }}
         onInteractOutside={(e) => {
             const target = e.target as HTMLElement;

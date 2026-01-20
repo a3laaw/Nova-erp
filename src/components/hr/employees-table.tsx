@@ -350,19 +350,19 @@ export function EmployeesTable() {
             </div>
              <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
                 <AlertDialogContent
-                  dir="rtl"
-                  onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[data-radix-select-content]')) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[data-radix-select-content]')) {
-                      e.preventDefault();
-                    }
-                  }}
+                    dir="rtl"
+                    onPointerDownOutside={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[data-radix-select-content]')) {
+                            e.preventDefault();
+                        }
+                    }}
+                    onInteractOutside={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[data-radix-select-content]')) {
+                            e.preventDefault();
+                        }
+                    }}
                 >
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
