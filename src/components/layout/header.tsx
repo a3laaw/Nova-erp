@@ -3,11 +3,12 @@ import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/layout/user-nav';
 import { Button } from '@/components/ui/button';
-import { Languages } from 'lucide-react';
+import { Languages, Calendar } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { Notifications } from './notifications';
+import Link from 'next/link';
 
 const getTitleFromPathname = (pathname: string, lang: 'ar' | 'en') => {
     // Exact matches first
@@ -87,6 +88,12 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                  <h1 className="text-xl font-semibold font-headline">{title}</h1>
             </div>
             <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="icon" asChild>
+                  <Link href="/dashboard/appointments">
+                    <Calendar className="h-4 w-4" />
+                    <span className="sr-only">Appointments</span>
+                  </Link>
+                </Button>
                 <Notifications />
                 <Button variant="outline" size="icon" onClick={toggleLanguage} aria-label="Toggle language">
                     <Languages className="h-4 w-4" />
