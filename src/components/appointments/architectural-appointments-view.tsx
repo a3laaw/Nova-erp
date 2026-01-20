@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -283,7 +282,21 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[cmdk-root]')) { e.preventDefault(); } }}>
+            <DialogContent
+              dir="rtl"
+              onPointerDownOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[cmdk-root]')) {
+                  e.preventDefault();
+                }
+              }}
+              onInteractOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[cmdk-root]')) {
+                  e.preventDefault();
+                }
+              }}
+            >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>حجز موعد جديد</DialogTitle>
@@ -326,3 +339,5 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         </Dialog>
     );
 }
+
+    

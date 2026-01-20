@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -247,7 +246,22 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg" dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[cmdk-root]')) { e.preventDefault(); } }}>
+      <DialogContent
+        className="sm:max-w-lg"
+        dir="rtl"
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
+                e.preventDefault();
+            }
+        }}
+      >
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}</DialogTitle>
@@ -362,3 +376,5 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     </Dialog>
   );
 }
+
+    

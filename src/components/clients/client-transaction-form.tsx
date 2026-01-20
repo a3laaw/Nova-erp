@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -196,7 +195,22 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetForm(); onClose(); } }}>
-            <DialogContent className="sm:max-w-lg" dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[data-radix-select-content]')) { e.preventDefault(); } }}>
+            <DialogContent
+              className="sm:max-w-lg"
+              dir="rtl"
+              onPointerDownOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[data-radix-select-content]')) {
+                  e.preventDefault();
+                }
+              }}
+              onInteractOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[data-radix-select-content]')) {
+                  e.preventDefault();
+                }
+              }}
+            >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>إضافة معاملة داخلية جديدة</DialogTitle>
@@ -253,3 +267,5 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         </Dialog>
     );
 }
+
+    
