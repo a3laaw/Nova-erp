@@ -139,37 +139,61 @@ export default function NewOtherAppointmentPage() {
                 dayEnd.setHours(23, 59, 59, 999);
 
                 const appointmentsRef = collection(firestore, 'appointments');
-                
-                const queries = [];
+
+                // Fetch for meeting room
                 if (meetingRoom) {
-                    queries.push(getDocs(query(appointmentsRef, where('meetingRoom', '==', meetingRoom), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd))));
-                }
-                 if (engineerId) {
-                    queries.push(getDocs(query(appointmentsRef, where('engineerId', '==', engineerId), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd))));
-                }
-                if (clientId) {
-                    queries.push(getDocs(query(appointmentsRef, where('clientId', '==', clientId), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd))));
-                }
-
-                const snapshots = await Promise.all(queries);
-
-                snapshots.forEach(snapshot => {
-                    snapshot.forEach(doc => {
-                        if (processedApptIds.has(doc.id)) return;
-                        
+                    const roomQuery = query(appointmentsRef, where('meetingRoom', '==', meetingRoom));
+                    const roomSnap = await getDocs(roomQuery);
+                    roomSnap.forEach(doc => {
                         const appt = doc.data();
-                        let type: 'client' | 'engineer' | 'room' = 'client';
-                        if (appt.meetingRoom === meetingRoom) type = 'room';
-                        else if (appt.engineerId === engineerId) type = 'engineer';
-
-                        bookedSlots.push({
-                            time: format(appt.appointmentDate.toDate(), 'HH:mm'),
-                            title: appt.title,
-                            type: type,
-                        });
-                        processedApptIds.add(doc.id);
+                        const apptDate = appt.appointmentDate.toDate();
+                        if (apptDate >= dayStart && apptDate <= dayEnd) {
+                            bookedSlots.push({
+                                time: format(apptDate, 'HH:mm'),
+                                title: appt.title,
+                                type: 'room',
+                            });
+                            processedApptIds.add(doc.id);
+                        }
                     });
-                });
+                }
+                
+                // Fetch for engineer
+                 if (engineerId) {
+                    const engQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
+                    const engSnap = await getDocs(engQuery);
+                    engSnap.forEach(doc => {
+                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
+                        const appt = doc.data();
+                        const apptDate = appt.appointmentDate.toDate();
+                        if(apptDate >= dayStart && apptDate <= dayEnd) {
+                            bookedSlots.push({
+                                time: format(apptDate, 'HH:mm'),
+                                title: appt.title,
+                                type: 'engineer',
+                            });
+                            processedApptIds.add(doc.id);
+                        }
+                    });
+                }
+
+                // Fetch for client
+                if (clientId) {
+                    const clientQuery = query(appointmentsRef, where('clientId', '==', clientId));
+                    const clientSnap = await getDocs(clientQuery);
+                    clientSnap.forEach(doc => {
+                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
+                        const appt = doc.data();
+                        const apptDate = appt.appointmentDate.toDate();
+                        if(apptDate >= dayStart && apptDate <= dayEnd) {
+                            bookedSlots.push({
+                                time: format(apptDate, 'HH:mm'),
+                                title: appt.title,
+                                type: 'client',
+                            });
+                        }
+                    });
+                }
 
                 bookedSlots.sort((a, b) => a.time.localeCompare(b.time));
                 setDailySchedule(bookedSlots);
