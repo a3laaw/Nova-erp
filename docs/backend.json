@@ -498,6 +498,11 @@
           "type": "string",
           "description": "Additional notes about the appointment."
         },
+        "type": {
+          "type": "string",
+          "description": "Distinguishes between architectural appointments and room bookings.",
+          "enum": ["architectural", "room"]
+        },
         "appointmentDate": {
           "type": "string",
           "format": "date-time",
@@ -513,7 +518,7 @@
           "format": "date-time"
         }
       },
-      "required": ["clientId", "title", "appointmentDate", "createdAt"]
+      "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
     }
   },
   "auth": {

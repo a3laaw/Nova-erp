@@ -225,6 +225,7 @@ export default function NewArchitecturalAppointmentPage() {
                 notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
+                type: 'architectural',
             };
             
             await addDoc(collection(firestore, 'appointments'), newAppointment);
