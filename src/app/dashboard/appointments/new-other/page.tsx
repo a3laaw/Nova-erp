@@ -65,7 +65,7 @@ export default function NewOtherAppointmentPage() {
                 setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                const otherEngineers = allEmployees.filter(emp => emp.department !== 'القسم المعماري');
+                const otherEngineers = allEmployees.filter(emp => emp.department?.trim() !== 'القسم المعماري');
                 setEngineers(otherEngineers);
 
             } catch (error) {

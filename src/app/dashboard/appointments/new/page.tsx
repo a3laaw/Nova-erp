@@ -65,7 +65,7 @@ export default function NewArchitecturalAppointmentPage() {
                 setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                const architecturalEngineers = allEmployees.filter(emp => emp.department === 'القسم المعماري');
+                const architecturalEngineers = allEmployees.filter(emp => emp.department?.trim() === 'القسم المعماري');
                 setEngineers(architecturalEngineers);
 
             } catch (error) {
