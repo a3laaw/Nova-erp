@@ -43,6 +43,7 @@ interface AugmentedAppointment extends Appointment {
     clientName: string;
     engineerName: string;
     engineerDepartment?: string;
+    meetingRoom?: string;
 }
 
 const formatDate = (dateValue: any) => {
@@ -108,7 +109,14 @@ function AppointmentsTable({ appointments, loading }: { appointments: AugmentedA
                             <TableCell className="font-medium">{appt.clientName}</TableCell>
                             <TableCell>{appt.engineerName}</TableCell>
                             <TableCell>{formatDate(appt.appointmentDate)}</TableCell>
-                            <TableCell>{appt.title}</TableCell>
+                            <TableCell>
+                                {appt.title}
+                                {appt.meetingRoom && (
+                                    <div className="text-xs text-muted-foreground font-mono">
+                                        ({appt.meetingRoom})
+                                    </div>
+                                )}
+                            </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>

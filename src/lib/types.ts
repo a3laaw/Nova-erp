@@ -103,6 +103,7 @@ export type Appointment = {
   appointmentDate: any;
   clientId: string;
   engineerId: string;
+  meetingRoom?: string;
   notes?: string;
   clientName?: string;
   engineerName?: string;

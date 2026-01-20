@@ -481,6 +481,10 @@
           "type": "string",
           "description": "The ID of the employee attending the appointment."
         },
+        "meetingRoom": {
+          "type": "string",
+          "description": "The name of the meeting room, if applicable (for non-architectural appointments)."
+        },
         "title": {
           "type": "string",
           "description": "The purpose or title of the appointment."

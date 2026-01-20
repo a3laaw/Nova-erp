@@ -33,6 +33,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
+const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة العرض'];
+
 export default function NewOtherAppointmentPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
@@ -46,6 +48,7 @@ export default function NewOtherAppointmentPage() {
     const [isSaving, setIsSaving] = useState(false);
 
     const [clientId, setClientId] = useState('');
+    const [meetingRoom, setMeetingRoom] = useState('');
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [engineerId, setEngineerId] = useState('');
     const [title, setTitle] = useState('');
@@ -53,7 +56,7 @@ export default function NewOtherAppointmentPage() {
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
 
-    const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' }[]>([]);
+    const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' | 'room' }[]>([]);
     const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
 
     useEffect(() => {
@@ -75,17 +78,14 @@ export default function NewOtherAppointmentPage() {
                 fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
                 setClients(fetchedClients);
                 
-                // User wants to see only specific engineering departments
                 const engineeringDeptNames = ['ميكانيك', 'واجهات', 'كهرباء', 'انشائي'];
                 const fetchedDepts = deptSnap.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
-                    // Filter to include only the specified engineering departments
                     .filter(dept => engineeringDeptNames.some(name => dept.name.includes(name)));
                 setDepartments(fetchedDepts);
 
 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                // Filter for engineers who are NOT in the architectural department
                 const otherEngineers = allEmployees.filter(emp => 
                     !emp.department?.includes('المعماري') &&
                     (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect'))
@@ -103,9 +103,7 @@ export default function NewOtherAppointmentPage() {
     }, [firestore, toast]);
     
     const filteredEngineers = useMemo(() => {
-        if (!selectedDepartment) {
-            return [];
-        }
+        if (!selectedDepartment) return [];
         const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name;
         if (!selectedDeptName) return [];
 
@@ -119,13 +117,13 @@ export default function NewOtherAppointmentPage() {
     
     useEffect(() => {
         const fetchSchedule = async () => {
-            if (!date || (!clientId && !engineerId) || !firestore) {
+            if (!date || (!clientId && !engineerId && !meetingRoom) || !firestore) {
                 setDailySchedule([]);
                 return;
             }
 
             setIsLoadingSchedule(true);
-            const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' }[] = [];
+            const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' | 'room' }[] = [];
             const processedApptIds = new Set<string>();
 
             try {
@@ -141,42 +139,37 @@ export default function NewOtherAppointmentPage() {
                 dayEnd.setHours(23, 59, 59, 999);
 
                 const appointmentsRef = collection(firestore, 'appointments');
-
-                // Fetch for engineer
-                if (engineerId) {
-                    const engQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
-                    const engSnap = await getDocs(engQuery);
-                    engSnap.forEach(doc => {
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if (apptDate >= dayStart && apptDate <= dayEnd) {
-                            bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
-                                title: appt.title,
-                                type: 'engineer',
-                            });
-                            processedApptIds.add(doc.id);
-                        }
-                    });
+                
+                const queries = [];
+                if (meetingRoom) {
+                    queries.push(getDocs(query(appointmentsRef, where('meetingRoom', '==', meetingRoom), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd))));
                 }
-
-                // Fetch for client
+                 if (engineerId) {
+                    queries.push(getDocs(query(appointmentsRef, where('engineerId', '==', engineerId), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd))));
+                }
                 if (clientId) {
-                    const clientQuery = query(appointmentsRef, where('clientId', '==', clientId));
-                    const clientSnap = await getDocs(clientQuery);
-                    clientSnap.forEach(doc => {
-                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if (apptDate >= dayStart && apptDate <= dayEnd) {
-                            bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
-                                title: appt.title,
-                                type: 'client',
-                            });
-                        }
-                    });
+                    queries.push(getDocs(query(appointmentsRef, where('clientId', '==', clientId), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd))));
                 }
+
+                const snapshots = await Promise.all(queries);
+
+                snapshots.forEach(snapshot => {
+                    snapshot.forEach(doc => {
+                        if (processedApptIds.has(doc.id)) return;
+                        
+                        const appt = doc.data();
+                        let type: 'client' | 'engineer' | 'room' = 'client';
+                        if (appt.meetingRoom === meetingRoom) type = 'room';
+                        else if (appt.engineerId === engineerId) type = 'engineer';
+
+                        bookedSlots.push({
+                            time: format(appt.appointmentDate.toDate(), 'HH:mm'),
+                            title: appt.title,
+                            type: type,
+                        });
+                        processedApptIds.add(doc.id);
+                    });
+                });
 
                 bookedSlots.sort((a, b) => a.time.localeCompare(b.time));
                 setDailySchedule(bookedSlots);
@@ -188,11 +181,11 @@ export default function NewOtherAppointmentPage() {
         };
 
         fetchSchedule();
-    }, [date, clientId, engineerId, firestore]);
+    }, [date, clientId, engineerId, meetingRoom, firestore]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !clientId || !selectedDepartment || !engineerId || !title || !date || !time) {
+        if (!firestore || !currentUser || !clientId || !meetingRoom || !selectedDepartment || !engineerId || !title || !date || !time) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
             return;
         }
@@ -200,57 +193,42 @@ export default function NewOtherAppointmentPage() {
         setIsSaving(true);
         try {
             const appointmentDateTime = new Date(`${date}T${time}`);
-
-            // --- Conflict Validation ---
             const windowStart = new Date(appointmentDateTime.getTime() - 59 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 59 * 60 * 1000);
-
             const appointmentsRef = collection(firestore, 'appointments');
 
-            // Check for engineer conflict
-            const engineerAppointmentsQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
-            const engineerAppointmentsSnap = await getDocs(engineerAppointmentsQuery);
-            const engineerHasConflict = engineerAppointmentsSnap.docs.some(doc => {
-                const appt = doc.data();
-                const apptDate = appt.appointmentDate.toDate();
-                return apptDate >= windowStart && apptDate <= windowEnd;
-            });
+            const roomQuery = query(appointmentsRef, where('meetingRoom', '==', meetingRoom), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
+            const engineerQuery = query(appointmentsRef, where('engineerId', '==', engineerId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
+            const clientQuery = query(appointmentsRef, where('clientId', '==', clientId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
+            
+            const [roomSnap, engineerSnap, clientSnap] = await Promise.all([
+                getDocs(roomQuery),
+                getDocs(engineerQuery),
+                getDocs(clientQuery),
+            ]);
 
-            if (engineerHasConflict) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تعارض في المواعيد',
-                    description: 'المهندس لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.',
-                });
+            if (!roomSnap.empty) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'قاعة الاجتماعات محجوزة في هذا الوقت. الرجاء اختيار وقت أو قاعة أخرى.'});
                 setIsSaving(false);
                 return;
             }
-
-            // Check for client conflict
-            const clientAppointmentsQuery = query(appointmentsRef, where('clientId', '==', clientId));
-            const clientAppointmentsSnap = await getDocs(clientAppointmentsQuery);
-            const clientHasConflict = clientAppointmentsSnap.docs.some(doc => {
-                const appt = doc.data();
-                const apptDate = appt.appointmentDate.toDate();
-                return apptDate >= windowStart && apptDate <= windowEnd;
-            });
-
-            if (clientHasConflict) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تعارض في المواعيد',
-                    description: 'العميل لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.',
-                });
+            if (!engineerSnap.empty) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.' });
                 setIsSaving(false);
                 return;
             }
-            // --- End of Conflict Validation ---
+            if (!clientSnap.empty) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.' });
+                setIsSaving(false);
+                return;
+            }
 
             const newAppointment = {
                 clientId,
                 engineerId: engineerId,
                 title,
                 notes,
+                meetingRoom: meetingRoom,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
             };
@@ -259,17 +237,15 @@ export default function NewOtherAppointmentPage() {
 
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
             
-            // Notification Logic
             const client = clients.find(c => c.id === clientId);
             const engineer = allOtherEngineers.find(e => e.id === engineerId);
-
             if (engineerId && engineer) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
                 if (targetUserId) {
                      await createNotification(firestore, {
                         userId: targetUserId,
                         title: `موعد جديد: ${title}`,
-                        body: `تم تحديد موعد لك مع العميل ${client?.nameAr} يوم ${date} الساعة ${time}.`,
+                        body: `تم تحديد موعد لك مع العميل ${client?.nameAr} في ${meetingRoom} يوم ${date} الساعة ${time}.`,
                         link: `/dashboard/appointments`
                     });
                 }
@@ -285,14 +261,13 @@ export default function NewOtherAppointmentPage() {
         }
     };
 
-
     return (
         <Card className="max-w-2xl mx-auto" dir="rtl">
             <form onSubmit={handleSubmit}>
                 <CardHeader>
                     <CardTitle>إنشاء موعد جديد (الأقسام الأخرى)</CardTitle>
                     <CardDescription>
-                        جدولة موعد جديد مع عميل لأحد مهندسي الأقسام الأخرى.
+                        جدولة موعد جديد مع عميل في إحدى قاعات الاجتماعات.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -315,6 +290,21 @@ export default function NewOtherAppointmentPage() {
                             </Select>
                         </div>
                         <div className="grid gap-2">
+                            <Label htmlFor="meetingRoom">قاعة الاجتماع <span className="text-destructive">*</span></Label>
+                            <Select dir="rtl" onValueChange={setMeetingRoom} value={meetingRoom} required>
+                                <SelectTrigger id="meetingRoom">
+                                    <SelectValue placeholder="اختر القاعة..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {meetingRooms.map(room => (
+                                        <SelectItem key={room} value={room}>{room}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
                             <Label htmlFor="department">القسم الهندسي <span className="text-destructive">*</span></Label>
                              <Select dir="rtl" onValueChange={handleDepartmentChange} value={selectedDepartment} required disabled={loading}>
                                 <SelectTrigger id="department">
@@ -327,23 +317,23 @@ export default function NewOtherAppointmentPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
-                         <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading || !selectedDepartment || filteredEngineers.length === 0}>
-                            <SelectTrigger id="engineerId">
-                                <SelectValue placeholder={
-                                    !selectedDepartment 
-                                    ? "اختر قسمًا أولاً" 
-                                    : (filteredEngineers.length === 0 ? "لا يوجد مهندسين بهذا القسم" : "اختر المهندس...")
-                                    } />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {filteredEngineers.map(e => (
-                                    <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <div className="grid gap-2">
+                            <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
+                             <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading || !selectedDepartment || filteredEngineers.length === 0}>
+                                <SelectTrigger id="engineerId">
+                                    <SelectValue placeholder={
+                                        !selectedDepartment 
+                                        ? "اختر قسمًا أولاً" 
+                                        : (filteredEngineers.length === 0 ? "لا يوجد مهندسين بهذا القسم" : "اختر المهندس...")
+                                        } />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {filteredEngineers.map(e => (
+                                        <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
@@ -372,7 +362,7 @@ export default function NewOtherAppointmentPage() {
                                                 <span>-</span>
                                                 <span>{slot.title}</span>
                                             </div>
-                                            <Badge variant="secondary">{slot.type === 'engineer' ? 'للمهندس' : 'للعميل'}</Badge>
+                                            <Badge variant="secondary">{slot.type === 'engineer' ? 'للمهندس' : slot.type === 'client' ? 'للعميل' : 'للقاعة'}</Badge>
                                         </div>
                                     ))}
                                 </div>
