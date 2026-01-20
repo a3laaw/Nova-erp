@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -25,7 +25,7 @@ import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client } from '@/lib/types';
+import type { Employee, Client, Department } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
@@ -36,11 +36,13 @@ export default function NewOtherAppointmentPage() {
     const { toast } = useToast();
     
     const [clients, setClients] = useState<Client[]>([]);
-    const [engineers, setEngineers] = useState<Employee[]>([]);
+    const [allOtherEngineers, setAllOtherEngineers] = useState<Employee[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
     const [clientId, setClientId] = useState('');
+    const [selectedDepartment, setSelectedDepartment] = useState('');
     const [engineerId, setEngineerId] = useState('');
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
@@ -54,22 +56,29 @@ export default function NewOtherAppointmentPage() {
             try {
                 const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
                 const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const deptQuery = query(collection(firestore, 'departments'), orderBy('name'));
 
-                const [clientSnap, engSnap] = await Promise.all([
+                const [clientSnap, engSnap, deptSnap] = await Promise.all([
                     getDocs(clientQuery),
-                    getDocs(engQuery)
+                    getDocs(engQuery),
+                    getDocs(deptQuery)
                 ]);
 
                 const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
                 fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
                 setClients(fetchedClients);
                 
+                const fetchedDepts = deptSnap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as Department))
+                    .filter(dept => !dept.name.includes('المعماري'));
+                setDepartments(fetchedDepts);
+
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
                 const otherEngineers = allEmployees.filter(emp => 
                     emp.department && !emp.department.trim().includes('المعماري') &&
                     (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect'))
                 );
-                setEngineers(otherEngineers);
+                setAllOtherEngineers(otherEngineers);
 
             } catch (error) {
                 console.error("Error fetching data: ", error);
@@ -81,9 +90,24 @@ export default function NewOtherAppointmentPage() {
         fetchData();
     }, [firestore, toast]);
     
+    const filteredEngineers = useMemo(() => {
+        if (!selectedDepartment) {
+            return [];
+        }
+        const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name;
+        if (!selectedDeptName) return [];
+
+        return allOtherEngineers.filter(eng => eng.department === selectedDeptName);
+    }, [selectedDepartment, allOtherEngineers, departments]);
+
+    const handleDepartmentChange = (deptId: string) => {
+        setSelectedDepartment(deptId);
+        setEngineerId('');
+    };
+    
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !clientId || !engineerId || !title || !date || !time) {
+        if (!firestore || !currentUser || !clientId || !selectedDepartment || !engineerId || !title || !date || !time) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
             return;
         }
@@ -106,7 +130,7 @@ export default function NewOtherAppointmentPage() {
             
             // Notification Logic
             const client = clients.find(c => c.id === clientId);
-            const engineer = engineers.find(e => e.id === engineerId);
+            const engineer = allOtherEngineers.find(e => e.id === engineerId);
 
             if (engineerId && engineer) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
@@ -160,18 +184,35 @@ export default function NewOtherAppointmentPage() {
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
-                             <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر المهندس..."} />
+                            <Label htmlFor="department">القسم الهندسي <span className="text-destructive">*</span></Label>
+                             <Select dir="rtl" onValueChange={handleDepartmentChange} value={selectedDepartment} required disabled={loading}>
+                                <SelectTrigger id="department">
+                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر القسم..."} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {engineers.map(e => (
-                                        <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
+                                    {departments.map(d => (
+                                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
+                         <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading || !selectedDepartment || filteredEngineers.length === 0}>
+                            <SelectTrigger id="engineerId">
+                                <SelectValue placeholder={
+                                    !selectedDepartment 
+                                    ? "اختر قسمًا أولاً" 
+                                    : (filteredEngineers.length === 0 ? "لا يوجد مهندسين بهذا القسم" : "اختر المهندس...")
+                                    } />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {filteredEngineers.map(e => (
+                                    <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
@@ -202,3 +243,4 @@ export default function NewOtherAppointmentPage() {
         </Card>
     );
 }
+    
