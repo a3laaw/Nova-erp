@@ -60,12 +60,12 @@ export default function NewArchitecturalAppointmentPage() {
                     getDocs(engQuery)
                 ]);
 
-                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+                const fetchedClients: Client[] = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
                 fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
                 setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                const architecturalEngineers = allEmployees.filter(emp => emp.department?.trim() === 'القسم المعماري');
+                const architecturalEngineers = allEmployees.filter(emp => emp.department?.includes('المعماري'));
                 setEngineers(architecturalEngineers);
 
             } catch (error) {
