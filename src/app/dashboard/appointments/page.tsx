@@ -368,6 +368,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     const [appointmentDate, setAppointmentDate] = useState<Date | undefined>(currentDate);
     const [startTime, setStartTime] = useState('');
 
+    const roomName = useMemo(() => dialogData?.room || dialogData?.meetingRoom, [dialogData]);
+
     useEffect(() => {
         if (isOpen && dialogData) {
             const initialDate = toFirestoreDate(dialogData.appointmentDate || dialogData.startTime);
@@ -397,7 +399,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         await onSave({ 
             ...formData, 
             id: dialogData.id,
-            room: dialogData.room,
+            room: roomName,
             startTime: newStartTime,
             endTime: newEndTime,
         });
@@ -411,7 +413,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
-                            حجز {dialogData.room}
+                            حجز {roomName}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
