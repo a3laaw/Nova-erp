@@ -100,12 +100,15 @@ export type Project = {
 export type Appointment = {
   id: string;
   title: string;
-  appointmentDate: any;
+  appointmentDate: any; // This will be the start time
+  endDate?: any; // This will be the end time
   clientId: string;
   engineerId: string;
   meetingRoom?: string;
+  department?: string; // For color coding
   notes?: string;
-  clientName?: string;
+  // For display purposes, not stored in DB directly
+  clientName?: string; 
   engineerName?: string;
 };
 

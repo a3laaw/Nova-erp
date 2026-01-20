@@ -485,6 +485,11 @@
           "type": "string",
           "description": "The name of the meeting room, if applicable (for non-architectural appointments)."
         },
+        "department": {
+          "type": "string",
+          "description": "The department associated with the appointment, used for color-coding.",
+          "enum": ["الكهرباء", "الصحي", "الإنشائي", "المعماري", "أخرى"]
+        },
         "title": {
           "type": "string",
           "description": "The purpose or title of the appointment."
@@ -496,7 +501,12 @@
         "appointmentDate": {
           "type": "string",
           "format": "date-time",
-          "description": "The date and time of the appointment."
+          "description": "The start date and time of the appointment."
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The end date and time of the appointment."
         },
         "createdAt": {
           "type": "string",
