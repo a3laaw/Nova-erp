@@ -68,12 +68,17 @@ export default function NewOtherAppointmentPage() {
                 fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
                 setClients(fetchedClients);
                 
+                // User wants to see only specific engineering departments
+                const engineeringDeptNames = ['ميكانيك', 'واجهات', 'كهرباء', 'انشائي'];
                 const fetchedDepts = deptSnap.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
-                    .filter(dept => !dept.name.includes('المعماري'));
+                    // Filter to include only the specified engineering departments
+                    .filter(dept => engineeringDeptNames.some(name => dept.name.includes(name)));
                 setDepartments(fetchedDepts);
 
+
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
+                // Filter for engineers who are NOT in the architectural department
                 const otherEngineers = allEmployees.filter(emp => 
                     emp.department && !emp.department.trim().includes('المعماري') &&
                     (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect'))
@@ -244,3 +249,4 @@ export default function NewOtherAppointmentPage() {
     );
 }
     
+
