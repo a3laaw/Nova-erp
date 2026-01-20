@@ -89,12 +89,13 @@ export function ArchitecturalAppointmentsView() {
                 const dayEnd = endOfDay(date);
                 const q = query(
                     collection(firestore, 'appointments'),
-                    where('type', '==', 'architectural'),
                     where('appointmentDate', '>=', dayStart),
                     where('appointmentDate', '<=', dayEnd)
                 );
                 const querySnapshot = await getDocs(q);
-                setAppointments(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment)));
+                const dayAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+                const architecturalAppointments = dayAppointments.filter(appt => appt.type === 'architectural');
+                setAppointments(architecturalAppointments);
             } catch (error) {
                 console.error("Error fetching appointments:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });

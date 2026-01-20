@@ -124,8 +124,6 @@ export default function NewOtherAppointmentPage() {
             }
 
             setIsLoadingSchedule(true);
-            const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' | 'room' }[] = [];
-            const processedApptIds = new Set<string>();
 
             try {
                 const appointmentDate = toFirestoreDate(date);
@@ -140,55 +138,48 @@ export default function NewOtherAppointmentPage() {
                 dayEnd.setHours(23, 59, 59, 999);
 
                 const appointmentsRef = collection(firestore, 'appointments');
+                const q = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
+                const querySnapshot = await getDocs(q);
 
-                // Fetch for meeting room
+                const dailyAppointments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                
+                const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' | 'room' }[] = [];
+                const processedApptIds = new Set<string>();
+
+                // Filter for meeting room
                 if (meetingRoom) {
-                    const roomQuery = query(appointmentsRef, where('meetingRoom', '==', meetingRoom));
-                    const roomSnap = await getDocs(roomQuery);
-                    roomSnap.forEach(doc => {
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if (apptDate >= dayStart && apptDate <= dayEnd) {
+                    dailyAppointments.forEach(appt => {
+                        if(appt.meetingRoom === meetingRoom) {
                             bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
+                                time: format(appt.appointmentDate.toDate(), 'HH:mm'),
                                 title: appt.title,
                                 type: 'room',
                             });
-                            processedApptIds.add(doc.id);
+                            processedApptIds.add(appt.id);
                         }
                     });
                 }
                 
-                // Fetch for engineer
+                // Filter for engineer
                  if (engineerId) {
-                    const engQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
-                    const engSnap = await getDocs(engQuery);
-                    engSnap.forEach(doc => {
-                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if(apptDate >= dayStart && apptDate <= dayEnd) {
-                            bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
+                    dailyAppointments.forEach(appt => {
+                        if (appt.engineerId === engineerId && !processedApptIds.has(appt.id)) {
+                             bookedSlots.push({
+                                time: format(appt.appointmentDate.toDate(), 'HH:mm'),
                                 title: appt.title,
                                 type: 'engineer',
                             });
-                            processedApptIds.add(doc.id);
+                            processedApptIds.add(appt.id);
                         }
                     });
                 }
 
-                // Fetch for client
+                // Filter for client
                 if (clientId) {
-                    const clientQuery = query(appointmentsRef, where('clientId', '==', clientId));
-                    const clientSnap = await getDocs(clientQuery);
-                    clientSnap.forEach(doc => {
-                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if(apptDate >= dayStart && apptDate <= dayEnd) {
+                    dailyAppointments.forEach(appt => {
+                        if (appt.clientId === clientId && !processedApptIds.has(appt.id)) {
                             bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
+                                time: format(appt.appointmentDate.toDate(), 'HH:mm'),
                                 title: appt.title,
                                 type: 'client',
                             });

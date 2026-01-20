@@ -97,9 +97,7 @@ export default function NewArchitecturalAppointmentPage() {
             }
 
             setIsLoadingSchedule(true);
-            const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' }[] = [];
-            const processedApptIds = new Set<string>();
-
+            
             try {
                 const appointmentDate = toFirestoreDate(date);
                 if (!appointmentDate) {
@@ -113,36 +111,34 @@ export default function NewArchitecturalAppointmentPage() {
                 dayEnd.setHours(23, 59, 59, 999);
 
                 const appointmentsRef = collection(firestore, 'appointments');
+                const q = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
+                const querySnapshot = await getDocs(q);
 
-                // Fetch for engineer
+                const dailyAppointments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+
+                const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' }[] = [];
+                const processedApptIds = new Set<string>();
+
+                // Filter for engineer
                 if (engineerId) {
-                    const engQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
-                    const engSnap = await getDocs(engQuery);
-                    engSnap.forEach(doc => {
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if (apptDate >= dayStart && apptDate <= dayEnd) {
-                            bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
+                    dailyAppointments.forEach(appt => {
+                        if (appt.engineerId === engineerId) {
+                             bookedSlots.push({
+                                time: format(appt.appointmentDate.toDate(), 'HH:mm'),
                                 title: appt.title,
                                 type: 'engineer',
                             });
-                            processedApptIds.add(doc.id);
+                            processedApptIds.add(appt.id);
                         }
                     });
                 }
 
-                // Fetch for client
+                // Filter for client
                 if (clientId) {
-                    const clientQuery = query(appointmentsRef, where('clientId', '==', clientId));
-                    const clientSnap = await getDocs(clientQuery);
-                    clientSnap.forEach(doc => {
-                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
-                        const appt = doc.data();
-                        const apptDate = appt.appointmentDate.toDate();
-                        if (apptDate >= dayStart && apptDate <= dayEnd) {
-                            bookedSlots.push({
-                                time: format(apptDate, 'HH:mm'),
+                    dailyAppointments.forEach(appt => {
+                        if (appt.clientId === clientId && !processedApptIds.has(appt.id)) {
+                             bookedSlots.push({
+                                time: format(appt.appointmentDate.toDate(), 'HH:mm'),
                                 title: appt.title,
                                 type: 'client',
                             });
