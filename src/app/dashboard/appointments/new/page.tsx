@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -67,7 +68,7 @@ export default function NewAppointmentPage() {
                 setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                setEngineers(allEmployees.filter(emp => emp.jobTitle?.includes('مهندس')));
+                setEngineers(allEmployees.filter(emp => emp.department?.includes('المعماري')));
 
             } catch (error) {
                 console.error("Error fetching data: ", error);
