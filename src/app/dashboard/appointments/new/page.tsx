@@ -28,6 +28,10 @@ import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
+import { toFirestoreDate } from '@/services/date-converter';
 
 export default function NewArchitecturalAppointmentPage() {
     const router = useRouter();
@@ -46,6 +50,10 @@ export default function NewArchitecturalAppointmentPage() {
     const [notes, setNotes] = useState('');
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
+
+    const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' }[]>([]);
+    const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+
 
     useEffect(() => {
         if (!firestore) return;
@@ -66,7 +74,7 @@ export default function NewArchitecturalAppointmentPage() {
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
                 const architecturalEngineers = allEmployees.filter(emp => 
-                    emp.department?.trim().includes('المعماري') &&
+                    emp.department?.includes('المعماري') &&
                     (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect'))
                 );
                 setEngineers(architecturalEngineers);
@@ -80,6 +88,79 @@ export default function NewArchitecturalAppointmentPage() {
         };
         fetchData();
     }, [firestore, toast]);
+    
+    useEffect(() => {
+        const fetchSchedule = async () => {
+            if (!date || (!clientId && !engineerId) || !firestore) {
+                setDailySchedule([]);
+                return;
+            }
+
+            setIsLoadingSchedule(true);
+            const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' }[] = [];
+            const processedApptIds = new Set<string>();
+
+            try {
+                const appointmentDate = toFirestoreDate(date);
+                if (!appointmentDate) {
+                    setIsLoadingSchedule(false);
+                    return;
+                }
+
+                const dayStart = new Date(appointmentDate);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(appointmentDate);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                const appointmentsRef = collection(firestore, 'appointments');
+
+                // Fetch for engineer
+                if (engineerId) {
+                    const engQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
+                    const engSnap = await getDocs(engQuery);
+                    engSnap.forEach(doc => {
+                        const appt = doc.data();
+                        const apptDate = appt.appointmentDate.toDate();
+                        if (apptDate >= dayStart && apptDate <= dayEnd) {
+                            bookedSlots.push({
+                                time: format(apptDate, 'HH:mm'),
+                                title: appt.title,
+                                type: 'engineer',
+                            });
+                            processedApptIds.add(doc.id);
+                        }
+                    });
+                }
+
+                // Fetch for client
+                if (clientId) {
+                    const clientQuery = query(appointmentsRef, where('clientId', '==', clientId));
+                    const clientSnap = await getDocs(clientQuery);
+                    clientSnap.forEach(doc => {
+                        if (processedApptIds.has(doc.id)) return; // Avoid duplicates
+                        const appt = doc.data();
+                        const apptDate = appt.appointmentDate.toDate();
+                        if (apptDate >= dayStart && apptDate <= dayEnd) {
+                            bookedSlots.push({
+                                time: format(apptDate, 'HH:mm'),
+                                title: appt.title,
+                                type: 'client',
+                            });
+                        }
+                    });
+                }
+
+                bookedSlots.sort((a, b) => a.time.localeCompare(b.time));
+                setDailySchedule(bookedSlots);
+            } catch (err) {
+                console.error("Error fetching daily schedule:", err);
+            } finally {
+                setIsLoadingSchedule(false);
+            }
+        };
+
+        fetchSchedule();
+    }, [date, clientId, engineerId, firestore]);
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -229,6 +310,30 @@ export default function NewArchitecturalAppointmentPage() {
                             <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
                         </div>
                     </div>
+                    {(isLoadingSchedule || dailySchedule.length > 0) && (
+                        <div className="space-y-2">
+                            <Label>جدول المواعيد في اليوم المحدد</Label>
+                            {isLoadingSchedule ? (
+                                <div className="space-y-2 rounded-md border p-3">
+                                    <Skeleton className="h-5 w-3/4" />
+                                    <Skeleton className="h-5 w-1/2" />
+                                </div>
+                            ) : (
+                                <div className="space-y-2 rounded-md border p-3 text-sm">
+                                    {dailySchedule.map((slot, index) => (
+                                        <div key={index} className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-muted-foreground">{slot.time}</span>
+                                                <span>-</span>
+                                                <span>{slot.title}</span>
+                                            </div>
+                                            <Badge variant="secondary">{slot.type === 'engineer' ? 'للمهندس' : 'للعميل'}</Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                      <div className="grid gap-2">
                         <Label htmlFor="notes">ملاحظات إضافية</Label>
                         <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="تفاصيل إضافية حول الموعد، جدول الأعمال، إلخ." />
