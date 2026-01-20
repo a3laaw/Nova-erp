@@ -181,7 +181,7 @@ export type Employee = {
     dob?: string;
     gender?: 'male' | 'female';
     civilId: string;
-    visaType?: 'worker' | 'engineer' | 'driver' | 'admin' | 'kuwaiti';
+    nationality?: string;
     residencyExpiry?: any;
     contractExpiry?: any;
     mobile: string;

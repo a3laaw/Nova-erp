@@ -226,8 +226,8 @@ export default function EmployeeProfilePage() {
                     <InfoRow icon={<Calendar />} label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
                     <InfoRow icon={<FileText />} label="نوع العقد" value={employee.contractType} />
                     {employee.contractType !== 'permanent' && <InfoRow icon={<Calendar />} label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />}
-                    <InfoRow icon={<Home />} label="نوع الإقامة" value={employee.visaType} />
-                    {employee.visaType !== 'kuwaiti' && <InfoRow icon={<Calendar />} label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
+                    <InfoRow icon={<Home />} label="الجنسية" value={employee.nationality} />
+                    {employee.nationality !== 'كويتي' && <InfoRow icon={<Calendar />} label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
                      {employee.status === 'terminated' && (
                         <>
                          <InfoRow icon={<Calendar />} label="تاريخ إنهاء الخدمة" value={formatDate(employee.terminationDate)} />

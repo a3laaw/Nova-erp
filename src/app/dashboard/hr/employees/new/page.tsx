@@ -47,7 +47,7 @@ export default function NewEmployeePage() {
         dob: '',
         gender: undefined,
         civilId: '',
-        visaType: 'kuwaiti',
+        nationality: 'كويتي',
         residencyExpiry: '',
         contractExpiry: '',
         mobile: '',
@@ -388,22 +388,13 @@ export default function NewEmployeePage() {
                                 <Input id="civilId" value={formData.civilId} onChange={handleInputChange} placeholder="12-digit number" dir="ltr" maxLength={12} required />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="visaType">نوع الإقامة / التأشيرة</Label>
-                                <Select dir="rtl" value={formData.visaType} onValueChange={(v) => handleSelectChange('visaType', v)}>
-                                    <SelectTrigger id="visaType"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="kuwaiti">كويتي</SelectItem>
-                                        <SelectItem value="engineer">مهندس</SelectItem>
-                                        <SelectItem value="worker">عامل</SelectItem>
-                                        <SelectItem value="driver">سائق</SelectItem>
-                                        <SelectItem value="admin">إداري</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="nationality">الجنسية</Label>
+                                <Input id="nationality" value={formData.nationality} onChange={handleInputChange} placeholder="مثال: كويتي" />
                             </div>
-                            {formData.visaType !== 'kuwaiti' && (
+                            {formData.nationality !== 'كويتي' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.visaType !== 'kuwaiti'} />
+                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.nationality !== 'كويتي'} />
                                 </div>
                             )}
                         </div>

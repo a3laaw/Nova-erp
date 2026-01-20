@@ -240,7 +240,7 @@
         "dob": { "type": "string", "format": "date", "description": "Date of birth." },
         "gender": { "type": "string", "enum": ["male", "female"] },
         "civilId": { "type": "string" },
-        "visaType": { "type": "string", "enum": ["worker", "engineer", "driver", "admin", "kuwaiti"] },
+        "nationality": { "type": "string", "description": "The employee's nationality." },
         "residencyExpiry": { "type": "string", "format": "date" },
         "contractExpiry": { "type": "string", "format": "date" },
         "mobile": { "type": "string" },
@@ -467,6 +467,39 @@
         }
       },
       "required": ["name"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Represents a scheduled meeting or visit.",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "The ID of the client for this appointment."
+        },
+        "engineerId": {
+          "type": "string",
+          "description": "The ID of the employee attending the appointment."
+        },
+        "title": {
+          "type": "string",
+          "description": "The purpose or title of the appointment."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the appointment."
+        },
+        "appointmentDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time of the appointment."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["clientId", "title", "appointmentDate", "createdAt"]
     }
   },
   "auth": {
@@ -556,6 +589,12 @@
     "/governorates/{governorateId}/areas/{areaId}": {
         "schema": { "$ref": "#/entities/Area" },
         "description": "Stores areas for a specific governorate."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": {
+        "$ref": "#/entities/Appointment"
+      },
+      "description": "Stores all scheduled appointments."
     }
   }
 }

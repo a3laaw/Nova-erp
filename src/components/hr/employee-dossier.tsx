@@ -124,8 +124,8 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
                     <InfoItem label="نوع العقد" value={employee.contractType} />
                     <InfoItem label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />
-                    <InfoItem label="نوع الإقامة" value={employee.visaType} />
-                    <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />
+                    <InfoItem label="الجنسية" value={employee.nationality} />
+                    {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
                 </Section>
 
                 <Section title="البيانات المالية" icon={<Wallet />}>
