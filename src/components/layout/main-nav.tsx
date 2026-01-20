@@ -73,7 +73,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
       <SidebarHeader>
         <div className="flex items-center gap-2">
             <Logo />
-            <div className="flex flex-col">
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
                 <span className="text-lg font-semibold font-headline tracking-tighter">scoop</span>
                 <span className="text-xs text-muted-foreground">
                     {language === 'ar' ? 'للاستشارات الهندسية' : 'Engineering Consultants'}
@@ -114,16 +114,16 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                 </SidebarMenuButton>
             </SidebarMenuItem>}
             <SidebarMenuItem>
-              <div className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none transition-colors text-muted-foreground">
+              <div className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none transition-colors text-muted-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback>{currentUser.fullName?.charAt(0)}</AvatarFallback>
                   </Avatar>
-                  <div className="grid flex-1 text-sm">
+                  <div className="grid flex-1 text-sm group-data-[collapsible=icon]:hidden">
                     <span className="font-semibold text-foreground">{currentUser.fullName}</span>
                     <span className="text-muted-foreground">{currentUser.email}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="mr-auto h-7 w-7 shrink-0" onClick={onLogout}>
+                  <Button variant="ghost" size="icon" className="mr-auto h-7 w-7 shrink-0 group-data-[collapsible=icon]:hidden" onClick={onLogout}>
                     <LogOut />
                   </Button>
                 </div>
