@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -183,7 +184,7 @@ export function RoomBookingCalendar() {
         const isEditing = !!formData.id;
         
         try {
-            const dataToSave = {
+            const dataToSave: any = {
                 clientId: formData.clientId,
                 engineerId: formData.engineerId,
                 title: formData.title,
@@ -193,8 +194,12 @@ export function RoomBookingCalendar() {
                 appointmentDate: Timestamp.fromDate(formData.startTime),
                 endDate: Timestamp.fromDate(formData.endTime),
                 type: 'room',
-                ...(!isEditing && { createdAt: serverTimestamp() })
             };
+            
+            if(!isEditing) {
+                dataToSave.createdAt = serverTimestamp();
+            }
+
 
             if(isEditing) {
                 const appointmentRef = doc(firestore, 'appointments', formData.id);
