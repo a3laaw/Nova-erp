@@ -28,7 +28,7 @@ export default function AppointmentsPage() {
                             <CardDescription>{t.description}</CardDescription>
                         </div>
                         <Button asChild size="sm" className="gap-1">
-                            <Link href="#">
+                            <Link href="/dashboard/appointments/new">
                                 <PlusCircle className="h-4 w-4" />
                                 {t.new}
                             </Link>

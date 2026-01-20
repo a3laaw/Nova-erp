@@ -95,6 +95,10 @@
             "type": "string",
             "description": "The client's Civil ID number."
         },
+        "plotNumber": {
+            "type": "string",
+            "description": "The client's plot number for contracts."
+        },
         "address": {
             "type": "object",
             "description": "The client's address.",
@@ -111,9 +115,9 @@
           "description": "The current status of the client's file.",
           "enum": [
             "new",
-            "received",
-            "completed",
-            "rejected"
+            "contracted",
+            "cancelled",
+            "reContracted"
           ]
         },
         "assignedEngineer": {
@@ -156,7 +160,28 @@
             },
             "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },
-            "updatedAt": { "type": "string", "format": "date-time" }
+            "updatedAt": { "type": "string", "format": "date-time" },
+            "contract": {
+                "type": "object",
+                "description": "Stores the customized contract clauses and total amount for this specific transaction.",
+                "properties": {
+                    "clauses": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "number" },
+                                "name": { "type": "string" },
+                                "amount": { "type": "number" },
+                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] }
+                            },
+                            "required": ["id", "name", "amount", "status"]
+                        }
+                    },
+                    "totalAmount": { "type": "number" }
+                },
+                "required": ["clauses", "totalAmount"]
+            }
         },
         "required": ["clientId", "transactionType", "status", "createdAt"]
     },
@@ -394,6 +419,87 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "title", "body", "link", "isRead", "createdAt"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Represents a department in the company.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the department."
+        }
+      },
+      "required": ["name"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "Represents a job title within a department.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the job."
+        }
+      },
+      "required": ["name"]
+    },
+    "Governorate": {
+      "title": "Governorate",
+      "description": "Represents a governorate in the country.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the governorate."
+        }
+      },
+      "required": ["name"]
+    },
+    "Area": {
+      "title": "Area",
+      "description": "Represents an area within a governorate.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the area."
+        }
+      },
+      "required": ["name"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Represents a scheduled meeting or visit.",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "The ID of the client for this appointment."
+        },
+        "engineerId": {
+          "type": "string",
+          "description": "The ID of the employee attending the appointment."
+        },
+        "title": {
+          "type": "string",
+          "description": "The purpose or title of the appointment."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the appointment."
+        },
+        "appointmentDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time of the appointment."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["clientId", "title", "appointmentDate", "createdAt"]
     }
   },
   "auth": {
@@ -467,8 +573,28 @@
         "$ref": "#/entities/Notification"
       },
       "description": "Stores notifications for all users."
+    },
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/Department" },
+      "description": "Stores company departments."
+    },
+    "/departments/{departmentId}/jobs/{jobId}": {
+        "schema": { "$ref": "#/entities/Job" },
+        "description": "Stores job titles for a specific department."
+    },
+    "/governorates/{governorateId}": {
+      "schema": { "$ref": "#/entities/Governorate" },
+      "description": "Stores country governorates."
+    },
+    "/governorates/{governorateId}/areas/{areaId}": {
+        "schema": { "$ref": "#/entities/Area" },
+        "description": "Stores areas for a specific governorate."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": {
+        "$ref": "#/entities/Appointment"
+      },
+      "description": "Stores all scheduled appointments."
     }
   }
 }
-
-    

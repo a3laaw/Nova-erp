@@ -1,4 +1,5 @@
 
+
 export type MultilingualString = {
     ar: string;
     en: string;
@@ -98,13 +99,15 @@ export type Project = {
 
 export type Appointment = {
   id: string;
-  title: MultilingualString;
-  date: string;
+  title: string;
+  appointmentDate: any;
   clientId: string;
-  projectId: string;
   engineerId: string;
-  notes: MultilingualString;
+  notes?: string;
+  clientName?: string;
+  engineerName?: string;
 };
+
 
 export type PaymentMilestone = {
   id: string;

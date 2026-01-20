@@ -1,16 +1,32 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarCheck } from 'lucide-react';
-import { appointments } from '@/lib/data';
+import { useFirebase, useCollection } from '@/firebase';
+import { collection, query, where, Timestamp } from 'firebase/firestore';
+import type { Appointment } from '@/lib/types';
 
 export function UpcomingAppointmentsCard() {
-    const [count, setCount] = useState(0);
+    const { firestore } = useFirebase();
 
-    useEffect(() => {
-        const upcomingCount = appointments.filter(a => new Date(a.date) >= new Date()).length;
-        setCount(upcomingCount);
-    }, []);
+    const appointmentsQuery = useMemo(() => {
+        if (!firestore) return null;
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+
+        return query(
+            collection(firestore, 'appointments'), 
+            where('appointmentDate', '>=', Timestamp.fromDate(today))
+        );
+    }, [firestore]);
+
+    const [snapshot, loading] = useCollection(appointmentsQuery);
+
+    const count = useMemo(() => {
+        if (loading || !snapshot) return 0;
+        return snapshot.docs.length;
+    }, [snapshot, loading]);
 
     return (
         <Card>
@@ -19,9 +35,9 @@ export function UpcomingAppointmentsCard() {
                 <CalendarCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{count}</div>
+                <div className="text-2xl font-bold">{loading ? '...' : count}</div>
                 <p className="text-xs text-muted-foreground">
-                    in the next 7 days
+                    All upcoming appointments
                 </p>
             </CardContent>
         </Card>
