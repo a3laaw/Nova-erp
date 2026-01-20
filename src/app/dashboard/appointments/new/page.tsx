@@ -80,7 +80,7 @@ export default function NewArchitecturalAppointmentPage() {
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !clientId || !title || !date || !time) {
+        if (!firestore || !currentUser || !clientId || !engineerId || !title || !date || !time) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
             return;
         }
@@ -90,7 +90,7 @@ export default function NewArchitecturalAppointmentPage() {
             const appointmentDateTime = new Date(`${date}T${time}`);
             const newAppointment = {
                 clientId,
-                engineerId: engineerId || null,
+                engineerId: engineerId,
                 title,
                 notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
@@ -157,10 +157,10 @@ export default function NewArchitecturalAppointmentPage() {
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="engineerId">المهندس المسؤول</Label>
-                             <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} disabled={loading}>
+                            <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
+                             <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر المهندس (اختياري)..."} />
+                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر المهندس..."} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {engineers.map(e => (
