@@ -80,7 +80,7 @@ export default function NewOtherAppointmentPage() {
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
                 // Filter for engineers who are NOT in the architectural department
                 const otherEngineers = allEmployees.filter(emp => 
-                    emp.department && !emp.department.trim().includes('المعماري') &&
+                    !emp.department?.trim().includes('المعماري') &&
                     (emp.jobTitle?.includes('مهندس') || emp.jobTitle?.toLowerCase().includes('architect'))
                 );
                 setAllOtherEngineers(otherEngineers);
@@ -120,6 +120,52 @@ export default function NewOtherAppointmentPage() {
         setIsSaving(true);
         try {
             const appointmentDateTime = new Date(`${date}T${time}`);
+
+            // --- Conflict Validation ---
+            const windowStart = new Date(appointmentDateTime.getTime() - 59 * 60 * 1000);
+            const windowEnd = new Date(appointmentDateTime.getTime() + 59 * 60 * 1000);
+
+            const appointmentsRef = collection(firestore, 'appointments');
+
+            // Check for engineer conflict
+            const engineerConflictQuery = query(
+                appointmentsRef,
+                where('engineerId', '==', engineerId),
+                where('appointmentDate', '>=', Timestamp.fromDate(windowStart)),
+                where('appointmentDate', '<=', Timestamp.fromDate(windowEnd))
+            );
+            const engineerConflictSnap = await getDocs(engineerConflictQuery);
+
+            if (!engineerConflictSnap.empty) {
+                toast({
+                    variant: 'destructive',
+                    title: 'تعارض في المواعيد',
+                    description: 'المهندس لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.',
+                });
+                setIsSaving(false);
+                return;
+            }
+
+            // Check for client conflict
+            const clientConflictQuery = query(
+                appointmentsRef,
+                where('clientId', '==', clientId),
+                where('appointmentDate', '>=', Timestamp.fromDate(windowStart)),
+                where('appointmentDate', '<=', Timestamp.fromDate(windowEnd))
+            );
+            const clientConflictSnap = await getDocs(clientConflictQuery);
+
+            if (!clientConflictSnap.empty) {
+                toast({
+                    variant: 'destructive',
+                    title: 'تعارض في المواعيد',
+                    description: 'العميل لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.',
+                });
+                setIsSaving(false);
+                return;
+            }
+            // --- End of Conflict Validation ---
+
             const newAppointment = {
                 clientId,
                 engineerId: engineerId,
@@ -249,4 +295,3 @@ export default function NewOtherAppointmentPage() {
     );
 }
     
-
