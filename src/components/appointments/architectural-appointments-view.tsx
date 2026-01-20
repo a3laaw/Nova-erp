@@ -61,13 +61,14 @@ export function ArchitecturalAppointmentsView() {
 
                 const q = query(
                     collection(firestore, 'appointments'),
-                    where('type', '==', 'architectural'),
                     where('appointmentDate', '>=', dayStart),
                     where('appointmentDate', '<=', dayEnd),
                     orderBy('appointmentDate', 'asc')
                 );
                 const querySnapshot = await getDocs(q);
-                const fetchedAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+                const fetchedAppointments = querySnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                    .filter(appt => appt.type === 'architectural');
                 setAppointments(fetchedAppointments);
             } catch (error) {
                 console.error("Error fetching architectural appointments:", error);

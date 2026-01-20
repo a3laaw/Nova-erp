@@ -114,12 +114,13 @@ export function RoomBookingCalendar() {
 
                 const q = query(
                     collection(firestore, 'appointments'),
-                    where('type', '==', 'room'),
                     where('appointmentDate', '>=', dayStart),
                     where('appointmentDate', '<=', dayEnd)
                 );
                 const querySnapshot = await getDocs(q);
-                const fetchedAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+                const fetchedAppointments = querySnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                    .filter(appt => appt.type === 'room');
                 setAppointments(fetchedAppointments);
             } catch (error) {
                 console.error("Error fetching appointments:", error);
@@ -370,7 +371,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     const [appointmentDate, setAppointmentDate] = useState<Date | undefined>(currentDate);
     const [startTime, setStartTime] = useState('');
 
-    const roomName = useMemo(() => dialogData?.room || dialogData?.meetingRoom, [dialogData]);
+    const roomName = useMemo(() => dialogData?.meetingRoom || dialogData?.room, [dialogData]);
 
     useEffect(() => {
         if (isOpen && dialogData) {
