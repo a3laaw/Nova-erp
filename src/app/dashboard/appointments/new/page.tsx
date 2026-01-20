@@ -99,15 +99,15 @@ export default function NewArchitecturalAppointmentPage() {
             const appointmentsRef = collection(firestore, 'appointments');
 
             // Check for engineer conflict
-            const engineerConflictQuery = query(
-                appointmentsRef,
-                where('engineerId', '==', engineerId),
-                where('appointmentDate', '>=', Timestamp.fromDate(windowStart)),
-                where('appointmentDate', '<=', Timestamp.fromDate(windowEnd))
-            );
-            const engineerConflictSnap = await getDocs(engineerConflictQuery);
+            const engineerAppointmentsQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
+            const engineerAppointmentsSnap = await getDocs(engineerAppointmentsQuery);
+            const engineerHasConflict = engineerAppointmentsSnap.docs.some(doc => {
+                const appt = doc.data();
+                const apptDate = appt.appointmentDate.toDate();
+                return apptDate >= windowStart && apptDate <= windowEnd;
+            });
 
-            if (!engineerConflictSnap.empty) {
+            if (engineerHasConflict) {
                 toast({
                     variant: 'destructive',
                     title: 'تعارض في المواعيد',
@@ -118,15 +118,15 @@ export default function NewArchitecturalAppointmentPage() {
             }
 
             // Check for client conflict
-            const clientConflictQuery = query(
-                appointmentsRef,
-                where('clientId', '==', clientId),
-                where('appointmentDate', '>=', Timestamp.fromDate(windowStart)),
-                where('appointmentDate', '<=', Timestamp.fromDate(windowEnd))
-            );
-            const clientConflictSnap = await getDocs(clientConflictQuery);
+            const clientAppointmentsQuery = query(appointmentsRef, where('clientId', '==', clientId));
+            const clientAppointmentsSnap = await getDocs(clientAppointmentsQuery);
+            const clientHasConflict = clientAppointmentsSnap.docs.some(doc => {
+                const appt = doc.data();
+                const apptDate = appt.appointmentDate.toDate();
+                return apptDate >= windowStart && apptDate <= windowEnd;
+            });
 
-            if (!clientConflictSnap.empty) {
+            if (clientHasConflict) {
                 toast({
                     variant: 'destructive',
                     title: 'تعارض في المواعيد',
