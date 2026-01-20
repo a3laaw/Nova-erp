@@ -286,13 +286,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
               dir="rtl"
               onPointerDownOutside={(e) => {
                 const target = e.target as HTMLElement;
-                if (target.closest('[cmdk-root]')) {
+                if (target.closest('[cmdk-root]') || target.closest('[data-radix-popover-content]')) {
                   e.preventDefault();
                 }
               }}
               onInteractOutside={(e) => {
                 const target = e.target as HTMLElement;
-                if (target.closest('[cmdk-root]')) {
+                if (target.closest('[cmdk-root]') || target.closest('[data-radix-popover-content]')) {
                   e.preventDefault();
                 }
               }}
