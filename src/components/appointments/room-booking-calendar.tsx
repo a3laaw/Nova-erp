@@ -411,7 +411,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl">
+            <DialogContent dir="rtl" onPointerDownOutside={(e) => e.preventDefault()}>
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>

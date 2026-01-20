@@ -158,7 +158,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md" dir="rtl">
+      <DialogContent className="sm:max-w-md" dir="rtl" onPointerDownOutside={(e) => e.preventDefault()}>
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>
