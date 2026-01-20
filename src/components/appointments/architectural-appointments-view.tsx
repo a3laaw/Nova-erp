@@ -1,21 +1,44 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, orderBy, Timestamp } from 'firebase/firestore';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { collection, query, getDocs, where, orderBy, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { format, startOfDay, endOfDay, setHours, setMinutes, getHours, getMinutes, addMinutes } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Combobox } from '@/components/ui/combobox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, PlusCircle } from 'lucide-react';
+import { CalendarIcon, Loader2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
-import Link from 'next/link';
+
+// --- Constants & Helpers ---
+const morningSlots = Array.from({ length: 12 }, (_, i) => format(addMinutes(setHours(new Date(), 7), i * 30), 'HH:mm'));
+const eveningSlots = Array.from({ length: 10 }, (_, i) => format(addMinutes(setHours(new Date(), 14), i * 30), 'HH:mm'));
+
+function getVisitColor(visit: Partial<Appointment>) {
+  if (visit.visitCount === 1) return "#facc15"; // yellow-400
+  if (visit.visitCount! > 1 && !visit.contractSigned) return "#22c55e"; // green-500
+  if (visit.visitCount! > 1 && visit.contractSigned && visit.projectType?.includes("بلدية سكن خاص")) return "#3b82f6"; // blue-500
+  return "#9ca3af"; // gray-400
+}
+
+const colorMap: Record<string, string> = {
+  '#facc15': 'bg-yellow-400',
+  '#22c55e': 'bg-green-500',
+  '#3b82f6': 'bg-blue-500',
+  '#9ca3af': 'bg-gray-400',
+};
+
 
 export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
@@ -23,135 +46,281 @@ export function ArchitecturalAppointmentsView() {
     
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [engineers, setEngineers] = useState<Employee[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [clientsMap, setClientsMap] = useState<Map<string, string>>(new Map());
-    const [engineersMap, setEngineersMap] = useState<Map<string, string>>(new Map());
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [dialogData, setDialogData] = useState<any>(null);
 
+    // Fetch static data (engineers, clients)
     useEffect(() => {
         if (!firestore) return;
-        
-        const fetchMaps = async () => {
+        const fetchData = async () => {
+            setLoading(true);
             try {
-                const [clientSnap, engSnap] = await Promise.all([
-                    getDocs(collection(firestore, 'clients')),
-                    getDocs(collection(firestore, 'employees'))
-                ]);
-                const newClientsMap = new Map(clientSnap.docs.map(doc => [doc.id, doc.data().nameAr]));
-                const newEngineersMap = new Map(engSnap.docs.map(doc => [doc.id, doc.data().fullName]));
-                setClientsMap(newClientsMap);
-                setEngineersMap(newEngineersMap);
+                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
+                
+                const [engSnap, clientSnap] = await Promise.all([getDocs(engQuery), getDocs(clientQuery)]);
+
+                const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                setEngineers(allEngineers.filter(e => e.department?.includes('المعماري')).sort((a,b) => a.fullName.localeCompare(b.fullName)));
+
+                const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+                setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+
             } catch (error) {
-                console.error("Error fetching map data: ", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
-            }
-        };
-
-        fetchMaps();
-    }, [firestore, toast]);
-    
-    useEffect(() => {
-        if (!firestore || !date) return;
-        setLoading(true);
-
-        const fetchAppointments = async () => {
-            try {
-                const dayStart = startOfDay(date);
-                const dayEnd = endOfDay(date);
-
-                const q = query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd),
-                    orderBy('appointmentDate', 'asc')
-                );
-                const querySnapshot = await getDocs(q);
-                const fetchedAppointments = querySnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                    .filter(appt => appt.type === 'architectural');
-                setAppointments(fetchedAppointments);
-            } catch (error) {
-                console.error("Error fetching architectural appointments:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد المعمارية.' });
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين والعملاء.' });
             } finally {
                 setLoading(false);
             }
         };
-
+        fetchData();
+    }, [firestore, toast]);
+    
+    // Fetch appointments for the selected date
+    useEffect(() => {
+        if (!firestore || !date) return;
+        setLoading(true);
+        const fetchAppointments = async () => {
+            try {
+                const dayStart = startOfDay(date);
+                const dayEnd = endOfDay(date);
+                const q = query(
+                    collection(firestore, 'appointments'),
+                    where('type', '==', 'architectural'),
+                    where('appointmentDate', '>=', dayStart),
+                    where('appointmentDate', '<=', dayEnd)
+                );
+                const querySnapshot = await getDocs(q);
+                setAppointments(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment)));
+            } catch (error) {
+                console.error("Error fetching appointments:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
+            } finally {
+                setLoading(false);
+            }
+        };
         fetchAppointments();
     }, [date, firestore, toast]);
 
-    const formatDate = (dateValue: any) => {
-        if (!dateValue) return '';
-        const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
-        return format(date, "h:mm a", { locale: ar });
+    const bookingsGrid = useMemo(() => {
+        const grid: Record<string, Record<string, Appointment | null>> = {};
+        engineers.forEach(eng => {
+            grid[eng.id!] = {};
+            [...morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null);
+        });
+
+        appointments.forEach(appt => {
+            const time = format(appt.appointmentDate.toDate(), 'HH:mm');
+            if (grid[appt.engineerId] && time in grid[appt.engineerId]) {
+                grid[appt.engineerId][time] = appt;
+            }
+        });
+        return grid;
+    }, [appointments, engineers]);
+
+    const handleCellClick = (engineer: Employee, time: string) => {
+        const appointmentDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
+        setDialogData({
+            engineerId: engineer.id,
+            engineerName: engineer.fullName,
+            appointmentDate,
+            session: Number(time.split(':')[0]) < 14 ? 'صباحية' : 'مسائية'
+        });
+        setIsDialogOpen(true);
     };
 
+    const handleSave = async (data: any) => {
+        if (!firestore) return;
+        try {
+            await addDoc(collection(firestore, 'appointments'), data);
+            setAppointments(prev => [...prev, data]);
+            toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
+            setIsDialogOpen(false);
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الموعد.' });
+        }
+    };
+    
+    const renderGridSection = (title: string, slots: string[]) => (
+        <div className="border rounded-lg overflow-x-auto">
+            <h3 className="font-bold text-lg p-3 bg-muted">{title}</h3>
+            <div className="grid" style={{ gridTemplateColumns: `8rem repeat(${slots.length}, minmax(8rem, 1fr))` }}>
+                <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-b border-l">المهندس</div>
+                {slots.map(time => <div key={time} className="p-2 text-center text-sm font-mono border-b">{time}</div>)}
+                {engineers.map(eng => (
+                    <React.Fragment key={eng.id}>
+                        <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">{eng.fullName}</div>
+                        {slots.map(time => {
+                            const booking = bookingsGrid[eng.id!]?.[time];
+                            return (
+                                <div key={`${eng.id}-${time}`} className="relative h-24 border-b p-1">
+                                    {booking ? (
+                                        <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-center text-white', colorMap[booking.color!] || 'bg-gray-400')}>
+                                            <p className="font-bold truncate">{booking.clientName}</p>
+                                            <p className="opacity-80 truncate">{format(booking.appointmentDate.toDate(), 'h:mm a')}</p>
+                                            <p className="opacity-80 truncate">{booking.title}</p>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md" />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </React.Fragment>
+                ))}
+            </div>
+        </div>
+    );
+
     return (
-        <div className="space-y-4">
+        <div className="space-y-6" dir='rtl'>
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold">مواعيد اليوم المحدد</h2>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}
-                        >
+                <h2 className="text-lg font-bold">جدول زيارات القسم المعماري</h2>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}>
                             <CalendarIcon className="ml-2 h-4 w-4" />
                             {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                         </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                        <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={setDate}
-                            initialFocus
-                        />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                 <Button asChild>
-                    <Link href="/dashboard/appointments/new">
-                        <PlusCircle className="ml-2 h-4 w-4" />
-                        إضافة موعد معماري
-                    </Link>
-                </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={setDate} initialFocus /></PopoverContent>
+                </Popover>
+            </div>
+            
+            {loading && <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
+
+            {!loading && (
+                <>
+                    {renderGridSection('الفترة الصباحية', morningSlots)}
+                    {renderGridSection('الفترة المسائية', eveningSlots)}
+                </>
+            )}
+             <div className="flex justify-center gap-4 pt-4 text-xs">
+                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-yellow-400" /><span>أول زيارة</span></div>
+                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-green-500" /><span>متابعة (بدون عقد)</span></div>
+                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-blue-500" /><span>متابعة (بعد العقد)</span></div>
+                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-gray-400" /><span>أخرى</span></div>
             </div>
 
-             <div className="border rounded-lg">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>الوقت</TableHead>
-                            <TableHead>العميل</TableHead>
-                            <TableHead>المهندس المسؤول</TableHead>
-                            <TableHead>الغرض</TableHead>
-                            <TableHead>ملاحظات</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loading && Array.from({length:3}).map((_,i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8" /></TableCell></TableRow>)}
-                        {!loading && appointments.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
-                                    لا توجد مواعيد معمارية لهذا اليوم.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {!loading && appointments.map(appt => (
-                            <TableRow key={appt.id}>
-                                <TableCell className="font-mono">{formatDate(appt.appointmentDate)}</TableCell>
-                                <TableCell>{clientsMap.get(appt.clientId) || appt.clientId}</TableCell>
-                                <TableCell>{engineersMap.get(appt.engineerId) || appt.engineerId}</TableCell>
-                                <TableCell>{appt.title}</TableCell>
-                                <TableCell>{appt.notes || '-'}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-             </div>
+            {isDialogOpen && (
+                <BookingDialog 
+                    isOpen={isDialogOpen}
+                    onClose={() => setIsDialogOpen(false)}
+                    onSave={handleSave}
+                    dialogData={dialogData}
+                    clients={clients}
+                    firestore={firestore}
+                />
+            )}
         </div>
+    );
+}
+
+
+// --- Sub-components ---
+
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    
+    const [clientId, setClientId] = useState('');
+    const [visitCount, setVisitCount] = useState(1);
+    const [contractSigned, setContractSigned] = useState(false);
+    const [projectType, setProjectType] = useState('بلدية سكن خاص');
+    const [title, setTitle] = useState('');
+    const [notes, setNotes] = useState('');
+
+    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr })), [clients]);
+
+    useEffect(() => {
+        if (!clientId || !firestore) {
+            setVisitCount(1);
+            setContractSigned(false);
+            return;
+        };
+        const fetchClientHistory = async () => {
+            const q = query(collection(firestore, 'appointments'), where('clientId', '==', clientId));
+            const snapshot = await getDocs(q);
+            const visits = snapshot.docs.map(doc => doc.data());
+            setVisitCount(visits.length + 1);
+            const hasSigned = visits.some(v => v.contractSigned && v.projectType === 'بلدية سكن خاص');
+            setContractSigned(hasSigned);
+        };
+        fetchClientHistory();
+    }, [clientId, firestore]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!clientId || !title) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل وإدخال الغرض من الموعد.' });
+            return;
+        }
+        setIsSaving(true);
+        const data = {
+            ...dialogData,
+            clientId,
+            clientName: clients.find((c: Client) => c.id === clientId)?.nameAr,
+            title,
+            notes,
+            visitCount,
+            contractSigned,
+            projectType,
+            type: 'architectural',
+            color: getVisitColor({ visitCount, contractSigned, projectType }),
+            createdAt: serverTimestamp(),
+            appointmentDate: Timestamp.fromDate(dialogData.appointmentDate),
+            endDate: Timestamp.fromDate(addMinutes(dialogData.appointmentDate, 30)),
+        };
+        await onSave(data);
+        setIsSaving(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent dir="rtl">
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>حجز موعد جديد</DialogTitle>
+                        <DialogDescription>
+                            للمهندس: {dialogData.engineerName} | الساعة: {format(dialogData.appointmentDate, 'h:mm a', { locale: ar })}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-6">
+                        <div className="grid gap-2">
+                            <Label htmlFor="client">العميل</Label>
+                            <Combobox options={clientOptions} value={clientId} onValueChange={setClientId} placeholder="اختر عميلاً..." searchPlaceholder="ابحث عن عميل..." />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="title">الغرض من الزيارة</Label>
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} required />
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="projectType">نوع المشروع</Label>
+                            <Input id="projectType" value={projectType} onChange={e => setProjectType(e.target.value)} />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="contractSigned" checked={contractSigned} onCheckedChange={(checked) => setContractSigned(checked as boolean)} />
+                            <Label htmlFor="contractSigned">تم توقيع عقد (بلدية سكن خاص) لهذا العميل؟</Label>
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="notes">ملاحظات</Label>
+                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} />
+                        </div>
+                         <div className="text-sm text-muted-foreground">سيتم تسجيل هذه الزيارة رقم {visitCount} للعميل.</div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                            حفظ الموعد
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

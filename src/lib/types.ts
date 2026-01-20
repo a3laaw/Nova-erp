@@ -103,13 +103,19 @@ export type Appointment = {
   appointmentDate: any; // This will be the start time
   endDate?: any; // This will be the end time
   clientId: string;
+  clientName?: string;
   engineerId: string;
-  meetingRoom?: string;
-  department?: string; // For color coding
-  notes?: string;
-  // For display purposes, not stored in DB directly
-  clientName?: string; 
   engineerName?: string;
+  meetingRoom?: string;
+  type: 'architectural' | 'room';
+  notes?: string;
+  // For architectural appointments with color logic
+  session?: 'صباحية' | 'مسائية';
+  visitCount?: number;
+  contractSigned?: boolean;
+  projectType?: string;
+  color?: string; // Hex color code
+  // For display purposes, not stored in DB directly
 };
 
 

@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "UserProfile": {
@@ -17,7 +16,7 @@
         "email": {
           "type": "string",
           "format": "email",
-          "description": "Auto-generated internal email address (e.g., username@bmec-kw.local)."
+          "description": "Auto-generated internal email address (e.g., username@scoop.local)."
         },
         "passwordHash": {
           "type": "string",
@@ -240,7 +239,7 @@
         "dob": { "type": "string", "format": "date", "description": "Date of birth." },
         "gender": { "type": "string", "enum": ["male", "female"] },
         "civilId": { "type": "string" },
-        "visaType": { "type": "string", "enum": ["worker", "engineer", "driver", "admin", "kuwaiti"] },
+        "nationality": { "type": "string", "description": "The employee's nationality." },
         "residencyExpiry": { "type": "string", "format": "date" },
         "contractExpiry": { "type": "string", "format": "date" },
         "mobile": { "type": "string" },
@@ -473,33 +472,24 @@
       "description": "Represents a scheduled meeting or visit.",
       "type": "object",
       "properties": {
-        "clientId": {
-          "type": "string",
-          "description": "The ID of the client for this appointment."
-        },
-        "engineerId": {
-          "type": "string",
-          "description": "The ID of the employee attending the appointment."
-        },
-        "title": {
-          "type": "string",
-          "description": "The purpose or title of the appointment."
-        },
-        "notes": {
-          "type": "string",
-          "description": "Additional notes about the appointment."
-        },
-        "appointmentDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The date and time of the appointment."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "engineerId": { "type": "string" },
+        "engineerName": { "type": "string" },
+        "meetingRoom": { "type": "string", "description": "For room bookings" },
+        "title": { "type": "string" },
+        "notes": { "type": "string" },
+        "type": { "type": "string", "enum": ["architectural", "room"] },
+        "appointmentDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "session": { "type": "string", "enum": ["صباحية", "مسائية"] },
+        "visitCount": { "type": "number" },
+        "contractSigned": { "type": "boolean" },
+        "projectType": { "type": "string" },
+        "color": { "type": "string", "description": "Hex color code calculated in the frontend" }
       },
-      "required": ["clientId", "title", "appointmentDate", "createdAt"]
+      "required": ["clientId", "title", "appointmentDate", "type"]
     }
   },
   "auth": {
