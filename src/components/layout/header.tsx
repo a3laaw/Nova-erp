@@ -83,7 +83,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
     return (
         <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6", className)}>
-            <SidebarTrigger className="sm:hidden" />
+            <SidebarTrigger />
             <div className="flex items-center gap-2">
                  <h1 className="text-xl font-semibold font-headline">{title}</h1>
             </div>
