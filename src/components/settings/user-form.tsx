@@ -158,7 +158,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md" dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[cmdk-root]')) { e.preventDefault(); } }}>
+      <DialogContent className="sm:max-w-md" dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[data-radix-select-content]')) { e.preventDefault(); } }}>
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>

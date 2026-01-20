@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -350,7 +349,7 @@ export function EmployeesTable() {
                 </Table>
             </div>
              <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
-                <AlertDialogContent dir="rtl" onPointerDownOutside={(e) => e.preventDefault()}>
+                <AlertDialogContent dir="rtl" onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('[data-radix-select-content]')) { e.preventDefault(); } }}>
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
