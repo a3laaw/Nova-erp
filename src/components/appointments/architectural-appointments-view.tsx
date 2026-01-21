@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -10,10 +10,28 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -35,22 +53,27 @@ export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [date, setDate] = useState<Date | undefined>();
+    const [date, setDate] = useState<Date | undefined>(undefined);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
+    const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
     
     useEffect(() => {
-        // Set date on client to avoid hydration mismatch and ensure it runs only once.
-        if(!date) {
-            setDate(new Date());
+        // Set date on client to avoid hydration mismatch.
+        // It will be undefined on server and then set to a Date object on the client.
+        if (date === undefined) {
+          setDate(new Date());
         }
     }, [date]);
+
 
     const fetchData = useCallback(async (d: Date | undefined) => {
         if (!firestore || !d) return;
@@ -98,8 +121,11 @@ export function ArchitecturalAppointmentsView() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        fetchData(date);
+        if (date) {
+            fetchData(date);
+        }
     }, [date, fetchData]);
+
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -145,6 +171,24 @@ export function ArchitecturalAppointmentsView() {
         }
     };
     
+    const handleDeleteBooking = async () => {
+        if (!appointmentToDelete || !firestore) return;
+        setIsDeleting(true);
+        try {
+            await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
+            toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
+            if (date) { // Re-fetch to update the UI
+                fetchData(date);
+            }
+        } catch (error) {
+            console.error("Error deleting appointment:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
+        } finally {
+            setIsDeleting(false);
+            setAppointmentToDelete(null);
+        }
+    };
+
     const handlePrint = () => {
         const element = document.getElementById('architectural-appointments-printable-area');
         if (!element || !date) return;
@@ -163,7 +207,7 @@ export function ArchitecturalAppointmentsView() {
         });
     };
     
-    if (!date) {
+    if (date === undefined) {
         return (
             <div className="space-y-6" dir='rtl'>
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
@@ -215,21 +259,28 @@ export function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                             <div style={{
-                                                height: '100%',
-                                                width: '100%',
-                                                borderRadius: '0.375rem',
-                                                padding: '0.5rem',
-                                                fontSize: '0.875rem',
-                                                color: '#1f2937',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                textAlign: 'center',
-                                                backgroundColor: booking.color,
-                                            }}>
-                                                <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
-                                            </div>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <div
+                                                        className="h-full w-full rounded-md p-2 text-sm text-gray-800 flex items-center justify-center text-center cursor-pointer"
+                                                        style={{ backgroundColor: booking.color }}
+                                                    >
+                                                        <p className="font-bold">{booking.clientName}</p>
+                                                    </div>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent dir="rtl">
+                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                    <DropdownMenuItem disabled>
+                                                        <Pencil className="ml-2 h-4 w-4" />
+                                                        <span>تعديل الموعد (قريبًا)</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                        <Trash2 className="ml-2 h-4 w-4" />
+                                                        <span>إلغاء الموعد</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         ) : (
                                             <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
                                         )}
@@ -308,6 +359,23 @@ export function ArchitecturalAppointmentsView() {
                     firestore={firestore}
                 />
             )}
+            
+            <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد من الإلغاء؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيتم حذف هذا الموعد بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteBooking} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                            {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
@@ -339,7 +407,11 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             return;
         };
         const fetchClientHistory = async () => {
-            const q = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId));
+            const q = query(
+              collection(firestore, 'appointments'), 
+              where('clientId', '==', selectedClientId),
+              where('type', '==', 'architectural')
+            );
             const snapshot = await getDocs(q);
             const architecturalVisits = snapshot.docs.map(doc => doc.data()).filter(appt => appt.type === 'architectural');
             setVisitCount(architecturalVisits.length + 1);
