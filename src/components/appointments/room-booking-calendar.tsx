@@ -92,8 +92,8 @@ export function RoomBookingCalendar() {
                 getDocs(query(
                     collection(firestore, 'appointments'),
                     where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd),
-                    where('type', '==', 'room')
+                    where('appointmentDate', '<=', dayEnd)
+                    // where('type', '==', 'room') // Removed to avoid composite index
                 ))
             ]);
             
@@ -102,10 +102,12 @@ export function RoomBookingCalendar() {
             
             const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
             setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+            
+            const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
-            const augmentedAppointments = apptSnap.docs
-                .map(doc => {
-                    const appt = { id: doc.id, ...doc.data() } as Appointment;
+            const augmentedAppointments = allAppointmentsForDay
+                .filter(appt => appt.type === 'room') // Filter on the client-side
+                .map(appt => {
                     return {
                         ...appt,
                         clientName: fetchedClients.find(c => c.id === appt.clientId)?.nameAr,

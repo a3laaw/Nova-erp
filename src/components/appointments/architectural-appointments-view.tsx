@@ -57,8 +57,8 @@ export function ArchitecturalAppointmentsView() {
                 getDocs(query(
                     collection(firestore, 'appointments'),
                     where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd),
-                    where('type', '==', 'architectural')
+                    where('appointmentDate', '<=', dayEnd)
+                    // where('type', '==', 'architectural') // Removed to avoid composite index
                 ))
             ]);
 
@@ -69,9 +69,11 @@ export function ArchitecturalAppointmentsView() {
             const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
             setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
             
-            const augmentedAppointments = apptSnap.docs
-                .map(doc => {
-                    const appt = { id: doc.id, ...doc.data() } as Appointment;
+            const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+
+            const augmentedAppointments = allAppointmentsForDay
+                .filter(appt => appt.type === 'architectural') // Filter on the client-side
+                .map(appt => {
                     return {
                         ...appt,
                         clientName: allClients.find(c => c.id === appt.clientId)?.nameAr,
@@ -296,15 +298,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
 
     useEffect(() => {
         if (!isOpen) { // Reset on close
-            setSelectedClientId('');
             setTitle('');
-            setVisitCount(1);
-            setContractSigned(false);
+            setSelectedClientId('');
         } else {
+             // Form is opening, reset to default state for a new booking
             setTitle('');
             setSelectedClientId('');
-            setVisitCount(1);
-            setContractSigned(false);
         }
     }, [isOpen]);
 
