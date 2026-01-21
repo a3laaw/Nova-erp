@@ -466,12 +466,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل.' });
             return;
         }
-         if (!newDate || !newTime) {
+         if (isEditing && (!newDate || !newTime)) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد التاريخ والوقت.' });
             return;
         }
         setIsSaving(true);
-        const appointmentDateTime = new Date(`${newDate}T${newTime}`);
+        const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
 
         try {
             // --- Conflict Validation ---
@@ -563,16 +563,18 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="date">التاريخ</Label>
-                                <Input id="date" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                        {isEditing && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="date">التاريخ</Label>
+                                    <Input id="date" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="time">الوقت</Label>
+                                    <Input id="time" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required step="1800" />
+                                </div>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="time">الوقت</Label>
-                                <Input id="time" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required step="1800" />
-                            </div>
-                        </div>
+                        )}
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
