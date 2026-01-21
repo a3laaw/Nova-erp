@@ -49,12 +49,12 @@ export function ArchitecturalAppointmentsView() {
         if (!firestore) return;
         setLoading(true);
         try {
-            const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-            const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
-            
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
-            const q = query(
+            
+            const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+            const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
+            const apptQuery = query(
                 collection(firestore, 'appointments'),
                 where('appointmentDate', '>=', dayStart),
                 where('appointmentDate', '<=', dayEnd)
@@ -63,20 +63,22 @@ export function ArchitecturalAppointmentsView() {
             const [engSnap, clientSnap, apptSnap] = await Promise.all([
                 getDocs(engQuery),
                 getDocs(clientQuery),
-                getDocs(q)
+                getDocs(apptQuery)
             ]);
 
             const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
             const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName));
             setEngineers(archEngineers);
-            const localEngineersMap = new Map(allEngineers.map(e => [e.id!, e.fullName]));
             
             const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
             setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
-            const localClientsMap = new Map(allClients.map(c => [c.id, c.nameAr]));
             
-            const dayAppointments = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-            const architecturalAppointments = dayAppointments.filter(appt => appt.type === 'architectural');
+            const localClientsMap = new Map(allClients.map(c => [c.id, c.nameAr]));
+            const localEngineersMap = new Map(allEngineers.map(e => [e.id!, e.fullName]));
+            
+            const architecturalAppointments = apptSnap.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                .filter(appt => appt.type === 'architectural');
 
             const augmentedAppointments = architecturalAppointments.map(appt => ({
                 ...appt,
@@ -191,7 +193,7 @@ export function ArchitecturalAppointmentsView() {
                                                 padding: '0.5rem',
                                                 fontSize: '0.75rem',
                                                 color: '#1f2937',
-                                                backgroundColor: getVisitColor(booking),
+                                                ...getVisitColor(booking),
                                             }}>
                                                 <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
                                                 <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
@@ -295,18 +297,15 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [contractSigned, setContractSigned] = useState(false);
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
     const [title, setTitle] = useState('');
-    const [notes, setNotes] = useState('');
 
     useEffect(() => {
         if (!isOpen) { // Reset on close
             setSelectedClientId('');
             setTitle('');
-            setNotes('');
             setVisitCount(1);
             setContractSigned(false);
         } else {
             setTitle('');
-            setNotes('');
             setVisitCount(1);
             setContractSigned(false);
         }
@@ -343,7 +342,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             clientId: client.id,
             clientName: client.nameAr,
             title,
-            notes,
+            notes: '',
             visitCount,
             contractSigned,
             projectType,
@@ -401,19 +400,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 placeholder="ابحث بالاسم أو رقم الجوال..."
                              />
                         </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="projectType">نوع المشروع</Label>
-                            <Input id="projectType" value={projectType} onChange={e => setProjectType(e.target.value)} />
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Checkbox id="contractSigned" checked={contractSigned} onCheckedChange={(checked) => setContractSigned(checked as boolean)} />
-                            <Label htmlFor="contractSigned">تم توقيع عقد (بلدية سكن خاص) لهذا العميل؟</Label>
-                        </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="notes">ملاحظات</Label>
-                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} />
-                        </div>
-                         <div className="text-sm text-muted-foreground">سيتم تسجيل هذه الزيارة رقم {visitCount} للعميل.</div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
