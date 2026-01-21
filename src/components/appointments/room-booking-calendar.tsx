@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
@@ -434,78 +435,6 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function InlineSearch({ value, onSelect, options, placeholder }: { value: string, onSelect: (value: string) => void, options: {label: string, value: string, searchKey?: string}[], placeholder: string }) {
-    const [search, setSearch] = React.useState('');
-    const [showOptions, setShowOptions] = React.useState(false);
-    const MAX_DISPLAY_ITEMS = 50;
-
-    const selectedLabel = useMemo(() => options.find(opt => opt.value === value)?.label || '', [options, value]);
-
-    useEffect(() => {
-        setSearch(selectedLabel);
-    }, [selectedLabel]);
-
-    const filteredOptions = useMemo(() => 
-        options.filter(opt => 
-            opt.label.toLowerCase().includes(search.toLowerCase()) || 
-            (opt.searchKey && opt.searchKey.toLowerCase().includes(search))
-        ),
-    [options, search]);
-
-    const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
-
-    return (
-        <div className="relative">
-            <Input
-                value={search}
-                placeholder={placeholder}
-                onFocus={() => setShowOptions(true)}
-                onBlur={() => setTimeout(() => setShowOptions(false), 150)}
-                onChange={(e) => {
-                    setSearch(e.target.value);
-                    setShowOptions(true);
-                    if (value) onSelect(''); // Clear selection on new typing
-                }}
-            />
-            {showOptions && (
-                 <div data-inline-search-list-options className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
-                    <ul className="max-h-48 overflow-y-auto p-1">
-                        {filteredOptions.length === 0 ? (
-                            <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
-                        ) : (
-                           <>
-                                {displayOptions.map(opt => (
-                                    <li
-                                        key={opt.value}
-                                        className="cursor-pointer p-2 text-sm rounded-md hover:bg-accent"
-                                        onMouseDown={(e) => {
-                                            e.preventDefault(); 
-                                            onSelect(opt.value);
-                                            setSearch(opt.label);
-                                            setShowOptions(false);
-                                        }}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span>{opt.label}</span>
-                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
-                                        </div>
-                                    </li>
-                                ))}
-                                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
-                                     <li className="p-2 text-xs text-center text-muted-foreground">
-                                        ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
-                                    </li>
-                                )}
-                           </>
-                        )}
-                    </ul>
-                </div>
-            )}
-        </div>
-    );
-}
-
-
 function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, currentDate }: any) {
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -596,15 +525,15 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                         </div>
                         <div className="grid gap-2">
                             <Label>العميل</Label>
-                            <InlineSearch value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
+                            <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
                         </div>
                         <div className="grid gap-2">
                             <Label>القسم</Label>
-                             <InlineSearch value={formData.department} onSelect={(v) => setFormData(p => ({...p, department: v}))} options={departmentOptionsForSelect} placeholder="ابحث عن قسم..." />
+                             <InlineSearchList value={formData.department} onSelect={(v) => setFormData(p => ({...p, department: v}))} options={departmentOptionsForSelect} placeholder="ابحث عن قسم..." />
                         </div>
                          <div className="grid gap-2">
                             <Label>المهندس</Label>
-                             <InlineSearch value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث بالاسم أو الرقم المدني..." />
+                             <InlineSearchList value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث بالاسم أو الرقم المدني..." />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الموعد</Label>

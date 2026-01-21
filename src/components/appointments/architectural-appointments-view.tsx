@@ -19,6 +19,7 @@ import { CalendarIcon, Loader2, Printer, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 // --- Constants & Helpers ---
 const morningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 7), i * 30), 'HH:mm'));
@@ -298,37 +299,31 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     
-    // State for the inline combobox
-    const [clientSearch, setClientSearch] = useState('');
-    const [showClientOptions, setShowClientOptions] = useState(false);
-    const [selectedClient, setSelectedClient] = useState<{id: string, name: string} | null>(null);
-
+    const [selectedClientId, setSelectedClientId] = useState('');
     const [visitCount, setVisitCount] = useState(1);
     const [contractSigned, setContractSigned] = useState(false);
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
 
-    const MAX_DISPLAY_ITEMS = 50;
-    
     useEffect(() => {
         if (!isOpen) { // Reset on close
-            setClientSearch('');
-            setShowClientOptions(false);
-            setSelectedClient(null);
+            setSelectedClientId('');
             setTitle('');
             setNotes('');
+            setVisitCount(1);
+            setContractSigned(false);
         }
     }, [isOpen]);
 
     useEffect(() => {
-        if (!selectedClient?.id || !firestore) {
+        if (!selectedClientId || !firestore) {
             setVisitCount(1);
             setContractSigned(false);
             return;
         };
         const fetchClientHistory = async () => {
-            const q = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClient.id));
+            const q = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId));
             const snapshot = await getDocs(q);
             const visits = snapshot.docs.map(doc => doc.data());
             setVisitCount(visits.length + 1);
@@ -336,19 +331,21 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             setContractSigned(hasSigned);
         };
         fetchClientHistory();
-    }, [selectedClient, firestore]);
+    }, [selectedClientId, firestore]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedClient?.id || !title) {
+        const client = clients.find((c: Client) => c.id === selectedClientId);
+
+        if (!client || !title) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل وإدخال الغرض من الموعد.' });
             return;
         }
         setIsSaving(true);
         const data = {
             ...dialogData,
-            clientId: selectedClient.id,
-            clientName: selectedClient.name,
+            clientId: client.id,
+            clientName: client.nameAr,
             title,
             notes,
             visitCount,
@@ -364,13 +361,11 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         setIsSaving(false);
     };
     
-    const filteredClients = clients.filter((opt: Client) =>
-        opt.nameAr.toLowerCase().includes(clientSearch.toLowerCase()) ||
-        (opt.mobile && opt.mobile.includes(clientSearch))
-    );
-
-
-    const displayClients = filteredClients.slice(0, MAX_DISPLAY_ITEMS);
+    const clientOptions = useMemo(() => clients.map((c: Client) => ({
+      value: c.id,
+      label: c.nameAr,
+      searchKey: c.mobile
+    })), [clients]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -378,13 +373,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 dir="rtl"
                 onPointerDownOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
                         e.preventDefault();
                     }
                 }}
                 onInteractOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
                         e.preventDefault();
                     }
                 }}
@@ -399,54 +394,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
                              <Label htmlFor="client-search">العميل</Label>
-                             <div className="relative">
-                                <Input
-                                    id="client-search"
-                                    value={clientSearch}
-                                    placeholder="ابحث بالاسم أو رقم الجوال..."
-                                    onFocus={() => setShowClientOptions(true)}
-                                    onBlur={() => setTimeout(() => setShowClientOptions(false), 150)} // Delay to allow click
-                                    onChange={(e) => {
-                                        setClientSearch(e.target.value);
-                                        setShowClientOptions(true);
-                                        if(selectedClient) setSelectedClient(null);
-                                    }}
-                                />
-                                {showClientOptions && (
-                                    <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-md">
-                                        <ul className="max-h-48 overflow-y-auto">
-                                            {filteredClients.length === 0 ? (
-                                                <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
-                                            ) : (
-                                                <>
-                                                    {displayClients.map((client: Client) => (
-                                                        <li
-                                                            key={client.id}
-                                                            className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                                            onMouseDown={(e) => {
-                                                                e.preventDefault(); 
-                                                                setSelectedClient({id: client.id, name: client.nameAr});
-                                                                setClientSearch(client.nameAr);
-                                                                setShowClientOptions(false);
-                                                            }}
-                                                        >
-                                                            <div className="flex justify-between items-center">
-                                                                <span>{client.nameAr}</span>
-                                                                {client.mobile && <span className="text-xs text-muted-foreground dir-ltr">{client.mobile}</span>}
-                                                            </div>
-                                                        </li>
-                                                    ))}
-                                                    {filteredClients.length > MAX_DISPLAY_ITEMS && (
-                                                        <li className="p-2 text-xs text-center text-muted-foreground">
-                                                            ... و {filteredClients.length - MAX_DISPLAY_ITEMS} نتائج أخرى
-                                                        </li>
-                                                    )}
-                                                </>
-                                            )}
-                                        </ul>
-                                    </div>
-                                )}
-                             </div>
+                             <InlineSearchList 
+                                value={selectedClientId}
+                                onSelect={setSelectedClientId}
+                                options={clientOptions}
+                                placeholder="ابحث بالاسم أو رقم الجوال..."
+                             />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة</Label>
@@ -468,7 +421,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !selectedClient}>
+                        <Button type="submit" disabled={isSaving || !selectedClientId}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             حفظ الموعد
                         </Button>
