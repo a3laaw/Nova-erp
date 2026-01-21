@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Save } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -146,15 +146,19 @@ export function ArchitecturalAppointmentsView() {
         }
     };
     
+    const handlePrint = () => {
+        window.print();
+    };
+
     const renderGridSection = (title: string, slots: string[]) => (
         <div className="border rounded-lg overflow-x-auto">
-            <h3 className="font-bold text-lg p-3 bg-muted">{title}</h3>
+            <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
             <div className="grid" style={{ gridTemplateColumns: `8rem repeat(${slots.length}, minmax(8rem, 1fr))` }}>
-                <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-b border-l">المهندس</div>
+                <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-b border-l print:text-sm">المهندس</div>
                 {slots.map(time => <div key={time} className="p-2 text-center text-sm font-mono border-b">{time}</div>)}
                 {engineers.map(eng => (
                     <React.Fragment key={eng.id}>
-                        <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">{eng.fullName}</div>
+                        <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{eng.fullName}</div>
                         {slots.map(time => {
                             const booking = bookingsGrid[eng.id!]?.[time];
                             return (
@@ -166,7 +170,7 @@ export function ArchitecturalAppointmentsView() {
                                             <p className="opacity-80 truncate">{booking.title}</p>
                                         </div>
                                     ) : (
-                                        <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md" />
+                                        <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
                                     )}
                                 </div>
                             );
@@ -179,48 +183,61 @@ export function ArchitecturalAppointmentsView() {
 
     return (
         <div className="space-y-6" dir='rtl'>
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
                 <h2 className="text-lg font-bold">جدول زيارات القسم المعماري</h2>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}>
-                            <CalendarIcon className="ml-2 h-4 w-4" />
-                            {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                        <Calendar 
-                          mode="single" 
-                          selected={date} 
-                          onSelect={setDate} 
-                          initialFocus 
-                          onDayPointerDown={(e) => e.preventDefault()}
-                          onMonthChange={(month) => {
-                            // This logic can be complex, for now we just prevent default
-                            // to stop popover from closing on month change navigation.
-                            const target = document.activeElement;
-                            if (target && target instanceof HTMLElement && !target.closest('.rdp-day')) {
-                                // e.preventDefault();
-                            }
-                          }}
-                        />
-                    </PopoverContent>
-                </Popover>
+                <div className='flex items-center gap-2'>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}>
+                                <CalendarIcon className="ml-2 h-4 w-4" />
+                                {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar 
+                              mode="single" 
+                              selected={date} 
+                              onSelect={setDate} 
+                              initialFocus 
+                              onDayPointerDown={(e) => e.preventDefault()}
+                              onMonthChange={(month) => {
+                                // This logic can be complex, for now we just prevent default
+                                // to stop popover from closing on month change navigation.
+                                const target = document.activeElement;
+                                if (target && target instanceof HTMLElement && !target.closest('.rdp-day')) {
+                                    // e.preventDefault();
+                                }
+                              }}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    <Button onClick={handlePrint} variant="outline">
+                        <Printer className="ml-2 h-4 w-4" />
+                        طباعة الجدول
+                    </Button>
+                </div>
             </div>
             
-            {loading && <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
+            <div className="printable-content">
+                <div className="hidden print:block mb-4">
+                    <h1 className="text-xl font-bold">جدول زيارات القسم المعماري</h1>
+                    {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
+                </div>
 
-            {!loading && (
-                <>
-                    {renderGridSection('الفترة الصباحية', morningSlots)}
-                    {renderGridSection('الفترة المسائية', eveningSlots)}
-                </>
-            )}
-             <div className="flex justify-center gap-4 pt-4 text-xs">
-                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-yellow-400" /><span>أول زيارة</span></div>
-                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-green-500" /><span>متابعة (بدون عقد)</span></div>
-                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-blue-500" /><span>متابعة (بعد العقد)</span></div>
-                <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-gray-400" /><span>أخرى</span></div>
+                {loading && <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
+
+                {!loading && (
+                    <>
+                        {renderGridSection('الفترة الصباحية', morningSlots)}
+                        {renderGridSection('الفترة المسائية', eveningSlots)}
+                    </>
+                )}
+                 <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-yellow-400" /><span>أول زيارة</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-green-500" /><span>متابعة (بدون عقد)</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-blue-500" /><span>متابعة (بعد العقد)</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-gray-400" /><span>أخرى</span></div>
+                </div>
             </div>
 
             {isDialogOpen && (

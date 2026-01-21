@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Save, Pencil, Trash2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -232,40 +232,53 @@ export function RoomBookingCalendar() {
             setAppointmentToDelete(null);
         }
     };
-
+    
+    const handlePrint = () => {
+        window.print();
+    };
 
     return (
         <div dir="rtl" className="p-4 space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
                 <h1 className="text-lg font-bold">تقويم حجوزات القاعات</h1>
-                 <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant={"outline"}
-                        className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}
-                    >
-                        <CalendarIcon className="ml-2 h-4 w-4" />
-                        {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
+                 <div className="flex items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}
+                        >
+                            <CalendarIcon className="ml-2 h-4 w-4" />
+                            {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" 
+                            onPointerDownOutside={(e) => e.preventDefault()}
+                            onInteractOutside={(e) => e.preventDefault()}
+                        >
+                        <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
+                    <Button onClick={handlePrint} variant="outline">
+                        <Printer className="ml-2 h-4 w-4" />
+                        طباعة الجدول
                     </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" 
-                        onPointerDownOutside={(e) => e.preventDefault()}
-                        onInteractOutside={(e) => e.preventDefault()}
-                    >
-                    <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        initialFocus
-                    />
-                    </PopoverContent>
-                </Popover>
+                 </div>
             </div>
 
-            <div className="overflow-x-auto border rounded-lg">
+            <div className="overflow-x-auto border rounded-lg printable-content">
+                <div className="hidden print:block mb-4 p-4">
+                    <h1 className="text-xl font-bold">تقويم حجوزات القاعات</h1>
+                    {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
+                </div>
                 <div className="grid grid-cols-[6rem_repeat(8,8rem)]">
                     {/* Header Row */}
-                    <div className="sticky top-0 left-0 bg-muted p-2 z-10 font-semibold text-center">القاعة</div>
+                    <div className="sticky top-0 left-0 bg-muted p-2 z-10 font-semibold text-center print:text-sm">القاعة</div>
                     {timeSlots.map(time => (
                         <div key={time} className="sticky top-0 bg-muted p-2 text-center text-sm font-mono border-r">
                             {time}
@@ -275,7 +288,7 @@ export function RoomBookingCalendar() {
                     {/* Rooms Rows */}
                     {rooms.map(room => (
                         <React.Fragment key={room}>
-                             <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-t">{room}</div>
+                             <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-t print:text-sm">{room}</div>
                              {timeSlots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
                                 return (
@@ -307,7 +320,7 @@ export function RoomBookingCalendar() {
                                         ) : (
                                             <button 
                                                 onClick={() => handleOpenDialog({ room, time })}
-                                                className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md"
+                                                className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print"
                                                 aria-label={`حجز ${room} الساعة ${time}`}
                                             />
                                         )}
@@ -320,7 +333,7 @@ export function RoomBookingCalendar() {
             </div>
              {loading && <div className="text-center p-8"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>}
 
-             <div className="flex justify-center gap-4 pt-4">
+             <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
                 {Object.entries(departmentColors).map(([dept, className]) => (
                     <div key={dept} className="flex items-center gap-2">
                         <div className={cn("h-4 w-4 rounded-sm border-l-4", className)} />

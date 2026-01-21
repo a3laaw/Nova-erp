@@ -97,8 +97,8 @@
         }
 
         @page {
-            size: A4;
-            margin: 1.5cm;
+            size: A4 landscape;
+            margin: 1cm;
         }
     }
 }
