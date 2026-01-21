@@ -46,9 +46,11 @@ export function ArchitecturalAppointmentsView() {
     const [dialogData, setDialogData] = useState<any>(null);
     
     useEffect(() => {
-        // Set date on client to avoid hydration mismatch
-        setDate(new Date());
-    }, []);
+        // Set date on client to avoid hydration mismatch and ensure it runs only once.
+        if(!date) {
+            setDate(new Date());
+        }
+    }, [date]);
 
     const fetchData = useCallback(async (d: Date | undefined) => {
         if (!firestore || !d) return;
@@ -339,9 +341,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         const fetchClientHistory = async () => {
             const q = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId));
             const snapshot = await getDocs(q);
-            const visits = snapshot.docs.map(doc => doc.data());
-            setVisitCount(visits.length + 1);
-            const hasSigned = visits.some(v => v.contractSigned && v.projectType === 'بلدية سكن خاص');
+            const architecturalVisits = snapshot.docs.map(doc => doc.data()).filter(appt => appt.type === 'architectural');
+            setVisitCount(architecturalVisits.length + 1);
+            const hasSigned = architecturalVisits.some(v => v.contractSigned && v.projectType === 'بلدية سكن خاص');
             setContractSigned(hasSigned);
         };
         fetchClientHistory();
