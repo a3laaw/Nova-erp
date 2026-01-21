@@ -34,7 +34,7 @@ export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [date, setDate] = useState<Date | undefined>();
+    const [date, setDate] = useState<Date>(new Date());
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
@@ -58,7 +58,6 @@ export function ArchitecturalAppointmentsView() {
                     collection(firestore, 'appointments'),
                     where('appointmentDate', '>=', dayStart),
                     where('appointmentDate', '<=', dayEnd)
-                    // where('type', '==', 'architectural') // Removed to avoid composite index
                 ))
             ]);
 
@@ -72,7 +71,7 @@ export function ArchitecturalAppointmentsView() {
             const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
             const augmentedAppointments = allAppointmentsForDay
-                .filter(appt => appt.type === 'architectural') // Filter on the client-side
+                .filter(appt => appt.type === 'architectural')
                 .map(appt => {
                     return {
                         ...appt,
@@ -91,15 +90,8 @@ export function ArchitecturalAppointmentsView() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        // Set date on client side to avoid hydration mismatch and trigger initial data fetch.
-        setDate(new Date());
-    }, []);
-
-    useEffect(() => {
         if (date) {
             fetchData(date);
-        } else {
-            setLoading(true); // Show loader until date is set
         }
     }, [date, fetchData]);
 
@@ -121,7 +113,6 @@ export function ArchitecturalAppointmentsView() {
     }, [appointments, engineers]);
 
     const handleCellClick = (engineer: Employee, time: string) => {
-        if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
         setDialogData({
             engineerId: engineer.id,
@@ -225,7 +216,7 @@ export function ArchitecturalAppointmentsView() {
                         <PopoverTrigger asChild>
                             <Button variant="outline" className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}>
                                 <CalendarIcon className="ml-2 h-4 w-4" />
-                                {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
+                                {format(date, "PPP", { locale: ar })}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -233,7 +224,9 @@ export function ArchitecturalAppointmentsView() {
                               mode="single" 
                               selected={date} 
                               onSelect={(newDate) => {
-                                  setDate(newDate);
+                                  if (newDate) {
+                                    setDate(newDate);
+                                  }
                                   setIsCalendarOpen(false);
                               }} 
                               initialFocus 

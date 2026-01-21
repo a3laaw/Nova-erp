@@ -65,7 +65,7 @@ export function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const [date, setDate] = useState<Date | undefined>();
+    const [date, setDate] = useState<Date>(new Date());
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -93,7 +93,6 @@ export function RoomBookingCalendar() {
                     collection(firestore, 'appointments'),
                     where('appointmentDate', '>=', dayStart),
                     where('appointmentDate', '<=', dayEnd)
-                    // where('type', '==', 'room') // Removed to avoid composite index
                 ))
             ]);
             
@@ -106,7 +105,7 @@ export function RoomBookingCalendar() {
             const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
             const augmentedAppointments = allAppointmentsForDay
-                .filter(appt => appt.type === 'room') // Filter on the client-side
+                .filter(appt => appt.type === 'room')
                 .map(appt => {
                     return {
                         ...appt,
@@ -125,15 +124,8 @@ export function RoomBookingCalendar() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        // Set date on client side to avoid hydration mismatch and trigger initial data fetch.
-        setDate(new Date());
-    }, []);
-    
-    useEffect(() => {
         if (date) {
             fetchData(date);
-        } else {
-            setLoading(true);
         }
     }, [date, fetchData]);
 
@@ -347,7 +339,7 @@ export function RoomBookingCalendar() {
                             className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}
                         >
                             <CalendarIcon className="ml-2 h-4 w-4" />
-                            {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
+                            {format(date, "PPP", { locale: ar })}
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -355,7 +347,9 @@ export function RoomBookingCalendar() {
                             mode="single"
                             selected={date}
                             onSelect={(newDate) => {
-                                setDate(newDate);
+                                if (newDate) {
+                                  setDate(newDate);
+                                }
                                 setIsCalendarOpen(false);
                             }}
                             initialFocus
