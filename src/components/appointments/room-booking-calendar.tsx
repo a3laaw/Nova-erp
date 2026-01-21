@@ -241,7 +241,7 @@ export function RoomBookingCalendar() {
           margin:       [0.5, 0.2, 0.5, 0.2],
           filename:     `room_bookings_${format(date, "yyyy-MM-dd")}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
           jsPDF:        { unit: 'in', format: 'a3', orientation: 'landscape' }
         };
 
@@ -313,9 +313,9 @@ export function RoomBookingCalendar() {
                                                     <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-between border-l-4 cursor-pointer', departmentColors[booking.department || 'أخرى'])}>
                                                         <div>
                                                             <p className="font-bold truncate">{booking.title}</p>
-                                                            <p className="text-muted-foreground truncate">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
+                                                            <p className="text-gray-700 truncate">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
                                                         </div>
-                                                        <p className="text-muted-foreground truncate font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
+                                                        <p className="text-gray-600 truncate font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
                                                     </div>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">

@@ -154,7 +154,7 @@ export function ArchitecturalAppointmentsView() {
           margin:       [0.5, 0.2, 0.5, 0.2], // [top, left, bottom, right]
           filename:     `architectural_appointments_${format(date, "yyyy-MM-dd")}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
           jsPDF:        { unit: 'in', format: 'a3', orientation: 'landscape' }
         };
 
@@ -178,7 +178,7 @@ export function ArchitecturalAppointmentsView() {
                             return (
                                 <div key={`${eng.id}-${time}`} className="relative h-24 border-b p-1">
                                     {booking ? (
-                                        <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-center text-white', colorMap[booking.color!] || 'bg-gray-400')}>
+                                        <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-center text-gray-800', colorMap[booking.color!] || 'bg-gray-400')}>
                                             <p className="font-bold truncate">{booking.clientName}</p>
                                             <p className="opacity-80 truncate">{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
                                             <p className="opacity-80 truncate">{booking.title}</p>
