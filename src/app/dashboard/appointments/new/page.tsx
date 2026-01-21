@@ -170,18 +170,23 @@ export default function NewArchitecturalAppointmentPage() {
             const appointmentDateTime = new Date(`${date}T${time}`);
             
             // --- Conflict Validation ---
+            const dayStart = new Date(appointmentDateTime);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(appointmentDateTime);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const appointmentsRef = collection(firestore, 'appointments');
+            const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
+            const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
+            const dayAppointments = dayAppointmentsSnap.docs.map(d => d.data());
+
             const windowStart = new Date(appointmentDateTime.getTime() - 59 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 59 * 60 * 1000);
 
-            const appointmentsRef = collection(firestore, 'appointments');
-
             // Check for engineer conflict
-            const engineerAppointmentsQuery = query(appointmentsRef, where('engineerId', '==', engineerId));
-            const engineerAppointmentsSnap = await getDocs(engineerAppointmentsQuery);
-            const engineerHasConflict = engineerAppointmentsSnap.docs.some(doc => {
-                const appt = doc.data();
+            const engineerHasConflict = dayAppointments.some(appt => {
                 const apptDate = appt.appointmentDate.toDate();
-                return apptDate >= windowStart && apptDate <= windowEnd;
+                return appt.engineerId === engineerId && apptDate >= windowStart && apptDate <= windowEnd;
             });
 
             if (engineerHasConflict) {
@@ -195,12 +200,9 @@ export default function NewArchitecturalAppointmentPage() {
             }
 
             // Check for client conflict
-            const clientAppointmentsQuery = query(appointmentsRef, where('clientId', '==', clientId));
-            const clientAppointmentsSnap = await getDocs(clientAppointmentsQuery);
-            const clientHasConflict = clientAppointmentsSnap.docs.some(doc => {
-                const appt = doc.data();
+            const clientHasConflict = dayAppointments.some(appt => {
                 const apptDate = appt.appointmentDate.toDate();
-                return apptDate >= windowStart && apptDate <= windowEnd;
+                return appt.clientId === clientId && apptDate >= windowStart && apptDate <= windowEnd;
             });
 
             if (clientHasConflict) {

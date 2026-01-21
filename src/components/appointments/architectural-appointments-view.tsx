@@ -479,22 +479,40 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             const newAppointmentTime = appointmentDateTime.getTime();
 
             if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
+                const dayStart = startOfDay(appointmentDateTime);
+                const dayEnd = endOfDay(appointmentDateTime);
+                const appointmentsRef = collection(firestore, 'appointments');
+                const appointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
+                const dayAppointmentsSnap = await getDocs(appointmentsQuery);
+                const dayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
                 const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
                 const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
-                const appointmentsRef = collection(firestore, 'appointments');
 
-                const engineerQuery = query(appointmentsRef, where('engineerId', '==', dialogData.engineerId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
-                const engineerSnap = await getDocs(engineerQuery);
-                const engineerHasConflict = engineerSnap.docs.some(doc => isEditing ? doc.id !== dialogData.id : true);
+                // Check for engineer conflict
+                const engineerHasConflict = dayAppointments.some(appt => {
+                    const isSameAppointment = isEditing && appt.id === dialogData.id;
+                    if (isSameAppointment) return false;
+                    
+                    const apptDate = appt.appointmentDate.toDate();
+                    return appt.engineerId === dialogData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
+                });
+
                 if (engineerHasConflict) {
                     toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
                     setIsSaving(false);
                     return;
                 }
 
-                const clientQuery = query(appointmentsRef, where('clientId', '==', selectedClientId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
-                const clientSnap = await getDocs(clientQuery);
-                const clientHasConflict = clientSnap.docs.some(doc => isEditing ? doc.id !== dialogData.id : true);
+                // Check for client conflict
+                const clientHasConflict = dayAppointments.some(appt => {
+                    const isSameAppointment = isEditing && appt.id === dialogData.id;
+                    if (isSameAppointment) return false;
+                    
+                    const apptDate = appt.appointmentDate.toDate();
+                    return appt.clientId === selectedClientId && apptDate >= windowStart && apptDate <= windowEnd;
+                });
+
                 if (clientHasConflict) {
                     toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
                     setIsSaving(false);
