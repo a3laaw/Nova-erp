@@ -150,6 +150,18 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       <DialogContent 
         className="sm:max-w-md" 
         dir="rtl"
+        onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                e.preventDefault();
+            }
+        }}
+        onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                e.preventDefault();
+            }
+        }}
       >
         <form onSubmit={handleSubmit}>
             <DialogHeader>
