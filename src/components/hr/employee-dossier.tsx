@@ -81,7 +81,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
 
 
   return (
-    <div className="p-4 md:p-6 bg-background font-body print:p-0" dir="rtl">
+    <div className="p-4 md:p-6 bg-background font-body print:p-0 printable-content" dir="rtl">
         <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2">
             {/* Header */}
             <header className="flex justify-between items-start pb-4 border-b">

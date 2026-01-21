@@ -79,23 +79,27 @@
         body {
             background: white !important;
             color: black !important;
-            font-family: 'Tajawal', sans-serif;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+        }
+
+        body * {
+            visibility: hidden;
+        }
+
+        .printable-content, .printable-content * {
+            visibility: visible;
+        }
+        
+        .printable-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
         }
 
         .no-print {
             display: none !important;
         }
         
-        /* Ensure the main content takes up the full page */
-        main, .printable-content {
-           padding: 0 !important;
-           margin: 0 !important;
-           border: none !important;
-           box-shadow: none !important;
-        }
-
         @page {
             size: A4 landscape;
             margin: 1cm;
