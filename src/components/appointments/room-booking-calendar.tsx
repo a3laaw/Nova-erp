@@ -77,6 +77,9 @@ export function RoomBookingCalendar() {
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const clientsMap = useMemo(() => new Map(clients.map(c => [c.id, c.nameAr])), [clients]);
+    const engineersMap = useMemo(() => new Map(engineers.map(e => [e.id!, e.fullName])), [engineers]);
+
 
     // --- Data Fetching ---
     const fetchAppointmentsForDate = useCallback(async (d: Date) => {
@@ -95,14 +98,21 @@ export function RoomBookingCalendar() {
             const fetchedAppointments = querySnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
                 .filter(appt => appt.type === 'room');
-            setAppointments(fetchedAppointments);
+            
+             const augmentedAppointments = fetchedAppointments.map(appt => ({
+                ...appt,
+                clientName: clientsMap.get(appt.clientId),
+                engineerName: appt.engineerId ? engineersMap.get(appt.engineerId) : undefined
+            }));
+
+            setAppointments(augmentedAppointments);
         } catch (error) {
             console.error("Error fetching appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث قائمة المواعيد.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast]);
+    }, [firestore, toast, clientsMap, engineersMap]);
     
     useEffect(() => {
         if (!firestore) return;
@@ -126,10 +136,10 @@ export function RoomBookingCalendar() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        if (date) {
+        if (date && clients.length > 0 && engineers.length > 0) {
             fetchAppointmentsForDate(date);
         }
-    }, [date, fetchAppointmentsForDate]);
+    }, [date, clients, engineers, fetchAppointmentsForDate]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -227,7 +237,9 @@ export function RoomBookingCalendar() {
         try {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
-            setAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id));
+            if (date) { // Re-fetch to update the UI
+                fetchAppointmentsForDate(date);
+            }
         } catch (error) {
             console.error("Error deleting appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
@@ -288,12 +300,12 @@ export function RoomBookingCalendar() {
                                                             padding: '0.5rem',
                                                             fontSize: '0.75rem',
                                                             cursor: 'pointer',
-                                                            ...departmentStyles[booking.department || 'أخرى']
+                                                            ...(departmentStyles[booking.department || 'أخرى'] || {})
                                                         }}
                                                     >
                                                         <p style={{ fontWeight: 'bold' }}>{booking.title}</p>
-                                                        <p>{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
-                                                        <p style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
+                                                        <p>{booking.clientName}</p>
+                                                        <p style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{booking.engineerName}</p>
                                                     </div>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">

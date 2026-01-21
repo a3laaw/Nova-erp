@@ -44,6 +44,8 @@ export function ArchitecturalAppointmentsView() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
 
+    const clientsMap = useMemo(() => new Map(clients.map(c => [c.id, c.nameAr])), [clients]);
+
     // Fetch static data (engineers, clients)
     useEffect(() => {
         if (!firestore) return;
@@ -84,21 +86,27 @@ export function ArchitecturalAppointmentsView() {
             const querySnapshot = await getDocs(q);
             const dayAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
             const architecturalAppointments = dayAppointments.filter(appt => appt.type === 'architectural');
-            setAppointments(architecturalAppointments);
+
+            const augmentedAppointments = architecturalAppointments.map(appt => ({
+                ...appt,
+                clientName: clientsMap.get(appt.clientId)
+            }));
+            
+            setAppointments(augmentedAppointments);
         } catch (error) {
             console.error("Error fetching appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast]);
+    }, [firestore, toast, clientsMap]);
 
     // Fetch appointments for the selected date
     useEffect(() => {
-        if (date) {
+        if (date && clients.length > 0) { // Ensure clients are loaded before fetching
             fetchAppointments(date);
         }
-    }, [date, fetchAppointments]);
+    }, [date, clients, fetchAppointments]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -190,7 +198,7 @@ export function ArchitecturalAppointmentsView() {
                                                 borderRadius: '0.375rem',
                                                 padding: '0.5rem',
                                                 fontSize: '0.75rem',
-                                                color: '#1f2937', 
+                                                color: '#1f2937',
                                                 backgroundColor: getVisitColor(booking),
                                             }}>
                                                 <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
