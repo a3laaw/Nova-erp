@@ -48,6 +48,7 @@ const initialFormData: Partial<UserProfile> = {
 function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; disabled?: boolean; }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
+    const MAX_DISPLAY_ITEMS = 50;
 
     useEffect(() => {
         setSearch(options.find(o => o.value === value)?.label || '');
@@ -57,12 +58,15 @@ function InlineSearchList({ value, onSelect, options, placeholder, disabled }: {
         opt.label.toLowerCase().includes(search.toLowerCase())
     );
 
+    const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
+
     return (
         <div className="relative">
             <Input
                 value={search}
                 placeholder={placeholder}
                 onFocus={() => !disabled && setShowOptions(true)}
+                onBlur={() => setTimeout(() => setShowOptions(false), 150)} // Delay to allow click
                 onChange={(e) => {
                     setSearch(e.target.value);
                     setShowOptions(true);
@@ -76,20 +80,27 @@ function InlineSearchList({ value, onSelect, options, placeholder, disabled }: {
                         {filteredOptions.length === 0 ? (
                             <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
                         ) : (
-                            filteredOptions.map(opt => (
-                                <li
-                                    key={opt.value}
-                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        onSelect(opt.value);
-                                        setSearch(opt.label);
-                                        setShowOptions(false);
-                                    }}
-                                >
-                                    {opt.label}
-                                </li>
-                            ))
+                           <>
+                                {displayOptions.map(opt => (
+                                    <li
+                                        key={opt.value}
+                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            onSelect(opt.value);
+                                            setSearch(opt.label);
+                                            setShowOptions(false);
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </li>
+                                ))}
+                                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
+                                    <li className="p-2 text-xs text-center text-muted-foreground">
+                                        ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
+                                    </li>
+                                )}
+                           </>
                         )}
                     </ul>
                 </div>
@@ -200,7 +211,22 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md" dir="rtl">
+      <DialogContent 
+        className="sm:max-w-md" 
+        dir="rtl"
+        onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                e.preventDefault();
+            }
+        }}
+        onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                e.preventDefault();
+            }
+        }}
+      >
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>

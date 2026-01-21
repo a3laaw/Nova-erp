@@ -43,7 +43,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { cn } from '@/lib/utils';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -67,6 +66,7 @@ const terminationReasons: {value: string, label: string}[] = [
 function InlineSearchList({ value, onSelect, options, placeholder }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
+    const MAX_DISPLAY_ITEMS = 50;
 
     useEffect(() => {
         setSearch(options.find(o => o.value === value)?.label || '');
@@ -75,6 +75,8 @@ function InlineSearchList({ value, onSelect, options, placeholder }: { value: st
     const filteredOptions = options.filter(opt =>
         opt.label.toLowerCase().includes(search.toLowerCase())
     );
+    
+    const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
 
     return (
         <div className="relative">
@@ -82,6 +84,7 @@ function InlineSearchList({ value, onSelect, options, placeholder }: { value: st
                 value={search}
                 placeholder={placeholder}
                 onFocus={() => setShowOptions(true)}
+                onBlur={() => setTimeout(() => setShowOptions(false), 150)} // Delay to allow click
                 onChange={(e) => {
                     setSearch(e.target.value);
                     setShowOptions(true);
@@ -94,20 +97,27 @@ function InlineSearchList({ value, onSelect, options, placeholder }: { value: st
                         {filteredOptions.length === 0 ? (
                             <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
                         ) : (
-                            filteredOptions.map(opt => (
-                                <li
-                                    key={opt.value}
-                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        onSelect(opt.value);
-                                        setSearch(opt.label);
-                                        setShowOptions(false);
-                                    }}
-                                >
-                                    {opt.label}
-                                </li>
-                            ))
+                            <>
+                                {displayOptions.map(opt => (
+                                    <li
+                                        key={opt.value}
+                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            onSelect(opt.value);
+                                            setSearch(opt.label);
+                                            setShowOptions(false);
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </li>
+                                ))}
+                                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
+                                    <li className="p-2 text-xs text-center text-muted-foreground">
+                                        ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
+                                    </li>
+                                )}
+                            </>
                         )}
                     </ul>
                 </div>
@@ -401,7 +411,21 @@ export function EmployeesTable() {
                 </Table>
             </div>
              <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent
+                    dir="rtl"
+                    onPointerDownOutside={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                            e.preventDefault();
+                        }
+                    }}
+                    onInteractOutside={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                            e.preventDefault();
+                        }
+                    }}
+                >
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>

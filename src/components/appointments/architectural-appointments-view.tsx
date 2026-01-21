@@ -238,6 +238,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
+
+    const MAX_DISPLAY_ITEMS = 50;
     
     useEffect(() => {
         if (!isOpen) { // Reset on close
@@ -296,9 +298,25 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         opt.nameAr.toLowerCase().includes(clientSearch.toLowerCase())
     );
 
+    const displayClients = filteredClients.slice(0, MAX_DISPLAY_ITEMS);
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-             <DialogContent dir="rtl">
+             <DialogContent
+                dir="rtl"
+                onPointerDownOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                        e.preventDefault();
+                    }
+                }}
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                        e.preventDefault();
+                    }
+                }}
+             >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>حجز موعد جديد</DialogTitle>
@@ -315,6 +333,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                     value={clientSearch}
                                     placeholder="ابحث عن عميل..."
                                     onFocus={() => setShowClientOptions(true)}
+                                    onBlur={() => setTimeout(() => setShowClientOptions(false), 150)} // Delay to allow click
                                     onChange={(e) => {
                                         setClientSearch(e.target.value);
                                         setShowClientOptions(true);
@@ -327,20 +346,27 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                             {filteredClients.length === 0 ? (
                                                 <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
                                             ) : (
-                                                filteredClients.map((client: Client) => (
-                                                    <li
-                                                        key={client.id}
-                                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                                        onMouseDown={(e) => {
-                                                            e.preventDefault(); 
-                                                            setSelectedClient({id: client.id, name: client.nameAr});
-                                                            setClientSearch(client.nameAr);
-                                                            setShowClientOptions(false);
-                                                        }}
-                                                    >
-                                                        {client.nameAr}
-                                                    </li>
-                                                ))
+                                                <>
+                                                    {displayClients.map((client: Client) => (
+                                                        <li
+                                                            key={client.id}
+                                                            className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault(); 
+                                                                setSelectedClient({id: client.id, name: client.nameAr});
+                                                                setClientSearch(client.nameAr);
+                                                                setShowClientOptions(false);
+                                                            }}
+                                                        >
+                                                            {client.nameAr}
+                                                        </li>
+                                                    ))}
+                                                    {filteredClients.length > MAX_DISPLAY_ITEMS && (
+                                                        <li className="p-2 text-xs text-center text-muted-foreground">
+                                                            ... و {filteredClients.length - MAX_DISPLAY_ITEMS} نتائج أخرى
+                                                        </li>
+                                                    )}
+                                                </>
                                             )}
                                         </ul>
                                     </div>

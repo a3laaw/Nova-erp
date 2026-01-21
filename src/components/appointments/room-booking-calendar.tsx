@@ -363,6 +363,7 @@ export function RoomBookingCalendar() {
 function InlineSearch({ value, onSelect, options, placeholder }: { value: string, onSelect: (value: string) => void, options: {label: string, value: string}[], placeholder: string }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
+    const MAX_DISPLAY_ITEMS = 50;
 
     const selectedLabel = useMemo(() => options.find(opt => opt.value === value)?.label || '', [options, value]);
 
@@ -374,12 +375,15 @@ function InlineSearch({ value, onSelect, options, placeholder }: { value: string
         options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase())),
     [options, search]);
 
+    const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
+
     return (
         <div className="relative">
             <Input
                 value={search}
                 placeholder={placeholder}
                 onFocus={() => setShowOptions(true)}
+                onBlur={() => setTimeout(() => setShowOptions(false), 150)}
                 onChange={(e) => {
                     setSearch(e.target.value);
                     setShowOptions(true);
@@ -392,20 +396,27 @@ function InlineSearch({ value, onSelect, options, placeholder }: { value: string
                         {filteredOptions.length === 0 ? (
                             <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
                         ) : (
-                            filteredOptions.map(opt => (
-                                <li
-                                    key={opt.value}
-                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault(); 
-                                        onSelect(opt.value);
-                                        setSearch(opt.label);
-                                        setShowOptions(false);
-                                    }}
-                                >
-                                    {opt.label}
-                                </li>
-                            ))
+                           <>
+                                {displayOptions.map(opt => (
+                                    <li
+                                        key={opt.value}
+                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                        onMouseDown={(e) => {
+                                            e.preventDefault(); 
+                                            onSelect(opt.value);
+                                            setSearch(opt.label);
+                                            setShowOptions(false);
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </li>
+                                ))}
+                                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
+                                     <li className="p-2 text-xs text-center text-muted-foreground">
+                                        ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
+                                    </li>
+                                )}
+                           </>
                         )}
                     </ul>
                 </div>
@@ -474,7 +485,21 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl">
+            <DialogContent 
+                dir="rtl"
+                onPointerDownOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                        e.preventDefault();
+                    }
+                }}
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
