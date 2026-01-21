@@ -46,12 +46,13 @@ const timeSlots = Array.from({ length: 8 }, (_, i) => { // From 7 AM, 8 slots (u
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 });
-const departmentColors: Record<string, string> = {
-  "الكهرباء": "bg-red-100 border-red-500 text-red-800",
-  "الصحي": "bg-blue-100 border-blue-500 text-blue-800",
-  "الإنشائي": "bg-green-100 border-green-500 text-green-800",
-  "المعماري": "bg-purple-100 border-purple-500 text-purple-800",
-  "أخرى": "bg-gray-100 border-gray-500 text-gray-800",
+
+const departmentStyles: Record<string, React.CSSProperties> = {
+  "الكهرباء": { backgroundColor: '#fee2e2', borderLeft: '4px solid #ef4444', color: '#991b1b' },
+  "الصحي": { backgroundColor: '#dbeafe', borderLeft: '4px solid #3b82f6', color: '#1e40af' },
+  "الإنشائي": { backgroundColor: '#dcfce7', borderLeft: '4px solid #22c55e', color: '#166534' },
+  "المعماري": { backgroundColor: '#f3e8ff', borderLeft: '4px solid #a855f7', color: '#7e22ce' },
+  "أخرى": { backgroundColor: '#f3f4f6', borderLeft: '4px solid #6b7280', color: '#374151' },
 };
 const departmentOptions = ['الكهرباء', 'الصحي', 'الإنشائي', 'المعماري', 'أخرى'];
 
@@ -316,10 +317,20 @@ export function RoomBookingCalendar() {
                                             {booking ? (
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <div className={cn('h-full w-full rounded-md p-2 text-xs border-l-4 cursor-pointer', departmentColors[booking.department || 'أخرى'])}>
-                                                            <p className="font-bold">{booking.title}</p>
-                                                            <p className="text-gray-700">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
-                                                            <p className="text-gray-600 font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
+                                                        <div 
+                                                            style={{
+                                                                height: '100%',
+                                                                width: '100%',
+                                                                borderRadius: '0.375rem',
+                                                                padding: '0.5rem',
+                                                                fontSize: '0.75rem',
+                                                                cursor: 'pointer',
+                                                                ...departmentStyles[booking.department || 'أخرى']
+                                                            }}
+                                                        >
+                                                            <p style={{ fontWeight: 'bold' }}>{booking.title}</p>
+                                                            <p>{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
+                                                            <p style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
                                                         </div>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent dir="rtl">
@@ -353,9 +364,9 @@ export function RoomBookingCalendar() {
              {loading && <div className="text-center p-8"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>}
 
              <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
-                {Object.entries(departmentColors).map(([dept, className]) => (
+                {Object.entries(departmentStyles).map(([dept, style]) => (
                     <div key={dept} className="flex items-center gap-2">
-                        <div className={cn("h-4 w-4 rounded-sm border-l-4", className)} />
+                        <div className="h-4 w-4 rounded-sm" style={{ backgroundColor: style.backgroundColor, borderLeft: style.borderLeft }} />
                         <span className="text-sm">{dept}</span>
                     </div>
                 ))}
@@ -561,7 +572,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
                                         <Calendar mode="single" selected={appointmentDate} onSelect={setAppointmentDate} initialFocus />
-                                    PopoverContent>
+                                    </PopoverContent>
                                 </Popover>
                             </div>
                             <div>

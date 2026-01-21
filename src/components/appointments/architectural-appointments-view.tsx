@@ -187,8 +187,16 @@ export function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                            <div className={cn('h-full w-full rounded-md p-2 text-xs text-gray-800', colorMap[booking.color!] || 'bg-gray-400')}>
-                                                <p className="font-bold">{booking.clientName}</p>
+                                             <div style={{
+                                                height: '100%',
+                                                width: '100%',
+                                                borderRadius: '0.375rem',
+                                                padding: '0.5rem',
+                                                fontSize: '0.75rem',
+                                                color: '#1f2937', // Equivalent to text-gray-800
+                                                backgroundColor: booking.color || '#9ca3af',
+                                            }}>
+                                                <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
                                                 <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
                                                 <p>{booking.title}</p>
                                             </div>
