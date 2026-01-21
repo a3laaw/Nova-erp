@@ -168,8 +168,8 @@ export function RoomBookingCalendar() {
             
             setDialogData({
                 room: data.room,
-                startTime,
-                endTime
+                appointmentDate: startTime,
+                endDate: endTime
             });
         }
         setIsDialogOpen(true);
@@ -185,11 +185,11 @@ export function RoomBookingCalendar() {
                 clientId: formData.clientId,
                 engineerId: formData.engineerId,
                 title: formData.title,
-                notes: formData.notes,
+                notes: formData.notes || '',
                 meetingRoom: formData.room,
                 department: formData.department,
-                appointmentDate: Timestamp.fromDate(formData.startTime),
-                endDate: Timestamp.fromDate(formData.endTime),
+                appointmentDate: Timestamp.fromDate(formData.appointmentDate),
+                endDate: Timestamp.fromDate(formData.endDate),
                 type: 'room',
             };
             
@@ -446,16 +446,16 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        const startTimeToSave = dialogData.appointmentDate?.toDate() || dialogData.startTime;
-        const endTimeToSave = dialogData.endDate?.toDate() || dialogData.endTime;
+        const appointmentDateToSave = dialogData.appointmentDate;
+        const endDateToSave = dialogData.endDate;
 
         setIsSaving(true);
         await onSave({ 
             ...formData, 
             id: dialogData.id,
             room: roomName,
-            startTime: startTimeToSave,
-            endTime: endTimeToSave,
+            appointmentDate: appointmentDateToSave,
+            endDate: endDateToSave,
         });
         setIsSaving(false);
     };
@@ -486,7 +486,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
-                            حجز {roomName} في {format(dialogData.appointmentDate?.toDate() || dialogData.startTime, "PPP", { locale: ar })} الساعة {format(dialogData.appointmentDate?.toDate() || dialogData.startTime, "h:mm a", { locale: ar })}
+                            حجز {roomName} في {format(dialogData.appointmentDate, "PPP", { locale: ar })} الساعة {format(dialogData.appointmentDate, "h:mm a", { locale: ar })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
@@ -519,3 +519,5 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         </Dialog>
     );
 }
+
+    
