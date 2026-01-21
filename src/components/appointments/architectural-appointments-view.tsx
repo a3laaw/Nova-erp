@@ -8,14 +8,12 @@ import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Save } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -73,18 +71,14 @@ export function ArchitecturalAppointmentsView() {
             const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
             setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
             
-            const localClientsMap = new Map(allClients.map(c => [c.id, c.nameAr]));
-            const localEngineersMap = new Map(allEngineers.map(e => [e.id!, e.fullName]));
-            
-            const architecturalAppointments = apptSnap.docs
+            const augmentedAppointments = apptSnap.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                .filter(appt => appt.type === 'architectural');
-
-            const augmentedAppointments = architecturalAppointments.map(appt => ({
-                ...appt,
-                clientName: localClientsMap.get(appt.clientId),
-                engineerName: appt.engineerId ? localEngineersMap.get(appt.engineerId) : undefined
-            }));
+                .filter(appt => appt.type === 'architectural')
+                .map(appt => ({
+                    ...appt,
+                    clientName: allClients.find(c => c.id === appt.clientId)?.nameAr,
+                    engineerName: allEngineers.find(e => e.id === appt.engineerId)?.fullName
+                }));
             
             setAppointments(augmentedAppointments);
 
@@ -193,11 +187,10 @@ export function ArchitecturalAppointmentsView() {
                                                 padding: '0.5rem',
                                                 fontSize: '0.75rem',
                                                 color: '#1f2937',
-                                                ...getVisitColor(booking),
+                                                backgroundColor: booking.color,
                                             }}>
                                                 <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
                                                 <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
-                                                <p>{booking.title}</p>
                                             </div>
                                         ) : (
                                             <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
@@ -224,21 +217,15 @@ export function ArchitecturalAppointmentsView() {
                                 {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0"
+                             onPointerDownOutside={(e) => e.preventDefault()}
+                             onInteractOutside={(e) => e.preventDefault()}
+                        >
                             <Calendar 
                               mode="single" 
                               selected={date} 
                               onSelect={setDate} 
                               initialFocus 
-                              onDayPointerDown={(e) => e.preventDefault()}
-                              onMonthChange={(month) => {
-                                // This logic can be complex, for now we just prevent default
-                                // to stop popover from closing on month change navigation.
-                                const target = document.activeElement;
-                                if (target && target instanceof HTMLElement && !target.closest('.rdp-day')) {
-                                    // e.preventDefault();
-                                }
-                              }}
                             />
                         </PopoverContent>
                     </Popover>
@@ -306,6 +293,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             setContractSigned(false);
         } else {
             setTitle('');
+            setSelectedClientId('');
             setVisitCount(1);
             setContractSigned(false);
         }
@@ -332,8 +320,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         e.preventDefault();
         const client = clients.find((c: Client) => c.id === selectedClientId);
 
-        if (!client || !title) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل وإدخال الغرض من الموعد.' });
+        if (!client) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل.' });
             return;
         }
         setIsSaving(true);
@@ -389,10 +377,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة</Label>
-                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} required />
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} />
                         </div>
                         <div className="grid gap-2">
-                             <Label htmlFor="client-search">العميل</Label>
+                             <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
                              <InlineSearchList 
                                 value={selectedClientId}
                                 onSelect={setSelectedClientId}
