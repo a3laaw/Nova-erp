@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -156,18 +156,38 @@ export function ArchitecturalAppointmentsView() {
         setIsDialogOpen(true);
     };
 
+    const handleEditClick = (booking: Appointment) => {
+        setDialogData({
+            ...booking,
+            id: booking.id, // Make sure ID is passed
+            appointmentDate: booking.appointmentDate.toDate(), // Convert timestamp to Date for dialog
+        });
+        setIsDialogOpen(true);
+    };
+
     const handleSave = async (data: any) => {
         if (!firestore) return;
+
+        const isEditing = !!data.id;
+        const { id, ...saveData } = data; // separate id from the rest of the data
+
         try {
-            await addDoc(collection(firestore, 'appointments'), data);
-            toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
+            if (isEditing) {
+                const appointmentRef = doc(firestore, 'appointments', id);
+                await updateDoc(appointmentRef, saveData);
+                toast({ title: 'نجاح', description: 'تم تعديل الموعد بنجاح.' });
+            } else {
+                await addDoc(collection(firestore, 'appointments'), saveData);
+                toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
+            }
+            
             setIsDialogOpen(false);
             if (date) { // Re-fetch data for the current date
                 fetchData(date);
             }
         } catch (error) {
             console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الموعد.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: `فشل ${isEditing ? 'تعديل' : 'حفظ'} الموعد.` });
         }
     };
     
@@ -270,9 +290,9 @@ export function ArchitecturalAppointmentsView() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">
                                                     <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                    <DropdownMenuItem disabled>
+                                                    <DropdownMenuItem onClick={() => handleEditClick(booking)}>
                                                         <Pencil className="ml-2 h-4 w-4" />
-                                                        <span>تعديل الموعد (قريبًا)</span>
+                                                        <span>تعديل الموعد</span>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
@@ -386,6 +406,7 @@ export function ArchitecturalAppointmentsView() {
 function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
+    const isEditing = !!dialogData?.id;
     
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
@@ -394,11 +415,22 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
 
     useEffect(() => {
-        if (!isOpen) { // Reset on close
-            setTitle('');
-            setSelectedClientId('');
+        if (isOpen && dialogData) {
+            if (isEditing) {
+                setSelectedClientId(dialogData.clientId || '');
+                // Do not set title if it was the default client name to allow placeholder to show
+                setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
+                setVisitCount(dialogData.visitCount || 1);
+                setContractSigned(dialogData.contractSigned || false);
+                setProjectType(dialogData.projectType || 'بلدية سكن خاص');
+            } else {
+                // Reset for new appointment
+                setSelectedClientId('');
+                setTitle('');
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, dialogData, isEditing]);
+
 
     useEffect(() => {
         if (!selectedClientId || !firestore) {
@@ -413,13 +445,16 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
               where('type', '==', 'architectural')
             );
             const snapshot = await getDocs(q);
-            const architecturalVisits = snapshot.docs.map(doc => doc.data()).filter(appt => appt.type === 'architectural');
+            const architecturalVisits = snapshot.docs
+                .filter(d => isEditing ? d.id !== dialogData.id : true)
+                .map(doc => doc.data()).filter(appt => appt.type === 'architectural');
+
             setVisitCount(architecturalVisits.length + 1);
             const hasSigned = architecturalVisits.some(v => v.contractSigned && v.projectType === 'بلدية سكن خاص');
             setContractSigned(hasSigned);
         };
         fetchClientHistory();
-    }, [selectedClientId, firestore]);
+    }, [selectedClientId, firestore, isEditing, dialogData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -430,8 +465,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             return;
         }
         setIsSaving(true);
-        const data = {
-            ...dialogData,
+        const dataToSave = {
+            // from dialogData when creating/editing
+            engineerId: dialogData.engineerId,
+            engineerName: dialogData.engineerName,
+            appointmentDate: Timestamp.fromDate(dialogData.appointmentDate),
+            session: dialogData.session,
+            // from form
             clientId: client.id,
             clientName: client.nameAr,
             title: title || client.nameAr,
@@ -440,10 +480,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             projectType,
             type: 'architectural',
             color: getVisitColor({ visitCount, contractSigned, projectType }),
-            createdAt: serverTimestamp(),
-            appointmentDate: Timestamp.fromDate(dialogData.appointmentDate),
+            // metadata
+            ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
         };
-        await onSave(data);
+        await onSave(dataToSave);
         setIsSaving(false);
     };
     
@@ -472,9 +512,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
              >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>حجز موعد جديد</DialogTitle>
+                        <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
-                            للمهندس: {dialogData.engineerName} | الساعة: {format(dialogData.appointmentDate, 'h:mm a', { locale: ar })}
+                            للمهندس: {dialogData.engineerName} | الساعة: {dialogData.appointmentDate ? format(dialogData.appointmentDate, 'h:mm a', { locale: ar }) : ''}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
@@ -496,7 +536,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                         <Button type="submit" disabled={isSaving || !selectedClientId}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                            حفظ الموعد
+                            {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
                     </DialogFooter>
                 </form>
