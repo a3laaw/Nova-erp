@@ -73,16 +73,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDoc = snapshot.docs[0];
         const userProfileData = userDoc.data() as UserProfile;
 
-        // Fetch employee data
-        const employeeDocRef = doc(firestore, 'employees', userProfileData.employeeId);
-        const employeeSnap = await getDoc(employeeDocRef);
-        const employeeData = employeeSnap.exists() ? (employeeSnap.data() as Employee) : {};
+        // Selectively fetch and attach only necessary employee data
+        let fullName, avatarUrl;
+        if (userProfileData.employeeId) {
+          const employeeDocRef = doc(firestore, 'employees', userProfileData.employeeId);
+          const employeeSnap = await getDoc(employeeDocRef);
+          if (employeeSnap.exists()) {
+            const employeeData = employeeSnap.data() as Employee;
+            fullName = employeeData.fullName;
+            avatarUrl = employeeData.profilePicture;
+          }
+        }
         
         setUser({
           ...userProfileData,
-          ...employeeData,
           id: userDoc.id,
-          uid: firebaseUser.uid
+          uid: firebaseUser.uid,
+          // Augment with employee data, providing fallbacks
+          fullName: fullName || userProfileData.username,
+          avatarUrl: avatarUrl || '',
         });
 
       } else {
