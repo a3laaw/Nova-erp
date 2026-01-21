@@ -205,12 +205,32 @@ export function RoomBookingCalendar() {
                 dataToSave.createdAt = serverTimestamp();
             }
 
-
             if(isEditing) {
                 const appointmentRef = doc(firestore, 'appointments', formData.id);
                 await updateDoc(appointmentRef, dataToSave);
                 toast({ title: "تم التعديل بنجاح!" });
-                setAppointments(prev => prev.map(appt => appt.id === formData.id ? { ...appt, ...dataToSave } : appt));
+                
+                setAppointments(prev => {
+                    const newAppointments = [...prev];
+                    const index = newAppointments.findIndex(a => a.id === formData.id);
+                    
+                    if (index > -1) {
+                        const originalAppointment = newAppointments[index];
+                        const updatedAppointment = { ...originalAppointment, ...dataToSave };
+            
+                        const updatedDate = updatedAppointment.appointmentDate.toDate();
+                        const mainViewDate = startOfDay(date!);
+                        
+                        if (startOfDay(updatedDate).getTime() === mainViewDate.getTime()) {
+                            newAppointments[index] = updatedAppointment;
+                            return newAppointments;
+                        } else {
+                            return newAppointments.filter(a => a.id !== formData.id);
+                        }
+                    }
+                    return prev;
+                });
+
             } else {
                 const newDocRef = await addDoc(collection(firestore, 'appointments'), dataToSave);
                 toast({ title: "تم الحجز بنجاح!" });
