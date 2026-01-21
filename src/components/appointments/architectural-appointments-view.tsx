@@ -34,7 +34,7 @@ export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [date, setDate] = useState<Date | undefined>(new Date());
+    const [date, setDate] = useState<Date | undefined>();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
@@ -51,18 +51,15 @@ export function ArchitecturalAppointmentsView() {
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
             
-            const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-            const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
-            const apptQuery = query(
-                collection(firestore, 'appointments'),
-                where('appointmentDate', '>=', dayStart),
-                where('appointmentDate', '<=', dayEnd)
-            );
-
             const [engSnap, clientSnap, apptSnap] = await Promise.all([
-                getDocs(engQuery),
-                getDocs(clientQuery),
-                getDocs(apptQuery)
+                getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+                getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
+                getDocs(query(
+                    collection(firestore, 'appointments'),
+                    where('appointmentDate', '>=', dayStart),
+                    where('appointmentDate', '<=', dayEnd),
+                    where('type', '==', 'architectural')
+                ))
             ]);
 
             const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
@@ -73,13 +70,13 @@ export function ArchitecturalAppointmentsView() {
             setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
             
             const augmentedAppointments = apptSnap.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                .filter(appt => appt.type === 'architectural')
-                .map(appt => ({
-                    ...appt,
-                    clientName: allClients.find(c => c.id === appt.clientId)?.nameAr,
-                    engineerName: allEngineers.find(e => e.id === appt.engineerId)?.fullName
-                }));
+                .map(doc => {
+                    const appt = { id: doc.id, ...doc.data() } as Appointment;
+                    return {
+                        ...appt,
+                        clientName: allClients.find(c => c.id === appt.clientId)?.nameAr,
+                    }
+                });
             
             setAppointments(augmentedAppointments);
 
@@ -92,8 +89,15 @@ export function ArchitecturalAppointmentsView() {
     }, [firestore, toast]);
     
     useEffect(() => {
+        // Set date on client side to avoid hydration mismatch and trigger initial data fetch.
+        setDate(new Date());
+    }, []);
+
+    useEffect(() => {
         if (date) {
             fetchData(date);
+        } else {
+            setLoading(true); // Show loader until date is set
         }
     }, [date, fetchData]);
 
@@ -115,7 +119,8 @@ export function ArchitecturalAppointmentsView() {
     }, [appointments, engineers]);
 
     const handleCellClick = (engineer: Employee, time: string) => {
-        const appointmentDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
+        if (!date) return;
+        const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
         setDialogData({
             engineerId: engineer.id,
             engineerName: engineer.fullName,
@@ -130,10 +135,10 @@ export function ArchitecturalAppointmentsView() {
         try {
             await addDoc(collection(firestore, 'appointments'), data);
             toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
-            if (date) {
+            setIsDialogOpen(false);
+            if (date) { // Re-fetch data for the current date
                 fetchData(date);
             }
-            setIsDialogOpen(false);
         } catch (error) {
             console.error(error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الموعد.' });
@@ -333,7 +338,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             ...dialogData,
             clientId: client.id,
             clientName: client.nameAr,
-            title,
+            title: title || '',
             visitCount,
             contractSigned,
             projectType,
@@ -379,7 +384,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
                          <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الزيارة</Label>
+                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} />
                         </div>
                         <div className="grid gap-2">

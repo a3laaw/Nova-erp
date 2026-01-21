@@ -65,7 +65,7 @@ export function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const [date, setDate] = useState<Date | undefined>(new Date());
+    const [date, setDate] = useState<Date | undefined>();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -92,7 +92,8 @@ export function RoomBookingCalendar() {
                 getDocs(query(
                     collection(firestore, 'appointments'),
                     where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
+                    where('appointmentDate', '<=', dayEnd),
+                    where('type', '==', 'room')
                 ))
             ]);
             
@@ -103,7 +104,6 @@ export function RoomBookingCalendar() {
             setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
 
             const augmentedAppointments = apptSnap.docs
-                .filter(doc => doc.data().type === 'room')
                 .map(doc => {
                     const appt = { id: doc.id, ...doc.data() } as Appointment;
                     return {
@@ -123,8 +123,15 @@ export function RoomBookingCalendar() {
     }, [firestore, toast]);
     
     useEffect(() => {
+        // Set date on client side to avoid hydration mismatch and trigger initial data fetch.
+        setDate(new Date());
+    }, []);
+    
+    useEffect(() => {
         if (date) {
             fetchData(date);
+        } else {
+            setLoading(true);
         }
     }, [date, fetchData]);
 
@@ -160,11 +167,12 @@ export function RoomBookingCalendar() {
 
 
     const handleOpenDialog = (data: Partial<Appointment> & { room: string, time?: string }) => {
+        if (!date) return;
         if (data.id) { // Editing existing appointment
             setDialogData(data);
         } else { // Creating new
             const { hours, minutes } = parseTime(data.time!);
-            const startTime = setMinutes(setHours(date!, hours), minutes);
+            const startTime = setMinutes(setHours(date, hours), minutes);
             const endTime = addMinutes(startTime, 30);
             
             setDialogData({
@@ -207,11 +215,11 @@ export function RoomBookingCalendar() {
                 toast({ title: "تم الحجز بنجاح!" });
             }
             
+            setIsDialogOpen(false);
             if (date) {
                 fetchData(date);
             }
 
-            setIsDialogOpen(false);
         } catch (error) {
             console.error(error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الموعد.' });
@@ -494,7 +502,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الموعد</Label>
+                            <Label htmlFor="title">الغرض من الموعد (اختياري)</Label>
                             <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
                         </div>
                         <div className="grid gap-2">
