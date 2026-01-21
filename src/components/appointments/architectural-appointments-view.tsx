@@ -167,31 +167,41 @@ export function ArchitecturalAppointmentsView() {
     const renderGridSection = (title: string, slots: string[]) => (
         <div className="border rounded-lg overflow-x-auto">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
-            <div className="grid" style={{ gridTemplateColumns: `8rem repeat(${slots.length}, minmax(8rem, 1fr))` }}>
-                <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-b border-l print:text-sm">المهندس</div>
-                {slots.map(time => <div key={time} className="p-2 text-center text-sm font-mono border-b">{time}</div>)}
-                {engineers.map(eng => (
-                    <React.Fragment key={eng.id}>
-                        <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{eng.fullName}</div>
-                        {slots.map(time => {
-                            const booking = bookingsGrid[eng.id!]?.[time];
-                            return (
-                                <div key={`${eng.id}-${time}`} className="relative h-24 border-b p-1">
-                                    {booking ? (
-                                        <div className={cn('h-full w-full rounded-md p-2 text-xs text-gray-800', colorMap[booking.color!] || 'bg-gray-400')}>
-                                            <p className="font-bold">{booking.clientName}</p>
-                                            <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
-                                            <p>{booking.title}</p>
-                                        </div>
-                                    ) : (
-                                        <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </React.Fragment>
-                ))}
-            </div>
+             <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                    <col style={{ width: '8rem' }} />
+                    {slots.map((_, i) => <col key={i} style={{ minWidth: '8rem' }} />)}
+                </colgroup>
+                <thead>
+                    <tr className='border-b'>
+                        <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">المهندس</th>
+                        {slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}
+                    </tr>
+                </thead>
+                <tbody>
+                    {engineers.map(eng => (
+                        <tr key={eng.id} className='border-b'>
+                            <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{eng.fullName}</th>
+                            {slots.map(time => {
+                                const booking = bookingsGrid[eng.id!]?.[time];
+                                return (
+                                    <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
+                                        {booking ? (
+                                            <div className={cn('h-full w-full rounded-md p-2 text-xs text-gray-800', colorMap[booking.color!] || 'bg-gray-400')}>
+                                                <p className="font-bold">{booking.clientName}</p>
+                                                <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
+                                                <p>{booking.title}</p>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
+                                        )}
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 
@@ -241,10 +251,10 @@ export function ArchitecturalAppointmentsView() {
                 {loading && <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
 
                 {!loading && (
-                    <>
+                    <div className="space-y-4">
                         {renderGridSection('الفترة الصباحية', morningSlots)}
                         {renderGridSection('الفترة المسائية', eveningSlots)}
-                    </>
+                    </div>
                 )}
                  <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
                     <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-yellow-400" /><span>أول زيارة</span></div>

@@ -290,58 +290,65 @@ export function RoomBookingCalendar() {
                     <h1 className="text-xl font-bold">تقويم حجوزات القاعات</h1>
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
-                <div className="grid grid-cols-[6rem_repeat(8,8rem)]">
-                    {/* Header Row */}
-                    <div className="sticky top-0 left-0 bg-muted p-2 z-10 font-semibold text-center print:text-sm">القاعة</div>
-                    {timeSlots.map(time => (
-                        <div key={time} className="sticky top-0 bg-muted p-2 text-center text-sm font-mono border-r">
-                            {time}
-                        </div>
-                    ))}
-
-                    {/* Rooms Rows */}
-                    {rooms.map(room => (
-                        <React.Fragment key={room}>
-                             <div className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-t print:text-sm">{room}</div>
-                             {timeSlots.map(time => {
-                                const booking = bookingsGrid[room]?.[time];
-                                return (
-                                    <div key={`${room}-${time}`} className="relative h-24 border-t border-r p-1">
-                                        {booking ? (
-                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <div className={cn('h-full w-full rounded-md p-2 text-xs border-l-4 cursor-pointer', departmentColors[booking.department || 'أخرى'])}>
-                                                        <p className="font-bold">{booking.title}</p>
-                                                        <p className="text-gray-700">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
-                                                        <p className="text-gray-600 font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
-                                                    </div>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent dir="rtl">
-                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleOpenDialog(booking)}>
-                                                        <Pencil className="ml-2 h-4 w-4" />
-                                                        <span>تعديل الموعد</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                        <Trash2 className="ml-2 h-4 w-4" />
-                                                        <span>إلغاء الموعد</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        ) : (
-                                            <button 
-                                                onClick={() => handleOpenDialog({ room, time })}
-                                                className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print"
-                                                aria-label={`حجز ${room} الساعة ${time}`}
-                                            />
-                                        )}
-                                    </div>
-                                );
-                             })}
-                        </React.Fragment>
-                    ))}
-                </div>
+                <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>
+                        <col style={{ width: '8rem' }} />
+                        {timeSlots.map((_, i) => <col key={i} style={{ minWidth: '8rem' }} />)}
+                    </colgroup>
+                    <thead>
+                        <tr className="border-b">
+                            <th className="sticky top-0 left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>
+                            {timeSlots.map(time => (
+                                <th key={time} className="sticky top-0 bg-muted p-2 text-center text-sm font-mono border-l">
+                                    {time}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rooms.map(room => (
+                            <tr key={room} className="border-b">
+                                <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
+                                {timeSlots.map(time => {
+                                    const booking = bookingsGrid[room]?.[time];
+                                    return (
+                                        <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
+                                            {booking ? (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <div className={cn('h-full w-full rounded-md p-2 text-xs border-l-4 cursor-pointer', departmentColors[booking.department || 'أخرى'])}>
+                                                            <p className="font-bold">{booking.title}</p>
+                                                            <p className="text-gray-700">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
+                                                            <p className="text-gray-600 font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
+                                                        </div>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent dir="rtl">
+                                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleOpenDialog(booking)}>
+                                                            <Pencil className="ml-2 h-4 w-4" />
+                                                            <span>تعديل الموعد</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                            <Trash2 className="ml-2 h-4 w-4" />
+                                                            <span>إلغاء الموعد</span>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleOpenDialog({ room, time })}
+                                                    className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print"
+                                                    aria-label={`حجز ${room} الساعة ${time}`}
+                                                />
+                                            )}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
              {loading && <div className="text-center p-8"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>}
 
@@ -554,7 +561,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
                                         <Calendar mode="single" selected={appointmentDate} onSelect={setAppointmentDate} initialFocus />
-                                    </PopoverContent>
+                                    PopoverContent>
                                 </Popover>
                             </div>
                             <div>
