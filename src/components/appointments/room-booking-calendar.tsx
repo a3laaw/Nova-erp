@@ -68,6 +68,7 @@ export function RoomBookingCalendar() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
@@ -185,7 +186,7 @@ export function RoomBookingCalendar() {
                 clientId: formData.clientId,
                 engineerId: formData.engineerId,
                 title: formData.title,
-                notes: '',
+                notes: formData.notes || '',
                 meetingRoom: formData.room,
                 department: formData.department,
                 appointmentDate: Timestamp.fromDate(formData.appointmentDate),
@@ -329,7 +330,7 @@ export function RoomBookingCalendar() {
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
                 <h1 className="text-lg font-bold">تقويم حجوزات القاعات</h1>
                  <div className="flex items-center gap-2">
-                    <Popover>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
                         <Button
                             variant={"outline"}
@@ -339,14 +340,14 @@ export function RoomBookingCalendar() {
                             {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                         </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" 
-                            onPointerDownOutside={(e) => e.preventDefault()}
-                            onInteractOutside={(e) => e.preventDefault()}
-                        >
+                        <PopoverContent className="w-auto p-0">
                         <Calendar
                             mode="single"
                             selected={date}
-                            onSelect={setDate}
+                            onSelect={(newDate) => {
+                                setDate(newDate);
+                                setIsCalendarOpen(false);
+                            }}
                             initialFocus
                         />
                         </PopoverContent>
@@ -427,6 +428,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         department: '',
         engineerId: '',
         title: '',
+        notes: '',
     });
     const [isSaving, setIsSaving] = useState(false);
     
@@ -439,6 +441,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                 department: dialogData.department || '',
                 engineerId: dialogData.engineerId || '',
                 title: dialogData.title || '',
+                notes: dialogData.notes || '',
             });
         }
     }, [isOpen, dialogData]);

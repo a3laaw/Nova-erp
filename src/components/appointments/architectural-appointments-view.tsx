@@ -39,6 +39,7 @@ export function ArchitecturalAppointmentsView() {
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
@@ -213,21 +214,21 @@ export function ArchitecturalAppointmentsView() {
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
                 <h2 className="text-lg font-bold">جدول زيارات القسم المعماري</h2>
                 <div className='flex items-center gap-2'>
-                    <Popover>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
                             <Button variant="outline" className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}>
                                 <CalendarIcon className="ml-2 h-4 w-4" />
                                 {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"
-                             onPointerDownOutside={(e) => e.preventDefault()}
-                             onInteractOutside={(e) => e.preventDefault()}
-                        >
+                        <PopoverContent className="w-auto p-0">
                             <Calendar 
                               mode="single" 
                               selected={date} 
-                              onSelect={setDate} 
+                              onSelect={(newDate) => {
+                                  setDate(newDate);
+                                  setIsCalendarOpen(false);
+                              }} 
                               initialFocus 
                             />
                         </PopoverContent>
@@ -283,10 +284,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [isSaving, setIsSaving] = useState(false);
     
     const [selectedClientId, setSelectedClientId] = useState('');
+    const [title, setTitle] = useState('');
     const [visitCount, setVisitCount] = useState(1);
     const [contractSigned, setContractSigned] = useState(false);
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
-    const [title, setTitle] = useState('');
 
     useEffect(() => {
         if (!isOpen) { // Reset on close
@@ -333,7 +334,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             clientId: client.id,
             clientName: client.nameAr,
             title,
-            notes: '',
             visitCount,
             contractSigned,
             projectType,
