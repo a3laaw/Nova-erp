@@ -178,7 +178,7 @@ export function ArchitecturalAppointmentsView() {
                             return (
                                 <div key={`${eng.id}-${time}`} className="relative h-24 border-b p-1">
                                     {booking ? (
-                                        <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-center text-gray-800', colorMap[booking.color!] || 'bg-gray-400')}>
+                                        <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-start text-gray-800', colorMap[booking.color!] || 'bg-gray-400')}>
                                             <p className="font-bold truncate">{booking.clientName}</p>
                                             <p className="opacity-80 truncate">{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
                                             <p className="opacity-80 truncate">{booking.title}</p>
