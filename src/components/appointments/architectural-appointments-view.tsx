@@ -185,12 +185,15 @@ export function ArchitecturalAppointmentsView() {
                                                 width: '100%',
                                                 borderRadius: '0.375rem',
                                                 padding: '0.5rem',
-                                                fontSize: '0.75rem',
+                                                fontSize: '0.875rem',
                                                 color: '#1f2937',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                textAlign: 'center',
                                                 backgroundColor: booking.color,
                                             }}>
                                                 <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
-                                                <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
                                             </div>
                                         ) : (
                                             <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
@@ -375,7 +378,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
-                        <div className="grid gap-2">
+                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} />
                         </div>
