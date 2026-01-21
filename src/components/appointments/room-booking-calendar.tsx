@@ -234,7 +234,21 @@ export function RoomBookingCalendar() {
     };
     
     const handlePrint = () => {
-        window.print();
+        const element = document.getElementById('room-booking-printable-area');
+        if (!element || !date) return;
+
+        const opt = {
+          margin:       [0.5, 0.2, 0.5, 0.2],
+          filename:     `room_bookings_${format(date, "yyyy-MM-dd")}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF:        { unit: 'in', format: 'a3', orientation: 'landscape' }
+        };
+
+        import('html2pdf.js').then(module => {
+            const html2pdf = module.default;
+            html2pdf().from(element).set(opt).save();
+        });
     };
 
     return (
@@ -271,7 +285,7 @@ export function RoomBookingCalendar() {
                  </div>
             </div>
 
-            <div className="overflow-x-auto border rounded-lg printable-content">
+            <div id="room-booking-printable-area" className="overflow-x-auto border rounded-lg printable-content">
                 <div className="hidden print:block mb-4 p-4">
                     <h1 className="text-xl font-bold">تقويم حجوزات القاعات</h1>
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
@@ -377,8 +391,8 @@ export function RoomBookingCalendar() {
 // --- Booking Dialog Component ---
 
 function InlineSearch({ value, onSelect, options, placeholder }: { value: string, onSelect: (value: string) => void, options: {label: string, value: string, searchKey?: string}[], placeholder: string }) {
-    const [search, setSearch] = useState('');
-    const [showOptions, setShowOptions] = useState(false);
+    const [search, setSearch] = React.useState('');
+    const [showOptions, setShowOptions] = React.useState(false);
     const MAX_DISPLAY_ITEMS = 50;
 
     const selectedLabel = useMemo(() => options.find(opt => opt.value === value)?.label || '', [options, value]);

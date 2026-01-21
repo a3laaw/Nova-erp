@@ -147,7 +147,21 @@ export function ArchitecturalAppointmentsView() {
     };
     
     const handlePrint = () => {
-        window.print();
+        const element = document.getElementById('architectural-appointments-printable-area');
+        if (!element || !date) return;
+        
+        const opt = {
+          margin:       [0.5, 0.2, 0.5, 0.2], // [top, left, bottom, right]
+          filename:     `architectural_appointments_${format(date, "yyyy-MM-dd")}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF:        { unit: 'in', format: 'a3', orientation: 'landscape' }
+        };
+
+        import('html2pdf.js').then(module => {
+            const html2pdf = module.default;
+            html2pdf().from(element).set(opt).save();
+        });
     };
 
     const renderGridSection = (title: string, slots: string[]) => (
@@ -218,7 +232,7 @@ export function ArchitecturalAppointmentsView() {
                 </div>
             </div>
             
-            <div className="printable-content">
+            <div id="architectural-appointments-printable-area" className="printable-content">
                 <div className="hidden print:block mb-4">
                     <h1 className="text-xl font-bold">جدول زيارات القسم المعماري</h1>
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
