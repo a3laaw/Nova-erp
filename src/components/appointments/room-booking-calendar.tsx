@@ -310,12 +310,10 @@ export function RoomBookingCalendar() {
                                         {booking ? (
                                              <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-between border-l-4 cursor-pointer', departmentColors[booking.department || 'أخرى'])}>
-                                                        <div>
-                                                            <p className="font-bold truncate">{booking.title}</p>
-                                                            <p className="text-gray-700 truncate">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
-                                                        </div>
-                                                        <p className="text-gray-600 truncate font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
+                                                    <div className={cn('h-full w-full rounded-md p-2 text-xs border-l-4 cursor-pointer', departmentColors[booking.department || 'أخرى'])}>
+                                                        <p className="font-bold">{booking.title}</p>
+                                                        <p className="text-gray-700">{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
+                                                        <p className="text-gray-600 font-mono text-xs">{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
                                                     </div>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">
