@@ -40,8 +40,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
-const morningSlots = Array.from({ length: 8 }, (_, i) => format(addMinutes(setHours(new Date(), 8), i * 30), 'HH:mm')); // 8:00 to 11:30
-const eveningSlots = Array.from({ length: 8 }, (_, i) => format(addMinutes(setHours(new Date(), 13), i * 30), 'HH:mm')); // 13:00 to 16:30
+const morningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 8), i * 30), 'HH:mm')); // 8:00 to 9:30
+const eveningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 13), i * 30), 'HH:mm')); // 13:00 to 14:30
 
 
 const departmentStyles: Record<string, React.CSSProperties> = {
