@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, addMinutes, setHours, setMinutes, getHours, getMinutes } from 'date-fns';
@@ -79,6 +79,31 @@ export function RoomBookingCalendar() {
 
 
     // --- Data Fetching ---
+    const fetchAppointmentsForDate = useCallback(async (d: Date) => {
+        if (!firestore) return;
+        setLoading(true);
+        try {
+            const dayStart = startOfDay(d);
+            const dayEnd = endOfDay(d);
+
+            const q = query(
+                collection(firestore, 'appointments'),
+                where('appointmentDate', '>=', dayStart),
+                where('appointmentDate', '<=', dayEnd)
+            );
+            const querySnapshot = await getDocs(q);
+            const fetchedAppointments = querySnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                .filter(appt => appt.type === 'room');
+            setAppointments(fetchedAppointments);
+        } catch (error) {
+            console.error("Error fetching appointments:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث قائمة المواعيد.' });
+        } finally {
+            setLoading(false);
+        }
+    }, [firestore, toast]);
+    
     useEffect(() => {
         if (!firestore) return;
 
@@ -101,37 +126,12 @@ export function RoomBookingCalendar() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        if (!firestore || !date) return;
-        setLoading(true);
-
-        const fetchAppointments = async () => {
-            try {
-                const dayStart = startOfDay(date);
-                const dayEnd = endOfDay(date);
-
-                const q = query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
-                );
-                const querySnapshot = await getDocs(q);
-                const fetchedAppointments = querySnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                    .filter(appt => appt.type === 'room');
-                setAppointments(fetchedAppointments);
-            } catch (error) {
-                console.error("Error fetching appointments:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchAppointments();
-    }, [date, firestore, toast]);
+        if (date) {
+            fetchAppointmentsForDate(date);
+        }
+    }, [date, fetchAppointmentsForDate]);
 
     const bookingsGrid = useMemo(() => {
-        // 1. Initialize an empty grid
         const grid: Record<string, Record<string, Appointment | null>> = {};
         const allSlots = [...morningSlots, ...eveningSlots];
         rooms.forEach(room => {
@@ -141,19 +141,15 @@ export function RoomBookingCalendar() {
             });
         });
 
-        // 2. Fill the grid with appointments
         appointments.forEach(appt => {
-            // Basic validation for the appointment object
             if (!appt || !appt.meetingRoom || !grid[appt.meetingRoom] || !appt.appointmentDate?.toDate) {
                 return; 
             }
 
             try {
                 const startTime = appt.appointmentDate.toDate();
-                // Format the appointment time to match the slot format 'HH:mm'
                 const timeKey = format(startTime, 'HH:mm');
 
-                // If a slot for this time exists in the grid for this room, place the appointment
                 if (timeKey in grid[appt.meetingRoom]) {
                     grid[appt.meetingRoom][timeKey] = appt;
                 }
@@ -209,32 +205,13 @@ export function RoomBookingCalendar() {
                 const appointmentRef = doc(firestore, 'appointments', formData.id);
                 await updateDoc(appointmentRef, dataToSave);
                 toast({ title: "تم التعديل بنجاح!" });
-                
-                setAppointments(prev => {
-                    const newAppointments = [...prev];
-                    const index = newAppointments.findIndex(a => a.id === formData.id);
-                    
-                    if (index > -1) {
-                        const originalAppointment = newAppointments[index];
-                        const updatedAppointment = { ...originalAppointment, ...dataToSave };
-            
-                        const updatedDate = updatedAppointment.appointmentDate.toDate();
-                        const mainViewDate = startOfDay(date!);
-                        
-                        if (startOfDay(updatedDate).getTime() === mainViewDate.getTime()) {
-                            newAppointments[index] = updatedAppointment;
-                            return newAppointments;
-                        } else {
-                            return newAppointments.filter(a => a.id !== formData.id);
-                        }
-                    }
-                    return prev;
-                });
-
             } else {
-                const newDocRef = await addDoc(collection(firestore, 'appointments'), dataToSave);
+                await addDoc(collection(firestore, 'appointments'), dataToSave);
                 toast({ title: "تم الحجز بنجاح!" });
-                setAppointments(prev => [...prev, {id: newDocRef.id, ...dataToSave} as Appointment]);
+            }
+            
+            if (date) {
+                fetchAppointmentsForDate(date);
             }
 
             setIsDialogOpen(false);

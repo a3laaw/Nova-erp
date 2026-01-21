@@ -31,14 +31,6 @@ function getVisitColor(visit: Partial<Appointment>) {
   return "#9ca3af"; // gray-400
 }
 
-const colorMap: Record<string, string> = {
-  '#facc15': 'bg-yellow-400',
-  '#22c55e': 'bg-green-500',
-  '#3b82f6': 'bg-blue-500',
-  '#9ca3af': 'bg-gray-400',
-};
-
-
 export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -78,32 +70,35 @@ export function ArchitecturalAppointmentsView() {
         fetchData();
     }, [firestore, toast]);
     
+    const fetchAppointments = useCallback(async (d: Date) => {
+        if (!firestore) return;
+        setLoading(true);
+        try {
+            const dayStart = startOfDay(d);
+            const dayEnd = endOfDay(d);
+            const q = query(
+                collection(firestore, 'appointments'),
+                where('appointmentDate', '>=', dayStart),
+                where('appointmentDate', '<=', dayEnd)
+            );
+            const querySnapshot = await getDocs(q);
+            const dayAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            const architecturalAppointments = dayAppointments.filter(appt => appt.type === 'architectural');
+            setAppointments(architecturalAppointments);
+        } catch (error) {
+            console.error("Error fetching appointments:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
+        } finally {
+            setLoading(false);
+        }
+    }, [firestore, toast]);
+
     // Fetch appointments for the selected date
     useEffect(() => {
-        if (!firestore || !date) return;
-        setLoading(true);
-        const fetchAppointments = async () => {
-            try {
-                const dayStart = startOfDay(date);
-                const dayEnd = endOfDay(date);
-                const q = query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
-                );
-                const querySnapshot = await getDocs(q);
-                const dayAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-                const architecturalAppointments = dayAppointments.filter(appt => appt.type === 'architectural');
-                setAppointments(architecturalAppointments);
-            } catch (error) {
-                console.error("Error fetching appointments:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchAppointments();
-    }, [date, firestore, toast]);
+        if (date) {
+            fetchAppointments(date);
+        }
+    }, [date, fetchAppointments]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -136,9 +131,11 @@ export function ArchitecturalAppointmentsView() {
     const handleSave = async (data: any) => {
         if (!firestore) return;
         try {
-            const newDocRef = await addDoc(collection(firestore, 'appointments'), data);
-            setAppointments(prev => [...prev, {...data, id: newDocRef.id} as Appointment]);
+            await addDoc(collection(firestore, 'appointments'), data);
             toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
+            if (date) {
+                fetchAppointments(date);
+            }
             setIsDialogOpen(false);
         } catch (error) {
             console.error(error);
@@ -193,8 +190,8 @@ export function ArchitecturalAppointmentsView() {
                                                 borderRadius: '0.375rem',
                                                 padding: '0.5rem',
                                                 fontSize: '0.75rem',
-                                                color: '#1f2937', // Equivalent to text-gray-800
-                                                backgroundColor: booking.color || '#9ca3af',
+                                                color: '#1f2937', 
+                                                backgroundColor: getVisitColor(booking),
                                             }}>
                                                 <p style={{ fontWeight: 'bold' }}>{booking.clientName}</p>
                                                 <p>{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
@@ -265,10 +262,10 @@ export function ArchitecturalAppointmentsView() {
                     </div>
                 )}
                  <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-yellow-400" /><span>أول زيارة</span></div>
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-green-500" /><span>متابعة (بدون عقد)</span></div>
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-blue-500" /><span>متابعة (بعد العقد)</span></div>
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full bg-gray-400" /><span>أخرى</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full" style={{ backgroundColor: '#facc15' }} /><span>أول زيارة</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full" style={{ backgroundColor: '#22c55e' }} /><span>متابعة (بدون عقد)</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full" style={{ backgroundColor: '#3b82f6' }} /><span>متابعة (بعد العقد)</span></div>
+                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full" style={{ backgroundColor: '#9ca3af' }} /><span>أخرى</span></div>
                 </div>
             </div>
 
