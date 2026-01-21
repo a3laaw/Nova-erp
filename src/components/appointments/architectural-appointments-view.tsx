@@ -412,8 +412,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
     const [visitCount, setVisitCount] = useState(1);
-    const [isContractSigned, setIsContractSigned] = useState(false);
-    const [projectType, setProjectType] = useState('');
 
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
@@ -431,13 +429,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
                 setVisitCount(dialogData.visitCount || 1);
-                setIsContractSigned(dialogData.contractSigned || false);
-                setProjectType(dialogData.projectType || '');
             } else {
                 setSelectedClientId('');
                 setTitle('');
-                setIsContractSigned(false);
-                setProjectType('');
             }
         }
     }, [isOpen, dialogData, isEditing]);
@@ -508,6 +502,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 }
             }
             // --- End of Conflict Validation ---
+
+            // --- Automated Logic ---
+            const isContractSigned = client.status === 'contracted' || client.status === 'reContracted';
+            const projectType = 'بلدية سكن خاص';
 
             const dataToSave = {
                 engineerId: dialogData.engineerId,
@@ -587,17 +585,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 options={clientOptions}
                                 placeholder="ابحث بالاسم أو رقم الجوال..."
                              />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="projectType">نوع المشروع (اختياري)</Label>
-                            <Input id="projectType" value={projectType} onChange={e => setProjectType(e.target.value)} placeholder="مثال: بلدية سكن خاص، تصميم تجاري..." />
-                        </div>
-
-                        <div className="flex items-center space-x-2" dir="rtl">
-                            <Checkbox id="isContractSigned" checked={isContractSigned} onCheckedChange={(checked) => setIsContractSigned(checked as boolean)} />
-                            <Label htmlFor="isContractSigned" className="cursor-pointer">
-                                تم توقيع العقد لهذا المشروع؟
-                            </Label>
                         </div>
                     </div>
                     <DialogFooter>
