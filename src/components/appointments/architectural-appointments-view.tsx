@@ -70,7 +70,7 @@ export function ArchitecturalAppointmentsView() {
         // Set date on client to avoid hydration mismatch.
         // It will be undefined on server and then set to a Date object on the client.
         if (date === undefined) {
-          setDate(new Date());
+            setDate(new Date());
         }
     }, [date]);
 
@@ -414,17 +414,25 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [contractSigned, setContractSigned] = useState(false);
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
 
+    const [newDate, setNewDate] = useState('');
+    const [newTime, setNewTime] = useState('');
+
+
     useEffect(() => {
         if (isOpen && dialogData) {
+            const appointmentDate = dialogData.appointmentDate;
+            if (appointmentDate instanceof Date) {
+                setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
+                setNewTime(format(appointmentDate, 'HH:mm'));
+            }
+
             if (isEditing) {
                 setSelectedClientId(dialogData.clientId || '');
-                // Do not set title if it was the default client name to allow placeholder to show
                 setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
                 setVisitCount(dialogData.visitCount || 1);
                 setContractSigned(dialogData.contractSigned || false);
                 setProjectType(dialogData.projectType || 'بلدية سكن خاص');
             } else {
-                // Reset for new appointment
                 setSelectedClientId('');
                 setTitle('');
             }
@@ -464,27 +472,66 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل.' });
             return;
         }
+         if (!newDate || !newTime) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد التاريخ والوقت.' });
+            return;
+        }
         setIsSaving(true);
-        const dataToSave = {
-            // from dialogData when creating/editing
-            engineerId: dialogData.engineerId,
-            engineerName: dialogData.engineerName,
-            appointmentDate: Timestamp.fromDate(dialogData.appointmentDate),
-            session: dialogData.session,
-            // from form
-            clientId: client.id,
-            clientName: client.nameAr,
-            title: title || client.nameAr,
-            visitCount,
-            contractSigned,
-            projectType,
-            type: 'architectural',
-            color: getVisitColor({ visitCount, contractSigned, projectType }),
-            // metadata
-            ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
-        };
-        await onSave(dataToSave);
-        setIsSaving(false);
+        const appointmentDateTime = new Date(`${newDate}T${newTime}`);
+
+        try {
+            // --- Conflict Validation ---
+            const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
+            const newAppointmentTime = appointmentDateTime.getTime();
+
+            if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
+                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
+                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
+                const appointmentsRef = collection(firestore, 'appointments');
+
+                const engineerQuery = query(appointmentsRef, where('engineerId', '==', dialogData.engineerId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
+                const engineerSnap = await getDocs(engineerQuery);
+                const engineerHasConflict = engineerSnap.docs.some(doc => isEditing ? doc.id !== dialogData.id : true);
+                if (engineerHasConflict) {
+                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
+                    setIsSaving(false);
+                    return;
+                }
+
+                const clientQuery = query(appointmentsRef, where('clientId', '==', selectedClientId), where('appointmentDate', '>=', windowStart), where('appointmentDate', '<=', windowEnd));
+                const clientSnap = await getDocs(clientQuery);
+                const clientHasConflict = clientSnap.docs.some(doc => isEditing ? doc.id !== dialogData.id : true);
+                if (clientHasConflict) {
+                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
+                    setIsSaving(false);
+                    return;
+                }
+            }
+            // --- End of Conflict Validation ---
+
+            const dataToSave = {
+                engineerId: dialogData.engineerId,
+                engineerName: dialogData.engineerName,
+                appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                session: appointmentDateTime.getHours() < 14 ? 'صباحية' : 'مسائية',
+                clientId: client.id,
+                clientName: client.nameAr,
+                title: title || client.nameAr,
+                visitCount,
+                contractSigned,
+                projectType,
+                type: 'architectural',
+                color: getVisitColor({ visitCount, contractSigned, projectType }),
+                ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
+            };
+            await onSave(dataToSave);
+            setIsSaving(false);
+
+        } catch (error) {
+             console.error("Error during save:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'حدث خطأ أثناء التحقق من المواعيد أو حفظها.' });
+            setIsSaving(false);
+        }
     };
     
     const clientOptions = useMemo(() => clients.map((c: Client) => ({
@@ -514,11 +561,21 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
-                            للمهندس: {dialogData.engineerName} | الساعة: {dialogData.appointmentDate ? format(dialogData.appointmentDate, 'h:mm a', { locale: ar }) : ''}
+                            للمهندس: {dialogData.engineerName}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
-                         <div className="grid gap-2">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="date">التاريخ</Label>
+                                <Input id="date" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="time">الوقت</Label>
+                                <Input id="time" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required step="1800" />
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
