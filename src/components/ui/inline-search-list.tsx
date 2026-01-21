@@ -76,7 +76,7 @@ export function InlineSearchList({
         disabled={disabled}
       />
       {showOptions && !disabled && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
+        <div data-inline-search-list-options className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
           <ul className="max-h-60 overflow-y-auto p-1">
             {filteredOptions.length === 0 ? (
               <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
