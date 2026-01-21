@@ -131,6 +131,7 @@ export function RoomBookingCalendar() {
     }, [date, firestore, toast]);
 
     const bookingsGrid = useMemo(() => {
+        // 1. Initialize an empty grid
         const grid: Record<string, Record<string, Appointment | null>> = {};
         const allSlots = [...morningSlots, ...eveningSlots];
         rooms.forEach(room => {
@@ -140,23 +141,30 @@ export function RoomBookingCalendar() {
             });
         });
 
+        // 2. Fill the grid with appointments
         appointments.forEach(appt => {
-            if (!appt.meetingRoom || !grid[appt.meetingRoom]) return;
+            // Basic validation for the appointment object
+            if (!appt || !appt.meetingRoom || !grid[appt.meetingRoom] || !appt.appointmentDate?.toDate) {
+                return; 
+            }
 
-            const startTime = appt.appointmentDate.toDate();
-            const startHour = getHours(startTime);
-            const startMinute = getMinutes(startTime);
+            try {
+                const startTime = appt.appointmentDate.toDate();
+                // Format the appointment time to match the slot format 'HH:mm'
+                const timeKey = format(startTime, 'HH:mm');
 
-            for (const slot of allSlots) {
-                const slotTime = parseTime(slot);
-                if (slotTime.hours === startHour && slotTime.minutes === startMinute) {
-                    grid[appt.meetingRoom][slot] = appt;
-                    break;
+                // If a slot for this time exists in the grid for this room, place the appointment
+                if (timeKey in grid[appt.meetingRoom]) {
+                    grid[appt.meetingRoom][timeKey] = appt;
                 }
+            } catch (e) {
+                console.error("Could not process appointment:", appt, e);
             }
         });
+
         return grid;
     }, [appointments]);
+
 
     const handleOpenDialog = (data: Partial<Appointment> & { room: string, time?: string }) => {
         if (data.id) { // Editing existing appointment
