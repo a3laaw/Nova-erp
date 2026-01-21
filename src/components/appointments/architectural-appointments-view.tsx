@@ -9,7 +9,6 @@ import { ar } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Combobox } from '@/components/ui/combobox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -114,6 +113,7 @@ export function ArchitecturalAppointmentsView() {
         });
 
         appointments.forEach(appt => {
+            if(!appt.appointmentDate) return;
             const time = format(appt.appointmentDate.toDate(), 'HH:mm');
             if (grid[appt.engineerId] && time in grid[appt.engineerId]) {
                 grid[appt.engineerId][time] = appt;
@@ -136,8 +136,8 @@ export function ArchitecturalAppointmentsView() {
     const handleSave = async (data: any) => {
         if (!firestore) return;
         try {
-            await addDoc(collection(firestore, 'appointments'), data);
-            setAppointments(prev => [...prev, data]);
+            const newDocRef = await addDoc(collection(firestore, 'appointments'), data);
+            setAppointments(prev => [...prev, {...data, id: newDocRef.id} as Appointment]);
             toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
             setIsDialogOpen(false);
         } catch (error) {
@@ -162,7 +162,7 @@ export function ArchitecturalAppointmentsView() {
                                     {booking ? (
                                         <div className={cn('h-full w-full rounded-md p-2 text-xs flex flex-col justify-center text-white', colorMap[booking.color!] || 'bg-gray-400')}>
                                             <p className="font-bold truncate">{booking.clientName}</p>
-                                            <p className="opacity-80 truncate">{format(booking.appointmentDate.toDate(), 'h:mm a')}</p>
+                                            <p className="opacity-80 truncate">{booking.appointmentDate ? format(booking.appointmentDate.toDate(), 'h:mm a') : ''}</p>
                                             <p className="opacity-80 truncate">{booking.title}</p>
                                         </div>
                                     ) : (
@@ -228,23 +228,28 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     
-    const [clientId, setClientId] = useState('');
+    // State for the inline combobox
+    const [search, setSearch] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
+    const [selectedClient, setSelectedClient] = useState<{id: string, name: string} | null>(null);
+
     const [visitCount, setVisitCount] = useState(1);
     const [contractSigned, setContractSigned] = useState(false);
     const [projectType, setProjectType] = useState('بلدية سكن خاص');
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
+    
+    const inputRef = React.useRef<HTMLInputElement | null>(null);
 
-    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr })), [clients]);
 
     useEffect(() => {
-        if (!clientId || !firestore) {
+        if (!selectedClient?.id || !firestore) {
             setVisitCount(1);
             setContractSigned(false);
             return;
         };
         const fetchClientHistory = async () => {
-            const q = query(collection(firestore, 'appointments'), where('clientId', '==', clientId));
+            const q = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClient.id));
             const snapshot = await getDocs(q);
             const visits = snapshot.docs.map(doc => doc.data());
             setVisitCount(visits.length + 1);
@@ -252,19 +257,19 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             setContractSigned(hasSigned);
         };
         fetchClientHistory();
-    }, [clientId, firestore]);
+    }, [selectedClient, firestore]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!clientId || !title) {
+        if (!selectedClient?.id || !title) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل وإدخال الغرض من الموعد.' });
             return;
         }
         setIsSaving(true);
         const data = {
             ...dialogData,
-            clientId,
-            clientName: clients.find((c: Client) => c.id === clientId)?.nameAr,
+            clientId: selectedClient.id,
+            clientName: selectedClient.name,
             title,
             notes,
             visitCount,
@@ -280,20 +285,23 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         setIsSaving(false);
     };
 
+    const handleClientSelect = (client: {id: string, name: string}) => {
+        setSelectedClient(client);
+        setSearch(client.name);
+        setShowOptions(false);
+    }
+    
+    const filteredClients = clients.filter((opt: Client) =>
+        opt.nameAr.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent
+             <DialogContent
                 dir="rtl"
                 onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
-                        e.preventDefault();
-                    }
-                }}
-                onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
-                        e.preventDefault();
+                    if (e.target !== inputRef.current && !inputRef.current?.contains(e.target as Node)) {
+                       setShowOptions(false);
                     }
                 }}
             >
@@ -306,8 +314,40 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="client">العميل</Label>
-                            <Combobox options={clientOptions} value={clientId} onValueChange={setClientId} placeholder="اختر عميلاً..." searchPlaceholder="ابحث عن عميل..." />
+                             <Label htmlFor="client-search">العميل</Label>
+                             <div className="relative">
+                                <Input
+                                    id="client-search"
+                                    ref={inputRef}
+                                    value={search}
+                                    placeholder="ابحث عن عميل..."
+                                    onFocus={() => setShowOptions(true)}
+                                    onChange={(e) => {
+                                        setSearch(e.target.value);
+                                        setShowOptions(true);
+                                        if(selectedClient) setSelectedClient(null);
+                                    }}
+                                />
+                                {showOptions && (
+                                    <ul className={cn("absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-background shadow-md")}>
+                                        {filteredClients.length === 0 && (
+                                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                                        )}
+                                        {filteredClients.map((client: Client) => (
+                                            <li
+                                                key={client.id}
+                                                className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault(); 
+                                                    handleClientSelect({id: client.id, name: client.nameAr});
+                                                }}
+                                            >
+                                                {client.nameAr}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                             </div>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة</Label>
@@ -329,7 +369,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving}>
+                        <Button type="submit" disabled={isSaving || !selectedClient}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             حفظ الموعد
                         </Button>
