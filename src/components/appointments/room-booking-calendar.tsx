@@ -31,7 +31,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Save, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -361,6 +360,61 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
+function InlineSearch({ value, onSelect, options, placeholder }: { value: string, onSelect: (value: string) => void, options: {label: string, value: string}[], placeholder: string }) {
+    const [search, setSearch] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
+
+    const selectedLabel = useMemo(() => options.find(opt => opt.value === value)?.label || '', [options, value]);
+
+    useEffect(() => {
+        setSearch(selectedLabel);
+    }, [selectedLabel]);
+
+    const filteredOptions = useMemo(() => 
+        options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase())),
+    [options, search]);
+
+    return (
+        <div className="relative">
+            <Input
+                value={search}
+                placeholder={placeholder}
+                onFocus={() => setShowOptions(true)}
+                onChange={(e) => {
+                    setSearch(e.target.value);
+                    setShowOptions(true);
+                    if (value) onSelect(''); // Clear selection on new typing
+                }}
+            />
+            {showOptions && (
+                 <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-md">
+                    <ul className="max-h-48 overflow-y-auto">
+                        {filteredOptions.length === 0 ? (
+                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                        ) : (
+                            filteredOptions.map(opt => (
+                                <li
+                                    key={opt.value}
+                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault(); 
+                                        onSelect(opt.value);
+                                        setSearch(opt.label);
+                                        setShowOptions(false);
+                                    }}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
 function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, currentDate }: any) {
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -413,23 +467,14 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         setIsSaving(false);
     };
 
+    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr })), [clients]);
+    const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id!, label: e.fullName })), [engineers]);
+    const departmentOptionsForSelect = useMemo(() => departmentOptions.map(d => ({ value: d, label: d })), []);
+
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent
-                dir="rtl"
-                onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
-                        e.preventDefault();
-                    }
-                }}
-                onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
-                        e.preventDefault();
-                    }
-                }}
-            >
+            <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
@@ -459,25 +504,16 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="clientId">العميل</Label>
-                            <Select dir="rtl" onValueChange={(v) => setFormData(p => ({ ...p, clientId: v }))} value={formData.clientId} required>
-                                <SelectTrigger><SelectValue placeholder="اختر العميل..." /></SelectTrigger>
-                                <SelectContent>{clients.map((c: Client) => <SelectItem key={c.id} value={c.id}>{c.nameAr}</SelectItem>)}</SelectContent>
-                            </Select>
+                            <Label>العميل</Label>
+                            <InlineSearch value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث عن عميل..." />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="department">القسم</Label>
-                            <Select dir="rtl" onValueChange={(v) => setFormData(p => ({ ...p, department: v }))} value={formData.department} required>
-                                <SelectTrigger><SelectValue placeholder="اختر القسم..." /></SelectTrigger>
-                                <SelectContent>{departmentOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                            </Select>
+                            <Label>القسم</Label>
+                             <InlineSearch value={formData.department} onSelect={(v) => setFormData(p => ({...p, department: v}))} options={departmentOptionsForSelect} placeholder="ابحث عن قسم..." />
                         </div>
                          <div className="grid gap-2">
-                            <Label htmlFor="engineerId">المهندس</Label>
-                            <Select dir="rtl" onValueChange={(v) => setFormData(p => ({ ...p, engineerId: v }))} value={formData.engineerId} required>
-                                <SelectTrigger><SelectValue placeholder="اختر المهندس..." /></SelectTrigger>
-                                <SelectContent>{engineers.map((e: Employee) => <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>)}</SelectContent>
-                            </Select>
+                            <Label>المهندس</Label>
+                             <InlineSearch value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث عن مهندس..." />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الموعد</Label>

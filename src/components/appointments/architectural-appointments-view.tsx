@@ -229,8 +229,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [isSaving, setIsSaving] = useState(false);
     
     // State for the inline combobox
-    const [search, setSearch] = useState('');
-    const [showOptions, setShowOptions] = useState(false);
+    const [clientSearch, setClientSearch] = useState('');
+    const [showClientOptions, setShowClientOptions] = useState(false);
     const [selectedClient, setSelectedClient] = useState<{id: string, name: string} | null>(null);
 
     const [visitCount, setVisitCount] = useState(1);
@@ -239,8 +239,15 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
     
-    const inputRef = React.useRef<HTMLInputElement | null>(null);
-
+    useEffect(() => {
+        if (!isOpen) { // Reset on close
+            setClientSearch('');
+            setShowClientOptions(false);
+            setSelectedClient(null);
+            setTitle('');
+            setNotes('');
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (!selectedClient?.id || !firestore) {
@@ -284,27 +291,14 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         await onSave(data);
         setIsSaving(false);
     };
-
-    const handleClientSelect = (client: {id: string, name: string}) => {
-        setSelectedClient(client);
-        setSearch(client.name);
-        setShowOptions(false);
-    }
     
     const filteredClients = clients.filter((opt: Client) =>
-        opt.nameAr.toLowerCase().includes(search.toLowerCase())
+        opt.nameAr.toLowerCase().includes(clientSearch.toLowerCase())
     );
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-             <DialogContent
-                dir="rtl"
-                onPointerDownOutside={(e) => {
-                    if (e.target !== inputRef.current && !inputRef.current?.contains(e.target as Node)) {
-                       setShowOptions(false);
-                    }
-                }}
-            >
+             <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>حجز موعد جديد</DialogTitle>
@@ -318,34 +312,38 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                              <div className="relative">
                                 <Input
                                     id="client-search"
-                                    ref={inputRef}
-                                    value={search}
+                                    value={clientSearch}
                                     placeholder="ابحث عن عميل..."
-                                    onFocus={() => setShowOptions(true)}
+                                    onFocus={() => setShowClientOptions(true)}
                                     onChange={(e) => {
-                                        setSearch(e.target.value);
-                                        setShowOptions(true);
+                                        setClientSearch(e.target.value);
+                                        setShowClientOptions(true);
                                         if(selectedClient) setSelectedClient(null);
                                     }}
                                 />
-                                {showOptions && (
-                                    <ul className={cn("absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-background shadow-md")}>
-                                        {filteredClients.length === 0 && (
-                                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
-                                        )}
-                                        {filteredClients.map((client: Client) => (
-                                            <li
-                                                key={client.id}
-                                                className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault(); 
-                                                    handleClientSelect({id: client.id, name: client.nameAr});
-                                                }}
-                                            >
-                                                {client.nameAr}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                {showClientOptions && (
+                                    <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-md">
+                                        <ul className="max-h-48 overflow-y-auto">
+                                            {filteredClients.length === 0 ? (
+                                                <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                                            ) : (
+                                                filteredClients.map((client: Client) => (
+                                                    <li
+                                                        key={client.id}
+                                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault(); 
+                                                            setSelectedClient({id: client.id, name: client.nameAr});
+                                                            setClientSearch(client.nameAr);
+                                                            setShowClientOptions(false);
+                                                        }}
+                                                    >
+                                                        {client.nameAr}
+                                                    </li>
+                                                ))
+                                            )}
+                                        </ul>
+                                    </div>
                                 )}
                              </div>
                         </div>

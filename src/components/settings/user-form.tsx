@@ -12,13 +12,6 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -36,14 +29,13 @@ interface UserFormProps {
   allUsers: UserProfile[];
 }
 
-const roles: UserProfile['role'][] = ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'];
-const roleTranslations: Record<UserProfile['role'], string> = {
-    Admin: 'مدير',
-    Engineer: 'مهندس',
-    Accountant: 'محاسب',
-    Secretary: 'سكرتارية',
-    HR: 'موارد بشرية',
-};
+const roleOptions: { value: UserProfile['role']; label: string }[] = [
+    { value: 'Admin', label: 'مدير' },
+    { value: 'Engineer', label: 'مهندس' },
+    { value: 'Accountant', label: 'محاسب' },
+    { value: 'Secretary', label: 'سكرتارية' },
+    { value: 'HR', label: 'موارد بشرية' },
+];
 
 const initialFormData: Partial<UserProfile> = {
     employeeId: '',
@@ -53,6 +45,59 @@ const initialFormData: Partial<UserProfile> = {
 };
 
 
+function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; disabled?: boolean; }) {
+    const [search, setSearch] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
+
+    useEffect(() => {
+        setSearch(options.find(o => o.value === value)?.label || '');
+    }, [value, options]);
+
+    const filteredOptions = options.filter(opt =>
+        opt.label.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="relative">
+            <Input
+                value={search}
+                placeholder={placeholder}
+                onFocus={() => !disabled && setShowOptions(true)}
+                onChange={(e) => {
+                    setSearch(e.target.value);
+                    setShowOptions(true);
+                    if (value) onSelect('');
+                }}
+                disabled={disabled}
+            />
+            {showOptions && !disabled && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
+                    <ul className="max-h-48 overflow-y-auto">
+                        {filteredOptions.length === 0 ? (
+                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                        ) : (
+                            filteredOptions.map(opt => (
+                                <li
+                                    key={opt.value}
+                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        onSelect(opt.value);
+                                        setSearch(opt.label);
+                                        setShowOptions(false);
+                                    }}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }: UserFormProps) {
   const { toast } = useToast();
   const isEditing = !!user;
@@ -61,11 +106,9 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   const [password, setPassword] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
 
-  // Filter out employees who are already linked to a user account
   const availableEmployees = useMemo(() => {
     const linkedEmployeeIds = new Set(allUsers.map(u => u.employeeId));
     if (isEditing && user?.employeeId) {
-        // If editing, allow the currently linked employee to be in the list
         linkedEmployeeIds.delete(user.employeeId);
     }
     return employees.filter(e => !linkedEmployeeIds.has(e.id));
@@ -80,7 +123,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
             username: user.username,
             role: user.role,
         });
-        setPassword(''); // Don't show password
+        setPassword('');
     } else {
         setFormData(initialFormData);
         setPassword('');
@@ -90,7 +133,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     if (id === 'username') {
-        // Basic username policy
         const sanitizedValue = value.toLowerCase().replace(/[^a-z0-9._]/g, '');
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
         checkUsername(sanitizedValue);
@@ -120,7 +162,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
 
-      // --- Validation ---
       if (!formData.employeeId) {
           toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار موظف لربط الحساب به.' });
           return;
@@ -140,40 +181,26 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       
       const dataToSave = { ...formData };
       if (password) {
-        // In a real app, this would trigger a Firebase Function to hash the password.
-        // For this demo, we store it as is, but name the field passwordHash to show intent.
         dataToSave.passwordHash = password;
       }
       
       onSave(dataToSave);
   }
   
-  const currentEmployeeSelection = useMemo(() => {
+  const currentEmployeeOptions = useMemo(() => {
+    const baseOptions = availableEmployees.map(e => ({ value: e.id!, label: `${e.fullName} (${e.civilId})`}));
     if (isEditing && user) {
         const linkedEmployee = employees.find(e => e.id === user.employeeId);
-        if (linkedEmployee) return [linkedEmployee, ...availableEmployees];
+        if (linkedEmployee && !baseOptions.some(o => o.value === linkedEmployee.id)) {
+            return [{ value: linkedEmployee.id!, label: `${linkedEmployee.fullName} (${linkedEmployee.civilId})`}, ...baseOptions];
+        }
     }
-    return availableEmployees;
+    return baseOptions;
   }, [isEditing, user, employees, availableEmployees]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="sm:max-w-md"
-        dir="rtl"
-        onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-radix-select-content]')) {
-                e.preventDefault();
-            }
-        }}
-        onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-radix-select-content]')) {
-                e.preventDefault();
-            }
-        }}
-      >
+      <DialogContent className="sm:max-w-md" dir="rtl">
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>
@@ -186,17 +213,14 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                    <Label htmlFor="employeeId">اختيار الموظف <span className="text-destructive">*</span></Label>
-                    <Select dir="rtl" value={formData.employeeId} onValueChange={(v) => handleSelectChange('employeeId', v)} disabled={isEditing}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="اختر موظفًا..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {currentEmployeeSelection.map(emp => (
-                                <SelectItem key={emp.id} value={emp.id!}>{`${emp.fullName} (${emp.civilId})`}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <Label>اختيار الموظف <span className="text-destructive">*</span></Label>
+                    <InlineSearchList
+                        value={formData.employeeId || ''}
+                        onSelect={(v) => handleSelectChange('employeeId', v)}
+                        options={currentEmployeeOptions}
+                        placeholder="ابحث عن موظف..."
+                        disabled={isEditing}
+                    />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="username">اسم المستخدم <span className="text-destructive">*</span></Label>
@@ -227,17 +251,13 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     />
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="role">الدور <span className="text-destructive">*</span></Label>
-                    <Select dir="rtl" value={formData.role} onValueChange={(v) => handleSelectChange('role', v as UserProfile['role'])}>
-                        <SelectTrigger id="role">
-                            <SelectValue placeholder="اختر دور المستخدم..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {roles.map(role => (
-                                <SelectItem key={role} value={role}>{roleTranslations[role]}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <Label>الدور <span className="text-destructive">*</span></Label>
+                     <InlineSearchList
+                        value={formData.role || ''}
+                        onSelect={(v) => handleSelectChange('role', v as UserProfile['role'])}
+                        options={roleOptions}
+                        placeholder="اختر دور المستخدم..."
+                    />
                 </div>
                  {!isEditing && (
                     <Alert>

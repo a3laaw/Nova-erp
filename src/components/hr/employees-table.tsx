@@ -21,7 +21,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, type DocumentData, doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -37,13 +37,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addMonths, format, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { cn } from '@/lib/utils';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -57,12 +57,64 @@ const statusColors: Record<Employee['status'], string> = {
   terminated: 'bg-red-100 text-red-800 border-red-200',
 };
 
-const terminationReasons: Record<string, string> = {
-    resignation: 'استقالة',
-    termination: 'إنهاء خدمة (من الشركة)',
-    probation: 'إنهاء فترة التجربة'
-};
+const terminationReasons: {value: string, label: string}[] = [
+    { value: 'resignation', label: 'استقالة' },
+    { value: 'termination', label: 'إنهاء خدمة (من الشركة)' },
+    { value: 'probation', label: 'إنهاء فترة التجربة' },
+];
 
+
+function InlineSearchList({ value, onSelect, options, placeholder }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; }) {
+    const [search, setSearch] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
+
+    useEffect(() => {
+        setSearch(options.find(o => o.value === value)?.label || '');
+    }, [value, options]);
+
+    const filteredOptions = options.filter(opt =>
+        opt.label.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="relative">
+            <Input
+                value={search}
+                placeholder={placeholder}
+                onFocus={() => setShowOptions(true)}
+                onChange={(e) => {
+                    setSearch(e.target.value);
+                    setShowOptions(true);
+                    if (value) onSelect('');
+                }}
+            />
+            {showOptions && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
+                    <ul className="max-h-48 overflow-y-auto">
+                        {filteredOptions.length === 0 ? (
+                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                        ) : (
+                            filteredOptions.map(opt => (
+                                <li
+                                    key={opt.value}
+                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        onSelect(opt.value);
+                                        setSearch(opt.label);
+                                        setShowOptions(false);
+                                    }}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function EmployeesTable() {
     const firestore = useFirestore();
@@ -349,21 +401,7 @@ export function EmployeesTable() {
                 </Table>
             </div>
              <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
-                <AlertDialogContent
-                    dir="rtl"
-                    onPointerDownOutside={(e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.closest('[data-radix-select-content]')) {
-                            e.preventDefault();
-                        }
-                    }}
-                    onInteractOutside={(e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.closest('[data-radix-select-content]')) {
-                            e.preventDefault();
-                        }
-                    }}
-                >
+                <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -372,17 +410,13 @@ export function EmployeesTable() {
                     </AlertDialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="grid gap-2">
-                             <Label htmlFor="terminationReason">سبب إنهاء الخدمة</Label>
-                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v)}>
-                                <SelectTrigger id="terminationReason">
-                                    <SelectValue placeholder="اختر السبب..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(terminationReasons).map(([key, value]) => (
-                                        <SelectItem key={key} value={key}>{value}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                             <Label>سبب إنهاء الخدمة</Label>
+                             <InlineSearchList 
+                                value={terminationReason}
+                                onSelect={setTerminationReason}
+                                options={terminationReasons}
+                                placeholder="اختر السبب..."
+                             />
                         </div>
                         <div className="flex items-center space-x-2">
                            <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />

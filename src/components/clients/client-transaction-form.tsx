@@ -12,22 +12,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, ClientTransaction } from '@/lib/types';
-import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { cn } from '@/lib/utils';
 
 
 interface ClientTransactionFormProps {
@@ -38,14 +31,66 @@ interface ClientTransactionFormProps {
 }
 
 const transactionTypes = [
-    'تصميم بلدية (سكن خاص)',
-    'تصميم بلدية (تجاري)',
-    'تصميم كهرباء وماء',
-    'إيصال تيار كهربائي',
-    'إشراف على التنفيذ',
-    'عقد توريد وتركيب',
-    'معاملة أخرى'
+    { value: 'تصميم بلدية (سكن خاص)', label: 'تصميم بلدية (سكن خاص)'},
+    { value: 'تصميم بلدية (تجاري)', label: 'تصميم بلدية (تجاري)'},
+    { value: 'تصميم كهرباء وماء', label: 'تصميم كهرباء وماء'},
+    { value: 'إيصال تيار كهربائي', label: 'إيصال تيار كهربائي'},
+    { value: 'إشراف على التنفيذ', label: 'إشراف على التنفيذ'},
+    { value: 'عقد توريد وتركيب', label: 'عقد توريد وتركيب'},
+    { value: 'معاملة أخرى', label: 'معاملة أخرى'}
 ];
+
+function InlineSearchList({ value, onSelect, options, placeholder }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; }) {
+    const [search, setSearch] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
+
+    useEffect(() => {
+        setSearch(options.find(o => o.value === value)?.label || '');
+    }, [value, options]);
+
+    const filteredOptions = options.filter(opt =>
+        opt.label.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="relative">
+            <Input
+                value={search}
+                placeholder={placeholder}
+                onFocus={() => setShowOptions(true)}
+                onChange={(e) => {
+                    setSearch(e.target.value);
+                    setShowOptions(true);
+                    if (value) onSelect('');
+                }}
+            />
+            {showOptions && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
+                    <ul className="max-h-48 overflow-y-auto">
+                        {filteredOptions.length === 0 ? (
+                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                        ) : (
+                            filteredOptions.map(opt => (
+                                <li
+                                    key={opt.value}
+                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        onSelect(opt.value);
+                                        setSearch(opt.label);
+                                        setShowOptions(false);
+                                    }}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -66,7 +111,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         const fetchEngineers = async () => {
             setEngineersLoading(true);
             try {
-                // A simple query, could be made more robust (e.g., check a 'role' field)
                 const q = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
                 const querySnapshot = await getDocs(q);
                 const fetchedEngineers: Employee[] = [];
@@ -192,25 +236,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             setIsSaving(false);
         }
     };
+    
+    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
+
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetForm(); onClose(); } }}>
-            <DialogContent
-              className="sm:max-w-lg"
-              dir="rtl"
-              onPointerDownOutside={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-radix-select-content]')) {
-                  e.preventDefault();
-                }
-              }}
-              onInteractOutside={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-radix-select-content]')) {
-                  e.preventDefault();
-                }
-              }}
-            >
+            <DialogContent className="sm:max-w-lg" dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>إضافة معاملة داخلية جديدة</DialogTitle>
@@ -220,30 +252,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="transactionType">نوع المعاملة <span className="text-destructive">*</span></Label>
-                            <Select dir="rtl" value={transactionType} onValueChange={setTransactionType} required>
-                                <SelectTrigger id="transactionType">
-                                    <SelectValue placeholder="اختر نوع المعاملة..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {transactionTypes.map(type => (
-                                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
+                            <InlineSearchList value={transactionType} onSelect={setTransactionType} options={transactionTypes} placeholder="اختر نوع المعاملة..." />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="assignedEngineerId">إسناد إلى مهندس (اختياري)</Label>
-                            <Select dir="rtl" value={assignedEngineerId} onValueChange={setAssignedEngineerId} disabled={engineersLoading}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={engineersLoading ? "تحميل المهندسين..." : "اختر مهندسًا..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {engineers.map(eng => (
-                                        <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label>إسناد إلى مهندس (اختياري)</Label>
+                            <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder={engineersLoading ? "تحميل..." : "ابحث عن مهندس..."} />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="description">وصف المعاملة</Label>

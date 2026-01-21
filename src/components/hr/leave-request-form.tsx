@@ -12,14 +12,6 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Combobox } from '@/components/ui/combobox';
 import { Textarea } from '../ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Loader2, Upload, AlertCircle, CalendarCheck, Wallet } from 'lucide-react';
@@ -30,7 +22,6 @@ import { useToast } from '@/hooks/use-toast';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '../ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 
@@ -42,6 +33,65 @@ interface LeaveRequestFormProps {
 
 type LeaveType = 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
 
+const leaveTypeOptions: { value: LeaveType; label: string }[] = [
+    { value: 'Annual', label: 'سنوية' },
+    { value: 'Sick', label: 'مرضية' },
+    { value: 'Emergency', label: 'طارئة' },
+    { value: 'Unpaid', label: 'بدون راتب' },
+];
+
+function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; disabled?: boolean; }) {
+    const [search, setSearch] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
+
+    useEffect(() => {
+        setSearch(options.find(o => o.value === value)?.label || '');
+    }, [value, options]);
+
+    const filteredOptions = options.filter(opt =>
+        opt.label.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="relative">
+            <Input
+                value={search}
+                placeholder={placeholder}
+                onFocus={() => !disabled && setShowOptions(true)}
+                onChange={(e) => {
+                    setSearch(e.target.value);
+                    setShowOptions(true);
+                    if (value) onSelect('');
+                }}
+                disabled={disabled}
+            />
+            {showOptions && !disabled && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
+                    <ul className="max-h-48 overflow-y-auto">
+                        {filteredOptions.length === 0 ? (
+                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                        ) : (
+                            filteredOptions.map(opt => (
+                                <li
+                                    key={opt.value}
+                                    className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        onSelect(opt.value);
+                                        setSearch(opt.label);
+                                        setShowOptions(false);
+                                    }}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveRequestFormProps) {
     const firestore = useFirebase();
@@ -65,7 +115,6 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
             if (!firestore || !isOpen) return;
             setEmployeesLoading(true);
             try {
-                // Fetch only active employees
                 const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEmployees: Employee[] = [];
@@ -94,7 +143,6 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         setFile(null);
     }, []);
     
-    // Pre-fill form if editing
     useEffect(() => {
         if (isEditing && requestToEdit) {
             setEmployeeId(requestToEdit.employeeId);
@@ -122,17 +170,9 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     
     const currentBalance = useMemo(() => {
         if (!selectedEmployee) return 0;
-
         const balance = calculateAnnualLeaveBalance(selectedEmployee);
-
-        // If we are editing a previously approved request, we need to temporarily add its days back
-        // to the balance to show the correct state *before* this request is (re)submitted.
         const daysToExclude = isEditing && requestToEdit?.leaveType === 'Annual' && requestToEdit?.status === 'approved' && requestToEdit?.workingDays ? requestToEdit.workingDays : 0;
-        
-        // The balance from the central function already accounts for used days.
-        // So we add back the days of the request being edited.
         return balance + daysToExclude;
-
     }, [selectedEmployee, isEditing, requestToEdit]);
 
     const remainingBalance = useMemo(() => {
@@ -174,7 +214,6 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         
         setIsSaving(true);
         try {
-            // --- Validation for existing requests ---
             if (!isEditing) {
                 const existingRequestsQuery = query(
                     collection(firestore, 'leaveRequests'),
@@ -189,7 +228,6 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                     const newStart = toFirestoreDate(startDate);
                     const newEnd = toFirestoreDate(endDate);
                     if (reqStart && reqEnd && newStart && newEnd) {
-                        // Check for overlap: (StartA <= EndB) and (EndA >= StartB)
                         return newStart <= reqEnd && newEnd >= reqStart;
                     }
                     return false;
@@ -205,8 +243,6 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                 }
             }
 
-
-            // In a real app, you would upload the file to Firebase Storage first and get the URL
             const dataToSave = {
                 employeeId: employeeId,
                 employeeName: selectedEmployee.fullName,
@@ -216,14 +252,14 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                 days: totalCalendarDays,
                 workingDays: workingDays,
                 notes: notes,
-                attachmentUrl: null, // Placeholder for file URL
+                attachmentUrl: null,
             };
 
             if (isEditing && requestToEdit) {
                  const requestRef = doc(firestore, 'leaveRequests', requestToEdit.id);
                  await updateDoc(requestRef, {
                     ...dataToSave,
-                    status: 'pending', // Reset status to pending on edit
+                    status: 'pending',
                  });
                  toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
             } else {
@@ -246,22 +282,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="sm:max-w-lg"
-        dir="rtl"
-        onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
-                e.preventDefault();
-            }
-        }}
-        onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[data-radix-select-content]')) {
-                e.preventDefault();
-            }
-        }}
-      >
+      <DialogContent className="sm:max-w-lg" dir="rtl">
         <form onSubmit={handleSubmit}>
             <DialogHeader>
                 <DialogTitle>{isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}</DialogTitle>
@@ -271,30 +292,23 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                    <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
-                    <Combobox
-                        options={employeeOptions}
+                    <Label>الموظف <span className="text-destructive">*</span></Label>
+                    <InlineSearchList 
                         value={employeeId}
-                        onValueChange={setEmployeeId}
+                        onSelect={setEmployeeId}
+                        options={employeeOptions}
                         placeholder={employeesLoading ? "تحميل..." : "اختر موظفًا..."}
-                        searchPlaceholder="ابحث عن موظف..."
-                        notFoundMessage="لم يتم العثور على موظف."
                         disabled={isEditing || employeesLoading}
                     />
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="leaveType">نوع الإجازة <span className="text-destructive">*</span></Label>
-                    <Select dir="rtl" value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)} required>
-                        <SelectTrigger id="leaveType">
-                            <SelectValue placeholder="اختر نوع الإجازة..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Annual">سنوية</SelectItem>
-                            <SelectItem value="Sick">مرضية</SelectItem>
-                            <SelectItem value="Emergency">طارئة</SelectItem>
-                            <SelectItem value="Unpaid">بدون راتب</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <Label>نوع الإجازة <span className="text-destructive">*</span></Label>
+                     <InlineSearchList 
+                        value={leaveType}
+                        onSelect={(v) => setLeaveType(v as LeaveType)}
+                        options={leaveTypeOptions}
+                        placeholder="اختر نوع الإجازة..."
+                    />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
@@ -307,7 +321,6 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                     </div>
                 </div>
 
-                {/* Dynamic Calculation Section */}
                 {selectedEmployee && startDate && endDate && totalCalendarDays > 0 && leaveType === 'Annual' && (
                      <Alert variant="default" className="bg-muted/50">
                         <Info className="h-4 w-4" />
