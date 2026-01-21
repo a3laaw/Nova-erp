@@ -72,13 +72,13 @@ export function ReportResults({ reportData }: { reportData: StandardReportData }
     };
     
     return (
-        <div className="border rounded-lg" id="report-content">
+        <div className="border rounded-lg printable-content">
             <div className='p-4 flex justify-between items-center print:p-0 print:mb-4'>
                 <div>
                     <h3 className='font-bold text-lg'>{reportData.title}</h3>
                     <p className='text-sm text-muted-foreground' dir='ltr'>{reportData.subtitle}</p>
                 </div>
-                <Button variant="outline" onClick={handlePrint} className="print:hidden">
+                <Button variant="outline" onClick={handlePrint} className="print:hidden no-print">
                     <Printer className="ml-2 h-4 w-4" />
                     طباعة
                 </Button>
@@ -123,5 +123,3 @@ export function ReportResults({ reportData }: { reportData: StandardReportData }
         </div>
     );
 };
-
-    

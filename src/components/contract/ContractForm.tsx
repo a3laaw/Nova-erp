@@ -95,7 +95,7 @@ export function ContractForm({ client }: { client: ClientData }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
-        <div className="print:hidden mb-6 flex justify-between items-center">
+        <div className="print:hidden mb-6 flex justify-between items-center no-print">
             <Button variant="outline" onClick={() => router.back()}>
                 <ArrowRight className="ml-2 h-4 w-4" />
                 العودة
@@ -103,7 +103,7 @@ export function ContractForm({ client }: { client: ClientData }) {
             <Button onClick={handleExport}><Printer className="ml-2 h-4 w-4" /> تصدير PDF</Button>
         </div>
 
-        <div id="contract-content" className="space-y-6">
+        <div id="contract-content" className="space-y-6 printable-content">
             {/* Header */}
             <header className="flex justify-between items-center pb-4 border-b">
                 <div className="flex items-center gap-4">
@@ -179,7 +179,7 @@ export function ContractForm({ client }: { client: ClientData }) {
                                         type="number"
                                         value={clause.amount}
                                         onChange={(e) => handleAmountChange(clause.id, e.target.value)}
-                                        className="text-left print:hidden h-8"
+                                        className="text-left print:hidden h-8 no-print"
                                     />
                                     <span className="hidden print:inline">{formatCurrency(clause.amount)}</span>
                                 </td>
@@ -195,7 +195,7 @@ export function ContractForm({ client }: { client: ClientData }) {
                     </table>
                 </div>
 
-                <div className="mt-4 space-y-2 print:hidden">
+                <div className="mt-4 space-y-2 print:hidden no-print">
                     <div className="flex items-center space-x-2">
                         <Checkbox id="has-discount" checked={hasDiscount} onCheckedChange={(checked) => setHasDiscount(checked as boolean)} />
                         <Label htmlFor="has-discount">هل هناك خصم على العقد؟</Label>

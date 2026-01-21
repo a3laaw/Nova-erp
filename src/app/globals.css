@@ -76,17 +76,33 @@
 
 @layer utilities {
     @media print {
+        /* 1. Hide everything on the page by default */
+        body * {
+            visibility: hidden;
+        }
+
+        /* 2. Make only the printable content and its children visible */
+        .printable-content, .printable-content * {
+            visibility: visible;
+        }
+        
+        /* 3. Position the printable content to fill the page */
+        .printable-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+
+        /* 4. Explicitly hide no-print elements */
         .no-print {
             display: none !important;
         }
-
-        main {
-            padding: 0 !important;
-        }
-        
-        @page {
-            size: A4 landscape;
-            margin: 1cm;
-        }
     }
+}
+
+/* Page setup for printing */
+@page {
+    size: A4 landscape;
+    margin: 1cm;
 }
