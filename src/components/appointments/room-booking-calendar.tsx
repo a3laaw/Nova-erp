@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { format, startOfDay, endOfDay, addMinutes, setHours, setMinutes, getHours, getMinutes } from 'date-fns';
+import { format, startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -30,19 +30,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
-import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '../ui/inline-search-list';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
-const morningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 8), i * 30), 'HH:mm')); // 8:00 to 9:30
-const eveningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 13), i * 30), 'HH:mm')); // 13:00 to 14:30
+const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`)); // 8:00 to 9:30
+const eveningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 13 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`)); // 13:00 to 14:30
 
 
 const departmentStyles: Record<string, React.CSSProperties> = {
@@ -65,7 +63,7 @@ export function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const [date, setDate] = useState<Date>(new Date());
+    const [date, setDate] = useState<Date | undefined>();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -79,8 +77,13 @@ export function RoomBookingCalendar() {
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const fetchData = useCallback(async (d: Date) => {
-        if (!firestore) return;
+    useEffect(() => {
+        // Set date on client to avoid hydration mismatch
+        setDate(new Date());
+    }, []);
+
+    const fetchData = useCallback(async (d: Date | undefined) => {
+        if (!firestore || !d) return;
         setLoading(true);
         try {
             const dayStart = startOfDay(d);
@@ -124,9 +127,7 @@ export function RoomBookingCalendar() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        if (date) {
-            fetchData(date);
-        }
+        fetchData(date);
     }, [date, fetchData]);
 
     const bookingsGrid = useMemo(() => {
@@ -167,12 +168,10 @@ export function RoomBookingCalendar() {
         } else { // Creating new
             const { hours, minutes } = parseTime(data.time!);
             const startTime = setMinutes(setHours(date, hours), minutes);
-            const endTime = addMinutes(startTime, 30);
             
             setDialogData({
                 room: data.room,
                 appointmentDate: startTime,
-                endDate: endTime
             });
         }
         setIsDialogOpen(true);
@@ -192,7 +191,6 @@ export function RoomBookingCalendar() {
                 meetingRoom: formData.room,
                 department: formData.department,
                 appointmentDate: Timestamp.fromDate(formData.appointmentDate),
-                endDate: Timestamp.fromDate(formData.endDate),
                 type: 'room',
             };
             
@@ -224,7 +222,7 @@ export function RoomBookingCalendar() {
         if (!appointmentToDelete || !firestore) return;
         setIsDeleting(true);
         try {
-            await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id));
+            await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
             if (date) { // Re-fetch to update the UI
                 fetchData(date);
@@ -255,6 +253,34 @@ export function RoomBookingCalendar() {
             html2pdf().from(element).set(opt).save();
         });
     };
+    
+    if (!date) {
+        return (
+            <div dir="rtl" className="p-4 space-y-6">
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
+                    <h1 className="text-lg font-bold">تقويم حجوزات القاعات</h1>
+                     <div className="flex items-center gap-2">
+                        <Skeleton className="h-10 w-[280px]" />
+                        <Skeleton className="h-10 w-32" />
+                     </div>
+                </div>
+                <div className="space-y-4">
+                    <div className="border rounded-lg overflow-x-auto">
+                         <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
+                            <Skeleton className="h-6 w-24" />
+                         </h3>
+                        <Skeleton className="h-48 w-full" />
+                    </div>
+                    <div className="border rounded-lg overflow-x-auto">
+                         <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
+                            <Skeleton className="h-6 w-24" />
+                         </h3>
+                        <Skeleton className="h-48 w-full" />
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     const renderGridSection = (title: string, slots: string[]) => (
         <div className="border rounded-lg overflow-x-auto">
@@ -339,7 +365,7 @@ export function RoomBookingCalendar() {
                             className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}
                         >
                             <CalendarIcon className="ml-2 h-4 w-4" />
-                            {format(date, "PPP", { locale: ar })}
+                            {date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -454,7 +480,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         e.preventDefault();
         
         const appointmentDateToSave = dialogData.appointmentDate;
-        const endDateToSave = dialogData.endDate;
 
         setIsSaving(true);
         await onSave({ 
@@ -462,7 +487,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
             id: dialogData.id,
             room: roomName,
             appointmentDate: appointmentDateToSave,
-            endDate: endDateToSave,
+            notes: formData.notes || '',
         });
         setIsSaving(false);
     };

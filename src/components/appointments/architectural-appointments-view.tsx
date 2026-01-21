@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, orderBy, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { format, startOfDay, endOfDay, setHours, setMinutes, getHours, getMinutes, addMinutes } from 'date-fns';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { format, startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,9 @@ import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 
 // --- Constants & Helpers ---
-const morningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 7), i * 30), 'HH:mm'));
-const eveningSlots = Array.from({ length: 4 }, (_, i) => format(addMinutes(setHours(new Date(), 14), i * 30), 'HH:mm'));
+const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
+const eveningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 13 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
+
 
 function getVisitColor(visit: Partial<Appointment>) {
   if (visit.visitCount === 1) return "#facc15"; // yellow-400
@@ -34,7 +35,7 @@ export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [date, setDate] = useState<Date>(new Date());
+    const [date, setDate] = useState<Date | undefined>();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
@@ -43,9 +44,14 @@ export function ArchitecturalAppointmentsView() {
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
+    
+    useEffect(() => {
+        // Set date on client to avoid hydration mismatch
+        setDate(new Date());
+    }, []);
 
-    const fetchData = useCallback(async (d: Date) => {
-        if (!firestore) return;
+    const fetchData = useCallback(async (d: Date | undefined) => {
+        if (!firestore || !d) return;
         setLoading(true);
         try {
             const dayStart = startOfDay(d);
@@ -90,9 +96,7 @@ export function ArchitecturalAppointmentsView() {
     }, [firestore, toast]);
     
     useEffect(() => {
-        if (date) {
-            fetchData(date);
-        }
+        fetchData(date);
     }, [date, fetchData]);
 
     const bookingsGrid = useMemo(() => {
@@ -113,6 +117,7 @@ export function ArchitecturalAppointmentsView() {
     }, [appointments, engineers]);
 
     const handleCellClick = (engineer: Employee, time: string) => {
+        if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
         setDialogData({
             engineerId: engineer.id,
@@ -155,6 +160,35 @@ export function ArchitecturalAppointmentsView() {
             html2pdf().from(element).set(opt).save();
         });
     };
+    
+    if (!date) {
+        return (
+            <div className="space-y-6" dir='rtl'>
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
+                    <h2 className="text-lg font-bold">جدول زيارات القسم المعماري</h2>
+                    <div className='flex items-center gap-2'>
+                        <Skeleton className="h-10 w-[280px]" />
+                        <Skeleton className="h-10 w-32" />
+                    </div>
+                </div>
+                
+                <div className="space-y-4">
+                    <div className="border rounded-lg overflow-x-auto">
+                         <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
+                            <Skeleton className="h-6 w-24" />
+                         </h3>
+                        <Skeleton className="h-48 w-full" />
+                    </div>
+                    <div className="border rounded-lg overflow-x-auto">
+                         <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
+                            <Skeleton className="h-6 w-24" />
+                         </h3>
+                        <Skeleton className="h-48 w-full" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const renderGridSection = (title: string, slots: string[]) => (
         <div className="border rounded-lg overflow-x-auto">
@@ -216,7 +250,7 @@ export function ArchitecturalAppointmentsView() {
                         <PopoverTrigger asChild>
                             <Button variant="outline" className={cn("w-[280px] justify-start text-left font-normal bg-card", !date && "text-muted-foreground")}>
                                 <CalendarIcon className="ml-2 h-4 w-4" />
-                                {format(date, "PPP", { locale: ar })}
+                                {date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -293,10 +327,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         if (!isOpen) { // Reset on close
             setTitle('');
             setSelectedClientId('');
-        } else {
-             // Form is opening, reset to default state for a new booking
-            setTitle('');
-            setSelectedClientId('');
         }
     }, [isOpen]);
 
@@ -330,7 +360,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             ...dialogData,
             clientId: client.id,
             clientName: client.nameAr,
-            title: title || '',
+            title: title || client.nameAr,
             visitCount,
             contractSigned,
             projectType,
@@ -338,7 +368,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             color: getVisitColor({ visitCount, contractSigned, projectType }),
             createdAt: serverTimestamp(),
             appointmentDate: Timestamp.fromDate(dialogData.appointmentDate),
-            endDate: Timestamp.fromDate(addMinutes(dialogData.appointmentDate, 30)),
         };
         await onSave(data);
         setIsSaving(false);
@@ -377,7 +406,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     <div className="grid gap-4 py-6">
                          <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
-                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} />
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
                         <div className="grid gap-2">
                              <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
