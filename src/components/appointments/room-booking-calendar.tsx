@@ -185,7 +185,7 @@ export function RoomBookingCalendar() {
                 clientId: formData.clientId,
                 engineerId: formData.engineerId,
                 title: formData.title,
-                notes: formData.notes || '',
+                notes: '',
                 meetingRoom: formData.room,
                 department: formData.department,
                 appointmentDate: Timestamp.fromDate(formData.appointmentDate),
@@ -491,6 +491,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
+                            <Label htmlFor="title">الغرض من الموعد</Label>
+                            <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
+                        </div>
+                        <div className="grid gap-2">
                             <Label>العميل</Label>
                             <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
                         </div>
@@ -501,10 +505,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                          <div className="grid gap-2">
                             <Label>المهندس</Label>
                              <InlineSearchList value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث بالاسم أو الرقم المدني..." />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الموعد</Label>
-                            <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
                         </div>
                     </div>
                     <DialogFooter>
@@ -519,5 +519,3 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         </Dialog>
     );
 }
-
-    
