@@ -40,12 +40,9 @@ import { toFirestoreDate } from '@/services/date-converter';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
-const timeSlots = Array.from({ length: 8 }, (_, i) => { // From 7 AM, 8 slots (until 10:30 AM)
-  const totalMinutes = 7 * 60 + i * 30;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-});
+const morningSlots = Array.from({ length: 8 }, (_, i) => format(addMinutes(setHours(new Date(), 8), i * 30), 'HH:mm')); // 8:00 to 11:30
+const eveningSlots = Array.from({ length: 8 }, (_, i) => format(addMinutes(setHours(new Date(), 13), i * 30), 'HH:mm')); // 13:00 to 16:30
+
 
 const departmentStyles: Record<string, React.CSSProperties> = {
   "الكهرباء": { backgroundColor: '#fee2e2', borderLeft: '4px solid #ef4444', color: '#991b1b' },
@@ -135,24 +132,25 @@ export function RoomBookingCalendar() {
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
+        const allSlots = [...morningSlots, ...eveningSlots];
         rooms.forEach(room => {
             grid[room] = {};
-            timeSlots.forEach(slot => {
+            allSlots.forEach(slot => {
                 grid[room][slot] = null;
             });
         });
 
         appointments.forEach(appt => {
-            if (!appt.meetingRoom) return;
+            if (!appt.meetingRoom || !grid[appt.meetingRoom]) return;
 
             const startTime = appt.appointmentDate.toDate();
             const startHour = getHours(startTime);
             const startMinute = getMinutes(startTime);
 
-            for (let i = 0; i < timeSlots.length; i++) {
-                const slotTime = parseTime(timeSlots[i]);
+            for (const slot of allSlots) {
+                const slotTime = parseTime(slot);
                 if (slotTime.hours === startHour && slotTime.minutes === startMinute) {
-                    grid[appt.meetingRoom][timeSlots[i]] = appt;
+                    grid[appt.meetingRoom][slot] = appt;
                     break;
                 }
             }
@@ -252,6 +250,77 @@ export function RoomBookingCalendar() {
         });
     };
 
+    const renderGridSection = (title: string, slots: string[]) => (
+        <div className="border rounded-lg overflow-x-auto">
+            <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
+             <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                    <col style={{ width: '8rem' }} />
+                    {slots.map((_, i) => <col key={i} style={{ minWidth: '8rem' }} />)}
+                </colgroup>
+                <thead>
+                    <tr className='border-b'>
+                        <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>
+                        {slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rooms.map(room => (
+                        <tr key={room} className='border-b'>
+                            <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
+                            {slots.map(time => {
+                                const booking = bookingsGrid[room]?.[time];
+                                return (
+                                    <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
+                                        {booking ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <div 
+                                                        style={{
+                                                            height: '100%',
+                                                            width: '100%',
+                                                            borderRadius: '0.375rem',
+                                                            padding: '0.5rem',
+                                                            fontSize: '0.75rem',
+                                                            cursor: 'pointer',
+                                                            ...departmentStyles[booking.department || 'أخرى']
+                                                        }}
+                                                    >
+                                                        <p style={{ fontWeight: 'bold' }}>{booking.title}</p>
+                                                        <p>{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
+                                                        <p style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
+                                                    </div>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent dir="rtl">
+                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => handleOpenDialog(booking)}>
+                                                        <Pencil className="ml-2 h-4 w-4" />
+                                                        <span>تعديل الموعد</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                        <Trash2 className="ml-2 h-4 w-4" />
+                                                        <span>إلغاء الموعد</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : (
+                                            <button 
+                                                onClick={() => handleOpenDialog({ room, time })}
+                                                className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print"
+                                                aria-label={`حجز ${room} الساعة ${time}`}
+                                            />
+                                        )}
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+
     return (
         <div dir="rtl" className="p-4 space-y-6">
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
@@ -286,82 +355,24 @@ export function RoomBookingCalendar() {
                  </div>
             </div>
 
-            <div id="room-booking-printable-area" className="overflow-x-auto border rounded-lg printable-content">
+            <div id="room-booking-printable-area" className="printable-content">
                 <div className="hidden print:block mb-4 p-4">
                     <h1 className="text-xl font-bold">تقويم حجوزات القاعات</h1>
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
-                <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                    <colgroup>
-                        <col style={{ width: '8rem' }} />
-                        {timeSlots.map((_, i) => <col key={i} style={{ minWidth: '8rem' }} />)}
-                    </colgroup>
-                    <thead>
-                        <tr className="border-b">
-                            <th className="sticky top-0 left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>
-                            {timeSlots.map(time => (
-                                <th key={time} className="sticky top-0 bg-muted p-2 text-center text-sm font-mono border-l">
-                                    {time}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rooms.map(room => (
-                            <tr key={room} className="border-b">
-                                <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
-                                {timeSlots.map(time => {
-                                    const booking = bookingsGrid[room]?.[time];
-                                    return (
-                                        <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
-                                            {booking ? (
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <div 
-                                                            style={{
-                                                                height: '100%',
-                                                                width: '100%',
-                                                                borderRadius: '0.375rem',
-                                                                padding: '0.5rem',
-                                                                fontSize: '0.75rem',
-                                                                cursor: 'pointer',
-                                                                ...departmentStyles[booking.department || 'أخرى']
-                                                            }}
-                                                        >
-                                                            <p style={{ fontWeight: 'bold' }}>{booking.title}</p>
-                                                            <p>{clients.find(c => c.id === booking.clientId)?.nameAr}</p>
-                                                            <p style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{engineers.find(e => e.id === booking.engineerId)?.fullName}</p>
-                                                        </div>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent dir="rtl">
-                                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                        <DropdownMenuItem onClick={() => handleOpenDialog(booking)}>
-                                                            <Pencil className="ml-2 h-4 w-4" />
-                                                            <span>تعديل الموعد</span>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                            <Trash2 className="ml-2 h-4 w-4" />
-                                                            <span>إلغاء الموعد</span>
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => handleOpenDialog({ room, time })}
-                                                    className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print"
-                                                    aria-label={`حجز ${room} الساعة ${time}`}
-                                                />
-                                            )}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                
+                {loading ? (
+                  <div className='space-y-4'>
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                  </div>
+                ) : (
+                    <div className="space-y-4">
+                        {renderGridSection('الفترة الصباحية', morningSlots)}
+                        {renderGridSection('الفترة المسائية', eveningSlots)}
+                    </div>
+                )}
             </div>
-             {loading && <div className="text-center p-8"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>}
 
              <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
                 {Object.entries(departmentStyles).map(([dept, style]) => (
@@ -440,16 +451,16 @@ function InlineSearch({ value, onSelect, options, placeholder }: { value: string
                 }}
             />
             {showOptions && (
-                 <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
-                    <ul className="max-h-48 overflow-y-auto">
+                 <div data-inline-search-list-options className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
+                    <ul className="max-h-48 overflow-y-auto p-1">
                         {filteredOptions.length === 0 ? (
-                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
+                            <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
                         ) : (
                            <>
                                 {displayOptions.map(opt => (
                                     <li
                                         key={opt.value}
-                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                                        className="cursor-pointer p-2 text-sm rounded-md hover:bg-accent"
                                         onMouseDown={(e) => {
                                             e.preventDefault(); 
                                             onSelect(opt.value);
@@ -537,21 +548,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent 
-                dir="rtl"
-                onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
-                        e.preventDefault();
-                    }
-                }}
-                onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
-                        e.preventDefault();
-                    }
-                }}
-            >
+            <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
