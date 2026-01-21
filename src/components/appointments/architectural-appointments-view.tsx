@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { Checkbox } from '../ui/checkbox';
 
 // --- Constants & Helpers ---
 const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
@@ -411,8 +412,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
     const [visitCount, setVisitCount] = useState(1);
-    const [contractSigned, setContractSigned] = useState(false);
-    const [projectType, setProjectType] = useState('بلدية سكن خاص');
+    const [isContractSigned, setIsContractSigned] = useState(false);
+    const [projectType, setProjectType] = useState('');
 
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
@@ -430,11 +431,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
                 setVisitCount(dialogData.visitCount || 1);
-                setContractSigned(dialogData.contractSigned || false);
-                setProjectType(dialogData.projectType || 'بلدية سكن خاص');
+                setIsContractSigned(dialogData.contractSigned || false);
+                setProjectType(dialogData.projectType || '');
             } else {
                 setSelectedClientId('');
                 setTitle('');
+                setIsContractSigned(false);
+                setProjectType('');
             }
         }
     }, [isOpen, dialogData, isEditing]);
@@ -443,7 +446,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     useEffect(() => {
         if (!selectedClientId || !firestore) {
             setVisitCount(1);
-            setContractSigned(false);
             return;
         };
         const fetchClientHistory = async () => {
@@ -455,11 +457,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             const snapshot = await getDocs(q);
             const architecturalVisits = snapshot.docs
                 .filter(d => isEditing ? d.id !== dialogData.id : true)
-                .map(doc => doc.data()).filter(appt => appt.type === 'architectural');
+                .map(doc => doc.data());
 
             setVisitCount(architecturalVisits.length + 1);
-            const hasSigned = architecturalVisits.some(v => v.contractSigned && v.projectType === 'بلدية سكن خاص');
-            setContractSigned(hasSigned);
         };
         fetchClientHistory();
     }, [selectedClientId, firestore, isEditing, dialogData]);
@@ -518,10 +518,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 clientName: client.nameAr,
                 title: title || client.nameAr,
                 visitCount,
-                contractSigned,
-                projectType,
+                contractSigned: isContractSigned,
+                projectType: projectType,
                 type: 'architectural',
-                color: getVisitColor({ visitCount, contractSigned, projectType }),
+                color: getVisitColor({ visitCount, contractSigned: isContractSigned, projectType }),
                 ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
             };
             await onSave(dataToSave);
@@ -588,6 +588,17 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 placeholder="ابحث بالاسم أو رقم الجوال..."
                              />
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="projectType">نوع المشروع (اختياري)</Label>
+                            <Input id="projectType" value={projectType} onChange={e => setProjectType(e.target.value)} placeholder="مثال: بلدية سكن خاص، تصميم تجاري..." />
+                        </div>
+
+                        <div className="flex items-center space-x-2" dir="rtl">
+                            <Checkbox id="isContractSigned" checked={isContractSigned} onCheckedChange={(checked) => setIsContractSigned(checked as boolean)} />
+                            <Label htmlFor="isContractSigned" className="cursor-pointer">
+                                تم توقيع العقد لهذا المشروع؟
+                            </Label>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
@@ -601,3 +612,4 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         </Dialog>
     );
 }
+    
