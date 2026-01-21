@@ -46,6 +46,8 @@ export function ArchitecturalAppointmentsView() {
     const [dialogData, setDialogData] = useState<any>(null);
 
     const clientsMap = useMemo(() => new Map(clients.map(c => [c.id, c.nameAr])), [clients]);
+    const engineersMap = useMemo(() => new Map(engineers.map(e => [e.id!, e.fullName])), [engineers]);
+
 
     // Fetch static data (engineers, clients)
     useEffect(() => {
@@ -90,7 +92,8 @@ export function ArchitecturalAppointmentsView() {
 
             const augmentedAppointments = architecturalAppointments.map(appt => ({
                 ...appt,
-                clientName: clientsMap.get(appt.clientId)
+                clientName: clientsMap.get(appt.clientId),
+                engineerName: appt.engineerId ? engineersMap.get(appt.engineerId) : undefined
             }));
             
             setAppointments(augmentedAppointments);
@@ -100,14 +103,14 @@ export function ArchitecturalAppointmentsView() {
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast, clientsMap]);
+    }, [firestore, toast, clientsMap, engineersMap]);
 
     // Fetch appointments for the selected date
     useEffect(() => {
-        if (date && clients.length > 0) { // Ensure clients are loaded before fetching
+        if (date && clients.length > 0 && engineers.length > 0) { // Ensure clients are loaded before fetching
             fetchAppointments(date);
         }
-    }, [date, clients, fetchAppointments]);
+    }, [date, clients, engineers, fetchAppointments]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -393,6 +396,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
+                            <Label htmlFor="title">الغرض من الزيارة</Label>
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} required />
+                        </div>
+                        <div className="grid gap-2">
                              <Label htmlFor="client-search">العميل</Label>
                              <InlineSearchList 
                                 value={selectedClientId}
@@ -400,10 +407,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 options={clientOptions}
                                 placeholder="ابحث بالاسم أو رقم الجوال..."
                              />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الزيارة</Label>
-                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} required />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="projectType">نوع المشروع</Label>
