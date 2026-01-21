@@ -40,7 +40,7 @@ const transactionTypes = [
     { value: 'معاملة أخرى', label: 'معاملة أخرى'}
 ];
 
-function InlineSearchList({ value, onSelect, options, placeholder }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; }) {
+function InlineSearchList({ value, onSelect, options, placeholder }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string; searchKey?: string }[]; placeholder: string; }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
     const MAX_DISPLAY_ITEMS = 50;
@@ -50,7 +50,8 @@ function InlineSearchList({ value, onSelect, options, placeholder }: { value: st
     }, [value, options]);
 
     const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(search.toLowerCase())
+        opt.label.toLowerCase().includes(search.toLowerCase()) ||
+        (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
     );
 
     const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
@@ -86,7 +87,10 @@ function InlineSearchList({ value, onSelect, options, placeholder }: { value: st
                                             setShowOptions(false);
                                         }}
                                     >
-                                        {opt.label}
+                                        <div className="flex justify-between items-center">
+                                            <span>{opt.label}</span>
+                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
+                                        </div>
                                     </li>
                                 ))}
                                 {filteredOptions.length > MAX_DISPLAY_ITEMS && (
@@ -248,7 +252,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         }
     };
     
-    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
+    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber || e.civilId })), [engineers]);
 
 
     return (
@@ -258,13 +262,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 className="sm:max-w-lg"
                 onPointerDownOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                     }
                 }}
                 onInteractOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                     }
                 }}
@@ -283,7 +287,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                         </div>
                         <div className="grid gap-2">
                             <Label>إسناد إلى مهندس (اختياري)</Label>
-                            <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder={engineersLoading ? "تحميل..." : "ابحث عن مهندس..."} />
+                            <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder={engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="description">وصف المعاملة</Label>

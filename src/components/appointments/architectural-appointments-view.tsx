@@ -188,7 +188,23 @@ export function ArchitecturalAppointmentsView() {
                             {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={setDate} initialFocus /></PopoverContent>
+                    <PopoverContent className="w-auto p-0">
+                        <Calendar 
+                          mode="single" 
+                          selected={date} 
+                          onSelect={setDate} 
+                          initialFocus 
+                          onDayPointerDown={(e) => e.preventDefault()}
+                          onMonthChange={(month) => {
+                            // This logic can be complex, for now we just prevent default
+                            // to stop popover from closing on month change navigation.
+                            const target = document.activeElement;
+                            if (target && target instanceof HTMLElement && !target.closest('.rdp-day')) {
+                                // e.preventDefault();
+                            }
+                          }}
+                        />
+                    </PopoverContent>
                 </Popover>
             </div>
             
@@ -295,8 +311,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     };
     
     const filteredClients = clients.filter((opt: Client) =>
-        opt.nameAr.toLowerCase().includes(clientSearch.toLowerCase())
+        opt.nameAr.toLowerCase().includes(clientSearch.toLowerCase()) ||
+        (opt.mobile && opt.mobile.includes(clientSearch))
     );
+
 
     const displayClients = filteredClients.slice(0, MAX_DISPLAY_ITEMS);
 
@@ -306,13 +324,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 dir="rtl"
                 onPointerDownOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                     }
                 }}
                 onInteractOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                     }
                 }}
@@ -331,7 +349,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 <Input
                                     id="client-search"
                                     value={clientSearch}
-                                    placeholder="ابحث عن عميل..."
+                                    placeholder="ابحث بالاسم أو رقم الجوال..."
                                     onFocus={() => setShowClientOptions(true)}
                                     onBlur={() => setTimeout(() => setShowClientOptions(false), 150)} // Delay to allow click
                                     onChange={(e) => {
@@ -358,7 +376,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                                                 setShowClientOptions(false);
                                                             }}
                                                         >
-                                                            {client.nameAr}
+                                                            <div className="flex justify-between items-center">
+                                                                <span>{client.nameAr}</span>
+                                                                {client.mobile && <span className="text-xs text-muted-foreground dir-ltr">{client.mobile}</span>}
+                                                            </div>
                                                         </li>
                                                     ))}
                                                     {filteredClients.length > MAX_DISPLAY_ITEMS && (

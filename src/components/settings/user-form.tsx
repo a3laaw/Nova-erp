@@ -45,7 +45,7 @@ const initialFormData: Partial<UserProfile> = {
 };
 
 
-function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; disabled?: boolean; }) {
+function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string; searchKey?: string }[]; placeholder: string; disabled?: boolean; }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
     const MAX_DISPLAY_ITEMS = 50;
@@ -55,7 +55,8 @@ function InlineSearchList({ value, onSelect, options, placeholder, disabled }: {
     }, [value, options]);
 
     const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(search.toLowerCase())
+        opt.label.toLowerCase().includes(search.toLowerCase()) ||
+        (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
     );
 
     const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
@@ -92,7 +93,10 @@ function InlineSearchList({ value, onSelect, options, placeholder, disabled }: {
                                             setShowOptions(false);
                                         }}
                                     >
-                                        {opt.label}
+                                        <div className="flex justify-between items-center">
+                                            <span>{opt.label}</span>
+                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
+                                        </div>
                                     </li>
                                 ))}
                                 {filteredOptions.length > MAX_DISPLAY_ITEMS && (
@@ -199,11 +203,11 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   }
   
   const currentEmployeeOptions = useMemo(() => {
-    const baseOptions = availableEmployees.map(e => ({ value: e.id!, label: `${e.fullName} (${e.civilId})`}));
+    const baseOptions = availableEmployees.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.civilId }));
     if (isEditing && user) {
         const linkedEmployee = employees.find(e => e.id === user.employeeId);
         if (linkedEmployee && !baseOptions.some(o => o.value === linkedEmployee.id)) {
-            return [{ value: linkedEmployee.id!, label: `${linkedEmployee.fullName} (${linkedEmployee.civilId})`}, ...baseOptions];
+            return [{ value: linkedEmployee.id!, label: linkedEmployee.fullName, searchKey: linkedEmployee.civilId }, ...baseOptions];
         }
     }
     return baseOptions;
@@ -216,13 +220,13 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
         dir="rtl"
         onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                 e.preventDefault();
             }
         }}
         onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                 e.preventDefault();
             }
         }}
@@ -244,7 +248,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                         value={formData.employeeId || ''}
                         onSelect={(v) => handleSelectChange('employeeId', v)}
                         options={currentEmployeeOptions}
-                        placeholder="ابحث عن موظف..."
+                        placeholder="ابحث بالاسم أو الرقم المدني..."
                         disabled={isEditing}
                     />
                 </div>

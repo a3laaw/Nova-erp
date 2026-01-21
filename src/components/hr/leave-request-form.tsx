@@ -40,7 +40,7 @@ const leaveTypeOptions: { value: LeaveType; label: string }[] = [
     { value: 'Unpaid', label: 'بدون راتب' },
 ];
 
-function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string }[]; placeholder: string; disabled?: boolean; }) {
+function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string; searchKey?: string }[]; placeholder: string; disabled?: boolean; }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
     const MAX_DISPLAY_ITEMS = 50;
@@ -50,7 +50,8 @@ function InlineSearchList({ value, onSelect, options, placeholder, disabled }: {
     }, [value, options]);
 
     const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(search.toLowerCase())
+        opt.label.toLowerCase().includes(search.toLowerCase()) ||
+        (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
     );
 
     const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
@@ -87,7 +88,10 @@ function InlineSearchList({ value, onSelect, options, placeholder, disabled }: {
                                             setShowOptions(false);
                                         }}
                                     >
-                                        {opt.label}
+                                        <div className="flex justify-between items-center">
+                                            <span>{opt.label}</span>
+                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
+                                        </div>
                                     </li>
                                 ))}
                                 {filteredOptions.length > MAX_DISPLAY_ITEMS && (
@@ -176,7 +180,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
     }, [employeeId, employees]);
 
     const employeeOptions = useMemo(() => 
-        employees.map(emp => ({ value: emp.id!, label: emp.fullName }))
+        employees.map(emp => ({ value: emp.id!, label: emp.fullName, searchKey: emp.civilId }))
     , [employees]);
     
     const currentBalance = useMemo(() => {
@@ -298,13 +302,13 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         dir="rtl"
         onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                 e.preventDefault();
             }
         }}
         onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                 e.preventDefault();
             }
         }}
@@ -323,7 +327,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                         value={employeeId}
                         onSelect={setEmployeeId}
                         options={employeeOptions}
-                        placeholder={employeesLoading ? "تحميل..." : "اختر موظفًا..."}
+                        placeholder={employeesLoading ? "تحميل..." : "ابحث بالاسم أو الرقم المدني..."}
                         disabled={isEditing || employeesLoading}
                     />
                 </div>

@@ -248,7 +248,10 @@ export function RoomBookingCalendar() {
                         {date ? format(date, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                     </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
+                    <PopoverContent className="w-auto p-0" 
+                        onPointerDownOutside={(e) => e.preventDefault()}
+                        onInteractOutside={(e) => e.preventDefault()}
+                    >
                     <Calendar
                         mode="single"
                         selected={date}
@@ -360,7 +363,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function InlineSearch({ value, onSelect, options, placeholder }: { value: string, onSelect: (value: string) => void, options: {label: string, value: string}[], placeholder: string }) {
+function InlineSearch({ value, onSelect, options, placeholder }: { value: string, onSelect: (value: string) => void, options: {label: string, value: string, searchKey?: string}[], placeholder: string }) {
     const [search, setSearch] = useState('');
     const [showOptions, setShowOptions] = useState(false);
     const MAX_DISPLAY_ITEMS = 50;
@@ -372,7 +375,10 @@ function InlineSearch({ value, onSelect, options, placeholder }: { value: string
     }, [selectedLabel]);
 
     const filteredOptions = useMemo(() => 
-        options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase())),
+        options.filter(opt => 
+            opt.label.toLowerCase().includes(search.toLowerCase()) || 
+            (opt.searchKey && opt.searchKey.toLowerCase().includes(search))
+        ),
     [options, search]);
 
     const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
@@ -391,7 +397,7 @@ function InlineSearch({ value, onSelect, options, placeholder }: { value: string
                 }}
             />
             {showOptions && (
-                 <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-md">
+                 <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
                     <ul className="max-h-48 overflow-y-auto">
                         {filteredOptions.length === 0 ? (
                             <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
@@ -408,7 +414,10 @@ function InlineSearch({ value, onSelect, options, placeholder }: { value: string
                                             setShowOptions(false);
                                         }}
                                     >
-                                        {opt.label}
+                                        <div className="flex justify-between items-center">
+                                            <span>{opt.label}</span>
+                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
+                                        </div>
                                     </li>
                                 ))}
                                 {filteredOptions.length > MAX_DISPLAY_ITEMS && (
@@ -478,9 +487,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         setIsSaving(false);
     };
 
-    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr })), [clients]);
-    const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id!, label: e.fullName })), [engineers]);
-    const departmentOptionsForSelect = useMemo(() => departmentOptions.map(d => ({ value: d, label: d })), []);
+    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
+    const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id!, label: e.fullName, searchKey: e.civilId })), [engineers]);
+    const departmentOptionsForSelect = useMemo(() => departmentOptions.map(d => ({ value: d, label: d, searchKey: d })), []);
 
 
     return (
@@ -489,7 +498,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                 dir="rtl"
                 onPointerDownOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]')) {
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                     }
                 }}
@@ -530,7 +539,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                         </div>
                         <div className="grid gap-2">
                             <Label>العميل</Label>
-                            <InlineSearch value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث عن عميل..." />
+                            <InlineSearch value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
                         </div>
                         <div className="grid gap-2">
                             <Label>القسم</Label>
@@ -538,7 +547,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                         </div>
                          <div className="grid gap-2">
                             <Label>المهندس</Label>
-                             <InlineSearch value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث عن مهندس..." />
+                             <InlineSearch value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث بالاسم أو الرقم المدني..." />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الموعد</Label>
