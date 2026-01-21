@@ -78,32 +78,43 @@ export function RoomBookingCalendar() {
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const clientsMap = useMemo(() => new Map(clients.map(c => [c.id, c.nameAr])), [clients]);
-    const engineersMap = useMemo(() => new Map(engineers.map(e => [e.id!, e.fullName])), [engineers]);
-
-
-    // --- Data Fetching ---
-    const fetchAppointmentsForDate = useCallback(async (d: Date) => {
+    const fetchData = useCallback(async (d: Date) => {
         if (!firestore) return;
         setLoading(true);
         try {
+            const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
+            const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+            
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
-
-            const q = query(
+            const apptQuery = query(
                 collection(firestore, 'appointments'),
                 where('appointmentDate', '>=', dayStart),
                 where('appointmentDate', '<=', dayEnd)
             );
-            const querySnapshot = await getDocs(q);
-            const fetchedAppointments = querySnapshot.docs
+
+            const [clientSnap, engSnap, apptSnap] = await Promise.all([
+                getDocs(clientQuery),
+                getDocs(engQuery),
+                getDocs(apptQuery)
+            ]);
+            
+            const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+            setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+            const localClientsMap = new Map(fetchedClients.map(c => [c.id, c.nameAr]));
+            
+            const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+            setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+            const localEngineersMap = new Map(fetchedEngineers.map(e => [e.id!, e.fullName]));
+            
+            const fetchedAppointments = apptSnap.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
                 .filter(appt => appt.type === 'room');
             
-             const augmentedAppointments = fetchedAppointments.map(appt => ({
+            const augmentedAppointments = fetchedAppointments.map(appt => ({
                 ...appt,
-                clientName: clientsMap.get(appt.clientId),
-                engineerName: appt.engineerId ? engineersMap.get(appt.engineerId) : undefined
+                clientName: localClientsMap.get(appt.clientId),
+                engineerName: appt.engineerId ? localEngineersMap.get(appt.engineerId) : undefined
             }));
 
             setAppointments(augmentedAppointments);
@@ -113,34 +124,13 @@ export function RoomBookingCalendar() {
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast, clientsMap, engineersMap]);
-    
-    useEffect(() => {
-        if (!firestore) return;
-
-        const fetchStaticData = async () => {
-             try {
-                const [clientSnap, engSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active')))
-                ]);
-                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
-                setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
-            } catch (error) {
-                console.error("Error fetching static data: ", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
-            }
-        }
-        fetchStaticData();
     }, [firestore, toast]);
     
     useEffect(() => {
-        if (date && clients.length > 0 && engineers.length > 0) {
-            fetchAppointmentsForDate(date);
+        if (date) {
+            fetchData(date);
         }
-    }, [date, clients, engineers, fetchAppointmentsForDate]);
+    }, [date, fetchData]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -222,7 +212,7 @@ export function RoomBookingCalendar() {
             }
             
             if (date) {
-                fetchAppointmentsForDate(date);
+                fetchData(date);
             }
 
             setIsDialogOpen(false);
@@ -239,7 +229,7 @@ export function RoomBookingCalendar() {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
             if (date) { // Re-fetch to update the UI
-                fetchAppointmentsForDate(date);
+                fetchData(date);
             }
         } catch (error) {
             console.error("Error deleting appointment:", error);
@@ -527,7 +517,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                                             {appointmentDate ? format(appointmentDate, "PPP", { locale: ar }) : <span>اختر يوما</span>}
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
+                                    <PopoverContent className="w-auto p-0"
+                                        onPointerDownOutside={(e) => e.preventDefault()}
+                                        onInteractOutside={(e) => e.preventDefault()}
+                                    >
                                         <Calendar mode="single" selected={appointmentDate} onSelect={setAppointmentDate} initialFocus />
                                     </PopoverContent>
                                 </Popover>

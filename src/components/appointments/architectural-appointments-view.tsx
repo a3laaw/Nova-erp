@@ -45,40 +45,13 @@ export function ArchitecturalAppointmentsView() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
 
-    const clientsMap = useMemo(() => new Map(clients.map(c => [c.id, c.nameAr])), [clients]);
-    const engineersMap = useMemo(() => new Map(engineers.map(e => [e.id!, e.fullName])), [engineers]);
-
-
-    // Fetch static data (engineers, clients)
-    useEffect(() => {
-        if (!firestore) return;
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
-                
-                const [engSnap, clientSnap] = await Promise.all([getDocs(engQuery), getDocs(clientQuery)]);
-
-                const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                setEngineers(allEngineers.filter(e => e.department?.includes('المعماري')).sort((a,b) => a.fullName.localeCompare(b.fullName)));
-
-                const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
-
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين والعملاء.' });
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [firestore, toast]);
-    
-    const fetchAppointments = useCallback(async (d: Date) => {
+    const fetchData = useCallback(async (d: Date) => {
         if (!firestore) return;
         setLoading(true);
         try {
+            const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+            const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
+            
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
             const q = query(
@@ -86,31 +59,46 @@ export function ArchitecturalAppointmentsView() {
                 where('appointmentDate', '>=', dayStart),
                 where('appointmentDate', '<=', dayEnd)
             );
-            const querySnapshot = await getDocs(q);
-            const dayAppointments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+
+            const [engSnap, clientSnap, apptSnap] = await Promise.all([
+                getDocs(engQuery),
+                getDocs(clientQuery),
+                getDocs(q)
+            ]);
+
+            const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+            const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName));
+            setEngineers(archEngineers);
+            const localEngineersMap = new Map(allEngineers.map(e => [e.id!, e.fullName]));
+            
+            const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+            setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+            const localClientsMap = new Map(allClients.map(c => [c.id, c.nameAr]));
+            
+            const dayAppointments = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
             const architecturalAppointments = dayAppointments.filter(appt => appt.type === 'architectural');
 
             const augmentedAppointments = architecturalAppointments.map(appt => ({
                 ...appt,
-                clientName: clientsMap.get(appt.clientId),
-                engineerName: appt.engineerId ? engineersMap.get(appt.engineerId) : undefined
+                clientName: localClientsMap.get(appt.clientId),
+                engineerName: appt.engineerId ? localEngineersMap.get(appt.engineerId) : undefined
             }));
             
             setAppointments(augmentedAppointments);
+
         } catch (error) {
             console.error("Error fetching appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast, clientsMap, engineersMap]);
-
-    // Fetch appointments for the selected date
+    }, [firestore, toast]);
+    
     useEffect(() => {
-        if (date && clients.length > 0 && engineers.length > 0) { // Ensure clients are loaded before fetching
-            fetchAppointments(date);
+        if (date) {
+            fetchData(date);
         }
-    }, [date, clients, engineers, fetchAppointments]);
+    }, [date, fetchData]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -146,7 +134,7 @@ export function ArchitecturalAppointmentsView() {
             await addDoc(collection(firestore, 'appointments'), data);
             toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
             if (date) {
-                fetchAppointments(date);
+                fetchData(date);
             }
             setIsDialogOpen(false);
         } catch (error) {
@@ -312,6 +300,11 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     useEffect(() => {
         if (!isOpen) { // Reset on close
             setSelectedClientId('');
+            setTitle('');
+            setNotes('');
+            setVisitCount(1);
+            setContractSigned(false);
+        } else {
             setTitle('');
             setNotes('');
             setVisitCount(1);
