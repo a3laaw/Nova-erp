@@ -13,8 +13,25 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { ArchitecturalAppointmentsView } from '@/components/appointments/architectural-appointments-view';
-import { RoomBookingCalendar } from '@/components/appointments/room-booking-calendar';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const ArchitecturalAppointmentsView = dynamic(
+    () => import('@/components/appointments/architectural-appointments-view').then(mod => mod.ArchitecturalAppointmentsView),
+    { 
+        loading: () => <Skeleton className="h-[400px] w-full" />,
+        ssr: false 
+    }
+);
+
+const RoomBookingCalendar = dynamic(
+    () => import('@/components/appointments/room-booking-calendar').then(mod => mod.RoomBookingCalendar),
+    { 
+        loading: () => <Skeleton className="h-[400px] w-full" />,
+        ssr: false 
+    }
+);
+
 
 export default function AppointmentsPage() {
     return (
