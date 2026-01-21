@@ -82,40 +82,35 @@ export function RoomBookingCalendar() {
         if (!firestore) return;
         setLoading(true);
         try {
-            const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
-            const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-            
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
-            const apptQuery = query(
-                collection(firestore, 'appointments'),
-                where('appointmentDate', '>=', dayStart),
-                where('appointmentDate', '<=', dayEnd)
-            );
 
             const [clientSnap, engSnap, apptSnap] = await Promise.all([
-                getDocs(clientQuery),
-                getDocs(engQuery),
-                getDocs(apptQuery)
+                getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
+                getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+                getDocs(query(
+                    collection(firestore, 'appointments'),
+                    where('appointmentDate', '>=', dayStart),
+                    where('appointmentDate', '<=', dayEnd)
+                ))
             ]);
             
             const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
             setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
-            const localClientsMap = new Map(fetchedClients.map(c => [c.id, c.nameAr]));
             
             const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
             setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
-            const localEngineersMap = new Map(fetchedEngineers.map(e => [e.id!, e.fullName]));
-            
-            const fetchedAppointments = apptSnap.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                .filter(appt => appt.type === 'room');
-            
-            const augmentedAppointments = fetchedAppointments.map(appt => ({
-                ...appt,
-                clientName: localClientsMap.get(appt.clientId),
-                engineerName: appt.engineerId ? localEngineersMap.get(appt.engineerId) : undefined
-            }));
+
+            const augmentedAppointments = apptSnap.docs
+                .filter(doc => doc.data().type === 'room')
+                .map(doc => {
+                    const appt = { id: doc.id, ...doc.data() } as Appointment;
+                    return {
+                        ...appt,
+                        clientName: fetchedClients.find(c => c.id === appt.clientId)?.nameAr,
+                        engineerName: appt.engineerId ? fetchedEngineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
+                    }
+                });
 
             setAppointments(augmentedAppointments);
         } catch (error) {
@@ -425,54 +420,42 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, currentDate }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers }: any) {
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
         clientId: '',
         department: '',
         engineerId: '',
         title: '',
-        notes: '',
     });
     const [isSaving, setIsSaving] = useState(false);
     
-    const [appointmentDate, setAppointmentDate] = useState<Date | undefined>(currentDate);
-    const [startTime, setStartTime] = useState('');
-
     const roomName = useMemo(() => dialogData?.meetingRoom || dialogData?.room, [dialogData]);
 
     useEffect(() => {
         if (isOpen && dialogData) {
-            const initialDate = toFirestoreDate(dialogData.appointmentDate || dialogData.startTime);
-            setAppointmentDate(initialDate || currentDate);
-            setStartTime(initialDate ? format(initialDate, 'HH:mm') : format(dialogData.startTime, 'HH:mm'));
-
             setFormData({
                 clientId: dialogData.clientId || '',
                 department: dialogData.department || '',
                 engineerId: dialogData.engineerId || '',
                 title: dialogData.title || '',
-                notes: dialogData.notes || '',
             });
         }
-    }, [isOpen, dialogData, currentDate]);
+    }, [isOpen, dialogData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        const newStartTime = new Date(appointmentDate!);
-        const [hours, minutes] = startTime.split(':').map(Number);
-        newStartTime.setHours(hours, minutes, 0, 0);
+        const startTimeToSave = dialogData.appointmentDate?.toDate() || dialogData.startTime;
+        const endTimeToSave = dialogData.endDate?.toDate() || dialogData.endTime;
 
-        const newEndTime = addMinutes(newStartTime, 30);
-        
         setIsSaving(true);
         await onSave({ 
             ...formData, 
             id: dialogData.id,
             room: roomName,
-            startTime: newStartTime,
-            endTime: newEndTime,
+            startTime: startTimeToSave,
+            endTime: endTimeToSave,
         });
         setIsSaving(false);
     };
@@ -503,33 +486,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
-                            حجز {roomName}
+                            حجز {roomName} في {format(dialogData.appointmentDate?.toDate() || dialogData.startTime, "PPP", { locale: ar })} الساعة {format(dialogData.appointmentDate?.toDate() || dialogData.startTime, "h:mm a", { locale: ar })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
-                         <div className="grid grid-cols-2 gap-4">
-                           <div>
-                                <Label>التاريخ</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                            <CalendarIcon className="ml-2 h-4 w-4" />
-                                            {appointmentDate ? format(appointmentDate, "PPP", { locale: ar }) : <span>اختر يوما</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"
-                                        onPointerDownOutside={(e) => e.preventDefault()}
-                                        onInteractOutside={(e) => e.preventDefault()}
-                                    >
-                                        <Calendar mode="single" selected={appointmentDate} onSelect={setAppointmentDate} initialFocus />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                            <div>
-                                <Label>وقت البدء</Label>
-                                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-                            </div>
-                        </div>
                         <div className="grid gap-2">
                             <Label>العميل</Label>
                             <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
@@ -544,11 +504,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">الغرض من الموعد</Label>
-                            <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} required />
-                        </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="notes">ملاحظات</Label>
-                            <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData(p => ({...p, notes: e.target.value}))} />
+                            <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
                         </div>
                     </div>
                     <DialogFooter>
