@@ -19,7 +19,7 @@ import {
   TableFooter
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, Timestamp, type DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +37,7 @@ import { Loader2, Printer, Search, ArrowRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 // Represents a leave request augmented with the current employee name
 interface AugmentedLeaveRequest extends LeaveRequest {
@@ -82,7 +83,7 @@ const formatDateForDisplay = (dateValue: any): string => {
 
 
 export default function LeaveReportsPage() {
-    const firestore = useFirestore();
+    const firestore = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
     const [isFetching, setIsFetching] = useState(true);
@@ -141,6 +142,15 @@ export default function LeaveReportsPage() {
         
         fetchAllData();
     }, [firestore, toast]);
+    
+    const employeeOptions = useMemo(() => [
+        { value: 'all', label: 'كل الموظفين' },
+        ...employees.map(emp => ({
+            value: emp.id!,
+            label: emp.fullName,
+            searchKey: emp.employeeNumber
+        }))
+    ], [employees]);
 
     const reportData = useMemo(() => {
         if (isFetching || !dateFrom || !dateTo) return [];
@@ -228,17 +238,13 @@ export default function LeaveReportsPage() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="employeeFilter">الموظف</Label>
-                             <Select dir="rtl" value={employeeFilter} onValueChange={(v) => setEmployeeFilter(v as any)}>
-                                <SelectTrigger id="employeeFilter">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">كل الموظفين</SelectItem>
-                                    {employees.map(emp => (
-                                        <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <InlineSearchList 
+                                value={employeeFilter}
+                                onSelect={setEmployeeFilter}
+                                options={employeeOptions}
+                                placeholder='ابحث عن موظف...'
+                                disabled={isFetching}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="statusFilter">حالة الطلب</Label>

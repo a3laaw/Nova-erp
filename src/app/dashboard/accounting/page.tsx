@@ -22,7 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { clients, invoices } from '@/lib/data';
+import { invoices } from '@/lib/data';
 import { formatCurrency } from '@/lib/utils';
 import type { InvoiceStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -71,12 +71,10 @@ export default function AccountingPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {invoices.map(invoice => {
-                        const client = clients.find(c => c.id === invoice.clientId);
-                        return (
+                    {invoices.map(invoice => (
                             <TableRow key={invoice.id}>
                                 <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                                <TableCell>{client?.name[language]}</TableCell>
+                                <TableCell>{invoice.clientId}</TableCell>
                                 <TableCell>{format(new Date(invoice.issueDate), 'dd/MM/yyyy')}</TableCell>
                                 <TableCell>{format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</TableCell>
                                 <TableCell>
@@ -85,7 +83,7 @@ export default function AccountingPage() {
                                 <TableCell className="text-left">{formatCurrency(invoice.amount)}</TableCell>
                             </TableRow>
                         )
-                    })}
+                    )}
                 </TableBody>
             </Table>
           </TabsContent>

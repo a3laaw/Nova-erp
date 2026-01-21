@@ -27,6 +27,7 @@ import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { intervalToDuration } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 
 type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
@@ -158,6 +159,12 @@ export function GratuityCalculator() {
     };
   }, [selectedEmployee, terminationDate, terminationReason]);
   
+    const employeeOptions = useMemo(() => employees.map(emp => ({
+        value: emp.id!,
+        label: emp.fullName,
+        searchKey: emp.employeeNumber || emp.civilId
+    })), [employees]);
+  
   return (
     <Card dir="rtl">
       <CardHeader>
@@ -170,18 +177,13 @@ export function GratuityCalculator() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="employee">اختر الموظف</Label>
-            <Select onValueChange={setSelectedEmployeeId} dir="rtl">
-              <SelectTrigger id="employee" disabled={employeesLoading}>
-                <SelectValue placeholder={employeesLoading ? "جاري تحميل الموظفين..." : "قائمة الموظفين..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id!}>
-                    {emp.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <InlineSearchList 
+                value={selectedEmployeeId || ''}
+                onSelect={setSelectedEmployeeId}
+                options={employeeOptions}
+                placeholder={employeesLoading ? 'جاري التحميل...' : 'ابحث عن موظف...'}
+                disabled={employeesLoading}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="termination-date">تاريخ انتهاء الخدمة</Label>

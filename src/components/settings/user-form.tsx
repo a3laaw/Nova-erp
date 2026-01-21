@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 
 interface UserFormProps {
@@ -43,75 +44,6 @@ const initialFormData: Partial<UserProfile> = {
     passwordHash: '',
     role: 'Engineer',
 };
-
-
-function InlineSearchList({ value, onSelect, options, placeholder, disabled }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string; searchKey?: string }[]; placeholder: string; disabled?: boolean; }) {
-    const [search, setSearch] = useState('');
-    const [showOptions, setShowOptions] = useState(false);
-    const MAX_DISPLAY_ITEMS = 50;
-
-    useEffect(() => {
-        setSearch(options.find(o => o.value === value)?.label || '');
-    }, [value, options]);
-
-    const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(search.toLowerCase()) ||
-        (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
-    );
-
-    const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
-
-    return (
-        <div className="relative">
-            <Input
-                value={search}
-                placeholder={placeholder}
-                onFocus={() => !disabled && setShowOptions(true)}
-                onBlur={() => setTimeout(() => setShowOptions(false), 150)} // Delay to allow click
-                onChange={(e) => {
-                    setSearch(e.target.value);
-                    setShowOptions(true);
-                    if (value) onSelect('');
-                }}
-                disabled={disabled}
-            />
-            {showOptions && !disabled && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
-                    <ul className="max-h-48 overflow-y-auto">
-                        {filteredOptions.length === 0 ? (
-                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
-                        ) : (
-                           <>
-                                {displayOptions.map(opt => (
-                                    <li
-                                        key={opt.value}
-                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            onSelect(opt.value);
-                                            setSearch(opt.label);
-                                            setShowOptions(false);
-                                        }}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span>{opt.label}</span>
-                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
-                                        </div>
-                                    </li>
-                                ))}
-                                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
-                                    <li className="p-2 text-xs text-center text-muted-foreground">
-                                        ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
-                                    </li>
-                                )}
-                           </>
-                        )}
-                    </ul>
-                </div>
-            )}
-        </div>
-    );
-}
 
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }: UserFormProps) {
   const { toast } = useToast();
@@ -218,18 +150,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       <DialogContent 
         className="sm:max-w-md" 
         dir="rtl"
-        onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
-                e.preventDefault();
-            }
-        }}
-        onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
-                e.preventDefault();
-            }
-        }}
       >
         <form onSubmit={handleSubmit}>
             <DialogHeader>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -21,20 +21,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { clients } from '@/lib/data';
 import { Printer, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
+import { useFirebase } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import type { Client } from '@/lib/types';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { useToast } from '@/hooks/use-toast';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
   const { language } = useLanguage();
   const [date, setDate] = useState('');
+  
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [selectedClientId, setSelectedClientId] = useState('');
 
   useEffect(() => {
     // Set date on client to avoid hydration mismatch
     setDate(new Date().toISOString().split('T')[0]);
   }, []);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchClients = async () => {
+      setClientsLoading(true);
+      try {
+        const q = query(collection(firestore, 'clients'), where('isActive', '==', true));
+        const snapshot = await getDocs(q);
+        const fetchedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+        fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
+        setClients(fetchedClients);
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة العملاء.' });
+      } finally {
+        setClientsLoading(false);
+      }
+    };
+    fetchClients();
+  }, [firestore, toast]);
+  
+  const clientOptions = useMemo(() => clients.map(c => ({
+      value: c.id,
+      label: c.nameAr,
+      searchKey: c.mobile,
+  })), [clients]);
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -55,16 +90,13 @@ export default function NewCashReceiptPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             <div className="md:col-span-2 grid gap-2">
               <Label htmlFor="receivedFrom">استلمنا من السيد/السادة</Label>
-              <Select dir='rtl'>
-                <SelectTrigger id="receivedFrom">
-                    <SelectValue placeholder="اختر العميل..." />
-                </SelectTrigger>
-                <SelectContent>
-                    {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>{client.name[language]}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <InlineSearchList 
+                value={selectedClientId}
+                onSelect={setSelectedClientId}
+                options={clientOptions}
+                placeholder={clientsLoading ? 'جاري التحميل...' : 'ابحث عن عميل بالاسم أو الجوال...'}
+                disabled={clientsLoading}
+              />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="date">التاريخ</Label>

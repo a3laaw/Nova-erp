@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -28,6 +28,7 @@ import { generateReport, ReportData, ReportType, BulkReportData, StandardReportD
 import type { Employee, AuditLog } from '@/lib/types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 const REPORT_TYPES: { value: ReportType; label: string }[] = [
@@ -134,6 +135,16 @@ export default function ReportsPage() {
         };
         fetchEmployees();
     }, [firestore, toast]);
+    
+    const employeeOptions = useMemo(() => [
+        { value: 'all', label: 'جميع الموظفين (تقرير جماعي)' },
+        ...employees.map(emp => ({
+            value: emp.id!,
+            label: emp.fullName,
+            searchKey: emp.employeeNumber
+        }))
+    ], [employees]);
+
 
     const handleGenerateReport = async () => {
         if (!firestore) {
@@ -239,15 +250,12 @@ export default function ReportsPage() {
                         {reportType === 'EmployeeDossier' && (
                              <div className="grid gap-2">
                                 <Label htmlFor="employeeFilter">تحديد موظف</Label>
-                                <Select dir="rtl" value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                                    <SelectTrigger id="employeeFilter"><SelectValue placeholder="اختر..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">جميع الموظفين (تقرير جماعي)</SelectItem>
-                                        {employees.map(emp => (
-                                            <SelectItem key={emp.id} value={emp.id!}>{emp.fullName}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList
+                                    value={selectedEmployeeId}
+                                    onSelect={setSelectedEmployeeId}
+                                    options={employeeOptions}
+                                    placeholder='ابحث عن موظف...'
+                                />
                             </div>
                         )}
 
