@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { format, setHours, setMinutes, startOfDay, endOfDay } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -216,7 +216,7 @@ export function RoomBookingCalendar() {
             
             setIsDialogOpen(false);
             if (date) {
-                fetchData(date);
+                await fetchData(date);
             }
 
         } catch (error) {
@@ -232,7 +232,7 @@ export function RoomBookingCalendar() {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
             if (date) { // Re-fetch to update the UI
-                fetchData(date);
+                await fetchData(date);
             }
         } catch (error) {
             console.error("Error deleting appointment:", error);

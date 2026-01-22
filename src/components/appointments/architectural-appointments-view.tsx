@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { format, setHours, setMinutes, startOfDay, endOfDay } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -183,7 +183,7 @@ export function ArchitecturalAppointmentsView() {
             
             setIsDialogOpen(false);
             if (date) { // Re-fetch data for the current date
-                fetchData(date);
+                await fetchData(date);
             }
         } catch (error) {
             console.error(error);
@@ -198,7 +198,7 @@ export function ArchitecturalAppointmentsView() {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
             if (date) { // Re-fetch to update the UI
-                fetchData(date);
+                await fetchData(date);
             }
         } catch (error) {
             console.error("Error deleting appointment:", error);
@@ -448,7 +448,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         setIsSaving(true);
         
         try {
-            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
+            const appointmentDateTime = isEditing 
+                ? new Date(`${newDate}T${newTime}`) 
+                : dialogData.appointmentDate;
             
             // --- Conflict Validation ---
             const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
