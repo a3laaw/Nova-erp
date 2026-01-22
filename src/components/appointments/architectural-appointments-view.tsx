@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, startOfDay, endOfDay } from 'firebase/firestore';
-import { format, setHours, setMinutes } from 'date-fns';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { format, setHours, setMinutes, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -68,8 +68,8 @@ export function ArchitecturalAppointmentsView() {
     const [dialogData, setDialogData] = useState<any>(null);
     
     useEffect(() => {
-        // Render skeleton on initial load, then set date on client.
-        if (date === undefined) {
+        // Set date on client-side to avoid hydration mismatch
+        if (!date) {
             setDate(new Date());
         }
     }, [date]);
@@ -621,3 +621,4 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         </Dialog>
     );
 }
+    

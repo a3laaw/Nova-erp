@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc, startOfDay, endOfDay } from 'firebase/firestore';
-import { format, setHours, setMinutes } from 'date-fns';
+import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { format, setHours, setMinutes, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -78,8 +78,8 @@ export function RoomBookingCalendar() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        // Render skeleton on initial load, then set date on client.
-        if (date === undefined) {
+        // Set date on client-side to avoid hydration mismatch
+        if (!date) {
             setDate(new Date());
         }
     }, [date]);
@@ -654,3 +654,5 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         </Dialog>
     );
 }
+
+    
