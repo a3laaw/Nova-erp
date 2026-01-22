@@ -326,25 +326,38 @@ export function ReferenceDataManager() {
         if (!firestore) return;
         setIsSeeding(true);
         try {
-            const departmentsQuery = query(collection(firestore, 'departments'));
-            const departmentsSnapshot = await getDocs(departmentsQuery);
+            const batch = writeBatch(firestore);
+            const departmentsRef = collection(firestore, 'departments');
 
-            if (departmentsSnapshot.empty) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إضافة الأقسام أولاً قبل تسجيل البيانات الافتراضية.' });
-                setIsSeeding(false);
-                return;
+            // Get existing department names to avoid creating duplicates
+            const departmentsSnapshot = await getDocs(departmentsRef);
+            const existingDeptsData = new Map<string, string>();
+            departmentsSnapshot.forEach(doc => {
+                existingDeptsData.set(doc.data().name, doc.id);
+            });
+
+            let newDeptCount = 0;
+            // Create departments that don't exist
+            for (const deptName of Object.keys(defaultTransactionTypesByDept)) {
+                if (!existingDeptsData.has(deptName)) {
+                    const newDeptRef = doc(departmentsRef);
+                    batch.set(newDeptRef, { name: deptName });
+                    existingDeptsData.set(deptName, newDeptRef.id); // Add to map to use its ID immediately
+                    newDeptCount++;
+                }
             }
 
-            const batch = writeBatch(firestore);
+            if (newDeptCount > 0) {
+                 toast({ title: `تم إنشاء ${newDeptCount} أقسام`, description: 'سيتم الآن تسجيل أنواع المعاملات.' });
+            }
+
+            // Now, seed transaction types for all relevant departments
             let count = 0;
-
-            for (const deptDoc of departmentsSnapshot.docs) {
-                const deptName = deptDoc.data().name;
-                const deptId = deptDoc.id;
-                const typesForDept = defaultTransactionTypesByDept[deptName];
-
-                if (typesForDept) {
+            for (const [deptName, typesForDept] of Object.entries(defaultTransactionTypesByDept)) {
+                const deptId = existingDeptsData.get(deptName);
+                if (deptId) {
                     const transactionTypesRef = collection(firestore, `departments/${deptId}/transactionTypes`);
+                    // We need to fetch existing types for THIS department to avoid duplicates within it
                     const existingTypesSnapshot = await getDocs(transactionTypesRef);
                     const existingNames = new Set(existingTypesSnapshot.docs.map(d => d.data().name));
 
@@ -358,13 +371,14 @@ export function ReferenceDataManager() {
                 }
             }
             
+            await batch.commit();
+            
             if (count > 0) {
-                await batch.commit();
-                toast({ title: 'نجاح', description: `تمت إضافة ${count} نوع معاملة جديد.` });
+                toast({ title: 'نجاح', description: `تمت إضافة/تحديث ${count} نوع معاملة.` });
             } else {
-                toast({ title: 'لا توجد تغييرات', description: 'جميع الأنواع الافتراضية موجودة بالفعل.' });
+                toast({ title: 'لا توجد تغييرات', description: 'جميع الأقسام وأنواع المعاملات الافتراضية موجودة بالفعل.' });
             }
-
+            
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل البيانات الافتراضية.' });
