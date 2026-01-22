@@ -28,6 +28,12 @@ import { ContractClausesForm } from '@/components/clients/contract-clauses-form'
 import type { ClientTransaction, Employee } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
