@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -34,6 +34,25 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useAuth } from '@/context/auth-context';
+import { useToast } from '@/hooks/use-toast';
+
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
@@ -81,11 +100,16 @@ export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
   const firestore = useFirestore();
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [contractTransaction, setContractTransaction] = useState<ClientTransaction | null>(null);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+
+  const [transactionToCancel, setTransactionToCancel] = useState<ClientTransaction | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // --- Data Fetching ---
   const clientRef = useMemo(() => {
@@ -127,6 +151,61 @@ export default function ClientProfilePage() {
     };
     fetchEmployees();
   }, [firestore]);
+
+
+  const handleConfirmCancelContract = async () => {
+    if (!firestore || !currentUser || !client || !transactionToCancel) return;
+
+    setIsCancelling(true);
+    try {
+        const batch = writeBatch(firestore);
+
+        // 1. Remove contract from the transaction using deleteField
+        const transactionRef = doc(firestore, 'clients', client.id, 'transactions', transactionToCancel.id!);
+        batch.update(transactionRef, { contract: deleteField() });
+
+        // 2. Log the event
+        const historyCollectionRef = collection(firestore, `clients/${client.id}/history`);
+        const logContent = `قام بإلغاء عقد المعاملة: "${transactionToCancel.transactionType}".`;
+        batch.set(doc(historyCollectionRef), {
+            type: 'log',
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        });
+
+        // 3. Check if this is the last contract to potentially revert client status
+        const otherTransactions = transactions.filter(tx => tx.id !== transactionToCancel.id!);
+        const hasOtherContracts = otherTransactions.some(tx => !!tx.contract);
+
+        if (!hasOtherContracts && client.status === 'contracted') {
+            const clientRef = doc(firestore, 'clients', client.id);
+            batch.update(clientRef, { status: 'new' });
+            
+            const statusLogContent = `تغيرت حالة الملف من "تم التعاقد" إلى "جديد" بعد إلغاء آخر عقد.`;
+            batch.set(doc(historyCollectionRef), {
+                type: 'log',
+                content: statusLogContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            });
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم إلغاء العقد بنجاح.' });
+
+    } catch (error) {
+        console.error("Error cancelling contract:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء العقد.' });
+    } finally {
+        setIsCancelling(false);
+        setTransactionToCancel(null);
+    }
+  };
 
 
   // --- Render Logic ---
@@ -305,11 +384,24 @@ export default function ClientProfilePage() {
                                             <TableCell>{formatDate(tx.createdAt)}</TableCell>
                                             <TableCell>
                                                 {tx.contract ? (
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link href={`/dashboard/clients/${id}/transactions/${tx.id}/contract`}>
-                                                            عرض العقد
-                                                        </Link>
-                                                    </Button>
+                                                     <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="outline" size="sm">
+                                                                الإجراءات <ChevronDown className="mr-2 h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent dir="rtl">
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/dashboard/clients/${id}/transactions/${tx.id}/contract`}>
+                                                                    عرض العقد
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => setTransactionToCancel(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                                <Trash2 className="ml-2 h-4 w-4" />
+                                                                إلغاء العقد
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 ) : (
                                                     <Button variant="default" size="sm" onClick={() => setContractTransaction(tx)}>
                                                         تعاقد
@@ -330,6 +422,22 @@ export default function ClientProfilePage() {
           </TabsContent>
         </Tabs>
     </div>
+     <AlertDialog open={!!transactionToCancel} onOpenChange={(open) => !open && setTransactionToCancel(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد إلغاء العقد</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في إلغاء عقد المعاملة "{transactionToCancel?.transactionType}"؟ سيتم حذف بيانات العقد نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isCancelling}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmCancelContract} disabled={isCancelling} className="bg-destructive hover:bg-destructive/90">
+                    {isCancelling ? 'جاري الإلغاء...' : 'نعم، قم بالإلغاء'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
