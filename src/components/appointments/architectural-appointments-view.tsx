@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -151,7 +151,6 @@ export function ArchitecturalAppointmentsView() {
             engineerId: engineer.id,
             engineerName: engineer.fullName,
             appointmentDate,
-            session: Number(time.split(':')[0]) < 14 ? 'صباحية' : 'مسائية'
         });
         setIsDialogOpen(true);
     };
@@ -165,29 +164,9 @@ export function ArchitecturalAppointmentsView() {
         setIsDialogOpen(true);
     };
 
-    const handleSave = async (data: any) => {
-        if (!firestore) return;
-
-        const isEditing = !!data.id;
-        const { id, ...saveData } = data; // separate id from the rest of the data
-
-        try {
-            if (isEditing) {
-                const appointmentRef = doc(firestore, 'appointments', id);
-                await updateDoc(appointmentRef, saveData);
-                toast({ title: 'نجاح', description: 'تم تعديل الموعد بنجاح.' });
-            } else {
-                await addDoc(collection(firestore, 'appointments'), saveData);
-                toast({ title: 'نجاح', description: 'تم حجز الموعد بنجاح.' });
-            }
-            
-            setIsDialogOpen(false);
-            if (date) { // Re-fetch data for the current date
-                await fetchData(date);
-            }
-        } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: `فشل ${isEditing ? 'تعديل' : 'حفظ'} الموعد.` });
+    const handleSave = async () => {
+        if (date) { // Re-fetch data for the current date
+            await fetchData(date);
         }
     };
     
@@ -374,11 +353,10 @@ export function ArchitecturalAppointmentsView() {
                 <BookingDialog 
                     isOpen={isDialogOpen}
                     onClose={() => setIsDialogOpen(false)}
-                    onSave={handleSave}
+                    onSaveSuccess={handleSave}
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
-                    dayAppointments={appointments}
                 />
             )}
             
@@ -405,7 +383,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore, dayAppointments }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const isEditing = !!dialogData?.id;
@@ -449,72 +427,122 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         setIsSaving(true);
         
         try {
+            // --- Conflict Validation ---
             const appointmentDateTime = isEditing 
                 ? new Date(`${newDate}T${newTime}`) 
                 : dialogData.appointmentDate;
             
-            // --- Conflict Validation ---
+            const dayStart = startOfDay(appointmentDateTime);
+            const dayEnd = endOfDay(appointmentDateTime);
+
+            const dayApptsQuery = query(collection(firestore, 'appointments'), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
+            const dayApptsSnap = await getDocs(dayApptsQuery);
+            const latestDayAppointments = dayApptsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+            
             const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
             
-            // Use the passed down appointments from the parent state
-            const latestDayAppointments = dayAppointments;
-
-            // Check for engineer conflict
             const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                if (isEditing && appt.id === dialogData.id) return false; // Don't conflict with itself
-                const apptDate = appt.appointmentDate.toDate();
-                return appt.engineerId === dialogData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
+                if (isEditing && appt.id === dialogData.id) return false;
+                return appt.engineerId === dialogData.engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
             });
-
             if (engineerHasConflict) {
-                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت (قد يكون في قاعة اجتماعات).' });
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
                 setIsSaving(false); return;
             }
 
-            // Check for client conflict
             const clientHasConflict = latestDayAppointments.some((appt: any) => {
                 if (isEditing && appt.id === dialogData.id) return false;
-                if (appt.type !== 'architectural') return false; // Only check arch vs arch for clients
-                const apptDate = appt.appointmentDate.toDate();
-                return appt.clientId === selectedClientId && apptDate >= windowStart && apptDate <= windowEnd;
+                return appt.clientId === selectedClientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
             });
-
             if (clientHasConflict) {
                 toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
                 setIsSaving(false); return;
             }
+            
+            // --- Color & Batch Write Logic ---
+            const batch = writeBatch(firestore);
 
-            // Count previous ARCHITECTURAL visits for this client
-            const allClientApptsSnapshot = await getDocs(query(
-              collection(firestore, 'appointments'), 
-              where('clientId', '==', selectedClientId),
-              where('type', '==', 'architectural')
-            ));
-            const visitCount = allClientApptsSnapshot.docs.filter(d => isEditing ? d.id !== dialogData.id : true).length + 1;
+            const allClientApptsQuery = query(
+                collection(firestore, 'appointments'),
+                where('clientId', '==', selectedClientId),
+                where('type', '==', 'architectural')
+            );
+            const allClientApptsSnap = await getDocs(allClientApptsQuery);
+            const existingAppointments = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
 
-            // --- Automated Logic ---
             const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
-            const projType = 'بلدية سكن خاص';
-
-            const dataToSave = {
-                engineerId: dialogData.engineerId,
+            
+            const currentAppointmentObject = {
+                id: isEditing ? dialogData.id : 'new-temp-id',
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 clientId: client.id,
                 title: title || client.nameAr,
-                visitCount,
+                engineerId: dialogData.engineerId,
                 contractSigned,
-                projectType: projType,
-                type: 'architectural',
-                color: getVisitColor({ visitCount, contractSigned }),
-                ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
+                type: 'architectural' as const,
             };
-            await onSave(dataToSave);
-            setIsSaving(false);
+
+            let processingList: (Partial<Appointment> & { id: string })[];
+            if (isEditing) {
+                processingList = existingAppointments.map(appt => 
+                    appt.id === currentAppointmentObject.id ? { ...appt, ...currentAppointmentObject } : appt
+                );
+            } else {
+                processingList = [...existingAppointments, currentAppointmentObject];
+            }
+            
+            processingList.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
+
+            processingList.forEach((appt, index) => {
+                const visitCount = index + 1;
+                const newColor = getVisitColor({ visitCount, contractSigned });
+
+                if (appt.id === 'new-temp-id') {
+                    const newApptRef = doc(collection(firestore, 'appointments'));
+                    const { id, ...dataToSave } = appt;
+                    batch.set(newApptRef, {
+                        ...dataToSave,
+                        color: newColor,
+                        visitCount,
+                        createdAt: serverTimestamp()
+                    });
+                } else {
+                    const existingData = existingAppointments.find(e => e.id === appt.id);
+                    let needsUpdate = false;
+                    const updatePayload: any = {};
+                    
+                    if (existingData?.color !== newColor) {
+                        updatePayload.color = newColor;
+                        needsUpdate = true;
+                    }
+                    if (existingData?.visitCount !== visitCount) {
+                        updatePayload.visitCount = visitCount;
+                        needsUpdate = true;
+                    }
+
+                    if (isEditing && appt.id === dialogData.id) {
+                         const { id, ...dataToSave } = currentAppointmentObject;
+                         Object.assign(updatePayload, dataToSave);
+                         needsUpdate = true;
+                    }
+
+                    if (needsUpdate) {
+                        const apptRef = doc(firestore, 'appointments', appt.id!);
+                        batch.update(apptRef, updatePayload);
+                    }
+                }
+            });
+
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم حفظ الموعد وتحديث الألوان بنجاح.' });
+            onClose();
+            onSaveSuccess();
 
         } catch (error) {
              console.error("Error during save:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'حدث خطأ أثناء التحقق من المواعيد أو حفظها.' });
+        } finally {
             setIsSaving(false);
         }
     };
@@ -589,4 +617,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         </Dialog>
     );
 }
+    
+
     
