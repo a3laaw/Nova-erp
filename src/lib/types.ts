@@ -362,6 +362,10 @@ export interface Area {
     id: string;
     name: string;
 }
+export interface TransactionType {
+    id: string;
+    name: string;
+}
 
 export type ContractClause = {
   id: number;

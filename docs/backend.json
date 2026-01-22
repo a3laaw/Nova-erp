@@ -468,6 +468,18 @@
       },
       "required": ["name"]
     },
+    "TransactionType": {
+      "title": "Transaction Type",
+      "description": "Represents a type of internal client transaction.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the transaction type."
+        }
+      },
+      "required": ["name"]
+    },
     "Appointment": {
       "title": "Appointment",
       "description": "Represents a scheduled meeting or visit.",
@@ -608,6 +620,10 @@
     "/governorates/{governorateId}/areas/{areaId}": {
         "schema": { "$ref": "#/entities/Area" },
         "description": "Stores areas for a specific governorate."
+    },
+    "/transactionTypes/{transactionTypeId}": {
+        "schema": { "$ref": "#/entities/TransactionType" },
+        "description": "Stores the list of available client transaction types."
     },
     "/appointments/{appointmentId}": {
       "schema": {

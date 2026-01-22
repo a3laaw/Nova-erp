@@ -26,23 +26,28 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Department, Job, Governorate, Area } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 
 // Generic Manager Component
 function DataManager<T extends {id: string, name: string}, S extends {id: string, name: string}>({
   primaryTitle,
+  primarySingularTitle,
   primaryCollectionName,
   secondaryTitle,
+  secondarySingularTitle,
   secondaryCollectionName,
   icon
 }: {
   primaryTitle: string;
+  primarySingularTitle: string;
   primaryCollectionName: string;
-  secondaryTitle: string;
-  secondaryCollectionName: string;
+  secondaryTitle?: string;
+  secondarySingularTitle?: string;
+  secondaryCollectionName?: string;
   icon: React.ReactNode;
 }) {
   const { firestore } = useFirebase();
@@ -92,7 +97,7 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
 
   const handleSelectPrimary = async (item: T) => {
     setSelectedPrimary(item);
-    if (!firestore) return;
+    if (!firestore || !secondaryCollectionName) return;
     setLoadingSecondary(true);
     setSecondaryItems([]);
     try {
@@ -174,11 +179,11 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
             {icon}
-            <CardTitle>إدارة {primaryTitle} و {secondaryTitle}</CardTitle>
+            <CardTitle>إدارة {primaryTitle} {secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
         </div>
-        <Button size="sm" onClick={() => openDialog('primary')}><Plus className="ml-2" /> إضافة {primaryTitle.slice(0, -1)}</Button>
+        <Button size="sm" onClick={() => openDialog('primary')}><Plus className="ml-2" /> إضافة {primarySingularTitle}</Button>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <CardContent className={cn("grid grid-cols-1 gap-6", secondaryTitle && "md:grid-cols-2")}>
         {/* Primary List */}
         <div>
           <h4 className="font-semibold mb-2 text-center">{primaryTitle}</h4>
@@ -199,27 +204,29 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
         </div>
         
         {/* Secondary List */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-semibold text-center flex-1">
-                {selectedPrimary ? `${secondaryTitle} (${selectedPrimary.name})` : `اختر ${primaryTitle.slice(0, -1)} لعرض ${secondaryTitle}`}
-            </h4>
-             <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2" /> إضافة {secondaryTitle.slice(0, -1)}</Button>
-          </div>
-          <ScrollArea className="h-72 border rounded-md p-2">
-            {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-              secondaryItems.map(item => (
-                <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
-                  <span>{item.name}</span>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </ScrollArea>
-        </div>
+        {secondaryTitle && secondaryCollectionName && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-center flex-1">
+                    {selectedPrimary ? `${secondaryTitle} (${selectedPrimary.name})` : `اختر ${primarySingularTitle} لعرض ${secondaryTitle}`}
+                </h4>
+                 <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2" /> إضافة {secondarySingularTitle}</Button>
+              </div>
+              <ScrollArea className="h-72 border rounded-md p-2">
+                {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+                  secondaryItems.map(item => (
+                    <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
+                      <span>{item.name}</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </ScrollArea>
+            </div>
+        )}
       </CardContent>
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
@@ -227,7 +234,7 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
           <DialogHeader>
             <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} عنصر جديد</DialogTitle>
             <DialogDescription>
-              {`أدخل اسم ${isPrimaryDialogOpen ? primaryTitle.slice(0, -1) : secondaryTitle.slice(0, -1)} الجديد.`}
+              {`أدخل اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle} الجديد.`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -275,19 +282,31 @@ export function ReferenceDataManager() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <DataManager<Department, Job> 
             primaryTitle="الأقسام"
+            primarySingularTitle="قسم"
             primaryCollectionName="departments"
             secondaryTitle="الوظائف"
+            secondarySingularTitle="وظيفة"
             secondaryCollectionName="jobs"
             icon={<Building />}
         />
         <DataManager<Governorate, Area> 
             primaryTitle="المحافظات"
+            primarySingularTitle="محافظة"
             primaryCollectionName="governorates"
             secondaryTitle="المناطق"
+            secondarySingularTitle="منطقة"
             secondaryCollectionName="areas"
             icon={<MapPin />}
         />
       </div>
+       <div className='mt-6'>
+         <DataManager<TransactionType, never> 
+            primaryTitle="أنواع المعاملات"
+            primarySingularTitle="نوع معاملة"
+            primaryCollectionName="transactionTypes"
+            icon={<FileText />}
+        />
+       </div>
     </div>
   );
 }

@@ -15,13 +15,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 
 interface ClientTransactionFormProps {
@@ -31,101 +32,6 @@ interface ClientTransactionFormProps {
   clientName: string;
 }
 
-const transactionTypes = [
-    { value: 'بلديه سكن خاص', label: 'بلديه سكن خاص'},
-    { value: 'تصاميم واجهات خارجية', label: 'تصاميم واجهات خارجية'},
-    { value: 'كهرباء صناعي + استثمار + تجاري', label: 'كهرباء صناعي + استثمار + تجاري'},
-    { value: 'ميكانيك ( مخطط صحي تصميم )', label: 'ميكانيك ( مخطط صحي تصميم )'},
-    { value: 'اشراف شهري على بناء الهيكل الاسود', label: 'اشراف شهري على بناء الهيكل الاسود'},
-    { value: 'مزارع - إيصال تيار كهربائي', label: 'مزارع - إيصال تيار كهربائي'},
-    { value: 'رخصة هدم', label: 'رخصة هدم'},
-    { value: 'تصاميم داخلية', label: 'تصاميم داخلية'},
-    { value: 'كهرباء تصميم', label: 'كهرباء تصميم'},
-    { value: 'ميكانيك ( مخطط تكييف )', label: 'ميكانيك ( مخطط تكييف )'},
-    { value: 'اشراف على مخطط الكهرباء', label: 'اشراف على مخطط الكهرباء'},
-    { value: 'مزارع - ترخيص بلديه ومطافي', label: 'مزارع - ترخيص بلديه ومطافي'},
-    { value: 'اضافة تصميم سرداب', label: 'اضافة تصميم سرداب'},
-    { value: 'كهرباء سكن خاص', label: 'كهرباء سكن خاص'},
-    { value: 'مخطط صحي الاشغال', label: 'مخطط صحي الاشغال'},
-    { value: 'اشراف على مخطط الميكانيك', label: 'اشراف على مخطط الميكانيك'},
-    { value: 'طلب ترخيص ( ايصال/تقوية ) تيار كهربائي', label: 'طلب ترخيص ( ايصال/تقوية ) تيار كهربائي'},
-    { value: '( تصميم مخطط هندسي )', label: '( تصميم مخطط هندسي )'},
-    { value: 'تقوية تيار كهربائي', label: 'تقوية تيار كهربائي'},
-    { value: 'رخصة اطفاء', label: 'رخصة اطفاء'},
-    { value: 'رخصة تعديلية', label: 'رخصة تعديلية'},
-    { value: 'ايصال تيار كهربائي مؤقت', label: 'ايصال تيار كهربائي مؤقت'},
-    { value: 'استثماري بلدية', label: 'استثماري بلدية'},
-    { value: 'كتاب ايصال تيار كهربائي صادر من البلدية', label: 'كتاب ايصال تيار كهربائي صادر من البلدية'},
-    { value: 'ترخيص حدائق', label: 'ترخيص حدائق'},
-];
-
-function InlineSearchList({ value, onSelect, options, placeholder }: { value: string; onSelect: (value: string) => void; options: { label: string; value: string; searchKey?: string }[]; placeholder: string; }) {
-    const [search, setSearch] = useState('');
-    const [showOptions, setShowOptions] = useState(false);
-    const MAX_DISPLAY_ITEMS = 50;
-
-    useEffect(() => {
-        setSearch(options.find(o => o.value === value)?.label || '');
-    }, [value, options]);
-
-    const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(search.toLowerCase()) ||
-        (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
-    );
-
-    const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
-
-    return (
-        <div className="relative">
-            <Input
-                value={search}
-                placeholder={placeholder}
-                onFocus={() => setShowOptions(true)}
-                onBlur={() => setTimeout(() => setShowOptions(false), 150)} // Delay to allow click
-                onChange={(e) => {
-                    setSearch(e.target.value);
-                    setShowOptions(true);
-                    if (value) onSelect('');
-                }}
-            />
-            {showOptions && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
-                    <ul className="max-h-48 overflow-y-auto">
-                        {filteredOptions.length === 0 ? (
-                            <li className="p-2 text-sm text-muted-foreground">لا توجد نتائج</li>
-                        ) : (
-                            <>
-                                {displayOptions.map(opt => (
-                                    <li
-                                        key={opt.value}
-                                        className="cursor-pointer p-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            onSelect(opt.value);
-                                            setSearch(opt.label);
-                                            setShowOptions(false);
-                                        }}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span>{opt.label}</span>
-                                            {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
-                                        </div>
-                                    </li>
-                                ))}
-                                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
-                                    <li className="p-2 text-xs text-center text-muted-foreground">
-                                        ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
-                                    </li>
-                                )}
-                            </>
-                        )}
-                    </ul>
-                </div>
-            )}
-        </div>
-    );
-}
-
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -133,6 +39,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
+    const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
+    const [typesLoading, setTypesLoading] = useState(true);
 
     const [transactionType, setTransactionType] = useState('');
     const [description, setDescription] = useState('');
@@ -142,28 +50,40 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
     useEffect(() => {
         if (!firestore || !isOpen) return;
 
-        const fetchEngineers = async () => {
+        const fetchData = async () => {
             setEngineersLoading(true);
+            setTypesLoading(true);
             try {
-                const q = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
-                const querySnapshot = await getDocs(q);
+                const engQuery = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
+                const typesQuery = query(collection(firestore, 'transactionTypes'), orderBy('name'));
+
+                const [engSnapshot, typesSnapshot] = await Promise.all([
+                    getDocs(engQuery),
+                    getDocs(typesQuery),
+                ]);
+
                 const fetchedEngineers: Employee[] = [];
-                querySnapshot.forEach((doc) => {
+                engSnapshot.forEach((doc) => {
                     const data = doc.data() as Employee;
                     if (data.jobTitle?.includes('مهندس') || data.jobTitle?.toLowerCase().includes('engineer')) {
                         fetchedEngineers.push({ id: doc.id, ...data });
                     }
                 });
                 setEngineers(fetchedEngineers);
+
+                const fetchedTypes = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
+                setTransactionTypes(fetchedTypes);
+
             } catch (error) {
-                console.error("Failed to fetch engineers:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المهندسين.' });
+                console.error("Failed to fetch data:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات اللازمة.' });
             } finally {
                 setEngineersLoading(false);
+                setTypesLoading(false);
             }
         };
 
-        fetchEngineers();
+        fetchData();
     }, [firestore, isOpen, toast]);
 
     const resetForm = () => {
@@ -292,7 +212,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
     };
     
     const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber || e.civilId })), [engineers]);
-
+    const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.name, label: t.name })), [transactionTypes]);
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetForm(); onClose(); } }}>
@@ -322,7 +242,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
                             <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
-                            <InlineSearchList value={transactionType} onSelect={setTransactionType} options={transactionTypes} placeholder="اختر نوع المعاملة..." />
+                            <InlineSearchList 
+                                value={transactionType} 
+                                onSelect={setTransactionType} 
+                                options={transactionTypeOptions} 
+                                placeholder={typesLoading ? "تحميل..." : "اختر نوع المعاملة..."} 
+                                disabled={typesLoading}
+                            />
                         </div>
 
                         {transactionType === 'تصميم بلدية (سكن خاص)' ? (
@@ -336,7 +262,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                         ) : (
                             <div className="grid gap-2">
                                 <Label>إسناد إلى مهندس (اختياري)</Label>
-                                <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder={engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} />
+                                <InlineSearchList 
+                                    value={assignedEngineerId} 
+                                    onSelect={setAssignedEngineerId} 
+                                    options={engineerOptions} 
+                                    placeholder={engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} 
+                                    disabled={engineersLoading}
+                                />
                             </div>
                         )}
                         
