@@ -434,7 +434,6 @@ export function RoomBookingCalendar() {
                     clients={clients}
                     engineers={engineers}
                     firestore={firestore}
-                    dayAppointments={appointments}
                 />
             )}
             
@@ -460,7 +459,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore, dayAppointments }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore }: any) {
     const { toast } = useToast();
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -499,18 +498,33 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.clientId || !formData.department || !formData.engineerId) {
+            toast({
+                variant: 'destructive',
+                title: 'حقول مطلوبة',
+                description: 'الرجاء تعبئة حقول العميل، القسم، والمهندس المسؤول.',
+            });
+            return;
+        }
         
         setIsSaving(true);
         
         try {
+            const appointmentsRef = collection(firestore, 'appointments');
+            const dayStart = startOfDay(isEditing ? new Date(newDate) : dialogData.appointmentDate);
+            const dayEnd = endOfDay(isEditing ? new Date(newDate) : dialogData.appointmentDate);
+
+            const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
+            const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
+            const latestDayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+
             const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
             
             // --- Conflict Validation ---
             const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
-
-            // Use the passed down appointments from the parent state
-            const latestDayAppointments = dayAppointments;
             
             // Check room conflict
             const roomHasConflict = latestDayAppointments.some((appt: any) => {
@@ -611,21 +625,21 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                             <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label>العميل</Label>
+                            <Label>العميل <span className="text-destructive">*</span></Label>
                             <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
                         </div>
                         <div className="grid gap-2">
-                            <Label>القسم</Label>
+                            <Label>القسم <span className="text-destructive">*</span></Label>
                              <InlineSearchList value={formData.department} onSelect={(v) => setFormData(p => ({...p, department: v}))} options={departmentOptionsForSelect} placeholder="ابحث عن قسم..." />
                         </div>
                          <div className="grid gap-2">
-                            <Label>المهندس</Label>
+                            <Label>المهندس <span className="text-destructive">*</span></Label>
                              <InlineSearchList value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث بالاسم أو الرقم المدني..." />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving}>
+                        <Button type="submit" disabled={isSaving || !formData.clientId || !formData.department || !formData.engineerId}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
