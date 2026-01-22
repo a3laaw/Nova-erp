@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -176,15 +176,64 @@ export function ArchitecturalAppointmentsView() {
         if (!appointmentToDelete || !firestore) return;
         setIsDeleting(true);
         try {
-            await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
-            toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
+            const clientId = appointmentToDelete.clientId;
+            const batch = writeBatch(firestore);
+
+            // 1. Delete the selected appointment
+            const appointmentRef = doc(firestore, 'appointments', appointmentToDelete.id!);
+            batch.delete(appointmentRef);
+
+            // 2. Fetch all OTHER appointments for this client
+            const allClientApptsQuery = query(
+                collection(firestore, 'appointments'),
+                where('clientId', '==', clientId),
+                where('type', '==', 'architectural')
+            );
+            const allClientApptsSnap = await getDocs(allClientApptsQuery);
+
+            // Filter out the one we are deleting
+            const remainingAppointments = allClientApptsSnap.docs
+                .map(d => ({ id: d.id, ...d.data() } as Appointment))
+                .filter(appt => appt.id !== appointmentToDelete.id);
+
+            // 3. Get client status for coloring
+            const clientRef = doc(firestore, 'clients', clientId);
+            const clientSnap = await getDoc(clientRef);
+            const clientData = clientSnap.exists() ? clientSnap.data() as Client : null;
+            const contractSigned = clientData?.status === 'contracted' || clientData?.status === 'reContracted';
             
-            // Local state update to avoid race conditions with fetching
-            setAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
+            // 4. Sort remaining appointments by date
+            remainingAppointments.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
+
+            // 5. Recalculate visitCount and color for remaining appointments and add to batch
+            remainingAppointments.forEach((appt, index) => {
+                const visitCount = index + 1;
+                const newColor = getVisitColor({ visitCount, contractSigned });
+
+                const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
+
+                if (needsUpdate) {
+                    const apptRefToUpdate = doc(firestore, 'appointments', appt.id!);
+                    batch.update(apptRefToUpdate, {
+                        visitCount: visitCount,
+                        color: newColor
+                    });
+                }
+            });
+            
+            // 6. Commit the batch
+            await batch.commit();
+
+            toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد وتحديث الزيارات بنجاح.' });
+            
+            // 7. Refresh the data for the current view
+            if (date) {
+                fetchData(date);
+            }
 
         } catch (error) {
-            console.error("Error deleting appointment:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
+            console.error("Error deleting appointment and recalculating:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد أو تحديث الزيارات.' });
         } finally {
             setIsDeleting(false);
             setAppointmentToDelete(null);
