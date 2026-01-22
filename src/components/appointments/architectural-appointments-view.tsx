@@ -404,7 +404,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore, appointments }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const isEditing = !!dialogData?.id;
@@ -444,23 +444,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل.' });
             return;
         }
-         if (isEditing && (!newDate || !newTime)) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد التاريخ والوقت.' });
-            return;
-        }
+        
         setIsSaving(true);
         const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
 
         try {
-            // --- Re-fetch latest appointments for robust conflict validation ---
-            const dayStart = startOfDay(appointmentDateTime);
-            const dayEnd = endOfDay(appointmentDateTime);
-            const apptsSnapshot = await getDocs(query(
-                collection(firestore, 'appointments'),
-                where('appointmentDate', '>=', dayStart),
-                where('appointmentDate', '<=', dayEnd)
-            ));
-            const latestDayAppointments = apptsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+            // --- Use parent's appointment state for validation ---
+            const latestDayAppointments = appointments;
 
             // --- Conflict Validation ---
             const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
@@ -504,12 +494,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             // --- End of Conflict Validation ---
 
             // Count previous ARCHITECTURAL visits for this client
-            const allClientAppts = await getDocs(query(
+            const allClientApptsSnapshot = await getDocs(query(
               collection(firestore, 'appointments'), 
               where('clientId', '==', selectedClientId),
               where('type', '==', 'architectural')
             ));
-            const visitCount = allClientAppts.docs.filter(d => isEditing ? d.id !== dialogData.id : true).length + 1;
+            const visitCount = allClientApptsSnapshot.docs.filter(d => isEditing ? d.id !== dialogData.id : true).length + 1;
 
             // --- Automated Logic ---
             const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
@@ -571,6 +561,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
+                        <div className="grid gap-2">
+                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
+                        </div>
                         {isEditing && (
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
@@ -583,10 +577,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 </div>
                             </div>
                         )}
-                        <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
-                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
-                        </div>
                         <div className="grid gap-2">
                             <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
                             <InlineSearchList 

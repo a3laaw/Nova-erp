@@ -433,6 +433,7 @@ export function RoomBookingCalendar() {
                     clients={clients}
                     engineers={engineers}
                     firestore={firestore}
+                    appointments={appointments}
                 />
             )}
             
@@ -458,7 +459,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore, appointments }: any) {
     const { toast } = useToast();
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -494,26 +495,14 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        if (isEditing && (!newDate || !newTime)) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد التاريخ والوقت.' });
-            return;
-        }
         
         const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
 
         setIsSaving(true);
         
         try {
-            // --- Re-fetch latest appointments for robust conflict validation ---
-            const dayStart = startOfDay(appointmentDateTime);
-            const dayEnd = endOfDay(appointmentDateTime);
-            const apptsSnapshot = await getDocs(query(
-                collection(firestore, 'appointments'),
-                where('appointmentDate', '>=', dayStart),
-                where('appointmentDate', '<=', dayEnd)
-            ));
-            const latestDayAppointments = apptsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+            // --- Use parent's appointment state for validation ---
+            const latestDayAppointments = appointments;
 
             // --- Conflict Validation ---
             const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
@@ -654,5 +643,4 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         </Dialog>
     );
 }
-
     
