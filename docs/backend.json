@@ -613,6 +613,10 @@
         "schema": { "$ref": "#/entities/Job" },
         "description": "Stores job titles for a specific department."
     },
+    "/departments/{departmentId}/transactionTypes/{transactionTypeId}": {
+        "schema": { "$ref": "#/entities/TransactionType" },
+        "description": "Stores transaction types for a specific department."
+    },
     "/governorates/{governorateId}": {
       "schema": { "$ref": "#/entities/Governorate" },
       "description": "Stores country governorates."
@@ -620,10 +624,6 @@
     "/governorates/{governorateId}/areas/{areaId}": {
         "schema": { "$ref": "#/entities/Area" },
         "description": "Stores areas for a specific governorate."
-    },
-    "/transactionTypes/{transactionTypeId}": {
-        "schema": { "$ref": "#/entities/TransactionType" },
-        "description": "Stores the list of available client transaction types."
     },
     "/appointments/{appointmentId}": {
       "schema": {
@@ -633,3 +633,5 @@
     }
   }
 }
+
+    

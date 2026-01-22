@@ -275,41 +275,26 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   );
 }
 
-const defaultTransactionTypes = [
-  // القسم المعماري
-  'بلدية سكن خاص',
-  'تصاميم واجهات خارجية',
-  'تصاميم داخلية',
-  '( تصميم مخطط هندسي )',
-  'إضافة تصميم سرداب',
-  'رخصة تعديلية',
-  'رخصه هدم',
-  'استثماري بلدية',
-  'ترخيص حدائق',
-  // قسم الكهرباء
-  'كهرباء سكن خاص',
-  'كهرباء تصميم',
-  'كهرباء صناعي + استثماري + تجاري',
-  'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي',
-  'إيصال تيار مؤقت',
-  'كتاب إيصال تيار من البلدية',
-  'تقوية تيار كهربائي',
-  'إشراف على مخطط الكهرباء',
-  // قسم الميكانيك
-  'ميكانيك ( مخطط صحي – تصميم )',
-  'مخطط صحي الأشغال',
-  'ميكانيك ( مخطط تكييف )',
-  'رخصة إطفاء ( دفاع مدني )',
-  'إشراف على مخطط الميكانيك',
-  // قسم الإنشائي / الإشراف
-  'تصميم الهيكل الأسود',
-  'إشراف شهري على بناء الهيكل الأسود',
-  'إشراف على مخطط الكهرباء أو الميكانيك',
-  // قسم المزارع والرخص الخاصة
-  'مزارع – إيصال تيار كهربائي',
-  'مزارع – ترخيص بلدية ومطافي',
-  'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع',
-];
+const defaultTransactionTypesByDept: Record<string, string[]> = {
+  'القسم المعماري': [
+    'بلدية سكن خاص', 'تصاميم واجهات خارجية', 'تصاميم داخلية', '( تصميم مخطط هندسي )', 'إضافة تصميم سرداب',
+    'رخصة تعديلية', 'رخصة هدم', 'استثماري بلدية', 'ترخيص حدائق'
+  ],
+  'قسم الكهرباء': [
+    'كهرباء سكن خاص', 'كهرباء تصميم', 'كهرباء صناعي + استثماري + تجاري', 'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي',
+    'إيصال تيار مؤقت', 'كتاب إيصال تيار من البلدية', 'تقوية تيار كهربائي', 'إشراف على مخطط الكهرباء'
+  ],
+  'قسم الميكانيك': [
+    'ميكانيك ( مخطط صحي – تصميم )', 'مخطط صحي الأشغال', 'ميكانيك ( مخطط تكييف )', 'رخصة إطفاء ( دفاع مدني )',
+    'إشراف على مخطط الميكانيك'
+  ],
+  'قسم الإنشائي / الإشراف': [
+    'تصميم الهيكل الأسود', 'إشراف شهري على بناء الهيكل الأسود', 'إشراف على مخطط الكهرباء أو الميكانيك'
+  ],
+  'قسم المزارع والرخص الخاصة': [
+    'مزارع – إيصال تيار كهربائي', 'مزارع – ترخيص بلدية ومطافي', 'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع'
+  ]
+};
 
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
@@ -320,20 +305,37 @@ export function ReferenceDataManager() {
         if (!firestore) return;
         setIsSeeding(true);
         try {
-            const transactionTypesRef = collection(firestore, 'transactionTypes');
-            const q = query(transactionTypesRef);
-            const existingDocs = await getDocs(q);
-            const existingNames = new Set(existingDocs.docs.map(d => d.data().name));
-            
+            const departmentsQuery = query(collection(firestore, 'departments'));
+            const departmentsSnapshot = await getDocs(departmentsQuery);
+
+            if (departmentsSnapshot.empty) {
+                toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إضافة الأقسام أولاً قبل تسجيل البيانات الافتراضية.' });
+                setIsSeeding(false);
+                return;
+            }
+
             const batch = writeBatch(firestore);
             let count = 0;
-            defaultTransactionTypes.forEach(typeName => {
-                if (!existingNames.has(typeName)) {
-                    const newDocRef = doc(collection(firestore, 'transactionTypes'));
-                    batch.set(newDocRef, { name: typeName });
-                    count++;
+
+            for (const deptDoc of departmentsSnapshot.docs) {
+                const deptName = deptDoc.data().name;
+                const deptId = deptDoc.id;
+                const typesForDept = defaultTransactionTypesByDept[deptName];
+
+                if (typesForDept) {
+                    const transactionTypesRef = collection(firestore, `departments/${deptId}/transactionTypes`);
+                    const existingTypesSnapshot = await getDocs(transactionTypesRef);
+                    const existingNames = new Set(existingTypesSnapshot.docs.map(d => d.data().name));
+
+                    typesForDept.forEach(typeName => {
+                        if (!existingNames.has(typeName)) {
+                            const newDocRef = doc(transactionTypesRef);
+                            batch.set(newDocRef, { name: typeName });
+                            count++;
+                        }
+                    });
                 }
-            });
+            }
             
             if (count > 0) {
                 await batch.commit();
@@ -388,10 +390,13 @@ export function ReferenceDataManager() {
         />
       </div>
        <div className='mt-6'>
-         <DataManager<TransactionType, never> 
-            primaryTitle="أنواع المعاملات"
-            primarySingularTitle="نوع معاملة"
-            primaryCollectionName="transactionTypes"
+         <DataManager<Department, TransactionType> 
+            primaryTitle="أنواع المعاملات حسب القسم"
+            primarySingularTitle="قسم"
+            primaryCollectionName="departments"
+            secondaryTitle="أنواع المعاملات"
+            secondarySingularTitle="نوع معاملة"
+            secondaryCollectionName="transactionTypes"
             icon={<FileText />}
             footer={seedButton}
         />
@@ -399,3 +404,5 @@ export function ReferenceDataManager() {
     </div>
   );
 }
+
+    

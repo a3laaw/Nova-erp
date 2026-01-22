@@ -17,7 +17,7 @@ import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, Department } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
@@ -39,8 +39,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
+    
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [departmentsLoading, setDepartmentsLoading] = useState(true);
+    const [selectedDepartment, setSelectedDepartment] = useState('');
+
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
-    const [typesLoading, setTypesLoading] = useState(true);
+    const [typesLoading, setTypesLoading] = useState(false);
 
     const [transactionType, setTransactionType] = useState('');
     const [description, setDescription] = useState('');
@@ -50,16 +55,16 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
     useEffect(() => {
         if (!firestore || !isOpen) return;
 
-        const fetchData = async () => {
+        const fetchInitialData = async () => {
             setEngineersLoading(true);
-            setTypesLoading(true);
+            setDepartmentsLoading(true);
             try {
                 const engQuery = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
-                const typesQuery = query(collection(firestore, 'transactionTypes'), orderBy('name'));
+                const deptQuery = query(collection(firestore, 'departments'), orderBy('name'));
 
-                const [engSnapshot, typesSnapshot] = await Promise.all([
+                const [engSnapshot, deptSnapshot] = await Promise.all([
                     getDocs(engQuery),
-                    getDocs(typesQuery),
+                    getDocs(deptQuery),
                 ]);
 
                 const fetchedEngineers: Employee[] = [];
@@ -71,26 +76,57 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 });
                 setEngineers(fetchedEngineers);
 
-                const fetchedTypes = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
-                setTransactionTypes(fetchedTypes);
+                const fetchedDepts = deptSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
+                setDepartments(fetchedDepts);
 
             } catch (error) {
-                console.error("Failed to fetch data:", error);
+                console.error("Failed to fetch initial data:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات اللازمة.' });
             } finally {
                 setEngineersLoading(false);
+                setDepartmentsLoading(false);
+            }
+        };
+
+        fetchInitialData();
+    }, [firestore, isOpen, toast]);
+
+    useEffect(() => {
+        if (!firestore || !selectedDepartment) {
+            setTransactionTypes([]);
+            return;
+        }
+
+        const fetchTransactionTypes = async () => {
+            setTypesLoading(true);
+            try {
+                const typesQuery = query(collection(firestore, `departments/${selectedDepartment}/transactionTypes`), orderBy('name'));
+                const typesSnapshot = await getDocs(typesQuery);
+                const fetchedTypes = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
+                setTransactionTypes(fetchedTypes);
+            } catch (error) {
+                console.error("Failed to fetch transaction types:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب أنواع المعاملات.' });
+            } finally {
                 setTypesLoading(false);
             }
         };
 
-        fetchData();
-    }, [firestore, isOpen, toast]);
+        fetchTransactionTypes();
+    }, [firestore, selectedDepartment, toast]);
 
     const resetForm = () => {
         setTransactionType('');
         setDescription('');
         setAssignedEngineerId('');
+        setSelectedDepartment('');
     };
+
+    const handleDepartmentChange = (deptId: string) => {
+        setSelectedDepartment(deptId);
+        setTransactionType(''); // Reset transaction type when department changes
+    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -99,8 +135,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             return;
         }
 
-        if (!transactionType) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار نوع المعاملة.' });
+        if (!selectedDepartment || !transactionType) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار القسم ونوع المعاملة.' });
             return;
         }
 
@@ -111,9 +147,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
             const newTransactionRefId = newTransactionRef.id;
 
-            let finalAssignedEngineerId = assignedEngineerId || undefined;
-            let engineer;
+            const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name || '';
 
+            let finalAssignedEngineerId = assignedEngineerId || undefined;
+            const filteredEngineers = engineers.filter(e => e.department === selectedDeptName);
+
+            // Special logic for "تصميم بلدية (سكن خاص)"
             if (transactionType === 'تصميم بلدية (سكن خاص)') {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
@@ -129,7 +168,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 }
             }
 
-            engineer = engineers.find(e => e.id === finalAssignedEngineerId);
+            const engineer = engineers.find(e => e.id === finalAssignedEngineerId);
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
@@ -146,7 +185,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             // Add creation log event to the transaction's timeline
             const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
             const logEventRef = doc(timelineCollectionRef);
-
             
             let logContent = `أنشأ المعاملة "${transactionType}".`;
             if (engineer) {
@@ -170,34 +208,21 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const engineerName = engineer ? engineer.fullName : 'غير مسند';
             const recipients = new Set<string>();
 
-            // 1. Add creator to recipients
-            if (currentUser.id) {
-                recipients.add(currentUser.id);
-            }
+            if (currentUser.id) recipients.add(currentUser.id);
 
-            // 2. Add assignee to recipients
             if (finalAssignedEngineerId) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, finalAssignedEngineerId);
-                if (targetUserId) {
-                    recipients.add(targetUserId);
-                }
+                if (targetUserId) recipients.add(targetUserId);
             }
             
-            // 3. Send notifications to all unique recipients
             for (const recipientId of recipients) {
                 const isCreator = recipientId === currentUser.id;
-                
                 const title = isCreator ? 'تم إنشاء معاملة بنجاح' : 'تم إسناد معاملة جديدة لك';
                 const body = isCreator 
                     ? `لقد أنشأت المعاملة "${transactionType}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`
                     : `أسند إليك ${currentUser.fullName} المعاملة "${transactionType}" للعميل ${clientName}.`;
                 
-                await createNotification(firestore, {
-                    userId: recipientId,
-                    title,
-                    body,
-                    link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}`
-                });
+                await createNotification(firestore, { userId: recipientId, title, body, link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}` });
             }
             
             resetForm();
@@ -211,7 +236,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         }
     };
     
-    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber || e.civilId })), [engineers]);
+    const engineerOptions = useMemo(() => {
+        if (!selectedDepartment) return [];
+        const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name;
+        return engineers.filter(e => e.department === selectedDeptName).map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber || e.civilId }))
+    }, [engineers, selectedDepartment, departments]);
+
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
     const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.name, label: t.name })), [transactionTypes]);
 
     return (
@@ -240,15 +271,27 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
-                        <div className="grid gap-2">
-                            <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
-                            <InlineSearchList 
-                                value={transactionType} 
-                                onSelect={setTransactionType} 
-                                options={transactionTypeOptions} 
-                                placeholder={typesLoading ? "تحميل..." : "اختر نوع المعاملة..."} 
-                                disabled={typesLoading}
-                            />
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="grid gap-2">
+                                <Label>القسم <span className="text-destructive">*</span></Label>
+                                <InlineSearchList 
+                                    value={selectedDepartment} 
+                                    onSelect={handleDepartmentChange} 
+                                    options={departmentOptions} 
+                                    placeholder={departmentsLoading ? "تحميل..." : "اختر القسم..."} 
+                                    disabled={departmentsLoading}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
+                                <InlineSearchList 
+                                    value={transactionType} 
+                                    onSelect={setTransactionType} 
+                                    options={transactionTypeOptions} 
+                                    placeholder={!selectedDepartment ? "اختر قسمًا أولاً" : typesLoading ? "تحميل..." : "اختر نوع المعاملة..."} 
+                                    disabled={!selectedDepartment || typesLoading}
+                                />
+                            </div>
                         </div>
 
                         {transactionType === 'تصميم بلدية (سكن خاص)' ? (
@@ -266,8 +309,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                                     value={assignedEngineerId} 
                                     onSelect={setAssignedEngineerId} 
                                     options={engineerOptions} 
-                                    placeholder={engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} 
-                                    disabled={engineersLoading}
+                                    placeholder={!selectedDepartment ? "اختر قسمًا أولاً" : engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} 
+                                    disabled={!selectedDepartment || engineersLoading}
                                 />
                             </div>
                         )}
@@ -294,3 +337,5 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         </Dialog>
     );
 }
+
+    
