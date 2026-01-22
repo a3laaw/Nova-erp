@@ -13,14 +13,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, ClientTransaction } from '@/lib/types';
+import type { Employee, Client, ClientTransaction } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 
 interface ClientTransactionFormProps {
@@ -172,11 +173,31 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
             const newTransactionRefId = newTransactionRef.id;
 
+            let finalAssignedEngineerId = assignedEngineerId || undefined;
+            let engineer;
+
+            if (transactionType === 'تصميم بلدية (سكن خاص)') {
+                const clientRef = doc(firestore, 'clients', clientId);
+                const clientSnap = await getDoc(clientRef);
+                if (clientSnap.exists()) {
+                    const clientData = clientSnap.data() as Client;
+                    if (clientData.assignedEngineer) {
+                        finalAssignedEngineerId = clientData.assignedEngineer;
+                    } else {
+                         toast({ variant: 'destructive', title: 'خطأ', description: 'يجب إسناد مهندس مسؤول للعميل أولاً قبل إنشاء معاملة سكن خاص.' });
+                         setIsSaving(false);
+                         return;
+                    }
+                }
+            }
+
+            engineer = engineers.find(e => e.id === finalAssignedEngineerId);
+
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
                 transactionType,
                 description,
-                assignedEngineerId: assignedEngineerId || undefined,
+                assignedEngineerId: finalAssignedEngineerId,
                 status: 'new',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -188,7 +209,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
             const logEventRef = doc(timelineCollectionRef);
 
-            const engineer = engineers.find(e => e.id === assignedEngineerId);
+            
             let logContent = `أنشأ المعاملة "${transactionType}".`;
             if (engineer) {
                 logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
@@ -217,8 +238,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             }
 
             // 2. Add assignee to recipients
-            if (assignedEngineerId) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, assignedEngineerId);
+            if (finalAssignedEngineerId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, finalAssignedEngineerId);
                 if (targetUserId) {
                     recipients.add(targetUserId);
                 }
@@ -285,10 +306,22 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                             <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
                             <InlineSearchList value={transactionType} onSelect={setTransactionType} options={transactionTypes} placeholder="اختر نوع المعاملة..." />
                         </div>
-                        <div className="grid gap-2">
-                            <Label>إسناد إلى مهندس (اختياري)</Label>
-                            <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder={engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} />
-                        </div>
+
+                        {transactionType === 'تصميم بلدية (سكن خاص)' ? (
+                            <Alert>
+                                <Info className="h-4 w-4" />
+                                <AlertTitle>إسناد تلقائي</AlertTitle>
+                                <AlertDescription>
+                                    سيتم إسناد هذه المعاملة تلقائيًا إلى المهندس المسؤول عن ملف العميل.
+                                </AlertDescription>
+                            </Alert>
+                        ) : (
+                            <div className="grid gap-2">
+                                <Label>إسناد إلى مهندس (اختياري)</Label>
+                                <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder={engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} />
+                            </div>
+                        )}
+                        
                          <div className="grid gap-2">
                             <Label htmlFor="description">وصف المعاملة</Label>
                             <Textarea 

@@ -29,6 +29,7 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 
@@ -182,6 +183,11 @@ export default function TransactionDetailPage() {
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
         });
+        
+        if (transaction.transactionType === 'تصميم بلدية (سكن خاص)') {
+            const clientRef = doc(firestore, 'clients', clientId);
+            batch.update(clientRef, { assignedEngineer: newEngineerId || null });
+        }
     }
 
     batch.update(transactionRef, updateData);
@@ -300,18 +306,26 @@ export default function TransactionDetailPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="engineer">تغيير المهندس المسؤول</Label>
-                    <Select dir="rtl" value={newEngineerId} onValueChange={setNewEngineerId}>
-                        <SelectTrigger id="engineer"><SelectValue placeholder="اختر مهندسا..." /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="unassign">إزالة الإسناد</SelectItem>
-                            {Array.from(employeesMap.entries()).map(([id, name]) => (
-                                <SelectItem key={id} value={id}>{name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                {transaction.transactionType !== 'تصميم بلدية (سكن خاص)' ? (
+                    <div className="grid gap-2">
+                        <Label htmlFor="engineer">تغيير المهندس المسؤول</Label>
+                        <Select dir="rtl" value={newEngineerId} onValueChange={setNewEngineerId}>
+                            <SelectTrigger id="engineer"><SelectValue placeholder="اختر مهندسا..." /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="unassign">إزالة الإسناد</SelectItem>
+                                {Array.from(employeesMap.entries()).map(([id, name]) => (
+                                    <SelectItem key={id} value={id}>{name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                ) : (
+                    <div className="grid gap-2">
+                        <Label>المهندس المسؤول</Label>
+                        <Input value={employeesMap.get(newEngineerId) || 'غير مسند'} readOnly disabled />
+                        <p className="text-xs text-muted-foreground">يتم التحكم في المهندس من ملف العميل لهذه المعاملة.</p>
+                    </div>
+                )}
             </CardContent>
             <CardFooter className="flex justify-end">
                 <Button onClick={handleUpdateTransaction} disabled={isSaving}>

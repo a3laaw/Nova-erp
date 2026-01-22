@@ -279,6 +279,15 @@ export default function EditClientPage() {
                     userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 });
+
+                // Cascade update to special transactions
+                const transactionsRef = collection(firestore, `clients/${id}/transactions`);
+                const q = query(transactionsRef, where('transactionType', '==', 'تصميم بلدية (سكن خاص)'));
+                const specialTransactionsSnap = await getDocs(q);
+                
+                specialTransactionsSnap.forEach(transactionDoc => {
+                    batch.update(transactionDoc.ref, { assignedEngineerId: formData.assignedEngineerId || null });
+                });
             }
 
 
