@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -23,11 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, getDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { ClientTransaction, ContractClause } from '@/lib/types';
 import { contractTemplates } from '@/lib/contract-templates';
 import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -38,6 +38,7 @@ interface ContractClausesFormProps {
 
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,16 +70,42 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
   }, [clauses]);
 
   const handleSubmit = async () => {
-    if (!firestore || !transaction?.id) return;
+    if (!firestore || !transaction?.id || !currentUser) return;
     setIsSaving(true);
     try {
+      const batch = writeBatch(firestore);
       const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id);
-      await updateDoc(transactionRef, {
+      const clientRef = doc(firestore, 'clients', clientId);
+
+      // Update the transaction with contract details
+      batch.update(transactionRef, {
         contract: {
           clauses: clauses,
           totalAmount: totalAmount,
         }
       });
+
+      // Check client status and update if it's 'new'
+      const clientSnap = await getDoc(clientRef); // Get latest status
+
+      if (clientSnap.exists() && clientSnap.data().status === 'new') {
+        batch.update(clientRef, { status: 'contracted' });
+
+        // Add a history log for the status change
+        const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+        const logContent = `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`;
+        batch.set(doc(historyCollectionRef), {
+            type: 'log',
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName || 'النظام',
+            userAvatar: currentUser.avatarUrl || '',
+            createdAt: serverTimestamp(),
+        });
+      }
+      
+      await batch.commit();
+
       toast({ title: 'نجاح', description: 'تم حفظ بنود العقد بنجاح.' });
       onClose(); // This might trigger a re-render on the parent, which is good.
     } catch (error) {

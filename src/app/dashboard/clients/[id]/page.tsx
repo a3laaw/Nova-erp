@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -19,27 +18,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, FileText } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
-import type { ClientTransaction, Employee, ContractTemplate } from '@/lib/types';
+import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
+import type { ClientTransaction, Employee } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 
@@ -92,6 +78,7 @@ export default function ClientProfilePage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [contractTransaction, setContractTransaction] = useState<ClientTransaction | null>(null);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
   // --- Data Fetching ---
@@ -200,6 +187,12 @@ export default function ClientProfilePage() {
         clientId={id}
         clientName={client.nameAr}
     />
+     <ContractClausesForm 
+        isOpen={!!contractTransaction} 
+        onClose={() => setContractTransaction(null)}
+        transaction={contractTransaction}
+        clientId={id}
+    />
     <div className='space-y-6' dir='rtl'>
         <div className='flex justify-between items-center no-print'>
              <Button variant="outline" onClick={() => router.push('/dashboard/clients')}>
@@ -207,36 +200,6 @@ export default function ClientProfilePage() {
                 العودة إلى قائمة العملاء
             </Button>
             <div className='flex gap-2'>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      disabled={!['contracted', 'reContracted'].includes(client.status)}
-                    >
-                      <FileText className="ml-2 h-4 w-4" />
-                      عرض العقود
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" dir="rtl">
-                    <DropdownMenuLabel>قائمة العقود</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={`/contracts/${id}`}>العقد الأساسي</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {transactions.map(tx => (
-                      <DropdownMenuItem key={tx.id} asChild>
-                        <Link href={`/dashboard/clients/${id}/transactions/${tx.id}/contract`}>
-                          {`عقد معاملة: ${tx.transactionType}`}
-                        </Link>
-                      </DropdownMenuItem>
-                    ))}
-                     {transactions.length === 0 && (
-                      <DropdownMenuItem disabled>لا توجد عقود معاملات</DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
                 <Button asChild>
                     <Link href={`/dashboard/clients/${id}/edit`}>
                         <Pencil className="ml-2 h-4 w-4" />
@@ -315,6 +278,7 @@ export default function ClientProfilePage() {
                                         <TableHead>المهندس المسؤول</TableHead>
                                         <TableHead>الحالة</TableHead>
                                         <TableHead>تاريخ الإنشاء</TableHead>
+                                        <TableHead>الإجراءات</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -333,6 +297,19 @@ export default function ClientProfilePage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>{formatDate(tx.createdAt)}</TableCell>
+                                            <TableCell>
+                                                {tx.contract ? (
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/dashboard/clients/${id}/transactions/${tx.id}/contract`}>
+                                                            عرض العقد
+                                                        </Link>
+                                                    </Button>
+                                                ) : (
+                                                    <Button variant="default" size="sm" onClick={() => setContractTransaction(tx)}>
+                                                        تعاقد
+                                                    </Button>
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
