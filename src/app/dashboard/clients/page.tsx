@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -37,7 +37,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
-import { collection, doc, updateDoc, query, orderBy, type DocumentData, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, type DocumentData, deleteDoc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirestore, useCollection } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +54,7 @@ interface Client extends DocumentData {
   nameEn?: string;
   mobile: string;
   status: ClientStatus;
+  assignedEngineer?: string;
 }
 
 const statusTranslations: Record<ClientStatus, string> = {
@@ -84,6 +85,31 @@ export default function ClientsPage() {
   const [snapshot, loading, error] = useCollection(clientsQuery);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+  const [employeesLoading, setEmployeesLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchEmployees = async () => {
+        setEmployeesLoading(true);
+        try {
+            const q = query(collection(firestore, 'employees'));
+            const querySnapshot = await getDocs(q);
+            const newMap = new Map<string, string>();
+            querySnapshot.forEach(doc => {
+                const emp = doc.data() as { fullName: string };
+                newMap.set(doc.id, emp.fullName);
+            });
+            setEmployeesMap(newMap);
+        } catch (e) {
+            console.error("Error fetching employees map: ", e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين.' });
+        } finally {
+            setEmployeesLoading(false);
+        }
+    };
+    fetchEmployees();
+  }, [firestore, toast]);
   
   const clients = useMemo(() => {
     if (!snapshot) return [];
@@ -112,6 +138,7 @@ export default function ClientsPage() {
       addClient: 'إضافة عميل',
       fileNumber: 'رقم الملف',
       fullName: 'الاسم الكامل',
+      assignedEngineer: 'المهندس المسؤول',
       mobile: 'رقم الجوال',
       status: 'الحالة',
       loading: 'جاري تحميل البيانات...',
@@ -132,6 +159,7 @@ export default function ClientsPage() {
       addClient: 'Add Client',
       fileNumber: 'File Number',
       fullName: 'Full Name',
+      assignedEngineer: 'Assigned Engineer',
       mobile: 'Mobile',
       status: 'Status',
       loading: 'Loading data...',
@@ -148,6 +176,8 @@ export default function ClientsPage() {
     }
   }
   const currentText = t[language];
+
+  const isLoading = loading || employeesLoading;
 
 
   return (
@@ -176,6 +206,7 @@ export default function ClientsPage() {
               <TableRow>
                 <TableHead>{currentText.fileNumber}</TableHead>
                 <TableHead>{currentText.fullName}</TableHead>
+                <TableHead>{currentText.assignedEngineer}</TableHead>
                 <TableHead>{currentText.mobile}</TableHead>
                 <TableHead>{currentText.status}</TableHead>
                 <TableHead>
@@ -184,53 +215,58 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && Array.from({ length: 3 }).map((_, i) => (
+              {isLoading && Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                   </TableRow>
               ))}
-              {error && <TableRow><TableCell colSpan={5} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
-              {!loading && clients.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">{currentText.noClients}</TableCell></TableRow>}
-              {clients.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
-                  <TableCell className="font-medium"><Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link></TableCell>
-                  <TableCell>{client.mobile}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={statusColors[client.status]}>
-                        {statusTranslations[client.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-                            <DropdownMenuLabel>{currentText.actions}</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/clients/${client.id}`}>{currentText.viewProfile}</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/clients/${client.id}/edit`}>{currentText.edit}</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => setClientToDelete(client)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {currentText.delete}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
+              {!isLoading && clients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{currentText.noClients}</TableCell></TableRow>}
+              {clients.map((client) => {
+                const assignedEngineerName = client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : null;
+                return (
+                    <TableRow key={client.id}>
+                        <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
+                        <TableCell className="font-medium"><Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link></TableCell>
+                        <TableCell>{assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
+                        <TableCell>{client.mobile}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline" className={statusColors[client.status]}>
+                                {statusTranslations[client.status]}
+                            </Badge>
+                        </TableCell>
+                        <TableCell>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">Toggle menu</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                                    <DropdownMenuLabel>{currentText.actions}</DropdownMenuLabel>
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/clients/${client.id}`}>{currentText.viewProfile}</Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/clients/${client.id}/edit`}>{currentText.edit}</Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => setClientToDelete(client)}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        {currentText.delete}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>
