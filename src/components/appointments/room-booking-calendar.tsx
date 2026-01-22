@@ -433,7 +433,6 @@ export function RoomBookingCalendar() {
                     clients={clients}
                     engineers={engineers}
                     firestore={firestore}
-                    appointments={appointments}
                 />
             )}
             
@@ -459,7 +458,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore, appointments }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore }: any) {
     const { toast } = useToast();
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -482,6 +481,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
             if (isEditing && appointmentDate instanceof Date) {
                 setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
                 setNewTime(format(appointmentDate, 'HH:mm'));
+            } else {
+                 setNewDate('');
+                 setNewTime('');
             }
             setFormData({
                 clientId: dialogData.clientId || '',
@@ -496,28 +498,32 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-
         setIsSaving(true);
         
         try {
-            // --- Use parent's appointment state for validation ---
-            const latestDayAppointments = appointments;
-
-            // --- Conflict Validation ---
+            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
             const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
             const newAppointmentTime = appointmentDateTime.getTime();
 
             if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
-                
+                // --- RE-FETCH LATEST DATA FOR VALIDATION ---
+                const dayStart = startOfDay(appointmentDateTime);
+                const dayEnd = endOfDay(appointmentDateTime);
+                const apptsQuery = query(
+                    collection(firestore, 'appointments'),
+                    where('appointmentDate', '>=', dayStart),
+                    where('appointmentDate', '<=', dayEnd)
+                );
+                const querySnapshot = await getDocs(apptsQuery);
+                const latestDayAppointments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                // --- END OF RE-FETCH ---
+
                 const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
                 const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
 
                 // Check room conflict
                 const roomHasConflict = latestDayAppointments.some((appt: any) => {
-                    const isSameAppointment = isEditing && appt.id === dialogData.id;
-                    if (isSameAppointment) return false;
-                    
+                    if (isEditing && appt.id === dialogData.id) return false;
                     const apptDate = appt.appointmentDate.toDate();
                     return appt.meetingRoom === roomName && apptDate >= windowStart && apptDate <= windowEnd;
                 });
@@ -529,9 +535,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                 // Check engineer conflict
                 if (formData.engineerId) {
                     const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                        const isSameAppointment = isEditing && appt.id === dialogData.id;
-                        if (isSameAppointment) return false;
-                        
+                        if (isEditing && appt.id === dialogData.id) return false;
                         const apptDate = appt.appointmentDate.toDate();
                         return appt.engineerId === formData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
                     });
@@ -544,9 +548,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                 // Check client conflict
                 if (formData.clientId) {
                      const clientHasConflict = latestDayAppointments.some((appt: any) => {
-                        const isSameAppointment = isEditing && appt.id === dialogData.id;
-                        if (isSameAppointment) return false;
-                        
+                        if (isEditing && appt.id === dialogData.id) return false;
                         const apptDate = appt.appointmentDate.toDate();
                         return appt.clientId === formData.clientId && apptDate >= windowStart && apptDate <= windowEnd;
                     });
@@ -556,7 +558,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     }
                 }
             }
-            // --- End of Conflict Validation ---
 
             await onSave({ 
                 ...formData, 
@@ -597,8 +598,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
-                        <DialogDescription>
+                         <DialogDescription>
                             حجز {roomName}
+                            {!isEditing && ` في ${format(dialogData.appointmentDate, "PPP 'الساعة' HH:mm", { locale: ar })}`}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">

@@ -377,7 +377,6 @@ export function ArchitecturalAppointmentsView() {
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
-                    appointments={appointments}
                 />
             )}
             
@@ -404,7 +403,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore, appointments }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const isEditing = !!dialogData?.id;
@@ -429,7 +428,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             } else {
                 setSelectedClientId('');
                 setTitle('');
-                setNewDate('');
+                // For new bookings, date/time are determined by cell click, not form
+                setNewDate(''); 
                 setNewTime('');
             }
         }
@@ -446,52 +446,52 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         }
         
         setIsSaving(true);
-        const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-
+        
         try {
-            // --- Use parent's appointment state for validation ---
-            const latestDayAppointments = appointments;
-
-            // --- Conflict Validation ---
+            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
             const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
             const newAppointmentTime = appointmentDateTime.getTime();
 
             if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
+                // --- RE-FETCH LATEST DATA FOR VALIDATION ---
+                const dayStart = startOfDay(appointmentDateTime);
+                const dayEnd = endOfDay(appointmentDateTime);
+                const apptsQuery = query(
+                    collection(firestore, 'appointments'),
+                    where('appointmentDate', '>=', dayStart),
+                    where('appointmentDate', '<=', dayEnd)
+                );
+                const querySnapshot = await getDocs(apptsQuery);
+                const latestDayAppointments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                // --- END OF RE-FETCH ---
 
-                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000); // Check 30 mins before
-                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);   // Check 30 mins after
+                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
+                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
 
-                // Check for engineer conflict across ALL appointment types
+                // Check for engineer conflict
                 const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                    const isSameAppointment = isEditing && appt.id === dialogData.id;
-                    if (isSameAppointment) return false;
-                    
+                    if (isEditing && appt.id === dialogData.id) return false;
                     const apptDate = appt.appointmentDate.toDate();
                     return appt.engineerId === dialogData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
                 });
 
                 if (engineerHasConflict) {
                     toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
-                    setIsSaving(false);
-                    return;
+                    setIsSaving(false); return;
                 }
 
-                // Check for client conflict across ALL appointment types
+                // Check for client conflict
                 const clientHasConflict = latestDayAppointments.some((appt: any) => {
-                    const isSameAppointment = isEditing && appt.id === dialogData.id;
-                    if (isSameAppointment) return false;
-                    
+                    if (isEditing && appt.id === dialogData.id) return false;
                     const apptDate = appt.appointmentDate.toDate();
                     return appt.clientId === selectedClientId && apptDate >= windowStart && apptDate <= windowEnd;
                 });
 
                 if (clientHasConflict) {
                     toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
-                    setIsSaving(false);
-                    return;
+                    setIsSaving(false); return;
                 }
             }
-            // --- End of Conflict Validation ---
 
             // Count previous ARCHITECTURAL visits for this client
             const allClientApptsSnapshot = await getDocs(query(
@@ -558,6 +558,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
                             للمهندس: {dialogData.engineerName}
+                            {!isEditing && ` في ${format(dialogData.appointmentDate, "PPP 'الساعة' HH:mm", { locale: ar })}`}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
