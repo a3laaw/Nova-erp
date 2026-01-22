@@ -292,19 +292,19 @@ export function ArchitecturalAppointmentsView() {
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
-                    <col style={{ width: '8rem' }} />
-                    {slots.map((_, i) => <col key={i} style={{ minWidth: '8rem' }} />)}
+                    <col className="w-[6rem] sm:w-[8rem]" />
+                    {slots.map((_, i) => <col key={i} className="w-[7rem] sm:w-[8rem]" />)}
                 </colgroup>
                 <thead>
                     <tr className='border-b'>
-                        <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">المهندس</th>
-                        {slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}
+                        <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">المهندس</th>
+                        {slots.map(time => <th key={time} className="p-1 sm:p-2 text-center text-sm font-mono border-l">{time}</th>)}
                     </tr>
                 </thead>
                 <tbody>
                     {engineers.map(eng => (
                         <tr key={eng.id} className='border-b'>
-                            <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{eng.fullName}</th>
+                            <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">{eng.fullName}</th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[eng.id!]?.[time];
                                 return (
@@ -313,7 +313,7 @@ export function ArchitecturalAppointmentsView() {
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <div
-                                                        className="h-full w-full rounded-md p-2 text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
+                                                        className="h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
                                                         style={{ backgroundColor: booking.color }}
                                                     >
                                                         <p className="font-bold">{booking.clientName}</p>
@@ -614,6 +614,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         <Dialog open={isOpen} onOpenChange={onClose}>
              <DialogContent
                 dir="rtl"
+                className="w-[95vw] max-w-md"
                 onPointerDownOutside={(e) => {
                     const target = e.target as HTMLElement;
                     if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {

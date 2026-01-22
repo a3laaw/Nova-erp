@@ -295,19 +295,19 @@ export function RoomBookingCalendar() {
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
-                    <col style={{ width: '8rem' }} />
-                    {slots.map((_, i) => <col key={i} style={{ minWidth: '8rem' }} />)}
+                    <col className="w-[6rem] sm:w-[8rem]" />
+                    {slots.map((_, i) => <col key={i} className="w-[7rem] sm:w-[8rem]" />)}
                 </colgroup>
                 <thead>
                     <tr className='border-b'>
-                        <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>
-                        {slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}
+                        <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>
+                        {slots.map(time => <th key={time} className="p-1 sm:p-2 text-center text-sm font-mono border-l">{time}</th>)}
                     </tr>
                 </thead>
                 <tbody>
                     {rooms.map(room => (
                         <tr key={room} className='border-b'>
-                            <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
+                            <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
                                 return (
@@ -316,19 +316,20 @@ export function RoomBookingCalendar() {
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <div 
+                                                        className="flex flex-col items-center justify-center text-center"
                                                         style={{
                                                             height: '100%',
                                                             width: '100%',
                                                             borderRadius: '0.375rem',
-                                                            padding: '0.5rem',
-                                                            fontSize: '0.75rem',
+                                                            padding: '0.25rem',
+                                                            fontSize: '0.7rem',
                                                             cursor: 'pointer',
                                                             ...(departmentStyles[booking.department || 'أخرى'] || {})
                                                         }}
                                                     >
                                                         <p style={{ fontWeight: 'bold' }}>{booking.title}</p>
                                                         <p>{booking.clientName}</p>
-                                                        <p style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{booking.engineerName}</p>
+                                                        <p style={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>{booking.engineerName}</p>
                                                     </div>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">
@@ -586,6 +587,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent
                 dir="rtl"
+                className="w-[95vw] sm:max-w-lg"
                 onPointerDownOutside={(e) => {
                     const target = e.target as HTMLElement;
                     if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
