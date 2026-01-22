@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
@@ -304,7 +304,7 @@ const defaultTransactionTypesByDept: Record<string, string[]> = {
     'رخصة إطفاء ( دفاع مدني )',
     'إشراف على مخطط الميكانيك',
   ],
-  'قسم الإنشائي / الإشراف': [
+  'قسم الاشراف': [
     'تصميم مخطط انشائي',
     'إشراف شهري على بناء الهيكل الأسود',
     'إشراف على مخطط الكهرباء أو الميكانيك',
