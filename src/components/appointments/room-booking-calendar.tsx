@@ -63,7 +63,7 @@ export function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const [date, setDate] = useState<Date | undefined>(new Date());
+    const [date, setDate] = useState<Date | undefined>(undefined);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -78,7 +78,7 @@ export function RoomBookingCalendar() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        // This is now safe as the component is client-side rendered only with ssr: false
+        // This is now safe as we show a skeleton on initial render
         if (date === undefined) {
             setDate(new Date());
         }
@@ -433,6 +433,7 @@ export function RoomBookingCalendar() {
                     clients={clients}
                     engineers={engineers}
                     firestore={firestore}
+                    dayAppointments={appointments}
                 />
             )}
             
@@ -458,7 +459,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore, dayAppointments }: any) {
     const { toast } = useToast();
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -510,18 +511,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
             const newAppointmentTime = appointmentDateTime.getTime();
 
             if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
-                const dayStart = startOfDay(appointmentDateTime);
-                const dayEnd = endOfDay(appointmentDateTime);
-                const appointmentsRef = collection(firestore, 'appointments');
-                const appointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
-                const dayAppointmentsSnap = await getDocs(appointmentsQuery);
-                const dayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-
+                
                 const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
                 const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
 
                 // Check room conflict
-                const roomHasConflict = dayAppointments.some(appt => {
+                const roomHasConflict = dayAppointments.some((appt: Appointment) => {
                     const isSameAppointment = isEditing && appt.id === dialogData.id;
                     if (isSameAppointment) return false;
                     
@@ -535,7 +530,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
                 // Check engineer conflict
                 if (formData.engineerId) {
-                    const engineerHasConflict = dayAppointments.some(appt => {
+                    const engineerHasConflict = dayAppointments.some((appt: Appointment) => {
                         const isSameAppointment = isEditing && appt.id === dialogData.id;
                         if (isSameAppointment) return false;
                         
@@ -550,7 +545,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                 
                 // Check client conflict
                 if (formData.clientId) {
-                     const clientHasConflict = dayAppointments.some(appt => {
+                     const clientHasConflict = dayAppointments.some((appt: Appointment) => {
                         const isSameAppointment = isEditing && appt.id === dialogData.id;
                         if (isSameAppointment) return false;
                         

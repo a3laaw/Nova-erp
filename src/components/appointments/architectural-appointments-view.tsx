@@ -68,8 +68,7 @@ export function ArchitecturalAppointmentsView() {
     const [dialogData, setDialogData] = useState<any>(null);
     
     useEffect(() => {
-        // Set date on client to avoid hydration mismatch.
-        // It will be undefined on server and then set to a Date object on the client.
+        // This is now safe as we show a skeleton on initial render
         if (date === undefined) {
             setDate(new Date());
         }
@@ -378,6 +377,7 @@ export function ArchitecturalAppointmentsView() {
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
+                    dayAppointments={appointments}
                 />
             )}
             
@@ -404,7 +404,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore, dayAppointments }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const isEditing = !!dialogData?.id;
@@ -412,6 +412,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
     const [visitCount, setVisitCount] = useState(1);
+    const [projectType, setProjectType] = useState('');
+    const [isContractSigned, setIsContractSigned] = useState(false);
 
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
@@ -428,10 +430,13 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             if (isEditing) {
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
-                setVisitCount(dialogData.visitCount || 1);
+                setProjectType(dialogData.projectType || '');
+                setIsContractSigned(dialogData.contractSigned || false);
             } else {
                 setSelectedClientId('');
                 setTitle('');
+                setProjectType('');
+                setIsContractSigned(false);
             }
         }
     }, [isOpen, dialogData, isEditing]);
@@ -479,18 +484,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             const newAppointmentTime = appointmentDateTime.getTime();
 
             if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
-                const dayStart = startOfDay(appointmentDateTime);
-                const dayEnd = endOfDay(appointmentDateTime);
-                const appointmentsRef = collection(firestore, 'appointments');
-                const appointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
-                const dayAppointmentsSnap = await getDocs(appointmentsQuery);
-                const dayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
                 const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
                 const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
 
                 // Check for engineer conflict
-                const engineerHasConflict = dayAppointments.some(appt => {
+                const engineerHasConflict = dayAppointments.some((appt: Appointment) => {
                     const isSameAppointment = isEditing && appt.id === dialogData.id;
                     if (isSameAppointment) return false;
                     
@@ -505,7 +504,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 }
 
                 // Check for client conflict
-                const clientHasConflict = dayAppointments.some(appt => {
+                const clientHasConflict = dayAppointments.some((appt: Appointment) => {
                     const isSameAppointment = isEditing && appt.id === dialogData.id;
                     if (isSameAppointment) return false;
                     
@@ -522,8 +521,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             // --- End of Conflict Validation ---
 
             // --- Automated Logic ---
-            const isContractSigned = client.status === 'contracted' || client.status === 'reContracted';
-            const projectType = 'بلدية سكن خاص';
+            const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
+            const projType = 'بلدية سكن خاص';
 
             const dataToSave = {
                 engineerId: dialogData.engineerId,
@@ -534,10 +533,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 clientName: client.nameAr,
                 title: title || client.nameAr,
                 visitCount,
-                contractSigned: isContractSigned,
-                projectType: projectType,
+                contractSigned: contractSigned,
+                projectType: projType,
                 type: 'architectural',
-                color: getVisitColor({ visitCount, contractSigned: isContractSigned, projectType }),
+                color: getVisitColor({ visitCount, contractSigned: contractSigned, projectType: projType }),
                 ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
             };
             await onSave(dataToSave);
@@ -594,17 +593,17 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                             </div>
                         )}
                         <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
-                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
-                        </div>
-                        <div className="grid gap-2">
-                             <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
-                             <InlineSearchList 
+                            <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
+                            <InlineSearchList 
                                 value={selectedClientId}
                                 onSelect={setSelectedClientId}
                                 options={clientOptions}
                                 placeholder="ابحث بالاسم أو رقم الجوال..."
-                             />
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
                     </div>
                     <DialogFooter>
