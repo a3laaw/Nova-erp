@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { format, startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, startOfDay, endOfDay } from 'firebase/firestore';
+import { format, setHours, setMinutes } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -68,7 +68,7 @@ export function ArchitecturalAppointmentsView() {
     const [dialogData, setDialogData] = useState<any>(null);
     
     useEffect(() => {
-        // This is now safe as we show a skeleton on initial render
+        // Render skeleton on initial load, then set date on client.
         if (date === undefined) {
             setDate(new Date());
         }
@@ -377,7 +377,6 @@ export function ArchitecturalAppointmentsView() {
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
-                    dayAppointments={appointments}
                 />
             )}
             
@@ -404,7 +403,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore, dayAppointments }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const isEditing = !!dialogData?.id;
@@ -412,9 +411,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
     const [visitCount, setVisitCount] = useState(1);
-    const [projectType, setProjectType] = useState('');
-    const [isContractSigned, setIsContractSigned] = useState(false);
-
+    
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
 
@@ -422,7 +419,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     useEffect(() => {
         if (isOpen && dialogData) {
             const appointmentDate = dialogData.appointmentDate;
-            if (appointmentDate instanceof Date) {
+            if (isEditing && appointmentDate instanceof Date) {
                 setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
                 setNewTime(format(appointmentDate, 'HH:mm'));
             }
@@ -430,13 +427,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             if (isEditing) {
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
-                setProjectType(dialogData.projectType || '');
-                setIsContractSigned(dialogData.contractSigned || false);
             } else {
                 setSelectedClientId('');
                 setTitle('');
-                setProjectType('');
-                setIsContractSigned(false);
             }
         }
     }, [isOpen, dialogData, isEditing]);
@@ -479,17 +472,27 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
 
         try {
+            // --- Re-fetch latest appointments for robust conflict validation ---
+            const dayStart = startOfDay(appointmentDateTime);
+            const dayEnd = endOfDay(appointmentDateTime);
+            const apptsSnapshot = await getDocs(query(
+                collection(firestore, 'appointments'),
+                where('appointmentDate', '>=', dayStart),
+                where('appointmentDate', '<=', dayEnd)
+            ));
+            const latestDayAppointments = apptsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+
             // --- Conflict Validation ---
             const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
             const newAppointmentTime = appointmentDateTime.getTime();
 
             if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
 
-                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
-                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
+                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000); // Check 30 mins before
+                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);   // Check 30 mins after
 
-                // Check for engineer conflict
-                const engineerHasConflict = dayAppointments.some((appt: Appointment) => {
+                // Check for engineer conflict across ALL appointment types
+                const engineerHasConflict = latestDayAppointments.some((appt: any) => {
                     const isSameAppointment = isEditing && appt.id === dialogData.id;
                     if (isSameAppointment) return false;
                     
@@ -503,8 +506,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     return;
                 }
 
-                // Check for client conflict
-                const clientHasConflict = dayAppointments.some((appt: Appointment) => {
+                // Check for client conflict across ALL appointment types
+                const clientHasConflict = latestDayAppointments.some((appt: any) => {
                     const isSameAppointment = isEditing && appt.id === dialogData.id;
                     if (isSameAppointment) return false;
                     
@@ -533,10 +536,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 clientName: client.nameAr,
                 title: title || client.nameAr,
                 visitCount,
-                contractSigned: contractSigned,
+                contractSigned,
                 projectType: projType,
                 type: 'architectural',
-                color: getVisitColor({ visitCount, contractSigned: contractSigned, projectType: projType }),
+                color: getVisitColor({ visitCount, contractSigned, projectType: projType }),
                 ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
             };
             await onSave(dataToSave);
@@ -618,4 +621,3 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         </Dialog>
     );
 }
-    
