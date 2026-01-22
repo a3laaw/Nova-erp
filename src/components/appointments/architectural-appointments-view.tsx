@@ -151,6 +151,7 @@ export function ArchitecturalAppointmentsView() {
             engineerId: engineer.id,
             engineerName: engineer.fullName,
             appointmentDate,
+            appointments, // Pass current appointments to dialog
         });
         setIsDialogOpen(true);
     };
@@ -160,6 +161,7 @@ export function ArchitecturalAppointmentsView() {
             ...booking,
             id: booking.id, // Make sure ID is passed
             appointmentDate: booking.appointmentDate.toDate(), // Convert timestamp to Date for dialog
+            appointments, // Pass current appointments to dialog
         });
         setIsDialogOpen(true);
     };
@@ -262,10 +264,15 @@ export function ArchitecturalAppointmentsView() {
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <div
-                                                        className="h-full w-full rounded-md p-2 text-sm text-gray-800 flex items-center justify-center text-center cursor-pointer"
+                                                        className="h-full w-full rounded-md p-2 text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
                                                         style={{ backgroundColor: booking.color }}
                                                     >
                                                         <p className="font-bold">{booking.clientName}</p>
+                                                        {booking.visitCount && (
+                                                            <span className="text-xs mt-1 opacity-75">
+                                                                (الزيارة رقم {booking.visitCount})
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">
@@ -432,6 +439,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 ? new Date(`${newDate}T${newTime}`) 
                 : dialogData.appointmentDate;
             
+            // Get the latest appointments for the day right before saving
             const dayStart = startOfDay(appointmentDateTime);
             const dayEnd = endOfDay(appointmentDateTime);
 
@@ -617,6 +625,4 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-    
-
     
