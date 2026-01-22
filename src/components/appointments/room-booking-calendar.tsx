@@ -231,9 +231,10 @@ export function RoomBookingCalendar() {
         try {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
-            if (date) { // Re-fetch to update the UI
-                await fetchData(date);
-            }
+            
+            // Local state update to avoid race conditions with fetching
+            setAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
+            
         } catch (error) {
             console.error("Error deleting appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });

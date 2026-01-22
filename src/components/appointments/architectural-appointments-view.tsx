@@ -43,7 +43,7 @@ const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinu
 const eveningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 13 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
 
 
-function getVisitColor(visit: Partial<Appointment>) {
+function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean }) {
   if (visit.visitCount === 1) return "#facc15"; // yellow-400
   if (visit.visitCount! > 1 && !visit.contractSigned) return "#22c55e"; // green-500
   if (visit.visitCount! > 1 && visit.contractSigned) return "#3b82f6"; // blue-500
@@ -197,9 +197,10 @@ export function ArchitecturalAppointmentsView() {
         try {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
-            if (date) { // Re-fetch to update the UI
-                await fetchData(date);
-            }
+            
+            // Local state update to avoid race conditions with fetching
+            setAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
+
         } catch (error) {
             console.error("Error deleting appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
@@ -425,7 +426,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                     setNewTime(format(appointmentDate, 'HH:mm'));
                 }
                 setSelectedClientId(dialogData.clientId || '');
-                setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
+                setTitle(dialogData.title || '');
             } else {
                 setSelectedClientId('');
                 setTitle('');
@@ -461,19 +462,20 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
 
             // Check for engineer conflict
             const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                if (isEditing && appt.id === dialogData.id) return false;
+                if (isEditing && appt.id === dialogData.id) return false; // Don't conflict with itself
                 const apptDate = appt.appointmentDate.toDate();
                 return appt.engineerId === dialogData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
             });
 
             if (engineerHasConflict) {
-                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت (قد يكون في قاعة اجتماعات).' });
                 setIsSaving(false); return;
             }
 
             // Check for client conflict
             const clientHasConflict = latestDayAppointments.some((appt: any) => {
                 if (isEditing && appt.id === dialogData.id) return false;
+                if (appt.type !== 'architectural') return false; // Only check arch vs arch for clients
                 const apptDate = appt.appointmentDate.toDate();
                 return appt.clientId === selectedClientId && apptDate >= windowStart && apptDate <= windowEnd;
             });
@@ -497,17 +499,14 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
 
             const dataToSave = {
                 engineerId: dialogData.engineerId,
-                engineerName: dialogData.engineerName,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                session: appointmentDateTime.getHours() < 14 ? 'صباحية' : 'مسائية',
                 clientId: client.id,
-                clientName: client.nameAr,
                 title: title || client.nameAr,
                 visitCount,
                 contractSigned,
                 projectType: projType,
                 type: 'architectural',
-                color: getVisitColor({ visitCount, contractSigned, projectType: projType }),
+                color: getVisitColor({ visitCount, contractSigned }),
                 ...(isEditing ? { id: dialogData.id } : { createdAt: serverTimestamp() }),
             };
             await onSave(dataToSave);
