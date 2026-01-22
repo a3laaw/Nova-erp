@@ -433,6 +433,7 @@ export function RoomBookingCalendar() {
                     clients={clients}
                     engineers={engineers}
                     firestore={firestore}
+                    dayAppointments={appointments}
                 />
             )}
             
@@ -458,7 +459,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore, dayAppointments }: any) {
     const { toast } = useToast();
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -502,60 +503,48 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         
         try {
             const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-            const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
-            const newAppointmentTime = appointmentDateTime.getTime();
+            
+            // --- Conflict Validation ---
+            const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
+            const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
 
-            if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
-                // --- RE-FETCH LATEST DATA FOR VALIDATION ---
-                const dayStart = startOfDay(appointmentDateTime);
-                const dayEnd = endOfDay(appointmentDateTime);
-                const apptsQuery = query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
-                );
-                const querySnapshot = await getDocs(apptsQuery);
-                const latestDayAppointments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                // --- END OF RE-FETCH ---
+            // Use the passed down appointments from the parent state
+            const latestDayAppointments = dayAppointments;
+            
+            // Check room conflict
+            const roomHasConflict = latestDayAppointments.some((appt: any) => {
+                if (isEditing && appt.id === dialogData.id) return false;
+                const apptDate = appt.appointmentDate.toDate();
+                return appt.meetingRoom === roomName && apptDate >= windowStart && apptDate <= windowEnd;
+            });
+            if (roomHasConflict) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'قاعة الاجتماعات محجوزة في هذا الوقت.' });
+                setIsSaving(false); return;
+            }
 
-                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
-                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
-
-                // Check room conflict
-                const roomHasConflict = latestDayAppointments.some((appt: any) => {
+            // Check engineer conflict
+            if (formData.engineerId) {
+                const engineerHasConflict = latestDayAppointments.some((appt: any) => {
                     if (isEditing && appt.id === dialogData.id) return false;
                     const apptDate = appt.appointmentDate.toDate();
-                    return appt.meetingRoom === roomName && apptDate >= windowStart && apptDate <= windowEnd;
+                    return appt.engineerId === formData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
                 });
-                if (roomHasConflict) {
-                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'قاعة الاجتماعات محجوزة في هذا الوقت.' });
+                if (engineerHasConflict) {
+                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
                     setIsSaving(false); return;
                 }
-
-                // Check engineer conflict
-                if (formData.engineerId) {
-                    const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                        if (isEditing && appt.id === dialogData.id) return false;
-                        const apptDate = appt.appointmentDate.toDate();
-                        return appt.engineerId === formData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
-                    });
-                    if (engineerHasConflict) {
-                        toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
-                        setIsSaving(false); return;
-                    }
-                }
-                
-                // Check client conflict
-                if (formData.clientId) {
-                     const clientHasConflict = latestDayAppointments.some((appt: any) => {
-                        if (isEditing && appt.id === dialogData.id) return false;
-                        const apptDate = appt.appointmentDate.toDate();
-                        return appt.clientId === formData.clientId && apptDate >= windowStart && apptDate <= windowEnd;
-                    });
-                    if (clientHasConflict) {
-                        toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
-                        setIsSaving(false); return;
-                    }
+            }
+            
+            // Check client conflict
+            if (formData.clientId) {
+                    const clientHasConflict = latestDayAppointments.some((appt: any) => {
+                    if (isEditing && appt.id === dialogData.id) return false;
+                    const apptDate = appt.appointmentDate.toDate();
+                    return appt.clientId === formData.clientId && apptDate >= windowStart && apptDate <= windowEnd;
+                });
+                if (clientHasConflict) {
+                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
+                    setIsSaving(false); return;
                 }
             }
 

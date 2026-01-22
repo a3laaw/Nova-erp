@@ -377,6 +377,7 @@ export function ArchitecturalAppointmentsView() {
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
+                    dayAppointments={appointments}
                 />
             )}
             
@@ -403,7 +404,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore, dayAppointments }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const isEditing = !!dialogData?.id;
@@ -428,7 +429,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
             } else {
                 setSelectedClientId('');
                 setTitle('');
-                // For new bookings, date/time are determined by cell click, not form
                 setNewDate(''); 
                 setNewTime('');
             }
@@ -449,48 +449,36 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
         
         try {
             const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-            const originalAppointmentTime = isEditing ? dialogData.appointmentDate.getTime() : null;
-            const newAppointmentTime = appointmentDateTime.getTime();
+            
+            // --- Conflict Validation ---
+            const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
+            const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
+            
+            // Use the passed down appointments from the parent state
+            const latestDayAppointments = dayAppointments;
 
-            if (!isEditing || newAppointmentTime !== originalAppointmentTime) {
-                // --- RE-FETCH LATEST DATA FOR VALIDATION ---
-                const dayStart = startOfDay(appointmentDateTime);
-                const dayEnd = endOfDay(appointmentDateTime);
-                const apptsQuery = query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
-                );
-                const querySnapshot = await getDocs(apptsQuery);
-                const latestDayAppointments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                // --- END OF RE-FETCH ---
+            // Check for engineer conflict
+            const engineerHasConflict = latestDayAppointments.some((appt: any) => {
+                if (isEditing && appt.id === dialogData.id) return false;
+                const apptDate = appt.appointmentDate.toDate();
+                return appt.engineerId === dialogData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
+            });
 
-                const windowStart = new Date(newAppointmentTime - 29 * 60 * 1000);
-                const windowEnd = new Date(newAppointmentTime + 29 * 60 * 1000);
+            if (engineerHasConflict) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
+                setIsSaving(false); return;
+            }
 
-                // Check for engineer conflict
-                const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                    if (isEditing && appt.id === dialogData.id) return false;
-                    const apptDate = appt.appointmentDate.toDate();
-                    return appt.engineerId === dialogData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
-                });
+            // Check for client conflict
+            const clientHasConflict = latestDayAppointments.some((appt: any) => {
+                if (isEditing && appt.id === dialogData.id) return false;
+                const apptDate = appt.appointmentDate.toDate();
+                return appt.clientId === selectedClientId && apptDate >= windowStart && apptDate <= windowEnd;
+            });
 
-                if (engineerHasConflict) {
-                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
-                    setIsSaving(false); return;
-                }
-
-                // Check for client conflict
-                const clientHasConflict = latestDayAppointments.some((appt: any) => {
-                    if (isEditing && appt.id === dialogData.id) return false;
-                    const apptDate = appt.appointmentDate.toDate();
-                    return appt.clientId === selectedClientId && apptDate >= windowStart && apptDate <= windowEnd;
-                });
-
-                if (clientHasConflict) {
-                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
-                    setIsSaving(false); return;
-                }
+            if (clientHasConflict) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
+                setIsSaving(false); return;
             }
 
             // Count previous ARCHITECTURAL visits for this client
@@ -566,6 +554,15 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                             <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
+                            <InlineSearchList 
+                                value={selectedClientId}
+                                onSelect={setSelectedClientId}
+                                options={clientOptions}
+                                placeholder="ابحث بالاسم أو رقم الجوال..."
+                            />
+                        </div>
                         {isEditing && (
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
@@ -578,15 +575,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 </div>
                             </div>
                         )}
-                        <div className="grid gap-2">
-                            <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
-                            <InlineSearchList 
-                                value={selectedClientId}
-                                onSelect={setSelectedClientId}
-                                options={clientOptions}
-                                placeholder="ابحث بالاسم أو رقم الجوال..."
-                            />
-                        </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
