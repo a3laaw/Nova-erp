@@ -46,7 +46,7 @@ const eveningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinu
 function getVisitColor(visit: Partial<Appointment>) {
   if (visit.visitCount === 1) return "#facc15"; // yellow-400
   if (visit.visitCount! > 1 && !visit.contractSigned) return "#22c55e"; // green-500
-  if (visit.visitCount! > 1 && visit.contractSigned && visit.projectType?.includes("بلدية سكن خاص")) return "#3b82f6"; // blue-500
+  if (visit.visitCount! > 1 && visit.contractSigned) return "#3b82f6"; // blue-500
   return "#9ca3af"; // gray-400
 }
 
@@ -377,6 +377,7 @@ export function ArchitecturalAppointmentsView() {
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
+                    appointments={appointments}
                 />
             )}
             
@@ -410,7 +411,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
     
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
-    const [visitCount, setVisitCount] = useState(1);
     
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
@@ -418,43 +418,23 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
 
     useEffect(() => {
         if (isOpen && dialogData) {
-            const appointmentDate = dialogData.appointmentDate;
-            if (isEditing && appointmentDate instanceof Date) {
-                setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
-                setNewTime(format(appointmentDate, 'HH:mm'));
-            }
-
             if (isEditing) {
+                const appointmentDate = dialogData.appointmentDate;
+                if (appointmentDate instanceof Date) {
+                    setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
+                    setNewTime(format(appointmentDate, 'HH:mm'));
+                }
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title !== dialogData.clientName ? dialogData.title : '');
             } else {
                 setSelectedClientId('');
                 setTitle('');
+                setNewDate('');
+                setNewTime('');
             }
         }
     }, [isOpen, dialogData, isEditing]);
 
-
-    useEffect(() => {
-        if (!selectedClientId || !firestore) {
-            setVisitCount(1);
-            return;
-        };
-        const fetchClientHistory = async () => {
-            const q = query(
-              collection(firestore, 'appointments'), 
-              where('clientId', '==', selectedClientId),
-              where('type', '==', 'architectural')
-            );
-            const snapshot = await getDocs(q);
-            const architecturalVisits = snapshot.docs
-                .filter(d => isEditing ? d.id !== dialogData.id : true)
-                .map(doc => doc.data());
-
-            setVisitCount(architecturalVisits.length + 1);
-        };
-        fetchClientHistory();
-    }, [selectedClientId, firestore, isEditing, dialogData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -522,6 +502,14 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                 }
             }
             // --- End of Conflict Validation ---
+
+            // Count previous ARCHITECTURAL visits for this client
+            const allClientAppts = await getDocs(query(
+              collection(firestore, 'appointments'), 
+              where('clientId', '==', selectedClientId),
+              where('type', '==', 'architectural')
+            ));
+            const visitCount = allClientAppts.docs.filter(d => isEditing ? d.id !== dialogData.id : true).length + 1;
 
             // --- Automated Logic ---
             const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
@@ -596,6 +584,10 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                             </div>
                         )}
                         <div className="grid gap-2">
+                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
+                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
+                        </div>
+                        <div className="grid gap-2">
                             <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
                             <InlineSearchList 
                                 value={selectedClientId}
@@ -603,10 +595,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, firestore
                                 options={clientOptions}
                                 placeholder="ابحث بالاسم أو رقم الجوال..."
                             />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
-                            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
                     </div>
                     <DialogFooter>
