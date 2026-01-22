@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -88,6 +88,19 @@ export default function NewArchitecturalAppointmentPage() {
         };
         fetchData();
     }, [firestore, toast]);
+    
+    const filteredClients = useMemo(() => {
+        if (!engineerId) {
+            return [];
+        }
+        return clients.filter(c => !c.assignedEngineer || c.assignedEngineer === engineerId);
+    }, [clients, engineerId]);
+    
+    useEffect(() => {
+        if (clientId && filteredClients.length > 0 && !filteredClients.some(c => c.id === clientId)) {
+            setClientId('');
+        }
+    }, [filteredClients, clientId]);
     
     useEffect(() => {
         const fetchSchedule = async () => {
@@ -273,19 +286,6 @@ export default function NewArchitecturalAppointmentPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="clientId">العميل <span className="text-destructive">*</span></Label>
-                            <Select dir="rtl" onValueChange={setClientId} value={clientId} required disabled={loading}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر العميل..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {clients.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>{c.nameAr}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
                             <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
                              <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading}>
                                 <SelectTrigger>
@@ -294,6 +294,19 @@ export default function NewArchitecturalAppointmentPage() {
                                 <SelectContent>
                                     {engineers.map(e => (
                                         <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="clientId">العميل <span className="text-destructive">*</span></Label>
+                            <Select dir="rtl" onValueChange={setClientId} value={clientId} required disabled={loading || !engineerId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={loading ? "تحميل..." : !engineerId ? "اختر مهندسًا أولاً" : "اختر العميل..."} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {filteredClients.map(c => (
+                                        <SelectItem key={c.id} value={c.id}>{c.nameAr}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

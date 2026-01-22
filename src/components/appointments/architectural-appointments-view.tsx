@@ -450,6 +450,11 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
 
+    const filteredClients = useMemo(() => {
+        if (!dialogData?.engineerId) return [];
+        // Show clients assigned to the selected engineer OR clients with no assigned engineer.
+        return clients.filter((c: Client) => !c.assignedEngineer || c.assignedEngineer === dialogData.engineerId);
+    }, [clients, dialogData?.engineerId]);
 
     useEffect(() => {
         if (isOpen && dialogData) {
@@ -469,6 +474,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             }
         }
     }, [isOpen, dialogData, isEditing]);
+
+    useEffect(() => {
+        if (selectedClientId && !filteredClients.some(c => c.id === selectedClientId)) {
+            setSelectedClientId('');
+        }
+    }, [filteredClients, selectedClientId]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -604,11 +615,11 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         }
     };
     
-    const clientOptions = useMemo(() => clients.map((c: Client) => ({
+    const clientOptions = useMemo(() => filteredClients.map((c: Client) => ({
       value: c.id,
       label: c.nameAr,
       searchKey: c.mobile
-    })), [clients]);
+    })), [filteredClients]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -647,7 +658,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                                 value={selectedClientId}
                                 onSelect={setSelectedClientId}
                                 options={clientOptions}
-                                placeholder="ابحث بالاسم أو رقم الجوال..."
+                                placeholder={clientOptions.length === 0 && dialogData?.engineerId ? "لا يوجد عملاء متاحون لهذا المهندس" : "ابحث بالاسم أو رقم الجوال..."}
                             />
                         </div>
                         {isEditing && (
