@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -40,7 +40,8 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   secondaryTitle,
   secondarySingularTitle,
   secondaryCollectionName,
-  icon
+  icon,
+  footer
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -49,6 +50,7 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   secondarySingularTitle?: string;
   secondaryCollectionName?: string;
   icon: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -229,6 +231,12 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
         )}
       </CardContent>
 
+      {footer && (
+        <CardFooter className="justify-end pt-4 border-t">
+          {footer}
+        </CardFooter>
+      )}
+
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent>
           <DialogHeader>
@@ -267,7 +275,77 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   );
 }
 
+const defaultTransactionTypes = [
+  'بلديه سكن خاص',
+  'تصاميم واجهات خارجية',
+  'كهرباء صناعي + استثمار + تجاري',
+  'ميكانيك ( مخطط صحي تصميم )',
+  'اشراف شهري على بناء الهيكل الاسود',
+  'مزارع - إيصال تيار كهربائي',
+  'رخصة هدم',
+  'تصاميم داخلية',
+  'كهرباء تصميم',
+  'ميكانيك ( مخطط تكييف )',
+  'اشراف على مخطط الكهرباء',
+  'مزارع - ترخيص بلديه ومطافي',
+  'اضافة تصميم سرداب',
+  'كهرباء سكن خاص',
+  'مخطط صحي الاشغال',
+  'اشراف على مخطط الميكانيك',
+  'طلب ترخيص ( ايصال/تقوية ) تيار كهربائي',
+  '( تصميم مخطط هندسي )',
+  'تقوية تيار كهربائي',
+  'ايصال تيار كهربائي مؤقت',
+  'استثماري بلدية',
+  'كتاب ايصال تيار كهربائي صادر من البلدية',
+  'ترخيص حدائق',
+];
+
 export function ReferenceDataManager() {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isSeeding, setIsSeeding] = useState(false);
+
+    const handleSeedData = async () => {
+        if (!firestore) return;
+        setIsSeeding(true);
+        try {
+            const transactionTypesRef = collection(firestore, 'transactionTypes');
+            const q = query(transactionTypesRef);
+            const existingDocs = await getDocs(q);
+            const existingNames = new Set(existingDocs.docs.map(d => d.data().name));
+            
+            const batch = writeBatch(firestore);
+            let count = 0;
+            defaultTransactionTypes.forEach(typeName => {
+                if (!existingNames.has(typeName)) {
+                    const newDocRef = doc(collection(firestore, 'transactionTypes'));
+                    batch.set(newDocRef, { name: typeName });
+                    count++;
+                }
+            });
+            
+            if (count > 0) {
+                await batch.commit();
+                toast({ title: 'نجاح', description: `تمت إضافة ${count} نوع معاملة جديد.` });
+            } else {
+                toast({ title: 'لا توجد تغييرات', description: 'جميع الأنواع الافتراضية موجودة بالفعل.' });
+            }
+
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل البيانات الافتراضية.' });
+        } finally {
+            setIsSeeding(false);
+        }
+    };
+    
+    const seedButton = (
+        <Button onClick={handleSeedData} disabled={isSeeding} variant="secondary">
+            {isSeeding && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+            تسجيل قائمة الأنواع الافتراضية
+        </Button>
+    );
 
   return (
     <div className="space-y-6">
@@ -305,6 +383,7 @@ export function ReferenceDataManager() {
             primarySingularTitle="نوع معاملة"
             primaryCollectionName="transactionTypes"
             icon={<FileText />}
+            footer={seedButton}
         />
        </div>
     </div>
