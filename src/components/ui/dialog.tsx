@@ -47,6 +47,7 @@ const DialogContent = React.forwardRef<
               target.closest('[cmdk-root]') || 
               target.closest('[role="listbox"]') || 
               target.closest('[data-radix-popper-content-wrapper]') ||
+              target.closest('[data-radix-popover-content]') ||
               target.closest('[data-inline-search-list-options]')
           ) {
               e.preventDefault();
@@ -58,6 +59,7 @@ const DialogContent = React.forwardRef<
               target.closest('[cmdk-root]') || 
               target.closest('[role="listbox"]') || 
               target.closest('[data-radix-popper-content-wrapper]') ||
+              target.closest('[data-radix-popover-content]') ||
               target.closest('[data-inline-search-list-options]')
           ) {
               e.preventDefault();
