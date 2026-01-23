@@ -629,25 +629,47 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "transactionTypes": {
-            "type": "array",
-            "items": { "type": "string" }
-        },
-        "clauses": {
+        "description": { "type": "string" },
+        "scopeOfWork": {
           "type": "array",
           "items": {
             "type": "object",
-            "properties": {
-              "id": { "type": "number" },
-              "name": { "type": "string" },
-              "amount": { "type": "number" },
-              "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] }
-            },
-            "required": ["id", "name", "amount", "status"]
+            "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
+            "required": ["id", "title"]
           }
-        }
+        },
+        "termsAndConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        },
+        "financials": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["fixed", "percentage"] },
+            "totalAmount": { "type": "number" },
+            "discount": { "type": "number" },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "condition": { "type": "string" },
+                  "value": { "type": "number" }
+                },
+                "required": ["id", "name", "value"]
+              }
+            }
+          }
+        },
+        "openClauses": { "type": "string" }
       },
-      "required": ["title", "transactionTypes", "clauses"]
+      "required": ["title"]
     }
   },
   "auth": {

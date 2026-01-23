@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
+import { ContractTemplateManager } from '@/components/settings/contract-template-manager';
 
 export default function SettingsPage() {
     const { language } = useLanguage();
@@ -36,9 +37,10 @@ export default function SettingsPage() {
 
   return (
     <Tabs defaultValue="users" dir="rtl">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="users">إدارة المستخدمين</TabsTrigger>
         <TabsTrigger value="reference-data">البيانات المرجعية</TabsTrigger>
+        <TabsTrigger value="contract-templates">نماذج العقود</TabsTrigger>
       </TabsList>
       <TabsContent value="users">
         <Card>
@@ -55,6 +57,9 @@ export default function SettingsPage() {
       </TabsContent>
       <TabsContent value="reference-data">
         <ReferenceDataManager />
+      </TabsContent>
+      <TabsContent value="contract-templates">
+        <ContractTemplateManager />
       </TabsContent>
     </Tabs>
   );

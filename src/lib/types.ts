@@ -382,12 +382,19 @@ export interface ContractTerm {
 
 export type ContractTemplate = {
   id?: string;
-  transactionTypes: string[];
   title: string;
-  clauses: ContractClause[];
+  description?: string;
+  scopeOfWork?: ContractScopeItem[];
   termsAndConditions?: ContractTerm[];
-  totalAmount?: number; // Calculated field
+  financials?: {
+    type: 'fixed' | 'percentage';
+    totalAmount: number;
+    discount: number;
+    milestones: ContractFinancialMilestone[];
+  };
+  openClauses?: string;
 };
+
 
 export interface ContractScopeItem {
   id: string;
