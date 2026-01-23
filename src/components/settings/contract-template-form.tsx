@@ -25,7 +25,7 @@ interface ContractTemplateFormProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
+const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
 
 
 export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template }: ContractTemplateFormProps) {
@@ -124,7 +124,14 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
   };
 
   const addMilestone = () => {
-    setFinancials(prev => ({ ...prev, milestones: [...prev.milestones, { id: generateId(), name: '', condition: '', value: 0 }] }));
+    setFinancials(prev => {
+      const newIndex = prev.milestones.length;
+      const newName = `الدفعة ال${arabicOrdinals[newIndex] || (newIndex + 1)}`;
+      return {
+        ...prev,
+        milestones: [...prev.milestones, { id: generateId(), name: newName, condition: '', value: 0 }]
+      };
+    });
   };
   const updateMilestone = (id: string, field: keyof ContractFinancialMilestone, value: string | number) => {
     setFinancials(prev => ({ ...prev, milestones: prev.milestones.map(m => m.id === id ? { ...m, [field]: value } : m) }));
@@ -258,9 +265,8 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                         <div className="space-y-2">
                             {financials.milestones.map((m, i) => (
                                  <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
-                                    <span className="col-span-1 text-sm text-muted-foreground">#{i+1}</span>
-                                    <Input placeholder={`مثال: الدفعة ال${['أولى', 'ثانية', 'ثالثة', 'رابعة', 'خامسة'][i] || `(${i + 1})`}`} value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="col-span-3"/>
-                                    <Input placeholder="شرط الاستحقاق" value={m.condition} onChange={e => updateMilestone(m.id, 'condition', e.target.value)} className="col-span-4"/>
+                                    <Label className="col-span-3 font-semibold">{m.name}</Label>
+                                    <Input placeholder="شرط الاستحقاق" value={m.condition} onChange={e => updateMilestone(m.id, 'condition', e.target.value)} className="col-span-5"/>
                                     <div className="col-span-3 flex items-center gap-1">
                                         <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
                                         <span className="text-sm">{financials.type === 'fixed' ? 'د.ك' : '%'}</span>

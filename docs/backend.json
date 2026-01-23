@@ -208,10 +208,11 @@
                         "items": {
                             "type": "object",
                             "properties": {
-                                "id": { "type": "number" },
+                                "id": { "type": "string" },
                                 "name": { "type": "string" },
                                 "amount": { "type": "number" },
-                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] }
+                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] },
+                                "percentage": { "type": "number", "description": "The original percentage value if the financial type was 'percentage'."}
                             },
                             "required": ["id", "name", "amount", "status"]
                         }
@@ -232,7 +233,8 @@
                         "required": ["id", "text"]
                       }
                     },
-                    "totalAmount": { "type": "number" }
+                    "totalAmount": { "type": "number" },
+                    "financialsType": { "type": "string", "enum": ["fixed", "percentage"] }
                 },
                 "required": ["clauses", "totalAmount"]
             }

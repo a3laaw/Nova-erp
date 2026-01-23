@@ -72,7 +72,18 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
           
           if (foundTemplate) {
             setTemplate(foundTemplate);
-            setClauses(JSON.parse(JSON.stringify(foundTemplate.financials.milestones.map(m => ({id: m.id, name: m.name, amount: m.value, status: 'غير مستحقة'})) || [])));
+            const totalContractAmount = foundTemplate.financials.totalAmount || 0;
+            const isPercentage = foundTemplate.financials.type === 'percentage';
+
+            const calculatedClauses = (foundTemplate.financials.milestones || []).map(m => ({
+                id: m.id || generateId(),
+                name: m.name,
+                amount: isPercentage ? ((m.value || 0) / 100) * totalContractAmount : (m.value || 0),
+                status: 'غير مستحقة',
+                percentage: isPercentage ? m.value : undefined
+            } as ContractClause));
+
+            setClauses(JSON.parse(JSON.stringify(calculatedClauses)));
             setTerms(JSON.parse(JSON.stringify(foundTemplate.termsAndConditions || [])));
             setOpenClauses(JSON.parse(JSON.stringify(foundTemplate.openClauses || [])));
           } else {
@@ -141,6 +152,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
           termsAndConditions: terms,
           openClauses: openClauses,
           totalAmount: totalAmount,
+          financialsType: template?.financials.type,
         }
       });
 

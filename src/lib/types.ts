@@ -335,6 +335,7 @@ export type ClientTransaction = {
         termsAndConditions?: ContractTerm[];
         openClauses?: ContractTerm[];
         totalAmount: number;
+        financialsType?: 'fixed' | 'percentage';
     };
 };
 
@@ -370,10 +371,11 @@ export interface TransactionType {
 }
 
 export type ContractClause = {
-  id: number;
+  id: string;
   name: string;
   amount: number;
   status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; // Paid, Due, Not Due
+  percentage?: number;
 };
 
 export interface ContractTerm {

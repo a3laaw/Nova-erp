@@ -31,6 +31,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
     const clauses = transaction.contract?.clauses || [];
     const terms = transaction.contract?.termsAndConditions || [];
     const openClauses = transaction.contract?.openClauses || [];
+    const financialsType = transaction.contract?.financialsType || 'fixed';
     
     useEffect(() => {
         const today = new Date();
@@ -163,7 +164,12 @@ export function TransactionContract({ client, transaction, company }: Transactio
                             <tbody>
                             {clauses.map((clause, index) => (
                                 <tr key={clause.id} className="border-t">
-                                    <td className="p-2">{index + 1}. {clause.name}</td>
+                                    <td className="p-2">
+                                        {index + 1}. {clause.name}
+                                        {financialsType === 'percentage' && clause.percentage != null && (
+                                            <span className="text-xs text-gray-500"> (وهي تمثل {clause.percentage}% من قيمة العقد)</span>
+                                        )}
+                                    </td>
                                     <td className="p-2 text-left font-mono">
                                         {formatCurrency(clause.amount)}
                                     </td>
