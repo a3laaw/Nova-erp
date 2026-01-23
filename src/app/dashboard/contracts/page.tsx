@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -46,7 +46,7 @@ import {
 
 import { useLanguage } from '@/context/language-context';
 import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -83,7 +83,6 @@ function CreatedContractsList() {
   };
 
   const t = language === 'ar' ? {
-    newContract: 'إنشاء عقد جديد',
     noContracts: 'لا توجد عقود محفوظة بعد.',
     contractTitle: 'عنوان العقد',
     clientName: 'اسم العميل',
@@ -91,7 +90,6 @@ function CreatedContractsList() {
     totalAmount: 'القيمة الإجمالية',
     actions: 'الإجراءات',
   } : {
-    newContract: 'New Contract',
     noContracts: 'No saved contracts yet.',
     contractTitle: 'Contract Title',
     clientName: 'Client Name',
@@ -102,14 +100,6 @@ function CreatedContractsList() {
 
   return (
     <>
-        <div className="flex justify-end mb-4">
-            <Button asChild>
-                <Link href="/dashboard/contracts/new">
-                <PlusCircle className="ml-2 h-4 w-4" />
-                {t.newContract}
-                </Link>
-            </Button>
-        </div>
         <div className="border rounded-lg">
             <Table>
                 <TableHeader>
@@ -164,7 +154,7 @@ function ContractTemplateManager() {
   const [selectedTemplate, setSelectedTemplate] = useState<ContractTemplate | null>(null);
   const [templateToDelete, setTemplateToDelete] = useState<ContractTemplate | null>(null);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     if (!firestore) return;
     setLoading(true);
     try {
@@ -176,11 +166,11 @@ function ContractTemplateManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [firestore, toast]);
 
   useEffect(() => {
     fetchTemplates();
-  }, [firestore]);
+  }, [fetchTemplates]);
 
   const handleAdd = () => {
     setSelectedTemplate(null);
@@ -292,12 +282,12 @@ export default function ContractsPage() {
 
   const t = language === 'ar' ? {
     title: 'إدارة العقود',
-    description: 'إنشاء وإدارة عقود العملاء ونماذج العقود القابلة لإعادة الاستخدام.',
+    description: 'عرض العقود التي تم إنشاؤها وإدارة النماذج القابلة لإعادة الاستخدام. يتم إنشاء العقود الجديدة من داخل صفحة العميل.',
     contracts: 'العقود المنشأة',
     templates: 'نماذج العقود',
   } : {
     title: 'Contract Management',
-    description: 'Create and manage client contracts and reusable contract templates.',
+    description: 'View created contracts and manage reusable templates. New contracts are created from the client page.',
     contracts: 'Created Contracts',
     templates: 'Contract Templates',
   };
