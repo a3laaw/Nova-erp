@@ -274,7 +274,17 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl" dir="rtl">
-        {step === 'loading' && <div className='flex justify-center items-center h-48'><Loader2 className="h-8 w-8 animate-spin" /></div>}
+        {step === 'loading' && (
+            <>
+                <DialogHeader>
+                    <DialogTitle>جاري التحميل...</DialogTitle>
+                    <DialogDescription>
+                        يتم الآن جلب بيانات العقود والنماذج.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className='flex justify-center items-center h-48'><Loader2 className="h-8 w-8 animate-spin" /></div>
+            </>
+        )}
         
         {step === 'select' && (
           <TemplateSelectionView 
