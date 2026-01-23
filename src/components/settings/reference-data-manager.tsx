@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText, ArrowRight, Workflow, Globe } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -330,9 +330,9 @@ export function ReferenceDataManager() {
                 const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(govsQuery),
-                    getDocs(jobsSnap),
-                    getDocs(areasSnap),
-                    getDocs(transTypesSnap),
+                    getDocs(jobsQuery),
+                    getDocs(areasQuery),
+                    getDocs(transTypesQuery),
                     getDocs(companiesQuery),
                 ]);
 
@@ -365,7 +365,7 @@ export function ReferenceDataManager() {
             secondaryTitle="الوظائف"
             secondarySingularTitle="وظيفة"
             secondaryCollectionName="jobs"
-            icon={<Workflow />}
+            icon={<Workflow className="h-full w-full" />}
             onBack={() => setView('dashboard')}
         />
     }
@@ -378,7 +378,7 @@ export function ReferenceDataManager() {
             secondaryTitle="المناطق"
             secondarySingularTitle="منطقة"
             secondaryCollectionName="areas"
-            icon={<Globe />}
+            icon={<Globe className="h-full w-full" />}
             onBack={() => setView('dashboard')}
         />
     }
@@ -391,7 +391,7 @@ export function ReferenceDataManager() {
             secondaryTitle="أنواع المعاملات"
             secondarySingularTitle="نوع معاملة"
             secondaryCollectionName="transactionTypes"
-            icon={<FileText />}
+            icon={<FileText className="h-full w-full" />}
             onBack={() => setView('dashboard')}
         />
     }
