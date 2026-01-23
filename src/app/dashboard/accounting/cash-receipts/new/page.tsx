@@ -25,10 +25,11 @@ import { Printer, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import type { Client } from '@/lib/types';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import type { Client, Company } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -40,14 +41,36 @@ export default function NewCashReceiptPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState('');
+  
+  const [company, setCompany] = useState<Company | null>(null);
+  const [companyLoading, setCompanyLoading] = useState(true);
 
   useEffect(() => {
     // Set date on client to avoid hydration mismatch
     setDate(new Date().toISOString().split('T')[0]);
   }, []);
-
+  
   useEffect(() => {
     if (!firestore) return;
+
+    const fetchCompany = async () => {
+        setCompanyLoading(true);
+        try {
+            const q = query(collection(firestore, 'companies'), limit(1));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                const companyData = snapshot.docs[0].data() as Company;
+                setCompany({ id: snapshot.docs[0].id, ...companyData });
+            }
+        } catch (error) {
+            console.error("Error fetching company data:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات الشركة.' });
+        } finally {
+            setCompanyLoading(false);
+        }
+    };
+    fetchCompany();
+
     const fetchClients = async () => {
       setClientsLoading(true);
       try {
@@ -79,11 +102,25 @@ export default function NewCashReceiptPage() {
                 <CardTitle>سـنـد قـبـض / Cash Receipt Voucher</CardTitle>
                 <CardDescription>CRV-2024-002 : رقم السند</CardDescription>
             </div>
-            <div className='text-left'>
-                <p className='font-semibold'>Dar Belaih Al-Mesfir Engineering Consultants</p>
-                <p className='text-sm text-muted-foreground'>Kuwait City, Kuwait</p>
-                <p className='text-sm text-muted-foreground'>CR: 123456</p>
-            </div>
+            {companyLoading ? (
+                <div className='text-left space-y-1'>
+                    <Skeleton className="h-5 w-64" />
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                </div>
+            ) : company ? (
+                <div className='text-left'>
+                    <p className='font-semibold'>{company.nameEn || company.name}</p>
+                    <p className='text-sm text-muted-foreground'>{company.address}</p>
+                    <p className='text-sm text-muted-foreground'>CR: {company.crNumber}</p>
+                </div>
+            ) : (
+                <div className='text-left'>
+                    <p className='font-semibold'>Dar Belaih Al-Mesfir Engineering Consultants</p>
+                    <p className='text-sm text-muted-foreground'>Kuwait City, Kuwait</p>
+                    <p className='text-sm text-muted-foreground'>CR: 123456</p>
+                </div>
+            )}
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

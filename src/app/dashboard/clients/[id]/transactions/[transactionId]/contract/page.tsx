@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, collection, query, getDocs, limit } from 'firebase/firestore';
 import { TransactionContract } from '@/components/clients/transaction-contract';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Client, ClientTransaction } from '@/lib/types';
+import type { Client, ClientTransaction, Company } from '@/lib/types';
 
 
 export default function TransactionContractPage() {
@@ -15,6 +15,9 @@ export default function TransactionContractPage() {
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
+
+  const [company, setCompany] = useState<Company | null>(null);
+  const [companyLoading, setCompanyLoading] = useState(true);
 
   const clientRef = useMemo(() => {
       if (!firestore || !clientId) return null;
@@ -29,6 +32,26 @@ export default function TransactionContractPage() {
   const [clientSnap, clientLoading] = useDoc(clientRef);
   const [transactionSnap, transactionLoading] = useDoc(transactionRef);
   
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchCompany = async () => {
+        setCompanyLoading(true);
+        try {
+            const q = query(collection(firestore, 'companies'), limit(1));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                const companyData = snapshot.docs[0].data() as Company;
+                setCompany({ id: snapshot.docs[0].id, ...companyData });
+            }
+        } catch (error) {
+            console.error("Error fetching company data:", error);
+        } finally {
+            setCompanyLoading(false);
+        }
+    };
+    fetchCompany();
+  }, [firestore]);
+
   const client = useMemo(() => {
       if (clientSnap?.exists()) {
           return { id: clientSnap.id, ...clientSnap.data() } as Client;
@@ -43,7 +66,7 @@ export default function TransactionContractPage() {
       return null;
   }, [transactionSnap]);
 
-  const isLoading = clientLoading || transactionLoading;
+  const isLoading = clientLoading || transactionLoading || companyLoading;
 
   if (isLoading) {
       return (
@@ -78,5 +101,5 @@ export default function TransactionContractPage() {
       );
   }
 
-  return <TransactionContract client={client} transaction={transaction} />;
+  return <TransactionContract client={client} transaction={transaction} company={company} />;
 }

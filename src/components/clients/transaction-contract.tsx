@@ -7,7 +7,7 @@ import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
 import { Printer, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { Client, ClientTransaction, ContractClause } from '@/lib/types';
+import type { Client, ClientTransaction, ContractClause, Company } from '@/lib/types';
 import { contractTemplates } from '@/lib/contract-templates';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
@@ -15,9 +15,10 @@ import { Label } from '../ui/label';
 interface TransactionContractProps {
   client: Client;
   transaction: ClientTransaction;
+  company: Company | null;
 }
 
-export function TransactionContract({ client, transaction }: TransactionContractProps) {
+export function TransactionContract({ client, transaction, company }: TransactionContractProps) {
     const router = useRouter();
     const [contractDate, setContractDate] = useState('');
     const [contractNumber, setContractNumber] = useState('');
@@ -105,11 +106,16 @@ export function TransactionContract({ client, transaction }: TransactionContract
             <div id="contract-content" className="space-y-8 printable-content">
                 <header className="flex justify-between items-center pb-4 border-b">
                     <div className="flex items-center gap-4">
-                        <Logo className="h-20 w-20 !p-3" />
+                        {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-20 w-20 !p-3" />}
                         <div>
-                           <h1 className="text-xl font-bold">سكوب للاستشارات الهندسية</h1>
-                           <p className="text-sm text-gray-500">scoop Engineering Consultants</p>
-                           <p className="text-xs text-gray-500 mt-2">الكويت - شرق - شارع عبدالعزيز حمد الصقر - الدور 23 - مركز الراية - مكتب رقم 2 - نقال 99389650</p>
+                           <h1 className="text-xl font-bold">{company?.name || 'سكوب للاستشارات الهندسية'}</h1>
+                           <p className="text-sm text-gray-500">{company?.nameEn || 'scoop Engineering Consultants'}</p>
+                           <p className="text-xs text-gray-500 mt-2">{company?.address}</p>
+                           <p className="text-xs text-gray-500 mt-1">
+                                {company?.phone && `Phone: ${company.phone}`}
+                                {company?.phone && company?.email && ' | '}
+                                {company?.email && `Email: ${company.email}`}
+                           </p>
                         </div>
                     </div>
                     <div className="text-left">
@@ -124,7 +130,7 @@ export function TransactionContract({ client, transaction }: TransactionContract
                     <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
                         <div>
                             <p className="font-semibold">الطرف الأول:</p>
-                            <p>مكتب سكوب للاستشارات الهندسية (scoop)، ويمثله المهندس/ بليه علي المسفر.</p>
+                            <p>{company?.name || 'مكتب سكوب للاستشارات الهندسية (scoop)'}، ويمثله المهندس/ بليه علي المسفر.</p>
                         </div>
                         <div>
                             <p className="font-semibold">الطرف الثاني:</p>

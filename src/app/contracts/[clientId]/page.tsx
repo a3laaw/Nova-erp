@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
 import { ContractForm } from '@/components/contract/ContractForm';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Company } from '@/lib/types';
 
 export default function ContractPage() {
   const params = useParams();
@@ -17,6 +18,29 @@ export default function ContractPage() {
   }, [firestore, params.clientId]);
 
   const [clientSnap, loading, error] = useDoc(clientRef);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [companyLoading, setCompanyLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchCompany = async () => {
+        setCompanyLoading(true);
+        try {
+            const q = query(collection(firestore, 'companies'), limit(1));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                const companyData = snapshot.docs[0].data() as Company;
+                setCompany({ id: snapshot.docs[0].id, ...companyData });
+            }
+        } catch (error) {
+            console.error("Error fetching company data:", error);
+        } finally {
+            setCompanyLoading(false);
+        }
+    };
+    fetchCompany();
+  }, [firestore]);
+
 
   const client = useMemo(() => {
     if (clientSnap?.exists()) {
@@ -26,7 +50,7 @@ export default function ContractPage() {
   }, [clientSnap]);
 
 
-  if (loading) {
+  if (loading || companyLoading) {
     return (
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-4xl mx-auto space-y-8">
             <header className="flex justify-between items-center pb-4 border-b">
@@ -59,5 +83,5 @@ export default function ContractPage() {
     );
   }
 
-  return <ContractForm client={client} />;
+  return <ContractForm client={client} company={company} />;
 }

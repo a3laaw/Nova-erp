@@ -9,6 +9,7 @@ import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
 import { Printer, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import type { Company } from '@/lib/types';
 
 interface ClientData {
   nameAr?: string;
@@ -37,7 +38,7 @@ const initialFinancialClauses: ContractItem[] = [
   { id: 5, description: 'الدفعة الخامسة: عند استلام رخصة البناء', amount: 100 },
 ];
 
-export function ContractForm({ client }: { client: ClientData }) {
+export function ContractForm({ client, company }: { client: ClientData, company: Company | null }) {
   const router = useRouter();
   const [financialClauses, setFinancialClauses] = useState<ContractItem[]>(initialFinancialClauses);
   const [hasDiscount, setHasDiscount] = useState(false);
@@ -107,11 +108,12 @@ export function ContractForm({ client }: { client: ClientData }) {
             {/* Header */}
             <header className="flex justify-between items-center pb-4 border-b">
                 <div className="flex items-center gap-4">
-                    <Logo className="h-20 w-20 !p-3" />
+                    {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-20 w-20 !p-3" />}
                     <div>
-                        <h1 className="text-xl font-bold">سكوب للإستشارات الهندسية</h1>
-                        <p className="text-sm text-gray-500">scoop Engineering Consultants</p>
-                        <p className="text-xs text-gray-500 mt-2">الكويت - شرق - شارع عبدالعزيز حمد الصقر - الدور 23 - مركز الراية - مكتب رقم 2 - نقال 99389650</p>
+                        <h1 className="text-xl font-bold">{company?.name || 'سكوب للاستشارات الهندسية'}</h1>
+                        <p className="text-sm text-gray-500">{company?.nameEn || 'scoop Engineering Consultants'}</p>
+                        <p className="text-xs text-gray-500 mt-2">{company?.address}</p>
+                        <p className="text-xs text-gray-500 mt-1">{company?.phone} {company?.email && `/ ${company.email}`}</p>
                     </div>
                 </div>
                 <div className="text-left">
@@ -126,9 +128,9 @@ export function ContractForm({ client }: { client: ClientData }) {
                 <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
                     <div>
                         <p className="font-semibold">الطرف الأول (المهندس):</p>
-                        <p>سكوب للاستشارات الهندسية (scoop)، ويمثله السيد/ بليه المسفر.</p>
-                        <p>العنوان: الكويت - شرق - شارع عبد العزيز حمد الصقر - مركز الراية - الدور 23 - مكتب رقم 2.</p>
-                         <p>بيانات الاتصال: نقال: 99389650، هاتف: 22626893، بريد إلكتروني: info@scoop-kw.com.</p>
+                        <p>{company?.name || 'سكوب للاستشارات الهندسية (scoop)'}، ويمثله السيد/ بليه المسفر.</p>
+                        <p>العنوان: {company?.address}.</p>
+                         <p>بيانات الاتصال: نقال: {company?.phone}، بريد إلكتروني: {company?.email}.</p>
                     </div>
                      <div>
                         <p className="font-semibold">الطرف الثاني (المالك):</p>
