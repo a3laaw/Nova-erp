@@ -62,7 +62,21 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
           setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses || [])));
           setTerms(JSON.parse(JSON.stringify(transaction.contract.termsAndConditions || [])));
           setOpenClauses(JSON.parse(JSON.stringify(transaction.contract.openClauses || [])));
-          setTemplate({ title: transaction.transactionType, clauses: [], transactionTypes: [], termsAndConditions: [] }); // Dummy template
+          // Create a valid, minimal template object to preserve financials type on edit
+          setTemplate({
+            title: transaction.transactionType,
+            description: '',
+            transactionTypes: [transaction.transactionType],
+            scopeOfWork: [],
+            termsAndConditions: [],
+            openClauses: [],
+            financials: {
+                type: transaction.contract.financialsType || 'fixed',
+                totalAmount: transaction.contract.totalAmount || 0,
+                discount: 0,
+                milestones: []
+            },
+          });
         } else {
           const templatesQuery = query(collection(firestore, 'contractTemplates'));
           const templatesSnapshot = await getDocs(templatesQuery);
