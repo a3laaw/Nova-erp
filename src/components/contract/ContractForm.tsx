@@ -1,278 +1,320 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
+import { useFirebase } from '@/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available, or use a simpler unique id generator
+
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InlineSearchList } from '../ui/inline-search-list';
 import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
-import { Printer, ArrowRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import type { Company } from '@/lib/types';
+import { Printer, ArrowRight, PlusCircle, Trash2, ArrowUp, ArrowDown, Save, Loader2 } from 'lucide-react';
+import type { Company, Client, Contract, ContractScopeItem, ContractTerm, ContractFinancialMilestone } from '@/lib/types';
 
-interface ClientData {
-  nameAr?: string;
-  civilId?: string;
-  address?: {
-    governorate: string;
-    area: string;
-    block: string;
-    street: string;
-    houseNumber: string;
-  };
-  plotNumber?: string;
-}
+// Helper to generate unique IDs for list items
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
-interface ContractItem {
-  id: number;
-  description: string;
-  amount: number;
-}
 
-const initialFinancialClauses: ContractItem[] = [
-  { id: 1, description: 'الدفعة الأولى: عند توقيع العقد', amount: 300 },
-  { id: 2, description: 'الدفعة الثانية: عند الانتهاء من الأرضي', amount: 150 },
-  { id: 3, description: 'الدفعة الثالثة: عند الانتهاء من الدور الأول', amount: 150 },
-  { id: 4, description: 'الدفعة الرابعة: عند الانتهاء من الدور الثاني', amount: 100 },
-  { id: 5, description: 'الدفعة الخامسة: عند استلام رخصة البناء', amount: 100 },
-];
-
-export function ContractForm({ client, company }: { client: ClientData, company: Company | null }) {
+export function ContractForm({ clients, company }: { clients: Client[], company: Company | null }) {
   const router = useRouter();
-  const [financialClauses, setFinancialClauses] = useState<ContractItem[]>(initialFinancialClauses);
-  const [hasDiscount, setHasDiscount] = useState(false);
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  
+  // States for each section of the contract
+  const [title, setTitle] = useState('اتفاقية تصميم هندسي');
   const [contractDate, setContractDate] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+
+  const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
+  const [termsAndConditions, setTermsAndConditions] = useState<ContractTerm[]>([]);
+  
+  const [financials, setFinancials] = useState<{
+    type: 'fixed' | 'percentage';
+    totalAmount: number;
+    discount: number;
+    milestones: ContractFinancialMilestone[];
+  }>({
+    type: 'fixed',
+    totalAmount: 0,
+    discount: 0,
+    milestones: [],
+  });
+  
+  const [openClauses, setOpenClauses] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // Set date on client to avoid hydration mismatch
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const year = today.getFullYear();
-    setContractDate(`${day}/${month}/${year}`);
+    setContractDate(new Date().toISOString().split('T')[0]);
   }, []);
 
-  const handleAmountChange = (id: number, value: string) => {
-    const newAmount = Number(value);
-    if (!isNaN(newAmount)) {
-      setFinancialClauses(clauses =>
-        clauses.map(clause =>
-          clause.id === id ? { ...clause, amount: newAmount } : clause
-        )
-      );
-    }
+  const client = useMemo(() => clients.find(c => c.id === selectedClientId), [clients, selectedClientId]);
+
+  // --- Dynamic Section Handlers ---
+
+  const addScopeItem = () => setScopeOfWork([...scopeOfWork, { id: generateId(), title: '', description: '' }]);
+  const updateScopeItem = (id: string, field: 'title' | 'description', value: string) => {
+    setScopeOfWork(scopeOfWork.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+  const removeScopeItem = (id: string) => setScopeOfWork(scopeOfWork.filter(item => item.id !== id));
+
+  const addTerm = () => setTermsAndConditions([...termsAndConditions, { id: generateId(), text: '' }]);
+  const updateTerm = (id: string, value: string) => {
+    setTermsAndConditions(termsAndConditions.map(term => term.id === id ? { ...term, text: value } : term));
+  };
+  const removeTerm = (id: string) => setTermsAndConditions(termsAndConditions.filter(term => term.id !== id));
+  const reorderTerm = (index: number, direction: 'up' | 'down') => {
+    const newTerms = [...termsAndConditions];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newTerms.length) return;
+    [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
+    setTermsAndConditions(newTerms);
   };
 
-  const totalAmount = useMemo(() => {
-    return financialClauses.reduce((sum, clause) => sum + clause.amount, 0);
-  }, [financialClauses]);
+  const addMilestone = () => {
+    const newMilestones = [...financials.milestones, { id: generateId(), name: '', condition: '', value: 0 }];
+    setFinancials(prev => ({ ...prev, milestones: newMilestones }));
+  };
+  const updateMilestone = (id: string, field: keyof ContractFinancialMilestone, value: string | number) => {
+    const newMilestones = financials.milestones.map(m => m.id === id ? { ...m, [field]: value } : m);
+    setFinancials(prev => ({ ...prev, milestones: newMilestones }));
+  };
+  const removeMilestone = (id: string) => {
+    const newMilestones = financials.milestones.filter(m => m.id !== id);
+    setFinancials(prev => ({ ...prev, milestones: newMilestones }));
+  };
   
-  const handleExport = () => {
-    // Dynamic import to ensure it runs only on the client
-    import('html2pdf.js').then(module => {
-        const html2pdf = module.default;
-        const element = document.getElementById('contract-content');
-        const opt = {
-          margin:       0.5,
-          filename:     `scoop_Contract_${client.nameAr}.pdf`,
-          image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true },
-          jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().from(element).set(opt).save();
-    });
+  const totalMilestoneValue = useMemo(() => {
+      return financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0);
+  }, [financials.milestones]);
+
+  const handleSaveContract = async () => {
+      if (!client || !currentUser || !firestore) {
+          toast({ variant: "destructive", title: "خطأ", description: "الرجاء اختيار عميل أولاً." });
+          return;
+      }
+      setIsSaving(true);
+      try {
+          const contractData: Omit<Contract, 'id'> = {
+              clientId: client.id,
+              clientName: client.nameAr,
+              companySnapshot: company || {},
+              title,
+              contractDate: new Date(contractDate),
+              scopeOfWork,
+              termsAndConditions,
+              financials,
+              openClauses,
+              createdAt: serverTimestamp(),
+              createdBy: currentUser.id,
+          };
+          await addDoc(collection(firestore, 'contracts'), contractData);
+          toast({ title: "نجاح", description: "تم حفظ العقد بنجاح." });
+          router.push('/dashboard/contracts');
+      } catch (error) {
+          console.error("Error saving contract:", error);
+          toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ العقد." });
+      } finally {
+          setIsSaving(false);
+      }
   };
 
-  const clientAddress = client.address ? [
-    client.address.governorate, 
-    client.address.area, 
-    `قطعة ${client.address.block}`, 
-    `شارع ${client.address.street}`, 
-    `منزل ${client.address.houseNumber}`
-  ].filter(Boolean).join('، ') : 'غير محدد';
-
+  const handlePrint = () => window.print();
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
-        <div className="print:hidden mb-6 flex justify-between items-center no-print">
-            <Button variant="outline" onClick={() => router.back()}>
-                <ArrowRight className="ml-2 h-4 w-4" />
-                العودة
-            </Button>
-            <Button onClick={handleExport}><Printer className="ml-2 h-4 w-4" /> تصدير PDF</Button>
+    <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6" dir="rtl">
+        <div className="flex justify-between items-center no-print">
+            <h1 className="text-2xl font-bold">إنشاء عقد جديد</h1>
+            <div className="flex gap-2">
+                <Button onClick={handlePrint} variant="outline"><Printer className="ml-2"/> طباعة</Button>
+                <Button onClick={handleSaveContract} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="ml-2 animate-spin" /> : <Save className="ml-2" />}
+                    حفظ العقد
+                </Button>
+            </div>
         </div>
 
-        <div id="contract-content" className="space-y-6 printable-content">
-            {/* Header */}
-            <header className="flex justify-between items-center pb-4 border-b">
-                <div className="flex items-center gap-4">
-                    {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-20 w-20 !p-3" />}
-                    <div>
-                        <h1 className="text-xl font-bold">{company?.name || 'سكوب للاستشارات الهندسية'}</h1>
-                        <p className="text-sm text-gray-500">{company?.nameEn || 'scoop Engineering Consultants'}</p>
-                        <p className="text-xs text-gray-500 mt-2">{company?.address}</p>
-                        <p className="text-xs text-gray-500 mt-1">{company?.phone} {company?.email && `/ ${company.email}`}</p>
-                    </div>
-                </div>
-                <div className="text-left">
-                     <h2 className="text-2xl font-bold text-gray-700">اتفاقية تصميم هندسي</h2>
-                     <p className="font-mono text-sm mt-1">تاريخ الاتفاقية: {contractDate}</p>
-                </div>
-            </header>
-
-            {/* Parties */}
-            <section>
-                <h3 className="font-bold mb-2">أطراف الاتفاقية</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
-                    <div>
-                        <p className="font-semibold">الطرف الأول (المهندس):</p>
-                        <p>{company?.name || 'سكوب للاستشارات الهندسية (scoop)'}، ويمثله السيد/ بليه المسفر.</p>
-                        <p>العنوان: {company?.address}.</p>
-                         <p>بيانات الاتصال: نقال: {company?.phone}، بريد إلكتروني: {company?.email}.</p>
-                    </div>
-                     <div>
-                        <p className="font-semibold">الطرف الثاني (المالك):</p>
-                        <p>{client.nameAr || '...'}</p>
-                        <p className='font-semibold mt-2'>بيانات العقار:</p>
-                        <p>قسيمة رقم {client.plotNumber || '...'}، قطعة رقم {client.address?.block || '...'}، منطقة {client.address?.area || '...'}.</p>
-                    </div>
-                </div>
-            </section>
-
-             <section>
-                <h3 className="font-bold mb-2">أولاً: نطاق عمل الطرف الأول</h3>
-                <div className="text-sm p-4 border rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                    <p className='mb-2'>يلتزم المهندس بالقيام بالأعمال التالية:</p>
-                    <ol className="list-decimal list-inside space-y-1">
-                        <li>المخطط المعماري (بدون سرداب).</li>
-                        <li>توزيع فرش المعماري.</li>
-                        <li>المخطط الإنشائي.</li>
-                        <li>استخراج رخصة البناء من البلدية.</li>
-                        <li>رخصة الأشغال.</li>
-                        <li>فحص التربة.</li>
-                        <li>ترخيص إيصال التيار الكهربائي (ONLINE).</li>
-                        <li>المخطط المساحي.</li>
-                    </ol>
-                </div>
-            </section>
-
-            {/* Payment Milestones (Editable) */}
-            <section>
-                <h3 className="font-bold mb-2">ثانياً: الأتعاب ونظام الدفع</h3>
-                 <p className='text-sm mb-2'>إجمالي قيمة الأتعاب هي {formatCurrency(totalAmount)}، تدفع كما يلي:</p>
-                <div className="border rounded-lg">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th className="p-2 text-right font-semibold">#</th>
-                                <th className="p-2 text-right font-semibold">البند</th>
-                                <th className="p-2 text-left font-semibold">المبلغ (د.ك)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {financialClauses.map((clause) => (
-                            <tr key={clause.id} className="border-t">
-                                <td className="p-2">{clause.id}</td>
-                                <td className="p-2">{clause.description}</td>
-                                <td className="p-2 text-left font-mono">
-                                    <Input
-                                        type="number"
-                                        value={clause.amount}
-                                        onChange={(e) => handleAmountChange(clause.id, e.target.value)}
-                                        className="text-left print:hidden h-8 no-print"
-                                    />
-                                    <span className="hidden print:inline">{formatCurrency(clause.amount)}</span>
-                                </td>
-                            </tr>
-                        ))}
-                        </tbody>
-                        <tfoot>
-                            <tr className="border-t-2 font-bold bg-gray-50 dark:bg-gray-700/50">
-                                <td colSpan={2} className="p-2 text-right">الإجمالي</td>
-                                <td className="p-2 text-left font-mono">{formatCurrency(totalAmount)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <div className="mt-4 space-y-2 print:hidden no-print">
-                    <div className="flex items-center space-x-2">
-                        <Checkbox id="has-discount" checked={hasDiscount} onCheckedChange={(checked) => setHasDiscount(checked as boolean)} />
-                        <Label htmlFor="has-discount">هل هناك خصم على العقد؟</Label>
-                    </div>
-                    {hasDiscount && (
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <Label htmlFor="discount-amount" className="text-right">قيمة الخصم (د.ك)</Label>
-                             <Input
-                                id="discount-amount"
-                                type="number"
-                                value={discountAmount}
-                                onChange={(e) => setDiscountAmount(Number(e.target.value))}
-                                className="col-span-2 h-8"
-                            />
+        <div id="printable-contract" className="bg-card p-8 rounded-lg shadow-sm space-y-8 print:shadow-none print:p-2">
+            
+            {/* Section 1 & 2: Header and Parties */}
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-16 w-16 object-contain"/> : <Logo className="h-16 w-16 !p-2" />}
+                            <div>
+                               <h2 className="text-lg font-bold">{company?.name || 'سكوب للاستشارات الهندسية'}</h2>
+                               <p className="text-xs text-muted-foreground">{company?.address}</p>
+                            </div>
                         </div>
-                    )}
-                </div>
-                 {hasDiscount && discountAmount > 0 && (
-                     <div className="mt-4 text-sm p-2 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-md">
-                        <strong>ملاحظة: </strong>
-                        يوجد خصم خاص بقيمة {formatCurrency(discountAmount)} على هذا العقد. الإجمالي لا يشمل الخصم.
+                        <div className="text-left">
+                            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="text-xl font-bold text-left mb-1 h-9" />
+                            <Input type="date" value={contractDate} onChange={(e) => setContractDate(e.target.value)} className="text-sm text-left h-8" />
+                        </div>
                     </div>
-                 )}
-            </section>
-            
-            {/* Financial Conditions (Static) */}
-            <section>
-                <h3 className="font-bold mb-2">أهم الشروط والأحكام</h3>
-                <div className="text-xs p-4 border rounded-lg space-y-2 bg-gray-50">
-                   <p>1. **التعديلات:** في حال طلب تعديلات بعد اعتماد المخطط المعماري والبدء بالأعمدة، يتم دفع 100 د.ك. وإذا استوجب التعديل إعادة المخطط الإنشائي، يتم دفع 200 د.ك.</p>
-                   <p>2. **تعديلات ما بعد الرخصة:** أي تعديل يوجب إصدار رخصة تعديلية من البلدية يلزم المالك بدفع مبلغ 380 د.ك إضافية.</p>
-                   <p>3. **فسخ العقد:** في حال الفسخ، يستحق المهندس الدفعات المتبقية ولا يتم استرجاع الدفعات السابقة.</p>
-                   <p>4. **مدة العقد:** سنتان من تاريخ التوقيع. في حال تجاوزها دون انتهاء التصميم لأي سبب، تضاف 40% من قيمة العقد الأصلي.</p>
-                   <p>5. عند قيام المالك بإيقاف أو تجميد أعمال المهندس بعد مباشرة أي مباشرة، يحق للمهندس أن يتقاضى كامل بدل الاتعاب عن الأعمال التي أنجزها تنفيذًا للعقد.</p>
-                   <p>6. حرر هذا العقد للعمل عند اللزوم.</p>
-                </div>
-            </section>
+                </CardHeader>
+                <CardContent>
+                    <h3 className="font-semibold mb-2">أطراف الاتفاقية</h3>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
+                         <div>
+                            <p className="font-semibold mb-1">الطرف الأول:</p>
+                            <p>{company?.name || 'مكتب سكوب للاستشارات الهندسية (scoop)'}, ويمثله المهندس/ بليه علي المسفر.</p>
+                        </div>
+                        <div>
+                            <p className="font-semibold mb-1">الطرف الثاني:</p>
+                             <InlineSearchList 
+                                options={clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.civilId }))}
+                                value={selectedClientId}
+                                onSelect={setSelectedClientId}
+                                placeholder="ابحث عن عميل..."
+                             />
+                             {client && (
+                                <div className="text-xs mt-2 space-y-1 text-muted-foreground">
+                                    <p>الرقم المدني: {client.civilId}</p>
+                                    <p>القطعة: {client.address?.block}, المنطقة: {client.address?.area}</p>
+                                </div>
+                             )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-             <section>
-                <h3 className="font-bold mb-2">بيانات البطاقة المدنية (الطرف الثاني)</h3>
-                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm p-4 border rounded-lg">
-                    <div><span className='text-gray-500'>الاسم:</span> {client.nameAr || '...'}</div>
-                    <div><span className='text-gray-500'>الرقم المدني:</span> {client.civilId || '...'}</div>
-                    <div><span className='text-gray-500'>تاريخ الميلاد:</span> ...</div>
-                    <div><span className='text-gray-500'>الجنسية:</span> ...</div>
-                    <div className='col-span-2'><span className='text-gray-500'>العنوان المسجل:</span> {clientAddress}</div>
-                    <div><span className='text-gray-500'>الرقم الآلي للعنوان:</span> ...</div>
-                </div>
-            </section>
-            
-            {/* Signatures */}
+            {/* Section 3: Scope of Work */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>نطاق عمل الطرف الأول (Scope of Work)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {scopeOfWork.map((item, index) => (
+                        <div key={item.id} className="flex gap-2 items-start p-2 border rounded-md">
+                           <span className="pt-2 font-mono text-sm text-muted-foreground">{index + 1}.</span>
+                           <div className="flex-grow space-y-2">
+                             <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} />
+                             <Textarea placeholder="وصف تفصيلي للبند..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} />
+                           </div>
+                           <Button variant="ghost" size="icon" onClick={() => removeScopeItem(item.id)} className="shrink-0"><Trash2 className="text-destructive h-4 w-4"/></Button>
+                        </div>
+                    ))}
+                    <Button variant="outline" onClick={addScopeItem}><PlusCircle className="ml-2"/> إضافة بند عمل</Button>
+                </CardContent>
+            </Card>
+
+            {/* Section 4: Terms and Conditions */}
+            <Card>
+                <CardHeader><CardTitle>الشروط والأحكام</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                     {termsAndConditions.map((term, index) => (
+                        <div key={term.id} className="flex gap-2 items-start">
+                           <span className="pt-2 font-semibold">{index + 1}-</span>
+                           <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow"/>
+                           <div className="flex flex-col">
+                            <Button variant="ghost" size="icon" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" onClick={() => reorderTerm(index, 'down')} disabled={index === termsAndConditions.length - 1}><ArrowDown className="h-4 w-4"/></Button>
+                           </div>
+                           <Button variant="ghost" size="icon" onClick={() => removeTerm(term.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
+                        </div>
+                     ))}
+                     <Button variant="outline" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط جديد</Button>
+                </CardContent>
+            </Card>
+
+            {/* Section 5 & 6: Financials & Discount */}
+            <Card>
+                <CardHeader><CardTitle>البنود المالية والخصم</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label>نوع العقد المالي</Label>
+                            <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v}))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="fixed">قيمة ثابتة</SelectItem>
+                                    <SelectItem value="percentage">نسبة مئوية</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>إجمالي قيمة العقد (د.ك)</Label>
+                            <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="dir-ltr text-left" />
+                        </div>
+                    </div>
+                     <Separator />
+                     <div className="flex justify-between items-center">
+                         <h4 className="font-semibold">الدفعات المالية</h4>
+                         <Button variant="outline" onClick={addMilestone}><PlusCircle className="ml-2"/> إضافة دفعة</Button>
+                     </div>
+                     <div className="space-y-2">
+                        {financials.milestones.map((m, i) => (
+                             <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
+                                <span className="col-span-1 text-sm text-muted-foreground">#{i+1}</span>
+                                <Input placeholder="اسم الدفعة" value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="col-span-3"/>
+                                <Input placeholder="شرط الاستحقاق" value={m.condition} onChange={e => updateMilestone(m.id, 'condition', e.target.value)} className="col-span-4"/>
+                                <div className="col-span-3 flex items-center gap-1">
+                                    <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
+                                    <span className="text-sm">{financials.type === 'fixed' ? 'د.ك' : '%'}</span>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={() => removeMilestone(m.id)} className="col-span-1"><Trash2 className="text-destructive h-4 w-4"/></Button>
+                             </div>
+                        ))}
+                     </div>
+                     {financials.milestones.length > 0 && (
+                        <div className="border-t pt-4 mt-4 space-y-2">
+                            <div className="flex justify-between font-semibold">
+                                <span>مجموع الدفعات:</span>
+                                <span className="font-mono">{financials.type === 'fixed' ? formatCurrency(totalMilestoneValue) : `${totalMilestoneValue}%`}</span>
+                            </div>
+                            {financials.type === 'percentage' && totalMilestoneValue !== 100 && <p className="text-destructive text-xs text-center">تحذير: مجموع النسب لا يساوي 100%</p>}
+                             {financials.type === 'fixed' && totalMilestoneValue !== financials.totalAmount && <p className="text-destructive text-xs text-center">تحذير: مجموع الدفعات لا يساوي إجمالي قيمة العقد</p>}
+                        </div>
+                     )}
+                     <Separator />
+                     <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label>قيمة الخصم (د.ك)</Label>
+                            <Input type="number" value={financials.discount} onChange={e => setFinancials(p => ({...p, discount: Number(e.target.value)}))} className="dir-ltr text-left" />
+                        </div>
+                         <div className="flex items-end justify-end text-lg font-bold">
+                            <div className="flex justify-between items-center gap-4 p-2 rounded-md bg-muted">
+                                <span>الإجمالي بعد الخصم:</span>
+                                <span className="font-mono text-primary">{formatCurrency(financials.totalAmount - financials.discount)}</span>
+                            </div>
+                        </div>
+                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Section 7: Open Clauses */}
+             <Card>
+                <CardHeader><CardTitle>بنود إضافية أو ملحقات</CardTitle></CardHeader>
+                <CardContent>
+                    <Textarea placeholder="أضف أي نصوص أو شروط إضافية هنا..." value={openClauses} onChange={e => setOpenClauses(e.target.value)} rows={6} />
+                </CardContent>
+            </Card>
+
+            {/* Section 8: Signatures */}
             <section className="pt-12">
-                 <div className="grid grid-cols-2 gap-8 text-center text-sm">
+                 <h3 className="font-bold mb-4 text-center">التوقيعات</h3>
+                 <div className="grid grid-cols-2 gap-8 text-center text-sm pt-16">
                     <div>
-                        <p className="font-bold">الطرف الأول (المهندس)</p>
-                        <div className="mt-12 border-t pt-2">التوقيع</div>
+                        <p className="font-bold border-t pt-2">الطرف الأول: {company?.name || '...'}</p>
                     </div>
                      <div>
-                        <p className="font-bold">الطرف الثاني (المالك)</p>
-                        <div className="mt-12 border-t pt-2">التوقيع</div>
+                        <p className="font-bold border-t pt-2">الطرف الثاني: {client?.nameAr || '...'}</p>
                     </div>
-                </div>
-                <div className="mt-8 text-center">
-                    <p className="font-bold text-lg">ختم الشركة</p>
                 </div>
             </section>
         </div>
-        <style jsx global>{`
-            @media print {
-                body {
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
-            }
-        `}</style>
     </div>
   );
 }

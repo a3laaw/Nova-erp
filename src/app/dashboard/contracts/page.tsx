@@ -23,7 +23,7 @@ import type { Contract } from '@/lib/types';
 
 export default function ContractsPage() {
   const { language } = useLanguage();
-  const firestore = useFirebase();
+  const { firestore } = useFirebase();
 
   const contractsQuery = useMemo(() => {
     if (!firestore) return null;
