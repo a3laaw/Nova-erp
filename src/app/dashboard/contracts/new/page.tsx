@@ -20,7 +20,7 @@ export default function NewContractPage() {
         setLoading(true);
         try {
             const companyQuery = query(collection(firestore, 'companies'), limit(1));
-            const clientsQuery = query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('nameAr'));
+            const clientsQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
 
             const [companySnap, clientsSnap] = await Promise.all([
                 getDocs(companyQuery),
@@ -33,6 +33,7 @@ export default function NewContractPage() {
             }
 
             const fetchedClients = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+            fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
             setClients(fetchedClients);
 
         } catch (error) {
