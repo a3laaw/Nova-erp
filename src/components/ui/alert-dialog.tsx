@@ -40,26 +40,14 @@ const AlertDialogContent = React.forwardRef<
         className
       )}
       onPointerDownOutside={(e) => {
-          const target = e.target as HTMLElement;
-          if (
-              target.closest('[cmdk-root]') || 
-              target.closest('[role="listbox"]') || 
-              target.closest('[data-radix-popper-content-wrapper]') ||
-              target.closest('[data-inline-search-list-options]')
-          ) {
-              e.preventDefault();
-          }
-      }}
-      onInteractOutside={(e) => {
-          const target = e.target as HTMLElement;
-          if (
-              target.closest('[cmdk-root]') || 
-              target.closest('[role="listbox"]') || 
-              target.closest('[data-radix-popper-content-wrapper]') ||
-              target.closest('[data-inline-search-list-options]')
-          ) {
-              e.preventDefault();
-          }
+        const target = e.target as HTMLElement;
+        if (
+          target.closest('[data-radix-select-content]') ||
+          target.closest('[data-radix-popover-content]') ||
+          target.closest('[data-inline-search-list-options]')
+        ) {
+          e.preventDefault();
+        }
       }}
       {...props}
     />
