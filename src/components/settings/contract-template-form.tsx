@@ -182,7 +182,32 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent dir="rtl" className="max-w-4xl h-[90vh]">
+        <DialogContent
+          dir="rtl"
+          className="max-w-4xl h-[90vh]"
+          onPointerDownOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (
+                  target.closest('[cmdk-root]') || 
+                  target.closest('[role="listbox"]') || 
+                  target.closest('[data-radix-popper-content-wrapper]') ||
+                  target.closest('[data-inline-search-list-options]')
+              ) {
+                  e.preventDefault();
+              }
+          }}
+          onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (
+                  target.closest('[cmdk-root]') || 
+                  target.closest('[role="listbox"]') || 
+                  target.closest('[data-radix-popper-content-wrapper]') ||
+                  target.closest('[data-inline-search-list-options]')
+              ) {
+                  e.preventDefault();
+              }
+          }}
+        >
             <DialogHeader>
                 <DialogTitle>{template ? 'تعديل نموذج عقد' : 'إنشاء نموذج عقد جديد'}</DialogTitle>
                 <DialogDescription>استخدم هذا النموذج لإنشاء قوالب عقود قابلة لإعادة الاستخدام.</DialogDescription>
