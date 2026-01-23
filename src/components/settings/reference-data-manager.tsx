@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch, collectionGroup } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -26,14 +26,14 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 
-// Generic Manager Component
-function DataManager<T extends {id: string, name: string}, S extends {id: string, name: string}>({
+// Reusable component for the management UI (previously the whole component)
+function ManagerView<T extends {id: string, name: string}, S extends {id: string, name: string}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -41,7 +41,8 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   secondarySingularTitle,
   secondaryCollectionName,
   icon,
-  footer
+  footer,
+  onBack,
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -51,6 +52,7 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   secondaryCollectionName?: string;
   icon: React.ReactNode;
   footer?: React.ReactNode;
+  onBack: () => void;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -179,16 +181,19 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
             {icon}
             <CardTitle>إدارة {primaryTitle} {secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
         </div>
-        <Button size="sm" onClick={() => openDialog('primary')}><Plus className="ml-2" /> إضافة {primarySingularTitle}</Button>
+        <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
       <CardContent className={cn("grid grid-cols-1 gap-6", secondaryTitle && "md:grid-cols-2")}>
         {/* Primary List */}
         <div>
-          <h4 className="font-semibold mb-2 text-center">{primaryTitle}</h4>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="font-semibold">{primaryTitle}</h4>
+            <Button size="sm" onClick={() => openDialog('primary')}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+          </div>
           <ScrollArea className="h-72 border rounded-md p-2">
             {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
               primaryItems.map(item => (
@@ -209,10 +214,10 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
         {secondaryTitle && secondaryCollectionName && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-center flex-1">
+                <h4 className="font-semibold">
                     {selectedPrimary ? `${secondaryTitle} (${selectedPrimary.name})` : `اختر ${primarySingularTitle} لعرض ${secondaryTitle}`}
                 </h4>
-                 <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2" /> إضافة {secondarySingularTitle}</Button>
+                 <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
               </div>
               <ScrollArea className="h-72 border rounded-md p-2">
                 {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
@@ -270,58 +275,99 @@ function DataManager<T extends {id: string, name: string}, S extends {id: string
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </Card>
   );
 }
 
-const defaultTransactionTypesByDept: Record<string, string[]> = {
-  'القسم المعماري': [
-    'بلدية سكن خاص',
-    'تصاميم واجهات خارجية',
-    'تصاميم داخلية',
-    '( تصميم مخطط هندسي )',
-    'إضافة تصميم سرداب',
-    'رخصة تعديلية',
-    'رخصه هدم',
-    'استثماري بلدية',
-    'ترخيص حدائق',
-  ],
-  'قسم الكهرباء': [
-    'كهرباء سكن خاص',
-    'كهرباء تصميم',
-    'كهرباء صناعي + استثماري + تجاري',
-    'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي',
-    'إيصال تيار مؤقت',
-    'كتاب إيصال تيار من البلدية',
-    'تقوية تيار كهربائي',
-    'إشراف على مخطط الكهرباء',
-  ],
-  'قسم الميكانيك': [
-    'ميكانيك ( مخطط صحي – تصميم )',
-    'مخطط صحي الأشغال',
-    'ميكانيك ( مخطط تكييف )',
-    'رخصة إطفاء ( دفاع مدني )',
-    'إشراف على مخطط الميكانيك',
-  ],
-  'قسم الاشراف': [
-    'تصميم مخطط انشائي',
-    'إشراف شهري على بناء الهيكل الأسود',
-    'إشراف على مخطط الكهرباء أو الميكانيك',
-  ],
-  'قسم المزارع والرخص الخاصة': [
-    'مزارع – إيصال تيار كهربائي',
-    'مزارع – ترخيص بلدية ومطافي',
-    'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع',
-  ],
+
+// --- Stat Card for Dashboard ---
+const StatCard = ({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) => {
+    const colors: {[key: string]: string} = {
+        yellow: 'bg-yellow-400',
+        red: 'bg-red-500',
+        cyan: 'bg-cyan-400',
+        blue: 'bg-blue-500',
+    };
+
+    return (
+        <div 
+            onClick={onNavigate}
+            className="bg-slate-50 dark:bg-slate-800/50 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 pt-12 relative cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
+        >
+            <div 
+                className={cn("absolute top-0 right-4 w-10 h-14 text-white flex items-center justify-center pt-2", colors[color])}
+                style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 85%, 0 100%)' }}
+            >
+                <span className="font-bold text-lg">{loading ? '...' : count}</span>
+            </div>
+            
+            <div className="flex flex-col items-center justify-center pb-6">
+                <div className="text-slate-500 dark:text-slate-400 h-16 w-16 p-2 flex items-center justify-center">{icon}</div>
+                <p className="font-semibold text-slate-800 dark:text-slate-200 mt-2 text-center">{title}</p>
+            </div>
+        </div>
+    );
 };
 
 
+// --- Main Component (Router) ---
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const [isSeeding, setIsSeeding] = useState(false);
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes'>('dashboard');
 
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0 });
+    const [loadingCounts, setLoadingCounts] = useState(true);
+
+    // Fetch counts for the dashboard
+    useEffect(() => {
+        if (!firestore) return;
+
+        const fetchCounts = async () => {
+            setLoadingCounts(true);
+            try {
+                const deptsQuery = query(collection(firestore, 'departments'));
+                const govsQuery = query(collection(firestore, 'governorates'));
+                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
+                const areasQuery = query(collectionGroup(firestore, 'areas'));
+                const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
+                
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap] = await Promise.all([
+                    getDocs(deptsQuery),
+                    getDocs(govsQuery),
+                    getDocs(jobsQuery),
+                    getDocs(areasQuery),
+                    getDocs(transTypesQuery),
+                ]);
+
+                setCounts({
+                    depts: deptsSnap.size,
+                    govs: govsSnap.size,
+                    jobs: jobsSnap.size,
+                    areas: areasSnap.size,
+                    transTypes: transTypesSnap.size,
+                });
+
+            } catch (error) {
+                console.error("Failed to fetch counts for reference data dashboard", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل إحصائيات البيانات المرجعية.' });
+            } finally {
+                setLoadingCounts(false);
+            }
+        };
+
+        fetchCounts();
+    }, [firestore, toast]);
+    
+    // --- SEEDING LOGIC ---
+    const defaultTransactionTypesByDept: Record<string, string[]> = {
+        'القسم المعماري': ['بلدية سكن خاص', 'تصاميم واجهات خارجية', 'تصاميم داخلية', '( تصميم مخطط هندسي )', 'إضافة تصميم سرداب', 'رخصة تعديلية', 'رخصه هدم', 'استثماري بلدية', 'ترخيص حدائق'],
+        'قسم الكهرباء': ['كهرباء سكن خاص', 'كهرباء تصميم', 'كهرباء صناعي + استثماري + تجاري', 'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي', 'إيصال تيار مؤقت', 'كتاب إيصال تيار من البلدية', 'تقوية تيار كهربائي', 'إشراف على مخطط الكهرباء'],
+        'قسم الميكانيك': ['ميكانيك ( مخطط صحي – تصميم )', 'مخطط صحي الأشغال', 'ميكانيك ( مخطط تكييف )', 'رخصة إطفاء ( دفاع مدني )', 'إشراف على مخطط الميكانيك'],
+        'قسم الاشراف': ['تصميم مخطط انشائي', 'إشراف شهري على بناء الهيكل الأسود', 'إشراف على مخطط الكهرباء أو الميكانيك'],
+        'قسم المزارع والرخص الخاصة': ['مزارع – إيصال تيار كهربائي', 'مزارع – ترخيص بلدية ومطافي', 'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع'],
+    };
+    const [isSeeding, setIsSeeding] = useState(false);
     const handleSeedData = async () => {
         if (!firestore) return;
         setIsSeeding(true);
@@ -329,54 +375,47 @@ export function ReferenceDataManager() {
             const batch = writeBatch(firestore);
             const departmentsRef = collection(firestore, 'departments');
 
-            // Get existing department names to avoid creating duplicates
             const departmentsSnapshot = await getDocs(departmentsRef);
             const existingDeptsData = new Map<string, string>();
             departmentsSnapshot.forEach(doc => {
                 existingDeptsData.set(doc.data().name, doc.id);
             });
 
-            let newDeptCount = 0;
-            // Create departments that don't exist
             for (const deptName of Object.keys(defaultTransactionTypesByDept)) {
                 if (!existingDeptsData.has(deptName)) {
                     const newDeptRef = doc(departmentsRef);
                     batch.set(newDeptRef, { name: deptName });
-                    existingDeptsData.set(deptName, newDeptRef.id); // Add to map to use its ID immediately
-                    newDeptCount++;
+                    existingDeptsData.set(deptName, newDeptRef.id);
                 }
             }
+            
+            await batch.commit();
 
-            if (newDeptCount > 0) {
-                 toast({ title: `تم إنشاء ${newDeptCount} أقسام`, description: 'سيتم الآن تسجيل أنواع المعاملات.' });
-            }
-
-            // Now, seed transaction types for all relevant departments
+            const secondBatch = writeBatch(firestore);
             let count = 0;
             for (const [deptName, typesForDept] of Object.entries(defaultTransactionTypesByDept)) {
                 const deptId = existingDeptsData.get(deptName);
                 if (deptId) {
                     const transactionTypesRef = collection(firestore, `departments/${deptId}/transactionTypes`);
-                    // We need to fetch existing types for THIS department to avoid duplicates within it
                     const existingTypesSnapshot = await getDocs(transactionTypesRef);
                     const existingNames = new Set(existingTypesSnapshot.docs.map(d => d.data().name));
 
                     typesForDept.forEach(typeName => {
                         if (!existingNames.has(typeName)) {
                             const newDocRef = doc(transactionTypesRef);
-                            batch.set(newDocRef, { name: typeName });
+                            secondBatch.set(newDocRef, { name: typeName });
                             count++;
                         }
                     });
                 }
             }
             
-            await batch.commit();
-            
-            if (count > 0) {
-                toast({ title: 'نجاح', description: `تمت إضافة/تحديث ${count} نوع معاملة.` });
+            if(count > 0) {
+                 await secondBatch.commit();
+                 toast({ title: 'نجاح', description: `تمت إضافة ${count} نوع معاملة.` });
+                 fetchUsersAndEmployees(); // Re-fetch counts
             } else {
-                toast({ title: 'لا توجد تغييرات', description: 'جميع الأقسام وأنواع المعاملات الافتراضية موجودة بالفعل.' });
+                 toast({ title: 'لا توجد تغييرات', description: 'جميع الأقسام وأنواع المعاملات الافتراضية موجودة بالفعل.' });
             }
             
         } catch (e) {
@@ -393,19 +432,10 @@ export function ReferenceDataManager() {
             تسجيل قائمة الأنواع الافتراضية
         </Button>
     );
+    // --- END SEEDING LOGIC ---
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>إدارة البيانات المرجعية</CardTitle>
-          <CardDescription>
-            تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام، مثل الأقسام والوظائف والمواقع الجغرافية.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <DataManager<Department, Job> 
+    if (view === 'depts') {
+        return <ManagerView
             primaryTitle="الأقسام"
             primarySingularTitle="قسم"
             primaryCollectionName="departments"
@@ -413,8 +443,12 @@ export function ReferenceDataManager() {
             secondarySingularTitle="وظيفة"
             secondaryCollectionName="jobs"
             icon={<Building />}
+            onBack={() => setView('dashboard')}
         />
-        <DataManager<Governorate, Area> 
+    }
+
+    if (view === 'locations') {
+         return <ManagerView 
             primaryTitle="المحافظات"
             primarySingularTitle="محافظة"
             primaryCollectionName="governorates"
@@ -422,10 +456,12 @@ export function ReferenceDataManager() {
             secondarySingularTitle="منطقة"
             secondaryCollectionName="areas"
             icon={<MapPin />}
+            onBack={() => setView('dashboard')}
         />
-      </div>
-       <div className='mt-6'>
-         <DataManager<Department, TransactionType> 
+    }
+    
+    if (view === 'transTypes') {
+         return <ManagerView
             primaryTitle="أنواع المعاملات حسب القسم"
             primarySingularTitle="قسم"
             primaryCollectionName="departments"
@@ -434,8 +470,44 @@ export function ReferenceDataManager() {
             secondaryCollectionName="transactionTypes"
             icon={<FileText />}
             footer={seedButton}
+            onBack={() => setView('dashboard')}
         />
-       </div>
-    </div>
-  );
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+            <CardTitle>إدارة البيانات المرجعية</CardTitle>
+            <CardDescription>
+                تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام.
+            </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    title="الأقسام والوظائف" 
+                    count={counts.depts + counts.jobs} 
+                    icon={<Workflow className="h-full w-full" />} 
+                    onNavigate={() => setView('depts')} 
+                    color="blue" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="المحافظات والمناطق" 
+                    count={counts.govs + counts.areas} 
+                    icon={<Globe className="h-full w-full" />} 
+                    onNavigate={() => setView('locations')} 
+                    color="cyan" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="أنواع المعاملات" 
+                    count={counts.transTypes} 
+                    icon={<FileText className="h-full w-full" />} 
+                    onNavigate={() => setView('transTypes')} 
+                    color="red" 
+                    loading={loadingCounts} 
+                />
+            </CardContent>
+        </Card>
+    );
 }
