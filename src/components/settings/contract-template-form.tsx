@@ -212,7 +212,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                         </div>
                         {scopeOfWork.map((item, index) => (
                             <div key={item.id} className="flex gap-2 items-start p-2 border rounded-md">
-                               <span className="pt-2 font-mono text-sm text-muted-foreground">{index + 1}.</span>
+                               <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <div className="flex-grow space-y-2">
                                  <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} />
                                  <Textarea placeholder="وصف تفصيلي للبند..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} />
