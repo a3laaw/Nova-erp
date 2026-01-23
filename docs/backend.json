@@ -1,6 +1,44 @@
 
 {
   "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "Represents a company profile, typically for the main organization or branches.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The full name of the company in Arabic."
+        },
+        "nameEn": {
+          "type": "string",
+          "description": "The full name of the company in English."
+        },
+        "address": {
+          "type": "string",
+          "description": "The full address of the company."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The company's contact phone number."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The company's contact email address."
+        },
+        "crNumber": {
+          "type": "string",
+          "description": "The Commercial Registration number."
+        },
+        "logoUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the company's logo."
+        }
+      },
+      "required": ["name"]
+    },
     "UserProfile": {
       "title": "User Profile",
       "description": "Represents a user's login account in the system.",
@@ -531,6 +569,85 @@
         }
       },
       "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+    },
+    "Contract": {
+      "title": "Contract",
+      "description": "Represents a fully dynamic, user-generated contract.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "companySnapshot": { "type": "object", "description": "A snapshot of company data at time of creation." },
+        "title": { "type": "string" },
+        "contractDate": { "type": "string", "format": "date-time" },
+        "scopeOfWork": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
+            "required": ["id", "title"]
+          }
+        },
+        "termsAndConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        },
+        "financials": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["fixed", "percentage"] },
+            "totalAmount": { "type": "number" },
+            "discount": { "type": "number" },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "condition": { "type": "string" },
+                  "value": { "type": "number" }
+                },
+                "required": ["id", "name", "value"]
+              }
+            }
+          }
+        },
+        "openClauses": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["clientId", "title", "contractDate", "createdAt"]
+    },
+    "ContractTemplate": {
+      "title": "Contract Template",
+      "description": "A reusable template for generating contracts.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "transactionTypes": {
+            "type": "array",
+            "items": { "type": "string" }
+        },
+        "clauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "number" },
+              "name": { "type": "string" },
+              "amount": { "type": "number" },
+              "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] }
+            },
+            "required": ["id", "name", "amount", "status"]
+          }
+        }
+      },
+      "required": ["title", "transactionTypes", "clauses"]
     }
   },
   "auth": {
@@ -539,6 +656,12 @@
     ]
   },
   "firestore": {
+    "/companies/{companyId}": {
+      "schema": {
+        "$ref": "#/entities/Company"
+      },
+      "description": "Stores company profiles."
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "#/entities/UserProfile"
@@ -630,8 +753,18 @@
         "$ref": "#/entities/Appointment"
       },
       "description": "Stores all scheduled appointments."
+    },
+    "/contracts/{contractId}": {
+      "schema": {
+        "$ref": "#/entities/Contract"
+      },
+      "description": "Stores dynamically generated contracts."
+    },
+    "/contractTemplates/{templateId}": {
+      "schema": {
+        "$ref": "#/entities/ContractTemplate"
+      },
+      "description": "Stores reusable contract templates for various transaction types."
     }
   }
 }
-
-    

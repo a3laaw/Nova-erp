@@ -22,10 +22,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, writeBatch, getDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, getDoc, collection, serverTimestamp, getDocs, query } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause } from '@/lib/types';
-import { contractTemplates } from '@/lib/contract-templates';
+import type { ClientTransaction, ContractClause, ContractTemplate } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 
@@ -42,22 +41,44 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
   const { toast } = useToast();
   const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [template, setTemplate] = useState<ContractTemplate | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   useEffect(() => {
-    if (isOpen && transaction) {
-      if (transaction.contract?.clauses) {
-        setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses)));
-      } else {
-        const template = contractTemplates.find(t => t.transactionTypes.includes(transaction.transactionType));
-        if (template) {
-          // Deep copy to avoid mutating template
-          setClauses(JSON.parse(JSON.stringify(template.clauses)));
+    if (!isOpen || !transaction || !firestore) return;
+
+    const findAndSetTemplate = async () => {
+      setLoadingTemplate(true);
+      try {
+        if (transaction.contract?.clauses) {
+          setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses)));
+          setTemplate({ title: transaction.transactionType, clauses: [], transactionTypes: [] }); // Dummy template
         } else {
-          setClauses([]);
+          const templatesQuery = query(collection(firestore, 'contractTemplates'));
+          const templatesSnapshot = await getDocs(templatesQuery);
+          const foundTemplate = templatesSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate))
+            .find(t => t.transactionTypes.includes(transaction.transactionType));
+          
+          if (foundTemplate) {
+            setTemplate(foundTemplate);
+            setClauses(JSON.parse(JSON.stringify(foundTemplate.clauses)));
+          } else {
+            setTemplate(null);
+            setClauses([]);
+          }
         }
+      } catch (error) {
+        console.error("Error fetching contract templates:", error);
+        toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب نماذج العقود." });
+      } finally {
+        setLoadingTemplate(false);
       }
-    }
-  }, [isOpen, transaction]);
+    };
+
+    findAndSetTemplate();
+
+  }, [isOpen, transaction, firestore, toast]);
 
   const handleAmountChange = (index: number, newAmount: string) => {
     const updatedClauses = [...clauses];
@@ -116,18 +137,16 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
     }
   };
 
-  const template = transaction ? contractTemplates.find(t => t.transactionTypes.includes(transaction.transactionType)) : null;
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl" dir="rtl">
         <DialogHeader>
           <DialogTitle>إدارة بنود العقد للمعاملة</DialogTitle>
           <DialogDescription>
-            {template ? `تعديل الدفعات المالية لبنود عقد "${template.title}".` : 'لا يوجد نموذج عقد لهذه المعاملة.'}
+            {loadingTemplate ? 'جاري تحميل النموذج...' : template ? `تعديل الدفعات المالية لبنود عقد "${template.title}".` : 'لا يوجد نموذج عقد لهذه المعاملة.'}
           </DialogDescription>
         </DialogHeader>
-        {template ? (
+        {loadingTemplate ? <div className='flex justify-center items-center h-48'><Loader2 className="h-8 w-8 animate-spin" /></div> : template ? (
           <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
             <Table>
               <TableHeader>

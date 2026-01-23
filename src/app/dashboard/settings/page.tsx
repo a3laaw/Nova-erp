@@ -36,10 +36,9 @@ export default function SettingsPage() {
 
   return (
     <Tabs defaultValue="users" dir="rtl">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="users">إدارة المستخدمين</TabsTrigger>
         <TabsTrigger value="reference-data">البيانات المرجعية</TabsTrigger>
-        <TabsTrigger value="contracts">العقود</TabsTrigger>
       </TabsList>
       <TabsContent value="users">
         <Card>
@@ -56,32 +55,6 @@ export default function SettingsPage() {
       </TabsContent>
       <TabsContent value="reference-data">
         <ReferenceDataManager />
-      </TabsContent>
-      <TabsContent value="contracts">
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                <div>
-                    <CardTitle>{t.title}</CardTitle>
-                    <CardDescription>{t.description}</CardDescription>
-                </div>
-                <Button asChild>
-                    <Link href="/dashboard/contracts/new">
-                    <PlusCircle className="ml-2 h-4 w-4" />
-                    {t.newContract}
-                    </Link>
-                </Button>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                    <h3 className="mt-4 text-lg font-medium">{t.noContracts}</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        ستظهر قائمة العقود المحفوظة هنا.
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
       </TabsContent>
     </Tabs>
   );

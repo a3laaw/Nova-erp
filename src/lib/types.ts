@@ -375,11 +375,11 @@ export type ContractClause = {
 };
 
 export type ContractTemplate = {
-  id: string; // e.g., 'architectural-design-private'
-  transactionTypes: string[]; // Match against ClientTransaction.transactionType
+  id?: string;
+  transactionTypes: string[];
   title: string;
   clauses: ContractClause[];
-  totalAmount: number;
+  totalAmount?: number; // Calculated field
 };
 
 export interface ContractScopeItem {

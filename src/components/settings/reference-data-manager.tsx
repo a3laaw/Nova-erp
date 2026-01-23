@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CompanyManager } from './company-manager';
+import { ContractTemplateManager } from './contract-template-manager';
 
 
 // Reusable component for the management UI (previously the whole component)
@@ -281,6 +282,7 @@ const StatCard = ({ title, count, icon, onNavigate, color, loading }: { title: s
         cyan: 'bg-cyan-400',
         blue: 'bg-blue-500',
         green: 'bg-green-500',
+        purple: 'bg-purple-500',
     };
 
     return (
@@ -308,9 +310,9 @@ const StatCard = ({ title, count, icon, onNavigate, color, loading }: { title: s
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'contractTemplates'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, contractTemplates: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
 
     // Fetch counts for the dashboard
@@ -323,17 +325,19 @@ export function ReferenceDataManager() {
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const govsQuery = query(collection(firestore, 'governorates'));
                 const companiesQuery = query(collection(firestore, 'companies'));
+                const contractTemplatesQuery = query(collection(firestore, 'contractTemplates'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 const areasQuery = query(collectionGroup(firestore, 'areas'));
                 const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
                 
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap, contractTemplatesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(govsQuery),
                     getDocs(jobsQuery),
                     getDocs(areasQuery),
                     getDocs(transTypesQuery),
                     getDocs(companiesQuery),
+                    getDocs(contractTemplatesQuery),
                 ]);
 
                 setCounts({
@@ -343,6 +347,7 @@ export function ReferenceDataManager() {
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
                     companies: companiesSnap.size,
+                    contractTemplates: contractTemplatesSnap.size,
                 });
 
             } catch (error) {
@@ -400,6 +405,10 @@ export function ReferenceDataManager() {
         return <CompanyManager onBack={() => setView('dashboard')} />
     }
 
+    if (view === 'contractTemplates') {
+        return <ContractTemplateManager onBack={() => setView('dashboard')} />
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -439,6 +448,14 @@ export function ReferenceDataManager() {
                     icon={<FileText className="h-full w-full" />} 
                     onNavigate={() => setView('transTypes')} 
                     color="red" 
+                    loading={loadingCounts} 
+                />
+                 <StatCard 
+                    title="نماذج العقود" 
+                    count={counts.contractTemplates} 
+                    icon={<FileText className="h-full w-full" />} 
+                    onNavigate={() => setView('contractTemplates')} 
+                    color="purple"
                     loading={loadingCounts} 
                 />
             </CardContent>
