@@ -216,6 +216,22 @@
                             "required": ["id", "name", "amount", "status"]
                         }
                     },
+                    "termsAndConditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+                        "required": ["id", "text"]
+                      }
+                    },
+                    "openClauses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+                        "required": ["id", "text"]
+                      }
+                    },
                     "totalAmount": { "type": "number" }
                 },
                 "required": ["clauses", "totalAmount"]
@@ -617,7 +633,14 @@
             }
           }
         },
-        "openClauses": { "type": "string" },
+        "openClauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
       },
@@ -668,7 +691,14 @@
             }
           }
         },
-        "openClauses": { "type": "string" }
+        "openClauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        }
       },
       "required": ["title"]
     }

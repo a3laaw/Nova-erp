@@ -37,12 +37,15 @@ interface ContractClausesFormProps {
   clientId: string;
 }
 
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [terms, setTerms] = useState<ContractTerm[]>([]);
+  const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [template, setTemplate] = useState<ContractTemplate | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
@@ -56,6 +59,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
         if (transaction.contract) {
           setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses || [])));
           setTerms(JSON.parse(JSON.stringify(transaction.contract.termsAndConditions || [])));
+          setOpenClauses(JSON.parse(JSON.stringify(transaction.contract.openClauses || [])));
           setTemplate({ title: transaction.transactionType, clauses: [], transactionTypes: [], termsAndConditions: [] }); // Dummy template
         } else {
           const templatesQuery = query(collection(firestore, 'contractTemplates'));
@@ -68,10 +72,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
             setTemplate(foundTemplate);
             setClauses(JSON.parse(JSON.stringify(foundTemplate.financials.milestones.map(m => ({id: m.id, name: m.name, amount: m.value, status: 'غير مستحقة'})) || [])));
             setTerms(JSON.parse(JSON.stringify(foundTemplate.termsAndConditions || [])));
+            setOpenClauses(JSON.parse(JSON.stringify(foundTemplate.openClauses || [])));
           } else {
             setTemplate(null);
             setClauses([]);
             setTerms([]);
+            setOpenClauses([]);
           }
         }
       } catch (error) {
@@ -92,7 +98,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
     setClauses(updatedClauses);
   };
   
-  const addTerm = () => setTerms(prev => [...prev, { id: Date.now().toString(), text: '' }]);
+  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
   const removeTerm = (id: string) => setTerms(prev => prev.filter(t => t.id !== id));
   const handleTermChange = (id: string, text: string) => setTerms(prev => prev.map(t => (t.id === id ? { ...t, text } : t)));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
@@ -101,6 +107,17 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
       if (newIndex < 0 || newIndex >= newTerms.length) return;
       [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
       setTerms(newTerms);
+  };
+
+  const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
+  const removeOpenClause = (id: string) => setOpenClauses(prev => prev.filter(t => t.id !== id));
+  const handleOpenClauseChange = (id: string, text: string) => setOpenClauses(prev => prev.map(t => (t.id === id ? { ...t, text } : t)));
+  const reorderOpenClause = (index: number, direction: 'up' | 'down') => {
+      const newClauses = [...openClauses];
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= newClauses.length) return;
+      [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
+      setOpenClauses(newClauses);
   };
 
   const totalAmount = useMemo(() => {
@@ -120,6 +137,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
         contract: {
           clauses: clauses,
           termsAndConditions: terms,
+          openClauses: openClauses,
           totalAmount: totalAmount,
         }
       });
@@ -208,7 +226,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                 </div>
                 <div className='space-y-2'>
                     {terms.map((term, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                        <div key={term.id} className="flex items-center gap-2">
                             <span className="text-sm font-semibold">{index + 1}.</span>
                             <Textarea
                                 placeholder={`نص الشرط ${index + 1}`}
@@ -225,6 +243,37 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                                 </Button>
                             </div>
                             <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeTerm(term.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="grid gap-2 pt-4">
+                <div className='flex justify-between items-center'>
+                  <Label className="text-base font-semibold">بنود إضافية</Label>
+                  <Button type="button" size="sm" variant="outline" onClick={addOpenClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
+                </div>
+                <div className='space-y-2'>
+                    {openClauses.map((clause, index) => (
+                        <div key={clause.id} className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">{index + 1}.</span>
+                            <Textarea
+                                placeholder={`نص البند الإضافي ${index + 1}`}
+                                value={clause.text}
+                                onChange={(e) => handleOpenClauseChange(clause.id, e.target.value)}
+                                rows={2}
+                            />
+                            <div className="flex flex-col">
+                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderOpenClause(index, 'up')} disabled={index === 0}>
+                                    <ArrowUp className="h-4 w-4" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderOpenClause(index, 'down')} disabled={index === openClauses.length - 1}>
+                                    <ArrowDown className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeOpenClause(clause.id)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>

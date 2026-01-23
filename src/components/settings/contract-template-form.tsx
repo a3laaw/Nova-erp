@@ -1,6 +1,3 @@
-// This component has been moved and consolidated into /app/dashboard/contracts/page.tsx
-// to create a unified contract management module.
-// This file is now deprecated and can be safely removed in the future.
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
@@ -45,7 +42,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     discount: 0,
     milestones: [],
   });
-  const [openClauses, setOpenClauses] = useState('');
+  const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
 
   const [allTransactionTypes, setAllTransactionTypes] = useState<MultiSelectOption[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
@@ -79,7 +76,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
         setScopeOfWork(template.scopeOfWork || []);
         setTermsAndConditions(template.termsAndConditions || []);
         setFinancials(template.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
-        setOpenClauses(template.openClauses || '');
+        setOpenClauses(template.openClauses || []);
     } else {
         setTitle('');
         setDescription('');
@@ -87,7 +84,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
         setScopeOfWork([]);
         setTermsAndConditions([]);
         setFinancials({ type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
-        setOpenClauses('');
+        setOpenClauses([]);
     }
   }, [template, isOpen]);
 
@@ -109,6 +106,19 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     if (newIndex < 0 || newIndex >= newTerms.length) return;
     [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
     setTermsAndConditions(newTerms);
+  };
+
+  const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
+  const updateOpenClause = (id: string, value: string) => {
+    setOpenClauses(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+  };
+  const removeOpenClause = (id: string) => setOpenClauses(prev => prev.filter(term => term.id !== id));
+  const reorderOpenClause = (index: number, direction: 'up' | 'down') => {
+    const newClauses = [...openClauses];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newClauses.length) return;
+    [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
+    setOpenClauses(newClauses);
   };
 
   const addMilestone = () => {
@@ -270,8 +280,21 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                     </section>
 
                     <section className="space-y-4 p-4 border rounded-lg">
-                        <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
-                         <Textarea placeholder="أضف أي نصوص أو شروط إضافية هنا..." value={openClauses} onChange={e => setOpenClauses(e.target.value)} rows={4} />
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
+                            <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2"/> إضافة بند</Button>
+                        </div>
+                         {openClauses.map((clause, index) => (
+                            <div key={clause.id} className="flex gap-2 items-start">
+                               <span className="pt-2 font-semibold">{index + 1}-</span>
+                               <Textarea value={clause.text} onChange={(e) => updateOpenClause(clause.id, e.target.value)} rows={2} className="flex-grow" placeholder={`نص البند الإضافي ${index + 1}`}/>
+                               <div className="flex flex-col">
+                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderOpenClause(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
+                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderOpenClause(index, 'down')} disabled={index === openClauses.length - 1}><ArrowDown className="h-4 w-4"/></Button>
+                               </div>
+                               <Button variant="ghost" size="icon" type="button" onClick={() => removeOpenClause(clause.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
+                            </div>
+                         ))}
                     </section>
 
                 </div>

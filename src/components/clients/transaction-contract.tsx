@@ -27,6 +27,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
     
     const clauses = transaction.contract?.clauses || [];
     const terms = transaction.contract?.termsAndConditions || [];
+    const openClauses = transaction.contract?.openClauses || [];
     
     useEffect(() => {
         const today = new Date();
@@ -175,6 +176,20 @@ export function TransactionContract({ client, transaction, company }: Transactio
                         </table>
                     </div>
                 </section>
+
+                {openClauses.length > 0 && (
+                    <section>
+                        <h3 className="font-bold mb-2">بنود إضافية</h3>
+                        <div className="space-y-2 text-sm p-4 border rounded-lg">
+                            {openClauses.map((clause, index) => (
+                                <div key={clause.id} className="flex gap-2">
+                                    <span className="font-semibold">{index + 1}-</span>
+                                    <p>{clause.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
                 
                 <section className="pt-16">
                     <div className="grid grid-cols-2 gap-8 text-center text-sm">

@@ -333,6 +333,7 @@ export type ClientTransaction = {
     contract?: {
         clauses: ContractClause[];
         termsAndConditions?: ContractTerm[];
+        openClauses?: ContractTerm[];
         totalAmount: number;
     };
 };
@@ -393,7 +394,7 @@ export type ContractTemplate = {
     discount: number;
     milestones: ContractFinancialMilestone[];
   };
-  openClauses?: string;
+  openClauses?: ContractTerm[];
   createdAt?: any;
   createdBy?: string;
 };
@@ -427,7 +428,7 @@ export interface Contract {
     discount: number;
     milestones: ContractFinancialMilestone[];
   };
-  openClauses?: string;
+  openClauses?: ContractTerm[];
   createdAt?: any;
   createdBy?: string;
 }
