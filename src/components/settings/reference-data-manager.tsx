@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText, ArrowRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText, ArrowRight, Workflow, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -361,11 +361,44 @@ export function ReferenceDataManager() {
     
     // --- SEEDING LOGIC ---
     const defaultTransactionTypesByDept: Record<string, string[]> = {
-        'القسم المعماري': ['بلدية سكن خاص', 'تصاميم واجهات خارجية', 'تصاميم داخلية', '( تصميم مخطط هندسي )', 'إضافة تصميم سرداب', 'رخصة تعديلية', 'رخصه هدم', 'استثماري بلدية', 'ترخيص حدائق'],
-        'قسم الكهرباء': ['كهرباء سكن خاص', 'كهرباء تصميم', 'كهرباء صناعي + استثماري + تجاري', 'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي', 'إيصال تيار مؤقت', 'كتاب إيصال تيار من البلدية', 'تقوية تيار كهربائي', 'إشراف على مخطط الكهرباء'],
-        'قسم الميكانيك': ['ميكانيك ( مخطط صحي – تصميم )', 'مخطط صحي الأشغال', 'ميكانيك ( مخطط تكييف )', 'رخصة إطفاء ( دفاع مدني )', 'إشراف على مخطط الميكانيك'],
-        'قسم الاشراف': ['تصميم مخطط انشائي', 'إشراف شهري على بناء الهيكل الأسود', 'إشراف على مخطط الكهرباء أو الميكانيك'],
-        'قسم المزارع والرخص الخاصة': ['مزارع – إيصال تيار كهربائي', 'مزارع – ترخيص بلدية ومطافي', 'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع'],
+      'القسم المعماري': [
+        'بلدية سكن خاص',
+        'تصاميم واجهات خارجية',
+        'تصاميم داخلية',
+        '( تصميم مخطط هندسي )',
+        'إضافة تصميم سرداب',
+        'رخصة تعديلية',
+        'رخصه هدم',
+        'استثماري بلدية',
+        'ترخيص حدائق',
+      ],
+      'قسم الكهرباء': [
+        'كهرباء سكن خاص',
+        'كهرباء تصميم',
+        'كهرباء صناعي + استثماري + تجاري',
+        'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي',
+        'إيصال تيار مؤقت',
+        'كتاب إيصال تيار من البلدية',
+        'تقوية تيار كهربائي',
+        'إشراف على مخطط الكهرباء',
+      ],
+      'قسم الميكانيك': [
+        'ميكانيك ( مخطط صحي – تصميم )',
+        'مخطط صحي الأشغال',
+        'ميكانيك ( مخطط تكييف )',
+        'رخصة إطفاء ( دفاع مدني )',
+        'إشراف على مخطط الميكانيك',
+      ],
+      'قسم الاشراف': [
+        'تصميم مخطط انشائي',
+        'إشراف شهري على بناء الهيكل الأسود',
+        'إشراف على مخطط الكهرباء أو الميكانيك',
+      ],
+      'قسم المزارع والرخص الخاصة': [
+        'مزارع – إيصال تيار كهربائي',
+        'مزارع – ترخيص بلدية ومطافي',
+        'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع',
+      ],
     };
     const [isSeeding, setIsSeeding] = useState(false);
     const handleSeedData = async () => {
@@ -413,7 +446,11 @@ export function ReferenceDataManager() {
             if(count > 0) {
                  await secondBatch.commit();
                  toast({ title: 'نجاح', description: `تمت إضافة ${count} نوع معاملة.` });
-                 fetchUsersAndEmployees(); // Re-fetch counts
+                 // Re-fetch counts after seeding
+                 const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
+                 const transTypesSnap = await getDocs(transTypesQuery);
+                 setCounts(prev => ({...prev, transTypes: transTypesSnap.size}));
+
             } else {
                  toast({ title: 'لا توجد تغييرات', description: 'جميع الأقسام وأنواع المعاملات الافتراضية موجودة بالفعل.' });
             }
