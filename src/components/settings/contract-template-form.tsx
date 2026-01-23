@@ -26,6 +26,7 @@ interface ContractTemplateFormProps {
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
+const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 
 export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template }: ContractTemplateFormProps) {
@@ -126,7 +127,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
   const addMilestone = () => {
     setFinancials(prev => {
       const newIndex = prev.milestones.length;
-      const newName = `الدفعة ال${arabicOrdinals[newIndex] || (newIndex + 1)}`;
+      const newName = `الدفعة ${milestoneNames[newIndex] || `(${newIndex + 1})`}`;
       return {
         ...prev,
         milestones: [...prev.milestones, { id: generateId(), name: newName, condition: '', value: 0 }]
