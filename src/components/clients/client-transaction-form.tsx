@@ -149,8 +149,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name || '';
 
-            let finalAssignedEngineerId = assignedEngineerId || undefined;
-            const filteredEngineers = engineers.filter(e => e.department === selectedDeptName);
+            let engineerForTransactionId: string | null = assignedEngineerId || null;
 
             // Special logic for "تصميم بلدية (سكن خاص)"
             if (transactionType === 'تصميم بلدية (سكن خاص)') {
@@ -159,7 +158,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 if (clientSnap.exists()) {
                     const clientData = clientSnap.data() as Client;
                     if (clientData.assignedEngineer) {
-                        finalAssignedEngineerId = clientData.assignedEngineer;
+                        engineerForTransactionId = clientData.assignedEngineer;
                     } else {
                          toast({ variant: 'destructive', title: 'خطأ', description: 'يجب إسناد مهندس مسؤول للعميل أولاً قبل إنشاء معاملة سكن خاص.' });
                          setIsSaving(false);
@@ -168,13 +167,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 }
             }
 
-            const engineer = engineers.find(e => e.id === finalAssignedEngineerId);
+            const engineer = engineers.find(e => e.id === engineerForTransactionId);
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
                 transactionType,
                 description,
-                assignedEngineerId: finalAssignedEngineerId,
+                assignedEngineerId: engineerForTransactionId,
                 status: 'new',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -210,8 +209,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             if (currentUser.id) recipients.add(currentUser.id);
 
-            if (finalAssignedEngineerId) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, finalAssignedEngineerId);
+            if (engineerForTransactionId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, engineerForTransactionId);
                 if (targetUserId) recipients.add(targetUserId);
             }
             
