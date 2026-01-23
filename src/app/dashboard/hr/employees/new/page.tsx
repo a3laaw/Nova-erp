@@ -77,6 +77,7 @@ export default function NewEmployeePage() {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
+    const [jobsLoading, setJobsLoading] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
@@ -144,12 +145,15 @@ export default function NewEmployeePage() {
 
         setFormData(prev => ({ ...prev, departmentId: deptId, jobTitle: '' }));
         setJobs([]);
+        setJobsLoading(true);
         try {
             const jobsQuery = query(collection(firestore, `departments/${deptId}/jobs`), orderBy('name'));
             const jobsSnapshot = await getDocs(jobsQuery);
             setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
         } catch (e) {
             toast({ variant: 'destructive', title: 'Error fetching jobs' });
+        } finally {
+            setJobsLoading(false);
         }
     }, [firestore, toast]);
 
@@ -442,9 +446,15 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} disabled={!formData.departmentId || jobs.length === 0}>
+                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} disabled={!formData.departmentId || jobsLoading || jobs.length === 0}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="اختر الوظيفة..." />
+                                        <SelectValue placeholder={
+                                            jobsLoading
+                                            ? "تحميل الوظائف..."
+                                            : !formData.departmentId
+                                                ? "اختر قسمًا أولاً"
+                                                : (jobs.length === 0 ? "لا توجد وظائف بهذا القسم" : "اختر الوظيفة...")
+                                        } />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {jobs.map(job => (
