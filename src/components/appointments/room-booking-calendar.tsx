@@ -588,18 +588,6 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
             <DialogContent
                 dir="rtl"
                 className="w-[95vw] sm:max-w-lg"
-                onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                        e.preventDefault();
-                    }
-                }}
-                onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                        e.preventDefault();
-                    }
-                }}
             >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
