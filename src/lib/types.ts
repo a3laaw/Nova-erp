@@ -404,7 +404,7 @@ export interface Contract {
   id?: string;
   clientId: string;
   clientName: string;
-  companySnapshot: Company;
+  companySnapshot: Partial<Company>;
   title: string;
   contractDate: any;
   scopeOfWork: ContractScopeItem[];
