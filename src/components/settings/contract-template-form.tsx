@@ -25,6 +25,8 @@ interface ContractTemplateFormProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
+
 
 export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template }: ContractTemplateFormProps) {
   const { firestore } = useFirebase();
@@ -219,7 +221,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                         </div>
                          {termsAndConditions.map((term, index) => (
                             <div key={term.id} className="flex gap-2 items-start">
-                               <span className="pt-2 font-semibold">{index + 1}-</span>
+                               <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow"/>
                                <div className="flex flex-col">
                                 <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
@@ -257,7 +259,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             {financials.milestones.map((m, i) => (
                                  <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
                                     <span className="col-span-1 text-sm text-muted-foreground">#{i+1}</span>
-                                    <Input placeholder="اسم الدفعة" value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="col-span-3"/>
+                                    <Input placeholder={`مثال: الدفعة ال${['أولى', 'ثانية', 'ثالثة', 'رابعة', 'خامسة'][i] || `(${i + 1})`}`} value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="col-span-3"/>
                                     <Input placeholder="شرط الاستحقاق" value={m.condition} onChange={e => updateMilestone(m.id, 'condition', e.target.value)} className="col-span-4"/>
                                     <div className="col-span-3 flex items-center gap-1">
                                         <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
@@ -286,7 +288,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                         </div>
                          {openClauses.map((clause, index) => (
                             <div key={clause.id} className="flex gap-2 items-start">
-                               <span className="pt-2 font-semibold">{index + 1}-</span>
+                               <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <Textarea value={clause.text} onChange={(e) => updateOpenClause(clause.id, e.target.value)} rows={2} className="flex-grow" placeholder={`نص البند الإضافي ${index + 1}`}/>
                                <div className="flex flex-col">
                                 <Button variant="ghost" size="icon" type="button" onClick={() => reorderOpenClause(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>

@@ -38,6 +38,8 @@ interface ContractClausesFormProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
+
 
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
@@ -227,7 +229,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                 <div className='space-y-2'>
                     {terms.map((term, index) => (
                         <div key={term.id} className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">{index + 1}.</span>
+                            <span className="text-sm font-semibold pt-2">{arabicOrdinals[index] || `${index + 1}-`}</span>
                             <Textarea
                                 placeholder={`نص الشرط ${index + 1}`}
                                 value={term.text}
@@ -258,7 +260,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                 <div className='space-y-2'>
                     {openClauses.map((clause, index) => (
                         <div key={clause.id} className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">{index + 1}.</span>
+                            <span className="text-sm font-semibold pt-2">{arabicOrdinals[index] || `${index + 1}-`}</span>
                             <Textarea
                                 placeholder={`نص البند الإضافي ${index + 1}`}
                                 value={clause.text}

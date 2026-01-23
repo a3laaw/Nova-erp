@@ -18,6 +18,9 @@ interface TransactionContractProps {
   company: Company | null;
 }
 
+const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
+
+
 export function TransactionContract({ client, transaction, company }: TransactionContractProps) {
     const router = useRouter();
     const [contractDate, setContractDate] = useState('');
@@ -137,7 +140,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
                         {terms.length > 0 ? (
                             terms.map((term, index) => (
                                 <div key={term.id} className="flex gap-2">
-                                    <span className="font-semibold">{index + 1}-</span>
+                                    <span className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                     <p>{term.text}</p>
                                 </div>
                             ))
@@ -158,9 +161,9 @@ export function TransactionContract({ client, transaction, company }: Transactio
                                 </tr>
                             </thead>
                             <tbody>
-                            {clauses.map((clause) => (
+                            {clauses.map((clause, index) => (
                                 <tr key={clause.id} className="border-t">
-                                    <td className="p-2">{clause.name}</td>
+                                    <td className="p-2">{index + 1}. {clause.name}</td>
                                     <td className="p-2 text-left font-mono">
                                         {formatCurrency(clause.amount)}
                                     </td>
@@ -183,7 +186,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
                         <div className="space-y-2 text-sm p-4 border rounded-lg">
                             {openClauses.map((clause, index) => (
                                 <div key={clause.id} className="flex gap-2">
-                                    <span className="font-semibold">{index + 1}-</span>
+                                    <span className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                     <p>{clause.text}</p>
                                 </div>
                             ))}
