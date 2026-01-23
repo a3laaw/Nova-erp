@@ -138,17 +138,6 @@ export type PaymentMilestone = {
   status: 'Pending' | 'Completed' | 'Overdue';
 };
 
-export type Contract = {
-  id: string;
-  projectId: string;
-  clientId: string;
-  engineerId: string;
-  title: MultilingualString;
-  totalAmount: number;
-  startDate: string;
-  milestones: PaymentMilestone[];
-};
-
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue';
 
 export type Invoice = {
@@ -392,3 +381,41 @@ export type ContractTemplate = {
   clauses: ContractClause[];
   totalAmount: number;
 };
+
+export interface ContractScopeItem {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface ContractTerm {
+  id: string;
+  text: string;
+}
+
+export interface ContractFinancialMilestone {
+  id: string;
+  name: string;
+  condition: string;
+  value: number;
+}
+
+export interface Contract {
+  id?: string;
+  clientId: string;
+  clientName: string;
+  companySnapshot: Company;
+  title: string;
+  contractDate: any;
+  scopeOfWork: ContractScopeItem[];
+  termsAndConditions: ContractTerm[];
+  financials: {
+    type: 'fixed' | 'percentage';
+    totalAmount: number;
+    discount: number;
+    milestones: ContractFinancialMilestone[];
+  };
+  openClauses?: string;
+  createdAt?: any;
+  createdBy?: string;
+}

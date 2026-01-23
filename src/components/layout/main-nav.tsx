@@ -20,7 +20,8 @@ import {
   Settings,
   LogOut,
   Bell,
-  HeartHandshake
+  HeartHandshake,
+  FileText,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,7 @@ const navItems = {
     { href: '/dashboard/notifications', label: 'تنبيهات النظام', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/accounting', label: 'المحاسبة', icon: Wallet, roles: ['Admin', 'Accountant'] },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
     { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
@@ -44,6 +46,7 @@ const navItems = {
       { href: '/dashboard/notifications', label: 'System Alerts', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
       { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
       { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+      { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Secretary'] },
       { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet, roles: ['Admin', 'Accountant'] },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
       { href: '/dashboard/hr', label: 'Human Resources', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },

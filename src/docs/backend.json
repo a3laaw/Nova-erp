@@ -569,6 +569,59 @@
         }
       },
       "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+    },
+    "Contract": {
+      "title": "Contract",
+      "description": "Represents a fully dynamic, user-generated contract.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "companySnapshot": { "type": "object", "description": "A snapshot of company data at time of creation." },
+        "title": { "type": "string" },
+        "contractDate": { "type": "string", "format": "date-time" },
+        "scopeOfWork": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
+            "required": ["id", "title"]
+          }
+        },
+        "termsAndConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        },
+        "financials": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["fixed", "percentage"] },
+            "totalAmount": { "type": "number" },
+            "discount": { "type": "number" },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "condition": { "type": "string" },
+                  "value": { "type": "number" }
+                },
+                "required": ["id", "name", "value"]
+              }
+            }
+          }
+        },
+        "openClauses": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["clientId", "title", "contractDate", "createdAt"]
     }
   },
   "auth": {
@@ -674,6 +727,12 @@
         "$ref": "#/entities/Appointment"
       },
       "description": "Stores all scheduled appointments."
+    },
+    "/contracts/{contractId}": {
+      "schema": {
+        "$ref": "#/entities/Contract"
+      },
+      "description": "Stores dynamically generated contracts."
     }
   }
 }
