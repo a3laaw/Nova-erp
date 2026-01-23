@@ -1,5 +1,16 @@
 
 
+export interface Company {
+    id?: string;
+    name: string;
+    nameEn?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    crNumber?: string;
+    logoUrl?: string;
+}
+
 export type MultilingualString = {
     ar: string;
     en: string;

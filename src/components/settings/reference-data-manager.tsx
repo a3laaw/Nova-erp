@@ -30,6 +30,7 @@ import { Plus, Pencil, Trash2, Loader2, Building, MapPin, FileText, ArrowRight, 
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { CompanyManager } from './company-manager';
 
 
 // Reusable component for the management UI (previously the whole component)
@@ -279,6 +280,7 @@ const StatCard = ({ title, count, icon, onNavigate, color, loading }: { title: s
         red: 'bg-red-500',
         cyan: 'bg-cyan-400',
         blue: 'bg-blue-500',
+        green: 'bg-green-500',
     };
 
     return (
@@ -306,9 +308,9 @@ const StatCard = ({ title, count, icon, onNavigate, color, loading }: { title: s
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
 
     // Fetch counts for the dashboard
@@ -320,16 +322,18 @@ export function ReferenceDataManager() {
             try {
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const govsQuery = query(collection(firestore, 'governorates'));
+                const companiesQuery = query(collection(firestore, 'companies'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 const areasQuery = query(collectionGroup(firestore, 'areas'));
                 const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
                 
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(govsQuery),
                     getDocs(jobsSnap),
-                    getDocs(areasQuery),
+                    getDocs(areasSnap),
                     getDocs(transTypesSnap),
+                    getDocs(companiesQuery),
                 ]);
 
                 setCounts({
@@ -338,6 +342,7 @@ export function ReferenceDataManager() {
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
+                    companies: companiesSnap.size,
                 });
 
             } catch (error) {
@@ -360,7 +365,7 @@ export function ReferenceDataManager() {
             secondaryTitle="الوظائف"
             secondarySingularTitle="وظيفة"
             secondaryCollectionName="jobs"
-            icon={<Building />}
+            icon={<Workflow />}
             onBack={() => setView('dashboard')}
         />
     }
@@ -373,7 +378,7 @@ export function ReferenceDataManager() {
             secondaryTitle="المناطق"
             secondarySingularTitle="منطقة"
             secondaryCollectionName="areas"
-            icon={<MapPin />}
+            icon={<Globe />}
             onBack={() => setView('dashboard')}
         />
     }
@@ -391,6 +396,10 @@ export function ReferenceDataManager() {
         />
     }
 
+    if (view === 'companies') {
+        return <CompanyManager onBack={() => setView('dashboard')} />
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -400,6 +409,14 @@ export function ReferenceDataManager() {
             </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    title="الشركات" 
+                    count={counts.companies} 
+                    icon={<Building className="h-full w-full" />} 
+                    onNavigate={() => setView('companies')} 
+                    color="green" 
+                    loading={loadingCounts} 
+                />
                 <StatCard 
                     title="الأقسام والوظائف" 
                     count={counts.depts + counts.jobs} 

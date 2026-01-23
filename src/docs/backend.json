@@ -1,5 +1,44 @@
+
 {
   "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "Represents a company profile, typically for the main organization or branches.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The full name of the company in Arabic."
+        },
+        "nameEn": {
+          "type": "string",
+          "description": "The full name of the company in English."
+        },
+        "address": {
+          "type": "string",
+          "description": "The full address of the company."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The company's contact phone number."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The company's contact email address."
+        },
+        "crNumber": {
+          "type": "string",
+          "description": "The Commercial Registration number."
+        },
+        "logoUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the company's logo."
+        }
+      },
+      "required": ["name"]
+    },
     "UserProfile": {
       "title": "User Profile",
       "description": "Represents a user's login account in the system.",
@@ -467,29 +506,69 @@
       },
       "required": ["name"]
     },
+    "TransactionType": {
+      "title": "Transaction Type",
+      "description": "Represents a type of internal client transaction.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the transaction type."
+        }
+      },
+      "required": ["name"]
+    },
     "Appointment": {
       "title": "Appointment",
       "description": "Represents a scheduled meeting or visit.",
       "type": "object",
       "properties": {
-        "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
-        "engineerId": { "type": "string" },
-        "engineerName": { "type": "string" },
-        "meetingRoom": { "type": "string", "description": "For room bookings" },
-        "title": { "type": "string" },
-        "notes": { "type": "string" },
-        "type": { "type": "string", "enum": ["architectural", "room"] },
-        "appointmentDate": { "type": "string", "format": "date-time" },
-        "endDate": { "type": "string", "format": "date-time" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "session": { "type": "string", "enum": ["صباحية", "مسائية"] },
-        "visitCount": { "type": "number" },
-        "contractSigned": { "type": "boolean" },
-        "projectType": { "type": "string" },
-        "color": { "type": "string", "description": "Hex color code calculated in the frontend" }
+        "clientId": {
+          "type": "string",
+          "description": "The ID of the client for this appointment."
+        },
+        "engineerId": {
+          "type": "string",
+          "description": "The ID of the employee attending the appointment."
+        },
+        "meetingRoom": {
+          "type": "string",
+          "description": "The name of the meeting room, if applicable (for non-architectural appointments)."
+        },
+        "department": {
+          "type": "string",
+          "description": "The department associated with the appointment, used for color-coding.",
+          "enum": ["الكهرباء", "الصحي", "الإنشائي", "المعماري", "أخرى"]
+        },
+        "title": {
+          "type": "string",
+          "description": "The purpose or title of the appointment."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the appointment."
+        },
+        "type": {
+          "type": "string",
+          "description": "Distinguishes between architectural appointments and room bookings.",
+          "enum": ["architectural", "room"]
+        },
+        "appointmentDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The start date and time of the appointment."
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The end date and time of the appointment."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["clientId", "title", "appointmentDate", "type"]
+      "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
     }
   },
   "auth": {
@@ -498,6 +577,12 @@
     ]
   },
   "firestore": {
+    "/companies/{companyId}": {
+      "schema": {
+        "$ref": "#/entities/Company"
+      },
+      "description": "Stores company profiles."
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "#/entities/UserProfile"
@@ -571,6 +656,10 @@
     "/departments/{departmentId}/jobs/{jobId}": {
         "schema": { "$ref": "#/entities/Job" },
         "description": "Stores job titles for a specific department."
+    },
+    "/departments/{departmentId}/transactionTypes/{transactionTypeId}": {
+        "schema": { "$ref": "#/entities/TransactionType" },
+        "description": "Stores transaction types for a specific department."
     },
     "/governorates/{governorateId}": {
       "schema": { "$ref": "#/entities/Governorate" },
