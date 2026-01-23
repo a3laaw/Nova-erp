@@ -12,14 +12,15 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import type { ContractTemplate, TransactionType, ContractClause } from '@/lib/types';
+import type { ContractTemplate, TransactionType, ContractClause, ContractTerm } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '../ui/scroll-area';
 import { Checkbox } from '../ui/checkbox';
-import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
+import { Trash2, PlusCircle, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, orderBy, collectionGroup } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
+import { Textarea } from '../ui/textarea';
 
 interface ContractTemplateFormProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ const initialData: Partial<ContractTemplate> = {
     title: '',
     transactionTypes: [],
     clauses: [],
+    termsAndConditions: [],
 };
 
 export function ContractTemplateForm({ isOpen, onClose, onSave, template }: ContractTemplateFormProps) {
@@ -69,6 +71,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSave, template }: Cont
             title: template.title,
             transactionTypes: template.transactionTypes || [],
             clauses: JSON.parse(JSON.stringify(template.clauses || [])),
+            termsAndConditions: JSON.parse(JSON.stringify(template.termsAndConditions || [])),
         });
     } else {
         setFormData(initialData);
@@ -95,6 +98,33 @@ export function ContractTemplateForm({ isOpen, onClose, onSave, template }: Cont
       newClauses.splice(index, 1);
       setFormData(prev => ({ ...prev, clauses: newClauses }));
   };
+
+  const addTerm = () => {
+    const newTerm: ContractTerm = { id: Date.now().toString(), text: '' };
+    setFormData(prev => ({
+        ...prev,
+        termsAndConditions: [...(prev.termsAndConditions || []), newTerm]
+    }));
+  };
+  const removeTerm = (id: string) => {
+      setFormData(prev => ({
+          ...prev,
+          termsAndConditions: (prev.termsAndConditions || []).filter(t => t.id !== id)
+      }));
+  };
+  const handleTermChange = (id: string, text: string) => {
+      setFormData(prev => ({
+          ...prev,
+          termsAndConditions: (prev.termsAndConditions || []).map(t => t.id === id ? { ...t, text } : t)
+      }));
+  };
+  const reorderTerm = (index: number, direction: 'up' | 'down') => {
+      const terms = [...(formData.termsAndConditions || [])];
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= terms.length) return;
+      [terms[index], terms[newIndex]] = [terms[newIndex], terms[index]];
+      setFormData(prev => ({ ...prev, termsAndConditions: terms }));
+  };
   
   const handleTransactionTypeToggle = (typeName: string) => {
     const currentTypes = formData.transactionTypes || [];
@@ -114,6 +144,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSave, template }: Cont
         title: formData.title,
         transactionTypes: formData.transactionTypes,
         clauses: (formData.clauses || []).map((c, i) => ({ ...c, id: i + 1, amount: Number(c.amount) || 0 })),
+        termsAndConditions: (formData.termsAndConditions || []).map((t, i) => ({ ...t, id: (i+1).toString() }))
     };
     onSave(finalData);
   };
@@ -181,6 +212,38 @@ export function ContractTemplateForm({ isOpen, onClose, onSave, template }: Cont
                         الإجمالي: {formatCurrency(totalAmount)}
                     </div>
                 </div>
+
+                <div className="grid gap-2">
+                    <Label>الشروط والأحكام</Label>
+                    <div className='space-y-2'>
+                        {(formData.termsAndConditions || []).map((term, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                 <span className="text-sm font-semibold">{index + 1}.</span>
+                                <Textarea
+                                    placeholder={`نص الشرط ${index + 1}`}
+                                    value={term.text}
+                                    onChange={(e) => handleTermChange(term.id, e.target.value)}
+                                    rows={2}
+                                />
+                                <div className="flex flex-col">
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}>
+                                        <ArrowUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderTerm(index, 'down')} disabled={index === (formData.termsAndConditions || []).length - 1}>
+                                        <ArrowDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeTerm(term.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={addTerm} className="w-fit">
+                        <PlusCircle className="ml-2 h-4 w-4"/> إضافة شرط
+                    </Button>
+                </div>
+
             </div>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>

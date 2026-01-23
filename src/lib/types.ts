@@ -332,6 +332,7 @@ export type ClientTransaction = {
     engineerName?: string;
     contract?: {
         clauses: ContractClause[];
+        termsAndConditions?: ContractTerm[];
         totalAmount: number;
     };
 };
@@ -374,11 +375,17 @@ export type ContractClause = {
   status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; // Paid, Due, Not Due
 };
 
+export interface ContractTerm {
+  id: string;
+  text: string;
+}
+
 export type ContractTemplate = {
   id?: string;
   transactionTypes: string[];
   title: string;
   clauses: ContractClause[];
+  termsAndConditions?: ContractTerm[];
   totalAmount?: number; // Calculated field
 };
 
@@ -386,11 +393,6 @@ export interface ContractScopeItem {
   id: string;
   title: string;
   description: string;
-}
-
-export interface ContractTerm {
-  id: string;
-  text: string;
 }
 
 export interface ContractFinancialMilestone {
