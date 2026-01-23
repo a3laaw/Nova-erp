@@ -41,7 +41,6 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   secondarySingularTitle,
   secondaryCollectionName,
   icon,
-  footer,
   onBack,
 }: {
   primaryTitle: string;
@@ -51,7 +50,6 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   secondarySingularTitle?: string;
   secondaryCollectionName?: string;
   icon: React.ReactNode;
-  footer?: React.ReactNode;
   onBack: () => void;
 }) {
   const { firestore } = useFirebase();
@@ -236,12 +234,6 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
         )}
       </CardContent>
 
-      {footer && (
-        <CardFooter className="justify-end pt-4 border-t">
-          {footer}
-        </CardFooter>
-      )}
-
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent>
           <DialogHeader>
@@ -335,9 +327,9 @@ export function ReferenceDataManager() {
                 const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(govsQuery),
-                    getDocs(jobsQuery),
+                    getDocs(jobsSnap),
                     getDocs(areasQuery),
-                    getDocs(transTypesQuery),
+                    getDocs(transTypesSnap),
                 ]);
 
                 setCounts({
@@ -359,117 +351,6 @@ export function ReferenceDataManager() {
         fetchCounts();
     }, [firestore, toast]);
     
-    // --- SEEDING LOGIC ---
-    const defaultTransactionTypesByDept: Record<string, string[]> = {
-      'القسم المعماري': [
-        'بلدية سكن خاص',
-        'تصاميم واجهات خارجية',
-        'تصاميم داخلية',
-        '( تصميم مخطط هندسي )',
-        'إضافة تصميم سرداب',
-        'رخصة تعديلية',
-        'رخصه هدم',
-        'استثماري بلدية',
-        'ترخيص حدائق',
-      ],
-      'قسم الكهرباء': [
-        'كهرباء سكن خاص',
-        'كهرباء تصميم',
-        'كهرباء صناعي + استثماري + تجاري',
-        'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي',
-        'إيصال تيار مؤقت',
-        'كتاب إيصال تيار من البلدية',
-        'تقوية تيار كهربائي',
-        'إشراف على مخطط الكهرباء',
-      ],
-      'قسم الميكانيك': [
-        'ميكانيك ( مخطط صحي – تصميم )',
-        'مخطط صحي الأشغال',
-        'ميكانيك ( مخطط تكييف )',
-        'رخصة إطفاء ( دفاع مدني )',
-        'إشراف على مخطط الميكانيك',
-      ],
-      'قسم الاشراف': [
-        'تصميم مخطط انشائي',
-        'إشراف شهري على بناء الهيكل الأسود',
-        'إشراف على مخطط الكهرباء أو الميكانيك',
-      ],
-      'قسم المزارع والرخص الخاصة': [
-        'مزارع – إيصال تيار كهربائي',
-        'مزارع – ترخيص بلدية ومطافي',
-        'طلب ترخيص ( إيصال / تقوية ) تيار كهربائي للمزارع',
-      ],
-    };
-    const [isSeeding, setIsSeeding] = useState(false);
-    const handleSeedData = async () => {
-        if (!firestore) return;
-        setIsSeeding(true);
-        try {
-            const batch = writeBatch(firestore);
-            const departmentsRef = collection(firestore, 'departments');
-
-            const departmentsSnapshot = await getDocs(departmentsRef);
-            const existingDeptsData = new Map<string, string>();
-            departmentsSnapshot.forEach(doc => {
-                existingDeptsData.set(doc.data().name, doc.id);
-            });
-
-            for (const deptName of Object.keys(defaultTransactionTypesByDept)) {
-                if (!existingDeptsData.has(deptName)) {
-                    const newDeptRef = doc(departmentsRef);
-                    batch.set(newDeptRef, { name: deptName });
-                    existingDeptsData.set(deptName, newDeptRef.id);
-                }
-            }
-            
-            await batch.commit();
-
-            const secondBatch = writeBatch(firestore);
-            let count = 0;
-            for (const [deptName, typesForDept] of Object.entries(defaultTransactionTypesByDept)) {
-                const deptId = existingDeptsData.get(deptName);
-                if (deptId) {
-                    const transactionTypesRef = collection(firestore, `departments/${deptId}/transactionTypes`);
-                    const existingTypesSnapshot = await getDocs(transactionTypesRef);
-                    const existingNames = new Set(existingTypesSnapshot.docs.map(d => d.data().name));
-
-                    typesForDept.forEach(typeName => {
-                        if (!existingNames.has(typeName)) {
-                            const newDocRef = doc(transactionTypesRef);
-                            secondBatch.set(newDocRef, { name: typeName });
-                            count++;
-                        }
-                    });
-                }
-            }
-            
-            if(count > 0) {
-                 await secondBatch.commit();
-                 toast({ title: 'نجاح', description: `تمت إضافة ${count} نوع معاملة.` });
-                 // Re-fetch counts after seeding
-                 const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
-                 const transTypesSnap = await getDocs(transTypesQuery);
-                 setCounts(prev => ({...prev, transTypes: transTypesSnap.size}));
-
-            } else {
-                 toast({ title: 'لا توجد تغييرات', description: 'جميع الأقسام وأنواع المعاملات الافتراضية موجودة بالفعل.' });
-            }
-            
-        } catch (e) {
-            console.error(e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل البيانات الافتراضية.' });
-        } finally {
-            setIsSeeding(false);
-        }
-    };
-    
-    const seedButton = (
-        <Button onClick={handleSeedData} disabled={isSeeding} variant="secondary">
-            {isSeeding && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-            تسجيل قائمة الأنواع الافتراضية
-        </Button>
-    );
-    // --- END SEEDING LOGIC ---
 
     if (view === 'depts') {
         return <ManagerView
@@ -506,7 +387,6 @@ export function ReferenceDataManager() {
             secondarySingularTitle="نوع معاملة"
             secondaryCollectionName="transactionTypes"
             icon={<FileText />}
-            footer={seedButton}
             onBack={() => setView('dashboard')}
         />
     }
