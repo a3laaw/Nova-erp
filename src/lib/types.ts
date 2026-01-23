@@ -384,15 +384,18 @@ export type ContractTemplate = {
   id?: string;
   title: string;
   description?: string;
-  scopeOfWork?: ContractScopeItem[];
-  termsAndConditions?: ContractTerm[];
-  financials?: {
+  transactionTypes: string[];
+  scopeOfWork: ContractScopeItem[];
+  termsAndConditions: ContractTerm[];
+  financials: {
     type: 'fixed' | 'percentage';
     totalAmount: number;
     discount: number;
     milestones: ContractFinancialMilestone[];
   };
   openClauses?: string;
+  createdAt?: any;
+  createdBy?: string;
 };
 
 
