@@ -32,7 +32,6 @@ import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/
 import { cn } from '@/lib/utils';
 import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
-import { ContractTemplateManager } from './contract-template-manager';
 
 
 // Reusable component for the management UI (previously the whole component)
@@ -312,9 +311,9 @@ export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const router = useRouter();
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'contract-templates'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, templates: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
 
     // Fetch counts for the dashboard
@@ -327,19 +326,17 @@ export function ReferenceDataManager() {
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const govsQuery = query(collection(firestore, 'governorates'));
                 const companiesQuery = query(collection(firestore, 'companies'));
-                const templatesQuery = query(collection(firestore, 'contractTemplates'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 const areasQuery = query(collectionGroup(firestore, 'areas'));
                 const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
                 
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap, templatesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(govsQuery),
                     getDocs(jobsQuery),
                     getDocs(areasQuery),
                     getDocs(transTypesQuery),
                     getDocs(companiesQuery),
-                    getDocs(templatesQuery),
                 ]);
 
                 setCounts({
@@ -349,7 +346,6 @@ export function ReferenceDataManager() {
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
                     companies: companiesSnap.size,
-                    templates: templatesSnap.size,
                 });
 
             } catch (error) {
@@ -406,10 +402,6 @@ export function ReferenceDataManager() {
     if (view === 'companies') {
         return <CompanyManager onBack={() => setView('dashboard')} />
     }
-    
-    if (view === 'contract-templates') {
-        return <ContractTemplateManager onBack={() => setView('dashboard')} />;
-    }
 
     return (
         <Card>
@@ -450,14 +442,6 @@ export function ReferenceDataManager() {
                     icon={<FileText className="h-full w-full" />} 
                     onNavigate={() => setView('transTypes')} 
                     color="red" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="نماذج العقود" 
-                    count={counts.templates} 
-                    icon={<FileText className="h-full w-full" />} 
-                    onNavigate={() => setView('contract-templates')} 
-                    color="purple" 
                     loading={loadingCounts} 
                 />
             </CardContent>
