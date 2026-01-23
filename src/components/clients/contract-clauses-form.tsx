@@ -66,7 +66,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
           
           if (foundTemplate) {
             setTemplate(foundTemplate);
-            setClauses(JSON.parse(JSON.stringify(foundTemplate.clauses || [])));
+            setClauses(JSON.parse(JSON.stringify(foundTemplate.financials.milestones.map(m => ({id: m.id, name: m.name, amount: m.value, status: 'غير مستحقة'})) || [])));
             setTerms(JSON.parse(JSON.stringify(foundTemplate.termsAndConditions || [])));
           } else {
             setTemplate(null);

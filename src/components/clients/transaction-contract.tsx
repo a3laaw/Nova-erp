@@ -25,19 +25,8 @@ export function TransactionContract({ client, transaction, company }: Transactio
     const [hasDiscount, setHasDiscount] = useState(false);
     const [discountAmount, setDiscountAmount] = useState(0);
     
-    const template = useMemo(() => contractTemplates.find(t => t.transactionTypes.includes(transaction.transactionType)), [transaction.transactionType]);
-    
-    const initialClauses = useMemo(() => {
-        if (transaction.contract?.clauses && transaction.contract.clauses.length > 0) {
-            return JSON.parse(JSON.stringify(transaction.contract.clauses));
-        }
-        if (template) {
-            return JSON.parse(JSON.stringify(template.clauses));
-        }
-        return [];
-    }, [transaction, template]);
-
-    const [clauses, setClauses] = useState<ContractClause[]>(initialClauses);
+    const clauses = transaction.contract?.clauses || [];
+    const terms = transaction.contract?.termsAndConditions || [];
     
     useEffect(() => {
         const today = new Date();
@@ -76,14 +65,14 @@ export function TransactionContract({ client, transaction, company }: Transactio
         `منزل ${client.address.houseNumber}`
     ].filter(Boolean).join('، ') : 'غير محدد';
     
-    const contractTitle = template?.title || transaction.transactionType;
+    const contractTitle = transaction.transactionType;
 
-    if (!template) {
+    if (!transaction.contract) {
         return (
             <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto text-center" dir="rtl">
-                <h2 className="text-xl font-bold text-destructive">لا يوجد نموذج عقد</h2>
+                <h2 className="text-xl font-bold text-destructive">لا يوجد عقد لهذه المعاملة</h2>
                 <p className="text-muted-foreground mt-2">
-                    لا يوجد نموذج عقد مرتبط بنوع هذه المعاملة: "{transaction.transactionType}".
+                    الرجاء إنشاء عقد من صفحة العميل أولاً.
                 </p>
                 <Button onClick={() => router.back()} className="mt-4">
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -142,6 +131,22 @@ export function TransactionContract({ client, transaction, company }: Transactio
                 </section>
                 
                 <section>
+                    <h3 className="font-bold mb-2">الشروط والأحكام</h3>
+                    <div className="space-y-2 text-sm p-4 border rounded-lg">
+                        {terms.length > 0 ? (
+                            terms.map((term, index) => (
+                                <div key={term.id} className="flex gap-2">
+                                    <span className="font-semibold">{index + 1}-</span>
+                                    <p>{term.text}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground">لا توجد شروط وأحكام خاصة.</p>
+                        )}
+                    </div>
+                </section>
+                
+                <section>
                     <h3 className="font-bold mb-2">البنود المالية</h3>
                     <div className="border rounded-lg">
                         <table className="w-full text-sm">
@@ -156,7 +161,6 @@ export function TransactionContract({ client, transaction, company }: Transactio
                                 <tr key={clause.id} className="border-t">
                                     <td className="p-2">{clause.name}</td>
                                     <td className="p-2 text-left font-mono">
-                                        {/* Static text for PDF view */}
                                         {formatCurrency(clause.amount)}
                                     </td>
                                 </tr>
@@ -169,10 +173,6 @@ export function TransactionContract({ client, transaction, company }: Transactio
                                 </tr>
                             </tfoot>
                         </table>
-                    </div>
-                     <div className="mt-4 text-sm p-2 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-md">
-                        <strong>ملاحظة: </strong>
-                        هذا العقد يمثل اتفاقية للمعاملة المحددة فقط.
                     </div>
                 </section>
                 

@@ -630,6 +630,7 @@
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "transactionTypes": { "type": "array", "items": { "type": "string" } },
         "scopeOfWork": {
           "type": "array",
           "items": {
