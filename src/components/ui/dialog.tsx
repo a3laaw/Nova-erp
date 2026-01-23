@@ -44,9 +44,10 @@ const DialogContent = React.forwardRef<
       onPointerDownOutside={(e) => {
           const target = e.target as HTMLElement;
           if (
-              target.closest('[cmdk-root]') || 
-              target.closest('[role="listbox"]') || 
+              target.closest('[cmdk-root]') ||
+              target.closest('[role="listbox"]') ||
               target.closest('[data-radix-popper-content-wrapper]') ||
+              target.closest('[data-radix-select-content]') ||
               target.closest('[data-radix-popover-content]') ||
               target.closest('[data-inline-search-list-options]')
           ) {
@@ -56,9 +57,10 @@ const DialogContent = React.forwardRef<
       onInteractOutside={(e) => {
           const target = e.target as HTMLElement;
           if (
-              target.closest('[cmdk-root]') || 
-              target.closest('[role="listbox"]') || 
+              target.closest('[cmdk-root]') ||
+              target.closest('[role="listbox"]') ||
               target.closest('[data-radix-popper-content-wrapper]') ||
+              target.closest('[data-radix-select-content]') ||
               target.closest('[data-radix-popover-content]') ||
               target.closest('[data-inline-search-list-options]')
           ) {
