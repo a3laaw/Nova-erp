@@ -273,7 +273,7 @@ export default function EditEmployeePage() {
                  toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات.' });
             }
             
-            router.push(`/dashboard/hr/employees/${id}`);
+            router.push('/dashboard/hr');
         } catch (error) {
             console.error("Error saving employee:", error);
             const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ التغييرات. يرجى التأكد من صحة البيانات المدخلة.';
