@@ -50,16 +50,17 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
                     variant="secondary"
                     key={item}
                     className="mr-1 mb-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUnselect(item);
-                    }}
                   >
                     {option?.label || item}
-                    <button
-                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Remove ${option?.label || item}`}
+                      className="ml-1 cursor-pointer ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
                           handleUnselect(item);
                         }
                       }}
@@ -73,7 +74,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
                       }}
                     >
                       <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </button>
+                    </span>
                   </Badge>
                 );
               })
