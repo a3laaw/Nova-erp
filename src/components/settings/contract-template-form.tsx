@@ -47,7 +47,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSave, template }: Cont
     if (firestore && isOpen) {
         setLoadingTypes(true);
         const fetchTypes = async () => {
-            const q = query(collectionGroup(firestore, 'transactionTypes'), orderBy('name'));
+            const q = query(collectionGroup(firestore, 'transactionTypes'));
             const snapshot = await getDocs(q);
             const uniqueTypes = new Map<string, TransactionType>();
             snapshot.docs.forEach(d => {
