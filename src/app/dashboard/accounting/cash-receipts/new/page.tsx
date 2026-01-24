@@ -24,11 +24,12 @@ import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { Client, Company } from '@/lib/types';
+import type { Client, Company, ClientTransaction } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { numberToArabicWords } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -40,10 +41,14 @@ export default function NewCashReceiptPage() {
   const [clientsLoading, setClientsLoading] = useState(true);
   const [company, setCompany] = useState<Company | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
+  
+  const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
 
   // Form state
   const [isSaving, setIsSaving] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [amount, setAmount] = useState('');
   const [amountInWords, setAmountInWords] = useState('');
   const [description, setDescription] = useState('');
@@ -61,9 +66,10 @@ export default function NewCashReceiptPage() {
     } else {
         setAmountInWords('');
     }
-}, [amount]);
+  }, [amount]);
 
 
+  // Effect to fetch initial company and client data
   useEffect(() => {
     if (!firestore) return;
 
@@ -101,6 +107,75 @@ export default function NewCashReceiptPage() {
     };
     fetchClients();
   }, [firestore, toast]);
+  
+  // Effect to fetch client's projects (transactions with contracts) when a client is selected
+  useEffect(() => {
+    if (!firestore || !selectedClientId) {
+        setClientProjects([]);
+        setSelectedProjectId('');
+        return;
+    }
+    
+    const fetchClientProjects = async () => {
+        setProjectsLoading(true);
+        try {
+            const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`), where('contract', '!=', null));
+            const snapshot = await getDocs(projectsQuery);
+            const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+            setClientProjects(fetchedProjects);
+        } catch (error) {
+            console.error("Error fetching client projects:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب عقود العميل.' });
+        } finally {
+            setProjectsLoading(false);
+        }
+    };
+
+    fetchClientProjects();
+  }, [firestore, selectedClientId, toast]);
+  
+  // Effect for automatic description generation
+  useEffect(() => {
+      if (!selectedProjectId || !amount || parseFloat(amount) <= 0) {
+          setDescription(''); // Reset description if no project or amount
+          return;
+      }
+      
+      const project = clientProjects.find(p => p.id === selectedProjectId);
+      if (!project || !project.contract?.clauses) {
+          setDescription('');
+          return;
+      }
+      
+      let remainingAmount = parseFloat(amount);
+      const descriptionParts: string[] = [];
+      const unpaidClauses = project.contract.clauses.filter(c => c.status !== 'مدفوعة');
+      
+      for (const clause of unpaidClauses) {
+          if (remainingAmount <= 0) break;
+          
+          // NOTE: This is a simplified logic. A real system would need to track partial payments on each clause.
+          // For now, we assume the clause.amount is the full remaining amount for that clause.
+          const clauseAmount = clause.amount;
+          
+          if (remainingAmount >= clauseAmount) {
+              descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(clauseAmount)}`);
+              remainingAmount -= clauseAmount;
+          } else {
+              descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(remainingAmount)}`);
+              const remainingInClause = clauseAmount - remainingAmount;
+              descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(remainingInClause)})`);
+              remainingAmount = 0;
+          }
+      }
+      
+      if (remainingAmount > 0) {
+          descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmount)} كدفعة مقدمة على الحساب.`);
+      }
+      
+      setDescription(descriptionParts.join('\n'));
+
+  }, [amount, selectedProjectId, clientProjects]);
 
   const clientOptions = useMemo(() => clients.map(c => ({
       value: c.id,
@@ -108,13 +183,19 @@ export default function NewCashReceiptPage() {
       searchKey: c.mobile,
   })), [clients]);
 
+  const projectOptions = useMemo(() => clientProjects.map(p => ({
+      value: p.id!,
+      label: p.transactionType,
+      searchKey: p.id
+  })), [clientProjects]);
+
   const handleSave = async () => {
     if (!firestore) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح.' });
         return;
     }
     // Validation
-    if (!selectedClientId || !amount || !date || !type || !paymentMethod || !amountInWords || !description) {
+    if (!selectedClientId || !amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -126,20 +207,29 @@ export default function NewCashReceiptPage() {
     setIsSaving(true);
     try {
         const selectedClient = clients.find(c => c.id === selectedClientId);
+        const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
 
-        const newReceiptData = {
+        const newReceiptData: any = { // Use 'any' to dynamically add properties
             clientId: selectedClientId,
             clientNameAr: selectedClient?.nameAr || '',
             clientNameEn: selectedClient?.nameEn || '',
             amount: parseFloat(amount),
             amountInWords: amountInWords,
             receiptDate: Timestamp.fromDate(new Date(date)),
-            type: type,
             paymentMethod: paymentMethod,
-            description: description,
+            description: description, // Use auto-generated or manually entered description
             reference: reference,
             createdAt: serverTimestamp(),
         };
+        
+        if (selectedProjectId && selectedProject) {
+            newReceiptData.projectId = selectedProjectId;
+            newReceiptData.projectNameAr = selectedProject.transactionType;
+        }
+
+        if(type) {
+            newReceiptData.type = type;
+        }
 
         await addDoc(collection(firestore, 'cashReceipts'), newReceiptData);
         
@@ -160,7 +250,16 @@ export default function NewCashReceiptPage() {
     } finally {
         setIsSaving(false);
     }
-};
+  };
+  
+  const handleClientChange = (clientId: string) => {
+    setSelectedClientId(clientId);
+    // Reset project-specific fields
+    setSelectedProjectId('');
+    setClientProjects([]);
+    setDescription('');
+  };
+
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -197,7 +296,7 @@ export default function NewCashReceiptPage() {
               <Label htmlFor="receivedFrom">استلمنا من السيد/السادة <span className="text-destructive">*</span></Label>
               <InlineSearchList 
                 value={selectedClientId}
-                onSelect={setSelectedClientId}
+                onSelect={handleClientChange}
                 options={clientOptions}
                 placeholder={clientsLoading ? 'جاري التحميل...' : 'ابحث عن عميل بالاسم أو الجوال...'}
                 disabled={clientsLoading || isSaving}
@@ -208,25 +307,35 @@ export default function NewCashReceiptPage() {
                 <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
             </div>
         </div>
+        
+        <div className="grid gap-2">
+            <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
+            <InlineSearchList 
+                value={selectedProjectId}
+                onSelect={setSelectedProjectId}
+                options={projectOptions}
+                placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب العقود...' : 'اختر العقد المراد سداد دفعة له...'}
+                disabled={!selectedClientId || projectsLoading || isSaving}
+            />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              <div className="grid gap-2">
                 <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
                 <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
             </div>
             <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="amountInWords">مبلغ وقدره (كتابة) <span className="text-destructive">*</span></Label>
-              <Input
-                id="amountInWords"
-                value={amountInWords}
-                onChange={(e) => setAmountInWords(e.target.value)}
-                placeholder="فقط..."
-                disabled={isSaving}
-                required
-              />
+              <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
+               <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50 print:hidden'>
+                 {amountInWords ? `فقط ${amountInWords} لا غير` : '(سيتم ملؤه تلقائياً للطباعة)'}
+              </div>
+              <div className="hidden print:block p-2 border rounded-md min-h-[40px]">
+                {amountInWords ? `فقط ${amountInWords} لا غير` : ''}
+              </div>
             </div>
         </div>
         <div className="grid gap-2">
-            <Label htmlFor="description">وذلك عن <span className="text-destructive">*</span></Label>
+            <Label htmlFor="description">وذلك عن</Label>
             <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -245,8 +354,8 @@ export default function NewCashReceiptPage() {
                 </Select>
             </div>
              <div className="grid gap-2">
-                <Label htmlFor="type">نوع الدفعة <span className="text-destructive">*</span></Label>
-                <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving}>
+                <Label htmlFor="type">نوع الدفعة (يدوي)</Label>
+                <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving || !!selectedProjectId}>
                     <SelectTrigger id="type">
                         <SelectValue placeholder="اختر نوع الدفعة" />
                     </SelectTrigger>
