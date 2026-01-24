@@ -33,7 +33,7 @@ interface ClientTransactionFormProps {
 }
 
 const transactionStageTemplates: Record<string, string[]> = {
-  'تصميم بلدية (سكن خاص)': [
+  'بلدية سكن خاص': [
     'التعاقد',
     'مراجعة واعتماد المخططات الابتدائية',
     'تصميم دور السرداب',
@@ -179,8 +179,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             let engineerForTransactionId: string | null = assignedEngineerId || null;
 
-            // Special logic for "تصميم بلدية (سكن خاص)"
-            if (transactionType === 'تصميم بلدية (سكن خاص)') {
+            // Special logic for "بلدية سكن خاص"
+            if (transactionType === 'بلدية سكن خاص') {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
                 if (clientSnap.exists()) {
@@ -325,7 +325,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                             </div>
                         </div>
 
-                        {transactionType === 'تصميم بلدية (سكن خاص)' ? (
+                        {transactionType === 'بلدية سكن خاص' ? (
                             <Alert>
                                 <Info className="h-4 w-4" />
                                 <AlertTitle>إسناد تلقائي</AlertTitle>
@@ -368,3 +368,5 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         </Dialog>
     );
 }
+
+    

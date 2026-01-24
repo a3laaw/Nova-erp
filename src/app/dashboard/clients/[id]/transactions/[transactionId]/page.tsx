@@ -201,7 +201,7 @@ export default function TransactionDetailPage() {
             createdAt: serverTimestamp(),
         });
         
-        if (transaction.transactionType === 'تصميم بلدية (سكن خاص)') {
+        if (transaction.transactionType === 'بلدية سكن خاص') {
             const clientRef = doc(firestore, 'clients', clientId);
             batch.update(clientRef, { assignedEngineer: newEngineerId || null });
         }
@@ -366,7 +366,7 @@ export default function TransactionDetailPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                {transaction.transactionType !== 'تصميم بلدية (سكن خاص)' ? (
+                {transaction.transactionType !== 'بلدية سكن خاص' ? (
                     <div className="grid gap-2">
                         <Label htmlFor="engineer">تغيير المهندس المسؤول</Label>
                         <Select dir="rtl" value={newEngineerId} onValueChange={setNewEngineerId}>
@@ -483,3 +483,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
