@@ -29,6 +29,7 @@ import type { Client, Company } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import Tafqeet from 'tafgeet';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -54,6 +55,21 @@ export default function NewCashReceiptPage() {
   useEffect(() => {
     setDate(new Date().toISOString().split('T')[0]);
   }, []);
+
+  useEffect(() => {
+    if (amount && !isNaN(parseFloat(amount))) {
+        try {
+            const num = parseFloat(amount);
+            const tafqeetInstance = new Tafqeet(num, { currency: 'KWD' });
+            setAmountInWords(tafqeetInstance.parse());
+        } catch (e) {
+            console.error("Tafqeet conversion error:", e);
+            setAmountInWords("خطأ في تحويل المبلغ إلى كلمات");
+        }
+    } else {
+        setAmountInWords('');
+    }
+  }, [amount]);
 
   useEffect(() => {
     if (!firestore) return;
@@ -204,9 +220,20 @@ export default function NewCashReceiptPage() {
                 <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
                 <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
             </div>
-            <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="amountInWords">مبلغ وقدره <span className="text-destructive">*</span></Label>
-              <Input id="amountInWords" placeholder="المبلغ كتابة..." value={amountInWords} onChange={e => setAmountInWords(e.target.value)} disabled={isSaving}/>
+            {/* On-screen placeholder */}
+            <div className="md:col-span-2 grid gap-2 print:hidden">
+              <Label>مبلغ وقدره</Label>
+              <div className="flex items-center h-10 rounded-md border border-input border-dashed bg-muted/30 px-3 text-sm text-muted-foreground">
+                سيتم ملؤه تلقائياً للطباعة
+              </div>
+            </div>
+            
+            {/* For-print version */}
+            <div className="md:col-span-2 hidden print:grid gap-2">
+                <Label>مبلغ وقدره</Label>
+                <div className="flex items-center h-10 rounded-md border border-input px-3 text-sm">
+                    {amountInWords || ''}
+                </div>
             </div>
         </div>
         <div className="grid gap-2">
