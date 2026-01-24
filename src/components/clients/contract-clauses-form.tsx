@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -507,7 +507,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                     </div>
                 </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t">
               <Button variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
               <Button onClick={handleSubmit} disabled={isSaving}>
                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
