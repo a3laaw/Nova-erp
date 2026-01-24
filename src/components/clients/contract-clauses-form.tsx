@@ -24,7 +24,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-re
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, writeBatch, getDoc, collection, serverTimestamp, getDocs, query } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm } from '@/lib/types';
+import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -87,6 +87,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
   const { toast } = useToast();
 
   // Form data state
+  const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
   const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
@@ -100,6 +101,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
   // This effect resets the entire component's state when the dialog is closed.
   useEffect(() => {
     if (!isOpen) {
+      setScopeOfWork([]);
       setClauses([]);
       setTerms([]);
       setOpenClauses([]);
@@ -119,6 +121,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
       try {
         if (transaction.contract) {
           // If a contract already exists, we go straight to editing it.
+          setScopeOfWork(JSON.parse(JSON.stringify(transaction.contract.scopeOfWork || [])));
           setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses || [])));
           setTerms(JSON.parse(JSON.stringify(transaction.contract.termsAndConditions || [])));
           setOpenClauses(JSON.parse(JSON.stringify(transaction.contract.openClauses || [])));
@@ -183,6 +186,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
       } as ContractClause));
 
       setClauses(JSON.parse(JSON.stringify(calculatedClauses)));
+      setScopeOfWork(JSON.parse(JSON.stringify(chosenTemplate?.scopeOfWork || [])));
       setTerms(JSON.parse(JSON.stringify(chosenTemplate?.termsAndConditions || [])));
       setOpenClauses(JSON.parse(JSON.stringify(chosenTemplate?.openClauses || [])));
       
@@ -195,6 +199,19 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
     setClauses(updatedClauses);
   };
   
+  const addScopeItem = () => setScopeOfWork(prev => [...prev, { id: generateId(), title: '', description: '' }]);
+  const removeScopeItem = (id: string) => setScopeOfWork(prev => prev.filter(s => s.id !== id));
+  const handleScopeChange = (id: string, field: 'title' | 'description', value: string) => {
+      setScopeOfWork(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+  const reorderScopeItem = (index: number, direction: 'up' | 'down') => {
+      const newItems = [...scopeOfWork];
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= newItems.length) return;
+      [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
+      setScopeOfWork(newItems);
+  };
+
   const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
   const removeTerm = (id: string) => setTerms(prev => prev.filter(t => t.id !== id));
   const handleTermChange = (id: string, text: string) => setTerms(prev => prev.map(t => (t.id === id ? { ...t, text } : t)));
@@ -233,6 +250,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
       batch.update(transactionRef, {
         contract: {
           clauses: clauses,
+          scopeOfWork: scopeOfWork,
           termsAndConditions: terms,
           openClauses: openClauses,
           totalAmount: totalAmount,
@@ -273,7 +291,16 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl" dir="rtl">
+      <DialogContent 
+        className="max-w-3xl" 
+        dir="rtl"
+        onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                e.preventDefault();
+            }
+        }}
+      >
         {step === 'loading' && (
             <>
                 <DialogHeader>
@@ -342,6 +369,44 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                         </TableRow>
                       </TableFooter>
                     </Table>
+                </div>
+                
+                <div className="grid gap-2 pt-4">
+                    <div className='flex justify-between items-center'>
+                      <Label className="text-base font-semibold">نطاق العمل</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={addScopeItem}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
+                    </div>
+                    <div className='space-y-2'>
+                        {scopeOfWork.map((item, index) => (
+                            <div key={item.id} className="flex items-start gap-2 p-2 border rounded-md">
+                                <span className="text-sm font-semibold pt-2">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                                <div className="flex-grow space-y-2">
+                                    <Input
+                                        placeholder={`عنوان البند ${index + 1}`}
+                                        value={item.title}
+                                        onChange={(e) => handleScopeChange(item.id, 'title', e.target.value)}
+                                    />
+                                    <Textarea
+                                        placeholder={`وصف تفصيلي للبند...`}
+                                        value={item.description}
+                                        onChange={(e) => handleScopeChange(item.id, 'description', e.target.value)}
+                                        rows={2}
+                                    />
+                                </div>
+                                <div className="flex flex-col">
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'up')} disabled={index === 0}>
+                                        <ArrowUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'down')} disabled={index === scopeOfWork.length - 1}>
+                                        <ArrowDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeScopeItem(item.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 
                 <div className="grid gap-2 pt-4">

@@ -28,6 +28,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
     const [hasDiscount, setHasDiscount] = useState(false);
     const [discountAmount, setDiscountAmount] = useState(0);
     
+    const scopeOfWork = transaction.contract?.scopeOfWork || [];
     const clauses = transaction.contract?.clauses || [];
     const terms = transaction.contract?.termsAndConditions || [];
     const openClauses = transaction.contract?.openClauses || [];
@@ -135,6 +136,20 @@ export function TransactionContract({ client, transaction, company }: Transactio
                     </div>
                 </section>
                 
+                {scopeOfWork.length > 0 && (
+                    <section>
+                        <h3 className="font-bold mb-2">نطاق العمل</h3>
+                        <div className="space-y-2 text-sm p-4 border rounded-lg">
+                            {scopeOfWork.map((item, index) => (
+                                <div key={item.id} className="pb-2">
+                                    <p className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`} {item.title}</p>
+                                    <p className="text-muted-foreground pr-4">{item.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
                 <section>
                     <h3 className="font-bold mb-2">الشروط والأحكام</h3>
                     <div className="space-y-2 text-sm p-4 border rounded-lg">

@@ -332,6 +332,7 @@ export type ClientTransaction = {
     engineerName?: string;
     contract?: {
         clauses: ContractClause[];
+        scopeOfWork?: ContractScopeItem[];
         termsAndConditions?: ContractTerm[];
         openClauses?: ContractTerm[];
         totalAmount: number;
