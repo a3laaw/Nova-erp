@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -179,27 +179,41 @@ export default function NewClientPage() {
                 setIsLoading(false);
                 return;
             }
+            
+            const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
+            const parentAccountSnap = await getDocs(parentAccountQuery);
+
+            if (parentAccountSnap.empty) {
+                throw new Error('لم يتم العثور على حساب "العملاء" الرئيسي في شجرة الحسابات. يرجى إضافته أولاً.');
+            }
+            const parentAccount = parentAccountSnap.docs[0].data();
+            const parentCode = parentAccount.code as string;
+            const parentLevel = parentAccount.level as number;
+
 
             await runTransaction(firestore, async (transaction) => {
+                // Client File ID Counter
                 const currentYear = String(new Date().getFullYear());
-                const counterRef = doc(firestore, 'counters', 'clientFiles');
-                
-                const counterDoc = await transaction.get(counterRef);
-                
-                let nextNumber = 1;
-                if (counterDoc.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 0) + 1;
+                const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
+                const clientFileCounterDoc = await transaction.get(clientFileCounterRef);
+                let nextFileNumber = 1;
+                if (clientFileCounterDoc.exists()) {
+                    const counts = clientFileCounterDoc.data()?.counts || {};
+                    nextFileNumber = (counts[currentYear] || 0) + 1;
                 }
-                
-                transaction.set(counterRef, { 
-                    counts: { [currentYear]: nextNumber } 
-                }, { merge: true });
+                transaction.set(clientFileCounterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
+                const newFileId = `${nextFileNumber}/${currentYear}`;
 
-                const newFileId = `${nextNumber}/${currentYear}`;
-                
+                // Chart of Accounts Client Counter
+                const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
+                const coaClientCounterDoc = await transaction.get(coaClientCounterRef);
+                const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
+                const nextClientCodeNumber = lastClientCodeNumber + 1;
+                const newAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+                transaction.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
+
+                // Create Client Document
                 const selectedGov = governorates.find(g => g.id === formData.governorateId);
-
                 const clientData = {
                     nameAr: formData.nameAr,
                     nameEn: formData.nameEn,
@@ -212,20 +226,29 @@ export default function NewClientPage() {
                         houseNumber: formData.houseNumber,
                     },
                     fileId: newFileId,
-                    fileNumber: nextNumber,
+                    fileNumber: nextFileNumber,
                     fileYear: parseInt(currentYear, 10),
                     status: 'new' as const,
                     assignedEngineer: assignedEngineerId || null,
                     createdAt: serverTimestamp(),
                     isActive: true,
                 };
-
                 const newClientRef = doc(collection(firestore, 'clients'));
                 transaction.set(newClientRef, clientData);
+                
+                // Create Chart of Account Document for the new Client
+                const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
+                const newAccountData = {
+                    name: formData.nameAr,
+                    code: newAccountCode,
+                    type: parentAccount.type,
+                    level: parentLevel + 1,
+                };
+                transaction.set(newAccountRef, newAccountData);
             });
 
 
-            toast({ title: 'نجاح', description: 'تمت إضافة العميل الجديد بنجاح.' });
+            toast({ title: 'نجاح', description: 'تمت إضافة العميل وحسابه في شجرة الحسابات بنجاح.' });
             router.push('/dashboard/clients');
 
         } catch (error) {
