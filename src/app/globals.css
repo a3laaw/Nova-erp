@@ -76,28 +76,22 @@
 
 @layer utilities {
     @media print {
+        body {
+            background-color: white !important;
+        }
         .no-print {
             display: none !important;
         }
-        main {
-            padding: 0 !important;
-        }
-        /* The gray background div on the page */
-        .print-container-reset {
-            background-color: white !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        /* The card element */
         .printable-wrapper {
-            max-width: 100% !important;
             box-shadow: none !important;
             border: none !important;
-            border-radius: 0 !important;
-        }
-        /* The actual content area */
-        .printable-content {
+            margin: 0 !important;
             padding: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        .printable-content {
+             padding: 0 !important;
         }
         * {
             -webkit-print-color-adjust: exact !important;
