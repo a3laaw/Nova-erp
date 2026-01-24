@@ -733,6 +733,31 @@
         }
       },
       "required": ["title"]
+    },
+    "ChartOfAccount": {
+      "title": "Chart of Account",
+      "description": "Represents an account in the chart of accounts.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "The unique code for the account."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the account in Arabic."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["asset", "liability", "equity", "income", "expense"],
+          "description": "The type of the account."
+        },
+        "level": {
+          "type": "number",
+          "description": "The indentation level in the chart tree, derived from code length."
+        }
+      },
+      "required": ["code", "name", "type", "level"]
     }
   },
   "auth": {
@@ -850,8 +875,12 @@
         "$ref": "#/entities/ContractTemplate"
       },
       "description": "Stores reusable contract templates for various transaction types."
+    },
+    "/chartOfAccounts/{accountId}": {
+      "schema": {
+        "$ref": "#/entities/ChartOfAccount"
+      },
+      "description": "Stores the company's chart of accounts."
     }
   }
 }
-
-    
