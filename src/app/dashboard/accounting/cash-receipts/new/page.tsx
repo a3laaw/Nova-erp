@@ -21,11 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Printer, Save, X } from 'lucide-react';
+import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import type { Client, Company } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -35,21 +34,27 @@ export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
   const { toast } = useToast();
-  const { language } = useLanguage();
+
   const [date, setDate] = useState('');
-  
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
-  const [selectedClientId, setSelectedClientId] = useState('');
-  
   const [company, setCompany] = useState<Company | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
 
+  // Form state
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [amountInWords, setAmountInWords] = useState('');
+  const [description, setDescription] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [type, setType] = useState(''); // advance, milestone, final
+  const [reference, setReference] = useState('');
+
   useEffect(() => {
-    // Set date on client to avoid hydration mismatch
     setDate(new Date().toISOString().split('T')[0]);
   }, []);
-  
+
   useEffect(() => {
     if (!firestore) return;
 
@@ -87,12 +92,66 @@ export default function NewCashReceiptPage() {
     };
     fetchClients();
   }, [firestore, toast]);
-  
+
   const clientOptions = useMemo(() => clients.map(c => ({
       value: c.id,
       label: c.nameAr,
       searchKey: c.mobile,
   })), [clients]);
+
+  const handleSave = async () => {
+    if (!firestore) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح.' });
+        return;
+    }
+    // Validation
+    if (!selectedClientId || !amount || !date || !type || !paymentMethod || !amountInWords || !description) {
+        toast({
+            variant: 'destructive',
+            title: 'حقول ناقصة',
+            description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).',
+        });
+        return;
+    }
+
+    setIsSaving(true);
+    try {
+        const selectedClient = clients.find(c => c.id === selectedClientId);
+
+        const newReceiptData = {
+            clientId: selectedClientId,
+            clientNameAr: selectedClient?.nameAr || '',
+            clientNameEn: selectedClient?.nameEn || '',
+            amount: parseFloat(amount),
+            amountInWords: amountInWords,
+            receiptDate: Timestamp.fromDate(new Date(date)),
+            type: type,
+            paymentMethod: paymentMethod,
+            description: description,
+            reference: reference,
+            createdAt: serverTimestamp(),
+        };
+
+        await addDoc(collection(firestore, 'cashReceipts'), newReceiptData);
+        
+        toast({
+            title: 'نجاح',
+            description: 'تم حفظ سند القبض بنجاح.',
+        });
+
+        router.push('/dashboard/accounting');
+
+    } catch (error) {
+        console.error("Error saving cash receipt:", error);
+        toast({
+            variant: 'destructive',
+            title: 'خطأ في الحفظ',
+            description: 'لم يتم حفظ السند، الرجاء المحاولة مرة أخرى.',
+        });
+    } finally {
+        setIsSaving(false);
+    }
+};
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -126,38 +185,38 @@ export default function NewCashReceiptPage() {
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="receivedFrom">استلمنا من السيد/السادة</Label>
+              <Label htmlFor="receivedFrom">استلمنا من السيد/السادة <span className="text-destructive">*</span></Label>
               <InlineSearchList 
                 value={selectedClientId}
                 onSelect={setSelectedClientId}
                 options={clientOptions}
                 placeholder={clientsLoading ? 'جاري التحميل...' : 'ابحث عن عميل بالاسم أو الجوال...'}
-                disabled={clientsLoading}
+                disabled={clientsLoading || isSaving}
               />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor="date">التاريخ</Label>
-                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
+                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
             </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              <div className="grid gap-2">
-                <Label htmlFor="amount">المبلغ</Label>
-                <Input id="amount" type="number" placeholder="0.00" className='text-left dir-ltr' />
+                <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
+                <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
             </div>
             <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="amountInWords">مبلغ وقدره</Label>
-              <Input id="amountInWords" placeholder="المبلغ كتابة..." />
+              <Label htmlFor="amountInWords">مبلغ وقدره <span className="text-destructive">*</span></Label>
+              <Input id="amountInWords" placeholder="المبلغ كتابة..." value={amountInWords} onChange={e => setAmountInWords(e.target.value)} disabled={isSaving}/>
             </div>
         </div>
         <div className="grid gap-2">
-            <Label htmlFor="description">وذلك عن</Label>
-            <Textarea id="description" placeholder="وصف عملية الدفع..." />
+            <Label htmlFor="description">وذلك عن <span className="text-destructive">*</span></Label>
+            <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="grid gap-2">
-                <Label htmlFor="paymentMethod">طريقة الدفع</Label>
-                 <Select dir='rtl'>
+                <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
+                 <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
                     <SelectTrigger id="paymentMethod">
                         <SelectValue placeholder="اختر طريقة الدفع" />
                     </SelectTrigger>
@@ -165,12 +224,27 @@ export default function NewCashReceiptPage() {
                         <SelectItem value="Cash">نقداً</SelectItem>
                         <SelectItem value="Cheque">شيك</SelectItem>
                         <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
+                        <SelectItem value="K-Net">كي-نت</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+             <div className="grid gap-2">
+                <Label htmlFor="type">نوع الدفعة <span className="text-destructive">*</span></Label>
+                <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving}>
+                    <SelectTrigger id="type">
+                        <SelectValue placeholder="اختر نوع الدفعة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="advance">دفعة مقدمة</SelectItem>
+                        <SelectItem value="milestone">دفعة مرحلية</SelectItem>
+                        <SelectItem value="final">دفعة أخيرة</SelectItem>
+                        <SelectItem value="other">أخرى</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-              <Input id="reference" placeholder="رقم المرجع..." />
+              <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
             </div>
         </div>
 
@@ -191,17 +265,17 @@ export default function NewCashReceiptPage() {
         
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => router.push('/dashboard/accounting')}>
+        <Button variant="outline" onClick={() => router.push('/dashboard/accounting')} disabled={isSaving}>
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button variant="outline">
+        <Button variant="outline" disabled={isSaving}>
             <Printer className="ml-2 h-4 w-4" />
             طباعة
         </Button>
-        <Button>
-            <Save className="ml-2 h-4 w-4" />
-            حفظ
+        <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+            {isSaving ? 'جاري الحفظ...' : 'حفظ'}
         </Button>
       </CardFooter>
     </Card>
