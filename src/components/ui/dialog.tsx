@@ -44,11 +44,10 @@ const DialogContent = React.forwardRef<
       onInteractOutside={(e) => {
         const target = e.target as HTMLElement;
         // This prevents the dialog from closing when interacting with other Radix primitives inside.
-        // Useful for components like Select, Popover, or Combobox that render in a separate portal.
         if (
-          target.closest('[data-radix-select-content]') ||
-          target.closest('[data-radix-popover-content]') ||
           target.closest('[cmdk-root]') ||
+          target.closest('[role="listbox"]') ||
+          target.closest('[data-radix-popper-content-wrapper]') ||
           target.closest('[data-inline-search-list-options]')
         ) {
           e.preventDefault();

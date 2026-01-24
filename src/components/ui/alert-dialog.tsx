@@ -43,9 +43,9 @@ const AlertDialogContent = React.forwardRef<
         const target = e.target as HTMLElement;
         // This prevents the dialog from closing when interacting with other Radix primitives inside.
         if (
-          target.closest('[data-radix-select-content]') ||
-          target.closest('[data-radix-popover-content]') ||
           target.closest('[cmdk-root]') ||
+          target.closest('[role="listbox"]') ||
+          target.closest('[data-radix-popper-content-wrapper]') ||
           target.closest('[data-inline-search-list-options]')
         ) {
           e.preventDefault();
