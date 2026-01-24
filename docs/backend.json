@@ -1,763 +1,220 @@
-
 {
   "entities": {
-    "Company": {
-      "title": "Company",
-      "description": "Represents a company profile, typically for the main organization or branches.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The full name of the company in Arabic."
-        },
-        "nameEn": {
-          "type": "string",
-          "description": "The full name of the company in English."
-        },
-        "address": {
-          "type": "string",
-          "description": "The full address of the company."
-        },
-        "phone": {
-          "type": "string",
-          "description": "The company's contact phone number."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The company's contact email address."
-        },
-        "crNumber": {
-          "type": "string",
-          "description": "The Commercial Registration number."
-        },
-        "logoUrl": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the company's logo."
-        }
-      },
-      "required": ["name"]
-    },
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Represents a user's login account in the system.",
-      "type": "object",
-      "properties": {
-        "uid": {
-          "type": "string",
-          "description": "The unique user ID from Firebase Authentication."
-        },
-        "username": {
-          "type": "string",
-          "description": "The user's unique username for login."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "Auto-generated internal email address (e.g., username@scoop.local)."
-        },
-        "passwordHash": {
-          "type": "string",
-          "description": "The securely hashed password for the user. Hashing should be done server-side."
-        },
-        "employeeId": {
-          "type": "string",
-          "description": "A reference to the corresponding document ID in the 'employees' collection."
-        },
-        "role": {
-          "type": "string",
-          "description": "The user's role in the system.",
-          "enum": ["Admin", "Secretary", "Accountant", "Engineer", "HR"]
-        },
-        "isActive": {
-          "type": "boolean",
-          "description": "Whether the user's account is active and can log in."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when the user account was created."
-        },
-        "activatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when the user account was last activated."
-        },
-        "createdBy": {
-            "type": "string",
-            "description": "The user ID of the admin who created this account."
-        }
-      },
-      "required": [
-        "username",
-        "email",
-        "passwordHash",
-        "employeeId",
-        "role",
-        "isActive",
-        "createdAt",
-        "createdBy"
-      ]
-    },
     "Client": {
       "title": "Client",
-      "description": "Represents a client of the consultancy.",
+      "description": "Represents a client of the Azad engineering office.",
       "type": "object",
       "properties": {
-        "fileId": {
+        "nameEn": {
           "type": "string",
-          "description": "The client's file ID, in the format 'sequence/year' (e.g., '1/2024')."
-        },
-        "fileNumber": {
-          "type": "number",
-          "description": "The sequential part of the client's file ID for a given year."
-        },
-        "fileYear": {
-          "type": "number",
-          "description": "The year of the client's file ID."
+          "description": "The full name of the client in English."
         },
         "nameAr": {
-            "type": "string",
-            "description": "The full name of the client in Arabic."
-        },
-        "nameEn": {
-            "type": "string",
-            "description": "The full name of the client in English."
-        },
-        "mobile": {
           "type": "string",
-          "description": "The client's mobile phone number."
-        },
-        "civilId": {
-            "type": "string",
-            "description": "The client's Civil ID number."
-        },
-        "plotNumber": {
-            "type": "string",
-            "description": "The client's plot number for contracts."
-        },
-        "address": {
-            "type": "object",
-            "description": "The client's address.",
-            "properties": {
-                "governorate": { "type": "string" },
-                "area": { "type": "string" },
-                "block": { "type": "string" },
-                "street": { "type": "string" },
-                "houseNumber": { "type": "string" }
-            }
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the client's file.",
-          "enum": [
-            "new",
-            "contracted",
-            "cancelled",
-            "reContracted"
-          ]
-        },
-        "assignedEngineer": {
-          "type": "string",
-          "description": "The ID of the engineer assigned to this client."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when the client was created."
+          "description": "The full name of the client in Arabic."
         },
         "isActive": {
           "type": "boolean",
-          "description": "Whether the client is active."
+          "description": "Whether the client's file is active."
         }
       },
-      "required": [
-        "fileId",
-        "fileNumber",
-        "fileYear",
-        "nameAr",
-        "mobile",
-        "status",
-        "createdAt",
-        "isActive"
-      ]
-    },
-    "ClientTransaction": {
-        "title": "Client Transaction",
-        "description": "Represents an internal service or transaction for a client, like a design submission.",
-        "type": "object",
-        "properties": {
-            "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
-            "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
-            "description": { "type": "string", "description": "A brief description of the transaction." },
-            "status": {
-                "type": "string",
-                "description": "The current status of the transaction.",
-                "enum": ["new", "in-progress", "completed", "submitted"]
-            },
-            "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
-            "createdAt": { "type": "string", "format": "date-time" },
-            "updatedAt": { "type": "string", "format": "date-time" },
-             "stages": {
-                "type": "array",
-                "description": "The lifecycle stages of the transaction.",
-                "items": { "$ref": "#/entities/TransactionStage" }
-            },
-            "contract": {
-                "type": "object",
-                "description": "Stores the customized contract clauses and total amount for this specific transaction.",
-                "properties": {
-                    "clauses": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": { "type": "string" },
-                                "name": { "type": "string" },
-                                "amount": { "type": "number" },
-                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] },
-                                "percentage": { "type": "number", "description": "The original percentage value if the financial type was 'percentage'."}
-                            },
-                            "required": ["id", "name", "amount", "status"]
-                        }
-                    },
-                    "scopeOfWork": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
-                        "required": ["id", "title"]
-                      }
-                    },
-                    "termsAndConditions": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
-                        "required": ["id", "text"]
-                      }
-                    },
-                    "openClauses": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
-                        "required": ["id", "text"]
-                      }
-                    },
-                    "totalAmount": { "type": "number" },
-                    "financialsType": { "type": "string", "enum": ["fixed", "percentage"] }
-                },
-                "required": ["clauses", "totalAmount"]
-            }
-        },
-        "required": ["clientId", "transactionType", "status", "createdAt"]
-    },
-    "TransactionTimelineEvent": {
-      "title": "Transaction Timeline Event",
-      "description": "Represents a single event (comment or log) in a transaction's history.",
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [ "comment", "log" ],
-          "description": "The type of event."
-        },
-        "content": {
-          "type": "string",
-          "description": "The content of the comment or the description of the log."
-        },
-        "userId": {
-          "type": "string",
-          "description": "The ID of the user who created the event."
-        },
-        "userName": {
-          "type": "string",
-          "description": "The name of the user who created the event."
-        },
-        "userAvatar": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL to the user's avatar image."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [ "type", "content", "userId", "userName", "createdAt" ]
-    },
-     "TransactionStage": {
-      "title": "Transaction Stage",
-      "description": "A single stage within a client transaction's lifecycle.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string", "description": "Name of the stage (e.g., 'Basement Design')." },
-        "status": {
-          "type": "string",
-          "enum": ["pending", "in-progress", "completed", "skipped"],
-          "description": "The current status of the stage."
-        },
-        "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
-        "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
-        "notes": { "type": "string", "description": "Notes specific to this stage." }
-      },
-      "required": ["name", "status"]
-    },
-    "Counter": {
-      "title": "Counter",
-      "description": "Stores sequential counters for various entities.",
-      "type": "object",
-      "properties": {
-        "counts": {
-          "type": "object",
-          "description": "A map of keys (e.g., years) to their current count."
-        }
-      }
-    },
-    "Employee": {
-      "title": "Employee",
-      "description": "Represents an employee in the company.",
-      "properties": {
-        "employeeNumber": { "type": "string", "description": "The unique identifying number for the employee." },
-        "fullName": { "type": "string", "description": "Employee's name in Arabic." },
-        "nameEn": { "type": "string", "description": "Employee's name in English." },
-        "dob": { "type": "string", "format": "date", "description": "Date of birth." },
-        "gender": { "type": "string", "enum": ["male", "female"] },
-        "civilId": { "type": "string" },
-        "nationality": { "type": "string", "description": "The employee's nationality." },
-        "residencyExpiry": { "type": "string", "format": "date" },
-        "contractExpiry": { "type": "string", "format": "date" },
-        "mobile": { "type": "string" },
-        "emergencyContact": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "jobTitle": { "type": "string" },
-        "position": { "type": "string", "enum": ["head", "employee", "assistant", "contractor"] },
-        "workStartTime": { "type": "string", "description": "The official start time for the employee's shift (e.g., '08:00')." },
-        "workEndTime": { "type": "string", "description": "The official end time for the employee's shift (e.g., '17:00')." },
-        "salaryPaymentType": { "type": "string", "enum": ["cash", "cheque", "transfer"] },
-        "bankName": { "type": "string" },
-        "accountNumber": { "type": "string" },
-        "iban": { "type": "string" },
-        "profilePicture": { "type": "string", "format": "uri" },
-        "hireDate": { "type": "string", "format": "date-time" },
-        "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
-        "terminationDate": { "type": ["string", "null"], "format": "date-time" },
-        "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
-        "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor"] },
-        "department": { "type": "string" },
-        "basicSalary": { "type": "number" },
-        "housingAllowance": { "type": "number" },
-        "transportAllowance": { "type": "number" },
-        "status": { "type": "string", "enum": ["active", "on-leave", "terminated"] },
-        "lastVacationAccrualDate": { "type": "string", "format": "date-time" },
-        "annualLeaveAccrued": { "type": "number" },
-        "annualLeaveUsed": { "type": "number" },
-        "carriedLeaveDays": { "type": "number" },
-        "sickLeaveUsed": { "type": "number" },
-        "emergencyLeaveUsed": { "type": "number" },
-        "maxEmergencyLeave": { "type": "number" },
-        "lastLeaveResetDate": { "type": "string", "format": "date-time" },
-        "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." }
-      },
-      "required": [
-        "employeeNumber",
-        "fullName",
-        "nameEn",
-        "civilId",
-        "mobile",
-        "department",
-        "jobTitle",
-        "hireDate",
-        "contractType",
-        "basicSalary",
-        "status"
-      ]
-    },
-    "LeaveRequest": {
-        "title": "Leave Request",
-        "description": "Represents a leave request submitted by an employee.",
-        "type": "object",
-        "properties": {
-            "employeeId": { "type": "string", "description": "ID of the employee requesting leave." },
-            "employeeName": { "type": "string", "description": "Full name of the employee." },
-            "leaveType": { "type": "string", "enum": ["Annual", "Sick", "Emergency", "Unpaid"] },
-            "startDate": { "type": "string", "format": "date-time" },
-            "endDate": { "type": "string", "format": "date-time" },
-            "days": { "type": "number", "description": "Total number of leave days." },
-            "workingDays": { "type": "number", "description": "Total number of calculated working days." },
-            "notes": { "type": "string", "description": "Reason or notes for the leave." },
-            "attachmentUrl": { "type": "string", "format": "uri", "description": "URL to a medical report or other document." },
-            "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The current status of the leave request." },
-            "createdAt": { "type": "string", "format": "date-time" },
-            "approvedBy": { "type": "string", "description": "UID of the user who approved/rejected the request." },
-            "approvedAt": { "type": "string", "format": "date-time" },
-            "rejectionReason": { "type": "string", "description": "Reason for rejecting the leave request." },
-            "isBackFromLeave": { "type": "boolean", "description": "Indicates if the employee has returned from this specific leave." },
-            "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." }
-        },
-        "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
-    },
-    "Holiday": {
-        "title": "Holiday",
-        "description": "Represents an official public holiday.",
-        "type": "object",
-        "properties": {
-            "name": { "type": "string", "description": "The name of the holiday." },
-            "date": { "type": "string", "format": "date", "description": "The date of the holiday." }
-        },
-        "required": ["name", "date"]
-    },
-    "AuditLog": {
-        "title": "Audit Log",
-        "description": "Records changes made to employee data for historical tracking.",
-        "type": "object",
-        "properties": {
-            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate"] },
-            "field": { "type": "string", "description": "The name of the field that was changed." },
-            "oldValue": { "description": "The value of the field before the change." },
-            "newValue": { "description": "The value of the field after the change." },
-            "effectiveDate": { "type": "string", "format": "date-time", "description": "The date when this change becomes effective." },
-            "changedBy": { "type": "string", "description": "The ID of the user who made the change." },
-            "notes": { "type": "string", "description": "Additional notes about the change." }
-        },
-        "required": ["changeType", "field", "newValue", "effectiveDate", "changedBy"]
-    },
-    "MonthlyAttendance": {
-      "title": "Monthly Attendance",
-      "description": "An employee's attendance records and summary for a specific month.",
-      "type": "object",
-      "properties": {
-        "employeeId": { "type": "string" },
-        "year": { "type": "number" },
-        "month": { "type": "number" },
-        "records": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "date": { "type": "string", "format": "date" },
-              "checkIn": { "type": "string" },
-              "checkOut": { "type": "string" },
-              "status": { "type": "string", "enum": ["present", "absent", "late", "leave"] }
-            },
-            "required": ["date", "status"]
-          }
-        },
-        "summary": {
-          "type": "object",
-          "properties": {
-            "totalDays": { "type": "number" },
-            "presentDays": { "type": "number" },
-            "absentDays": { "type": "number" },
-            "lateDays": { "type": "number" },
-            "leaveDays": { "type": "number" }
-          },
-          "required": ["presentDays", "absentDays", "lateDays", "leaveDays"]
-        }
-      },
-      "required": ["employeeId", "year", "month", "records", "summary"]
-    },
-    "Payslip": {
-      "title": "Payslip",
-      "description": "An employee's payslip for a specific month.",
-      "type": "object",
-      "properties": {
-        "employeeId": { "type": "string" },
-        "employeeName": { "type": "string" },
-        "year": { "type": "number" },
-        "month": { "type": "number" },
-        "attendanceId": { "type": "string", "description": "Reference to the attendance document ID." },
-        "salaryPaymentType": { "type": "string", "enum": ["cash", "cheque", "transfer"] },
-        "earnings": {
-          "type": "object",
-          "properties": {
-            "basicSalary": { "type": "number" },
-            "housingAllowance": { "type": "number" },
-            "transportAllowance": { "type": "number" }
-          },
-           "required": ["basicSalary"]
-        },
-        "deductions": {
-          "type": "object",
-          "properties": {
-            "absenceDeduction": { "type": "number" },
-            "otherDeductions": { "type": "number" }
-          }
-        },
-        "netSalary": { "type": "number" },
-        "status": { "type": "string", "enum": ["draft", "processed", "paid"] },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["employeeId", "year", "month", "earnings", "netSalary", "status", "createdAt"]
-    },
-    "Notification": {
-      "title": "Notification",
-      "description": "Represents a notification for a user about an event in the system.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string", "description": "The ID of the user to whom the notification is sent." },
-        "title": { "type": "string", "description": "A short, bolded title for the notification." },
-        "body": { "type": "string", "description": "The main content of the notification message." },
-        "link": { "type": "string", "description": "The URL the user will be redirected to upon clicking the notification." },
-        "isRead": { "type": "boolean", "description": "Whether the user has read the notification." },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "title", "body", "link", "isRead", "createdAt"]
+      "required": ["nameAr", "isActive"]
     },
     "Department": {
       "title": "Department",
-      "description": "Represents a department in the company.",
+      "description": "Represents a department in the company (e.g., Architectural, Structural).",
       "type": "object",
       "properties": {
-        "name": {
+        "nameEn": {
           "type": "string",
-          "description": "The name of the department."
+          "description": "The name of the department in English."
+        },
+        "nameAr": {
+          "type": "string",
+          "description": "The name of the department in Arabic."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the department is active."
         }
       },
-      "required": ["name"]
+      "required": ["nameAr", "isActive"]
     },
-    "Job": {
-      "title": "Job",
-      "description": "Represents a job title within a department.",
+    "Employee": {
+      "title": "Employee",
+      "description": "Represents an engineer or employee linked to Firebase Authentication.",
       "type": "object",
       "properties": {
-        "name": {
+        "userId": {
           "type": "string",
-          "description": "The name of the job."
+          "description": "The UID from Firebase Authentication for this user."
+        },
+        "nameEn": {
+          "type": "string",
+          "description": "The full name of the employee in English."
+        },
+        "nameAr": {
+          "type": "string",
+          "description": "The full name of the employee in Arabic."
+        },
+        "departmentId": {
+          "type": "string",
+          "description": "A reference to the document ID in the 'departments' collection."
+        },
+        "hourlyRate": {
+          "type": "number",
+          "description": "The cost rate per hour for this employee in KWD."
         }
       },
-      "required": ["name"]
+      "required": ["userId", "nameAr", "departmentId", "hourlyRate"]
     },
-    "Governorate": {
-      "title": "Governorate",
-      "description": "Represents a governorate in the country.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the governorate."
-        }
-      },
-      "required": ["name"]
-    },
-    "Area": {
-      "title": "Area",
-      "description": "Represents an area within a governorate.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the area."
-        }
-      },
-      "required": ["name"]
-    },
-    "TransactionType": {
-      "title": "Transaction Type",
-      "description": "Represents a type of internal client transaction.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the transaction type."
-        }
-      },
-      "required": ["name"]
-    },
-    "Appointment": {
-      "title": "Appointment",
-      "description": "Represents a scheduled meeting or visit.",
+    "Project": {
+      "title": "Project",
+      "description": "Represents a single engineering project.",
       "type": "object",
       "properties": {
         "clientId": {
           "type": "string",
-          "description": "The ID of the client for this appointment."
+          "description": "A reference to the document ID in the 'clients' collection."
         },
-        "engineerId": {
+        "nameEn": {
           "type": "string",
-          "description": "The ID of the employee attending the appointment."
+          "description": "The name of the project in English."
         },
-        "meetingRoom": {
+        "nameAr": {
           "type": "string",
-          "description": "The name of the meeting room, if applicable (for non-architectural appointments)."
+          "description": "The name of the project in Arabic."
         },
-        "department": {
+        "status": {
           "type": "string",
-          "description": "The department associated with the appointment, used for color-coding.",
-          "enum": ["الكهرباء", "الصحي", "الإنشائي", "المعماري", "أخرى"]
-        },
-        "title": {
-          "type": "string",
-          "description": "The purpose or title of the appointment."
-        },
-        "notes": {
-          "type": "string",
-          "description": "Additional notes about the appointment."
-        },
-        "type": {
-          "type": "string",
-          "description": "Distinguishes between architectural appointments and room bookings.",
-          "enum": ["architectural", "room"]
-        },
-        "appointmentDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The start date and time of the appointment."
-        },
-        "endDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The end date and time of the appointment."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
+          "description": "The current status of the project.",
+          "enum": ["active", "completed", "on-hold", "cancelled"]
         }
       },
-      "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+      "required": ["clientId", "nameAr", "status"]
     },
-    "Contract": {
-      "title": "Contract",
-      "description": "Represents a fully dynamic, user-generated contract.",
+    "CashReceipt": {
+      "title": "Cash Receipt",
+      "description": "Represents a cash receipt voucher to track revenue from clients.",
       "type": "object",
       "properties": {
-        "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
-        "companySnapshot": { "type": "object", "description": "A snapshot of company data at time of creation." },
-        "title": { "type": "string" },
-        "contractDate": { "type": "string", "format": "date-time" },
-        "scopeOfWork": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
-            "required": ["id", "title"]
-          }
-        },
-        "termsAndConditions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
-            "required": ["id", "text"]
-          }
-        },
-        "financials": {
-          "type": "object",
-          "properties": {
-            "type": { "type": "string", "enum": ["fixed", "percentage"] },
-            "totalAmount": { "type": "number" },
-            "discount": { "type": "number" },
-            "milestones": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string" },
-                  "name": { "type": "string" },
-                  "condition": { "type": "string" },
-                  "value": { "type": "number" }
-                },
-                "required": ["id", "name", "value"]
-              }
-            }
-          }
-        },
-        "openClauses": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
-            "required": ["id", "text"]
-          }
-        },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "createdBy": { "type": "string" }
-      },
-      "required": ["clientId", "title", "contractDate", "createdAt"]
-    },
-    "ContractTemplate": {
-      "title": "Contract Template",
-      "description": "A reusable template for generating contracts.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "transactionTypes": { "type": "array", "items": { "type": "string" } },
-        "scopeOfWork": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
-            "required": ["id", "title"]
-          }
-        },
-        "termsAndConditions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
-            "required": ["id", "text"]
-          }
-        },
-        "financials": {
-          "type": "object",
-          "properties": {
-            "type": { "type": "string", "enum": ["fixed", "percentage"] },
-            "totalAmount": { "type": "number" },
-            "discount": { "type": "number" },
-            "milestones": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string" },
-                  "name": { "type": "string" },
-                  "condition": { "type": "string" },
-                  "value": { "type": "number" }
-                },
-                "required": ["id", "name", "value"]
-              }
-            }
-          }
-        },
-        "openClauses": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
-            "required": ["id", "text"]
-          }
-        }
-      },
-      "required": ["title"]
-    },
-    "ChartOfAccount": {
-      "title": "Chart of Account",
-      "description": "Represents an account in the chart of accounts.",
-      "type": "object",
-      "properties": {
-        "code": {
+        "clientId": {
           "type": "string",
-          "description": "The unique code for the account."
+          "description": "The ID of the client making the payment."
         },
-        "name": {
+        "projectId": {
           "type": "string",
-          "description": "The name of the account in Arabic."
+          "description": "Optional ID of the project this receipt is for."
         },
-        "type": {
-          "type": "string",
-          "enum": ["asset", "liability", "equity", "income", "expense"],
-          "description": "The type of the account."
-        },
-        "level": {
+        "amount": {
           "type": "number",
-          "description": "The indentation level in the chart tree, derived from code length."
+          "description": "The amount received in KWD."
+        },
+        "receiptDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the payment was received."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of payment.",
+          "enum": ["advance", "milestone", "final"]
+        },
+        "clientNameEn": {
+          "type": "string",
+          "description": "Automatically populated client name in English."
+        },
+        "clientNameAr": {
+          "type": "string",
+          "description": "Automatically populated client name in Arabic."
+        },
+        "projectNameEn": {
+          "type": "string",
+          "description": "Optional automatically populated project name in English."
+        },
+        "projectNameAr": {
+          "type": "string",
+          "description": "Optional automatically populated project name in Arabic."
         }
       },
-      "required": ["code", "name", "type", "level"]
+      "required": ["clientId", "amount", "receiptDate", "type", "clientNameAr"]
+    },
+    "TimeCost": {
+      "title": "Time Cost",
+      "description": "Represents the actual cost of time spent by an employee on a project.",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The ID of the employee who spent the time."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "The ID of the project worked on."
+        },
+        "hours": {
+          "type": "number",
+          "description": "The number of hours spent."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the work was performed."
+        },
+        "hourlyRate": {
+          "type": "number",
+          "description": "The employee's hourly rate at the time of work."
+        },
+        "totalCost": {
+          "type": "number",
+          "description": "Automatically calculated cost (hours * hourlyRate)."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Auto-populated: The client associated with the project."
+        },
+        "employeeNameEn": {
+          "type": "string",
+          "description": "Auto-populated: The employee's name in English."
+        },
+        "employeeNameAr": {
+          "type": "string",
+          "description": "Auto-populated: The employee's name in Arabic."
+        },
+        "departmentId": {
+          "type": "string",
+          "description": "Auto-populated: The employee's department ID."
+        },
+        "departmentNameEn": {
+          "type": "string",
+          "description": "Auto-populated: The department's name in English."
+        },
+        "departmentNameAr": {
+          "type": "string",
+          "description": "Auto-populated: The department's name in Arabic."
+        },
+        "projectNameEn": {
+          "type": "string",
+          "description": "Auto-populated: The project's name in English."
+        },
+        "projectNameAr": {
+          "type": "string",
+          "description": "Auto-populated: The project's name in Arabic."
+        }
+      },
+      "required": [
+        "employeeId",
+        "projectId",
+        "hours",
+        "date",
+        "hourlyRate",
+        "totalCost",
+        "clientId",
+        "employeeNameAr",
+        "departmentId",
+        "departmentNameAr",
+        "projectNameAr"
+      ]
     }
   },
   "auth": {
@@ -766,121 +223,41 @@
     ]
   },
   "firestore": {
-    "/companies/{companyId}": {
-      "schema": {
-        "$ref": "#/entities/Company"
-      },
-      "description": "Stores company profiles."
-    },
-    "/users/{userId}": {
-      "schema": {
-        "$ref": "#/entities/UserProfile"
-      },
-      "description": "Stores user login accounts, linked to employees."
-    },
     "/clients/{clientId}": {
       "schema": {
         "$ref": "#/entities/Client"
       },
-      "description": "Stores information about the company's clients."
-    },
-    "/clients/{clientId}/transactions/{transactionId}": {
-        "schema": {
-            "$ref": "#/entities/ClientTransaction"
-        },
-        "description": "Stores internal transactions/services for a specific client."
-    },
-    "/clients/{clientId}/transactions/{transactionId}/timelineEvents/{eventId}": {
-      "schema": {
-        "$ref": "#/entities/TransactionTimelineEvent"
-      },
-      "description": "Stores the chronological history and comments for a specific transaction."
-    },
-    "/clients/{clientId}/history/{eventId}": {
-      "schema": {
-        "$ref": "#/entities/TransactionTimelineEvent"
-      },
-      "description": "Stores the audit history and important events for a client file."
-    },
-    "/counters/{counterId}": {
-      "schema": {
-        "$ref": "#/entities/Counter"
-      },
-      "description": "Stores shared counters. e.g., counterId = 'clientFiles'."
-    },
-    "/employees/{employeeId}": {
-        "schema": { "$ref": "#/entities/Employee" },
-        "description": "Stores HR information about company employees."
-    },
-    "/employees/{employeeId}/auditLogs/{logId}": {
-        "schema": { "$ref": "#/entities/AuditLog" },
-        "description": "Stores the historical audit trail of changes for a specific employee."
-    },
-    "/leaveRequests/{leaveRequestId}": {
-        "schema": { "$ref": "#/entities/LeaveRequest" },
-        "description": "Stores all employee leave requests."
-    },
-    "/holidays/{holidayId}": {
-        "schema": { "$ref": "#/entities/Holiday" },
-        "description": "Stores all official public holidays."
-    },
-    "/attendance/{attendanceId}": {
-      "schema": { "$ref": "#/entities/MonthlyAttendance" },
-      "description": "Stores monthly attendance sheets for employees. The ID is a composite of year-month-employeeId."
-    },
-    "/payroll/{payslipId}": {
-      "schema": { "$ref": "#/entities/Payslip" },
-      "description": "Stores generated monthly payslips for employees. The ID is a composite of year-month-employeeId."
-    },
-    "/notifications/{notificationId}": {
-      "schema": {
-        "$ref": "#/entities/Notification"
-      },
-      "description": "Stores notifications for all users."
+      "description": "Stores client profiles for the Azad engineering office."
     },
     "/departments/{departmentId}": {
-      "schema": { "$ref": "#/entities/Department" },
-      "description": "Stores company departments."
-    },
-    "/departments/{departmentId}/jobs/{jobId}": {
-        "schema": { "$ref": "#/entities/Job" },
-        "description": "Stores job titles for a specific department."
-    },
-    "/departments/{departmentId}/transactionTypes/{transactionTypeId}": {
-        "schema": { "$ref": "#/entities/TransactionType" },
-        "description": "Stores transaction types for a specific department."
-    },
-    "/governorates/{governorateId}": {
-      "schema": { "$ref": "#/entities/Governorate" },
-      "description": "Stores country governorates."
-    },
-    "/governorates/{governorateId}/areas/{areaId}": {
-        "schema": { "$ref": "#/entities/Area" },
-        "description": "Stores areas for a specific governorate."
-    },
-    "/appointments/{appointmentId}": {
       "schema": {
-        "$ref": "#/entities/Appointment"
+        "$ref": "#/entities/Department"
       },
-      "description": "Stores all scheduled appointments."
+      "description": "Stores company departments like 'Structural' and 'Architectural'."
     },
-    "/contracts/{contractId}": {
+    "/employees/{employeeId}": {
       "schema": {
-        "$ref": "#/entities/Contract"
+        "$ref": "#/entities/Employee"
       },
-      "description": "Stores dynamically generated contracts."
+      "description": "Stores employee data, including their department and hourly rate."
     },
-    "/contractTemplates/{templateId}": {
+    "/projects/{projectId}": {
       "schema": {
-        "$ref": "#/entities/ContractTemplate"
+        "$ref": "#/entities/Project"
       },
-      "description": "Stores reusable contract templates for various transaction types."
+      "description": "Stores information about individual engineering projects."
     },
-    "/chartOfAccounts/{accountId}": {
+    "/cashReceipts/{cashReceiptId}": {
       "schema": {
-        "$ref": "#/entities/ChartOfAccount"
+        "$ref": "#/entities/CashReceipt"
       },
-      "description": "Stores the company's chart of accounts."
+      "description": "Tracks all incoming cash flow from clients for projects or general payments."
+    },
+    "/timeCosts/{timeCostId}": {
+      "schema": {
+        "$ref": "#/entities/TimeCost"
+      },
+      "description": "Tracks the actual cost incurred by employees working on various projects."
     }
   }
 }
