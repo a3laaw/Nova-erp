@@ -18,10 +18,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, ArrowRight, MoreHorizontal, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { PlusCircle, ArrowRight, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -82,6 +82,54 @@ const accountTypeColors: Record<Account['type'], string> = {
     income: 'bg-green-100 text-green-800',
     expense: 'bg-orange-100 text-orange-800',
 };
+
+// Define default chart of accounts
+const defaultChartOfAccounts: Omit<Account, 'id'>[] = [
+    // الأصول
+    { code: '1', name: 'الأصول', type: 'asset', level: 0 },
+    { code: '11', name: 'الأصول المتداولة', type: 'asset', level: 1 },
+    { code: '1101', name: 'النقدية وما في حكمها', type: 'asset', level: 2 },
+    { code: '110101', name: 'الصندوق', type: 'asset', level: 3 },
+    { code: '110102', name: 'البنوك', type: 'asset', level: 3 },
+    { code: '1102', name: 'الذمم المدينة', type: 'asset', level: 2 },
+    { code: '110201', name: 'العملاء', type: 'asset', level: 3 },
+    { code: '1103', name: 'المخزون', type: 'asset', level: 2 },
+    { code: '12', name: 'الأصول غير المتداولة', type: 'asset', level: 1 },
+    { code: '1201', name: 'الأصول الثابتة', type: 'asset', level: 2 },
+    { code: '120101', name: 'الأراضي والمباني', type: 'asset', level: 3 },
+    { code: '120102', name: 'الأثاث والمعدات', type: 'asset', level: 3 },
+
+    // الخصوم
+    { code: '2', name: 'الخصوم (الالتزامات)', type: 'liability', level: 0 },
+    { code: '21', name: 'الخصوم المتداولة', type: 'liability', level: 1 },
+    { code: '2101', name: 'الذمم الدائنة', type: 'liability', level: 2 },
+    { code: '210101', name: 'الموردون', type: 'liability', level: 3 },
+    { code: '2102', name: 'المصروفات المستحقة', type: 'liability', level: 2 },
+    { code: '2103', name: 'الضرائب المستحقة', type: 'liability', level: 2 },
+    { code: '210301', name: 'ضريبة القيمة المضافة المستحقة', type: 'liability', level: 3 },
+    { code: '22', name: 'الخصوم غير المتداولة', type: 'liability', level: 1 },
+    { code: '2201', name: 'القروض طويلة الأجل', type: 'liability', level: 2 },
+
+    // حقوق الملكية
+    { code: '3', name: 'حقوق الملكية', type: 'equity', level: 0 },
+    { code: '31', name: 'رأس المال', type: 'equity', level: 1 },
+    { code: '3101', name: 'رأس المال المدفوع', type: 'equity', level: 2 },
+    { code: '32', name: 'الأرباح المحتجزة', type: 'equity', level: 1 },
+
+    // الإيرادات
+    { code: '4', name: 'الإيرادات', type: 'income', level: 0 },
+    { code: '41', name: 'إيرادات النشاط الرئيسي', type: 'income', level: 1 },
+    { code: '4101', name: 'إيرادات استشارات هندسية', type: 'income', level: 2 },
+    { code: '42', name: 'إيرادات أخرى', type: 'income', level: 1 },
+
+    // المصروفات
+    { code: '5', name: 'المصروفات', type: 'expense', level: 0 },
+    { code: '51', name: 'تكلفة الإيرادات', type: 'expense', level: 1 },
+    { code: '52', name: 'المصاريف العمومية والإدارية', type: 'expense', level: 1 },
+    { code: '5201', name: 'رواتب وأجور', type: 'expense', level: 2 },
+    { code: '5202', name: 'مصاريف إيجار', type: 'expense', level: 2 },
+    { code: '5203', name: 'مصاريف كهرباء ومياه', type: 'expense', level: 2 },
+];
 
 
 function AccountForm({ isOpen, onClose, onSave, account }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null }) {
@@ -154,6 +202,7 @@ export default function ChartOfAccountsPage() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -227,6 +276,26 @@ export default function ChartOfAccountsPage() {
         }
     };
 
+    const handleSeedChartOfAccounts = async () => {
+        if (!firestore) return;
+        setIsSeeding(true);
+        try {
+            const batch = writeBatch(firestore);
+            const accountsRef = collection(firestore, 'chartOfAccounts');
+            defaultChartOfAccounts.forEach(account => {
+                const docRef = doc(accountsRef);
+                batch.set(docRef, account);
+            });
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم تنزيل شجرة الحسابات الأساسية بنجاح.' });
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنزيل شجرة الحسابات.' });
+        } finally {
+            setIsSeeding(false);
+        }
+    };
+
 
     return (
         <div className="space-y-6" dir="rtl">
@@ -268,7 +337,17 @@ export default function ChartOfAccountsPage() {
                                 ))}
                                 {!loading && accounts.length === 0 && (
                                      <TableRow>
-                                        <TableCell colSpan={4} className="text-center h-24">لا توجد حسابات. ابدأ بإضافة حساب جديد.</TableCell>
+                                        <TableCell colSpan={4} className="text-center h-48">
+                                            <div className="flex flex-col items-center justify-center gap-4">
+                                                <p className="text-muted-foreground">
+                                                    لا توجد حسابات. ابدأ بإضافة حساب جديد، أو قم بتنزيل شجرة حسابات أساسية للبدء.
+                                                </p>
+                                                <Button onClick={handleSeedChartOfAccounts} disabled={isSeeding}>
+                                                    {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                                    {isSeeding ? 'جاري التنزيل...' : 'تنزيل شجرة حسابات أساسية'}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
                                     </TableRow>
                                 )}
                                 {!loading && accounts.map((account) => (
