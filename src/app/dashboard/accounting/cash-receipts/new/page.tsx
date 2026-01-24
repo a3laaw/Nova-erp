@@ -330,139 +330,144 @@ export default function NewCashReceiptPage() {
     setClientProjects([]);
     setDescription('');
   };
+  
+  const handlePrint = () => {
+    window.print();
+  };
 
 
   return (
     <Card className="max-w-4xl mx-auto">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
-                <CardTitle>سـنـد قـبـض / Cash Receipt Voucher</CardTitle>
-                <CardDescription>{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
-            </div>
-            {companyLoading ? (
-                <div className='text-left space-y-1'>
-                    <Skeleton className="h-5 w-64" />
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-4 w-32" />
+        <div className="printable-content print:p-8">
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>سـنـد قـبـض / Cash Receipt Voucher</CardTitle>
+                        <CardDescription>{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
+                    </div>
+                    {companyLoading ? (
+                        <div className='text-left space-y-1'>
+                            <Skeleton className="h-5 w-64" />
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-4 w-32" />
+                        </div>
+                    ) : company ? (
+                        <div className='text-left'>
+                            <p className='font-semibold'>{company.nameEn || company.name}</p>
+                            <p className='text-sm text-muted-foreground'>{company.address}</p>
+                            <p className='text-sm text-muted-foreground'>CR: {company.crNumber}</p>
+                        </div>
+                    ) : (
+                        <div className='text-left'>
+                            <p className='font-semibold'>Dar Belaih Al-Mesfir Engineering Consultants</p>
+                            <p className='text-sm text-muted-foreground'>Kuwait City, Kuwait</p>
+                            <p className='text-sm text-muted-foreground'>CR: 123456</p>
+                        </div>
+                    )}
                 </div>
-            ) : company ? (
-                <div className='text-left'>
-                    <p className='font-semibold'>{company.nameEn || company.name}</p>
-                    <p className='text-sm text-muted-foreground'>{company.address}</p>
-                    <p className='text-sm text-muted-foreground'>CR: {company.crNumber}</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <div className="md:col-span-2 grid gap-2">
+                    <Label htmlFor="receivedFrom">استلمنا من السيد/السادة <span className="text-destructive">*</span></Label>
+                    <InlineSearchList 
+                        value={selectedClientId}
+                        onSelect={handleClientChange}
+                        options={clientOptions}
+                        placeholder={clientsLoading ? 'جاري التحميل...' : 'ابحث عن عميل بالاسم أو الجوال...'}
+                        disabled={clientsLoading || isSaving}
+                    />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
+                        <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
+                    </div>
                 </div>
-            ) : (
-                <div className='text-left'>
-                    <p className='font-semibold'>Dar Belaih Al-Mesfir Engineering Consultants</p>
-                    <p className='text-sm text-muted-foreground'>Kuwait City, Kuwait</p>
-                    <p className='text-sm text-muted-foreground'>CR: 123456</p>
+                
+                <div className="grid gap-2">
+                    <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
+                    <InlineSearchList 
+                        value={selectedProjectId}
+                        onSelect={setSelectedProjectId}
+                        options={projectOptions}
+                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب العقود...' : 'اختر العقد المراد سداد دفعة له...'}
+                        disabled={!selectedClientId || projectsLoading || isSaving}
+                    />
                 </div>
-            )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-            <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="receivedFrom">استلمنا من السيد/السادة <span className="text-destructive">*</span></Label>
-              <InlineSearchList 
-                value={selectedClientId}
-                onSelect={handleClientChange}
-                options={clientOptions}
-                placeholder={clientsLoading ? 'جاري التحميل...' : 'ابحث عن عميل بالاسم أو الجوال...'}
-                disabled={clientsLoading || isSaving}
-              />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
-            </div>
-        </div>
-        
-        <div className="grid gap-2">
-            <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
-            <InlineSearchList 
-                value={selectedProjectId}
-                onSelect={setSelectedProjectId}
-                options={projectOptions}
-                placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب العقود...' : 'اختر العقد المراد سداد دفعة له...'}
-                disabled={!selectedClientId || projectsLoading || isSaving}
-            />
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="grid gap-2">
-                <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
-            </div>
-            <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
-               <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
-                 {amountInWords || '(سيتم ملؤه تلقائياً)'}
-              </div>
-            </div>
-        </div>
-        <div className="grid gap-2">
-            <Label htmlFor="description">وذلك عن</Label>
-            <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="grid gap-2">
-                <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
-                 <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                    <SelectTrigger id="paymentMethod">
-                        <SelectValue placeholder="اختر طريقة الدفع" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Cash">نقداً</SelectItem>
-                        <SelectItem value="Cheque">شيك</SelectItem>
-                        <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
-                        <SelectItem value="K-Net">كي-نت</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-             <div className="grid gap-2">
-                <Label htmlFor="type">نوع الدفعة (يدوي)</Label>
-                <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving || !!selectedProjectId}>
-                    <SelectTrigger id="type">
-                        <SelectValue placeholder="اختر نوع الدفعة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="advance">دفعة مقدمة</SelectItem>
-                        <SelectItem value="milestone">دفعة مرحلية</SelectItem>
-                        <SelectItem value="final">دفعة أخيرة</SelectItem>
-                        <SelectItem value="other">أخرى</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-              <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
-            </div>
-        </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
+                        <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    </div>
+                    <div className="md:col-span-2 grid gap-2">
+                    <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
+                    <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
+                        {amountInWords || '(سيتم ملؤه تلقائياً)'}
+                    </div>
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="description">وذلك عن</Label>
+                    <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
+                        <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
+                            <SelectTrigger id="paymentMethod">
+                                <SelectValue placeholder="اختر طريقة الدفع" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Cash">نقداً</SelectItem>
+                                <SelectItem value="Cheque">شيك</SelectItem>
+                                <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
+                                <SelectItem value="K-Net">كي-نت</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="type">نوع الدفعة (يدوي)</Label>
+                        <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving || !!selectedProjectId}>
+                            <SelectTrigger id="type">
+                                <SelectValue placeholder="اختر نوع الدفعة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="advance">دفعة مقدمة</SelectItem>
+                                <SelectItem value="milestone">دفعة مرحلية</SelectItem>
+                                <SelectItem value="final">دفعة أخيرة</SelectItem>
+                                <SelectItem value="other">أخرى</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-2">
+                    <Label htmlFor="reference">رقم الشيك/المرجع</Label>
+                    <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
+                    </div>
+                </div>
 
-        <div className="grid grid-cols-2 gap-20 pt-16">
-            <div className="text-center">
-                <div className="border-t pt-2">
-                    <p className="font-semibold">المستلم</p>
-                    <p className="text-sm text-muted-foreground">Receiver's Signature</p>
+                <div className="grid grid-cols-2 gap-20 pt-16">
+                    <div className="text-center">
+                        <div className="border-t pt-2">
+                            <p className="font-semibold">المستلم</p>
+                            <p className="text-sm text-muted-foreground">Receiver's Signature</p>
+                        </div>
+                    </div>
+                    <div className="text-center">
+                        <div className="border-t pt-2">
+                            <p className="font-semibold">المحاسب</p>
+                            <p className="text-sm text-muted-foreground">Accountant's Signature</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div className="text-center">
-                <div className="border-t pt-2">
-                    <p className="font-semibold">المحاسب</p>
-                     <p className="text-sm text-muted-foreground">Accountant's Signature</p>
-                </div>
-            </div>
+            </CardContent>
         </div>
-        
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
+      <CardFooter className="flex justify-end gap-2 no-print">
         <Button variant="outline" onClick={() => router.push('/dashboard/accounting')} disabled={isSaving}>
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button variant="outline" disabled={isSaving}>
+        <Button variant="outline" disabled={isSaving} onClick={handlePrint}>
             <Printer className="ml-2 h-4 w-4" />
             طباعة
         </Button>
