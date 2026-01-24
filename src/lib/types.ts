@@ -332,6 +332,8 @@ export interface TransactionStage {
   status: 'pending' | 'in-progress' | 'completed' | 'skipped';
   startDate: any | null;
   endDate: any | null;
+  durationDays?: number;
+  expectedEndDate?: any | null;
   notes?: string;
 }
       

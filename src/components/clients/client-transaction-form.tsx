@@ -200,9 +200,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const stagesTemplate = transactionStageTemplates[transactionType];
             const initialStages = stagesTemplate ? stagesTemplate.map(name => ({
                 name,
-                status: 'pending',
+                status: 'pending' as const,
                 startDate: null,
                 endDate: null,
+                durationDays: 2, // Default duration
+                expectedEndDate: null,
                 notes: ''
             })) : [];
 

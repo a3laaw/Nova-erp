@@ -32,6 +32,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 import { cn } from '@/lib/utils';
+import { format, isPast, formatDistanceToNowStrict } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 
 // Using the same translation objects from client profile page
@@ -233,12 +235,26 @@ export default function TransactionDetailPage() {
 
     const updatedStages = [...stages];
     const stage = updatedStages[stageIndex];
+    const oldStatus = stage.status;
     stage.status = newStatus;
-    if (newStatus === 'in-progress' && !stage.startDate) {
-        stage.startDate = Timestamp.now();
+
+    if (newStatus === 'in-progress' && oldStatus !== 'in-progress') {
+        const startDate = Timestamp.now();
+        stage.startDate = startDate;
+        if (stage.durationDays && stage.durationDays > 0) {
+            const expectedEndDate = new Date(startDate.toDate().getTime());
+            expectedEndDate.setDate(expectedEndDate.getDate() + stage.durationDays);
+            stage.expectedEndDate = Timestamp.fromDate(expectedEndDate);
+        }
     }
-    if (newStatus === 'completed') {
+    
+    if (newStatus === 'completed' && oldStatus !== 'completed') {
         stage.endDate = Timestamp.now();
+    }
+
+    if (newStatus === 'pending' && oldStatus === 'in-progress') {
+      stage.startDate = null;
+      stage.expectedEndDate = null;
     }
     
     setStages(updatedStages); // Optimistic update
@@ -269,6 +285,24 @@ export default function TransactionDetailPage() {
         // Revert optimistic update on error
         setStages(transaction.stages || []);
     }
+  };
+
+  const renderStageTiming = (stage: TransactionStage) => {
+    if (stage.status !== 'in-progress' || !stage.expectedEndDate) {
+        return null;
+    }
+    
+    const expectedEndDate = stage.expectedEndDate.toDate();
+    const now = new Date();
+    const isOverdue = isPast(expectedEndDate);
+    
+    const distance = formatDistanceToNowStrict(expectedEndDate, { addSuffix: true, locale: ar });
+
+    return (
+        <Badge variant={isOverdue ? "destructive" : "secondary"}>
+            {isOverdue ? `متأخر ${distance}` : `متبقي ${distance}`}
+        </Badge>
+    );
   };
 
 
@@ -427,6 +461,7 @@ export default function TransactionDetailPage() {
                                                 {stageStatusTranslations[stage.status]}
                                             </Badge>
                                             <div className="font-semibold">{stage.name}</div>
+                                            {renderStageTiming(stage)}
                                         </div>
                                         <div className="flex gap-2">
                                             {stage.status === 'pending' && (
