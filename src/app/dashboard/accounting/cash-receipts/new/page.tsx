@@ -28,6 +28,7 @@ import type { Client, Company } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { numberToArabicWords } from '@/lib/utils';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -53,6 +54,15 @@ export default function NewCashReceiptPage() {
   useEffect(() => {
     setDate(new Date().toISOString().split('T')[0]);
   }, []);
+
+  useEffect(() => {
+    if (amount && !isNaN(parseFloat(amount))) {
+        setAmountInWords(numberToArabicWords(amount));
+    } else {
+        setAmountInWords('');
+    }
+}, [amount]);
+
 
   useEffect(() => {
     if (!firestore) return;
