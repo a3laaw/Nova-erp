@@ -9,7 +9,7 @@ import { useFirebase, useDoc } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
 import type { CashReceipt, Company } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 
@@ -160,10 +160,15 @@ export default function ViewCashReceiptPage() {
                         </div>
                     </div>
                     
-                     <div className="grid grid-cols-3 gap-8 pt-4">
+                     <div className={cn("grid gap-8 pt-4", receipt.paymentMethod !== 'Cash' && receipt.reference ? 'grid-cols-2' : 'grid-cols-1')}>
                          <InfoRow label="طريقة الدفع" value={paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod} />
-                         <InfoRow label="نوع الدفعة" value={receipt.type} />
-                         <InfoRow label="رقم الشيك/المرجع" value={receipt.reference} />
+                         
+                         {receipt.paymentMethod !== 'Cash' && receipt.reference && (
+                             <InfoRow 
+                                label={receipt.paymentMethod === 'Cheque' ? 'رقم الشيك' : 'رقم المرجع'} 
+                                value={receipt.reference} 
+                             />
+                         )}
                     </div>
                 </main>
                 
