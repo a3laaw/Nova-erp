@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -28,7 +27,7 @@ import type { InvoiceStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Sparkles } from 'lucide-react';
+import { PlusCircle, Sparkles, Library } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import { format } from 'date-fns';
 
@@ -65,6 +64,7 @@ export default function AccountingPage() {
           <TabsList>
             <TabsTrigger value="invoices">الفواتير</TabsTrigger>
             <TabsTrigger value="cash-receipts">سندات القبض</TabsTrigger>
+            <TabsTrigger value="chart-of-accounts">شجرة الحسابات</TabsTrigger>
             <TabsTrigger value="transactions">الإيرادات/المصروفات</TabsTrigger>
             <TabsTrigger value="reports">التقارير</TabsTrigger>
           </TabsList>
@@ -111,6 +111,20 @@ export default function AccountingPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                     سيتم عرض قائمة بجميع سندات القبض هنا.
                 </p>
+            </div>
+          </TabsContent>
+          <TabsContent value="chart-of-accounts" className="mt-4">
+            <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                <Library className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium">عرض شجرة الحسابات</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    لعرض وتعديل دليل الحسابات الخاص بالشركة، انتقل إلى الصفحة المخصصة.
+                </p>
+                <Button asChild className="mt-4">
+                    <Link href="/dashboard/accounting/chart-of-accounts">
+                        الانتقال إلى شجرة الحسابات
+                    </Link>
+                </Button>
             </div>
           </TabsContent>
           <TabsContent value="transactions" className="mt-4">
