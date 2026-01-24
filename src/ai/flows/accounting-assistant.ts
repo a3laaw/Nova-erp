@@ -321,7 +321,8 @@ payload:
         "partner_type": null,
         "partner_name": null,
         "debit": "رقم",
-        "credit": 0
+        "credit": 0,
+        "analytic_account": null
       },
       {
         "account_code": "...",
@@ -329,7 +330,8 @@ payload:
         "partner_type": "customer | other",
         "partner_name": "...",
         "debit": 0,
-        "credit": "رقم"
+        "credit": "رقم",
+        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
       }
     ]
   }
@@ -375,7 +377,8 @@ payload:
         "partner_type": "vendor | employee | other",
         "partner_name": "...",
         "debit": "رقم",
-        "credit": 0
+        "credit": 0,
+        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
       },
       {
         "account_code": "...",
@@ -383,7 +386,8 @@ payload:
         "partner_type": null,
         "partner_name": null,
         "debit": 0,
-        "credit": "رقم"
+        "credit": "رقم",
+        "analytic_account": null
       }
     ]
   }
@@ -427,7 +431,8 @@ payload:
         "partner_type": "vendor | employee | other | null",
         "partner_name": "... أو null",
         "debit": "رقم",
-        "credit": 0
+        "credit": 0,
+        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
       },
       {
         "account_code": "...",
@@ -435,7 +440,8 @@ payload:
         "partner_type": null,
         "partner_name": null,
         "debit": 0,
-        "credit": "رقم"
+        "credit": "رقم",
+        "analytic_account": null
       }
     ]
   }
@@ -477,7 +483,8 @@ payload:
         "partner_type": "vendor | employee | other | null",
         "partner_name": "... أو null",
         "debit": "رقم",
-        "credit": 0
+        "credit": 0,
+        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
       },
       {
         "account_code": "...",
@@ -485,7 +492,8 @@ payload:
         "partner_type": null,
         "partner_name": null,
         "debit": 0,
-        "credit": "رقم"
+        "credit": "رقم",
+        "analytic_account": null
       }
     ]
   }
