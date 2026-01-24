@@ -652,7 +652,7 @@ const prompt = ai.definePrompt({
   system: systemPrompt,
   input: { schema: AccountingAssistantInputSchema },
   output: { schema: AccountingAssistantOutputSchema, format: 'json' },
-  prompt: '{{input}}',
+  prompt: '{{prompt}}',
 });
 
 const accountingAssistantFlow = ai.defineFlow(
