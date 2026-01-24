@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Wand2, Sparkles, ArrowRight } from 'lucide-react';
+import { Loader2, Wand2, Sparkles, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { runAccountingAssistant, type AccountingAssistantOutput } from '@/ai/flows/accounting-assistant';
 import { useRouter } from 'next/navigation';
@@ -91,9 +91,23 @@ export default function AccountingAssistantPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <Alert>
-                        <AlertTitle>رد المساعد</AlertTitle>
-                        <AlertDescription>{result.natural_language_reply}</AlertDescription>
+                        <AlertTitle>شرح العملية</AlertTitle>
+                        <AlertDescription>{result.explanation}</AlertDescription>
                     </Alert>
+
+                    {result.warnings && result.warnings.length > 0 && (
+                        <Alert variant="default" className="bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800/50 dark:text-yellow-200">
+                             <AlertTriangle className="h-4 w-4 !text-yellow-600 dark:!text-yellow-300" />
+                            <AlertTitle>تحذيرات</AlertTitle>
+                            <AlertDescription>
+                                <ul className="list-disc pr-5">
+                                    {result.warnings.map((warning, index) => (
+                                        <li key={index}>{warning}</li>
+                                    ))}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
                     <div>
                         <h4 className="font-semibold mb-2">الأمر المنظم (JSON)</h4>
