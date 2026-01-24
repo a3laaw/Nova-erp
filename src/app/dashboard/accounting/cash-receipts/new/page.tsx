@@ -23,7 +23,7 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore';
 import type { Client, Company, ClientTransaction } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,36 @@ export default function NewCashReceiptPage() {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [type, setType] = useState(''); // advance, milestone, final
   const [reference, setReference] = useState('');
+
+  const [voucherNumber, setVoucherNumber] = useState('جاري التوليد...');
+  const [isGeneratingVoucher, setIsGeneratingVoucher] = useState(true);
+
+  useEffect(() => {
+    if (!firestore) return;
+
+    const generateVoucherNumber = async () => {
+        setIsGeneratingVoucher(true);
+        try {
+            const currentYear = new Date().getFullYear();
+            const counterRef = doc(firestore, 'counters', 'cashReceipts');
+            const counterDoc = await getDoc(counterRef);
+            let nextNumber = 1;
+            if (counterDoc.exists()) {
+                const counts = counterDoc.data()?.counts || {};
+                nextNumber = (counts[currentYear] || 0) + 1;
+            }
+            setVoucherNumber(`CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+        } catch (error) {
+            console.error("Error generating voucher number:", error);
+            setVoucherNumber('خطأ');
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل توليد رقم سند تلقائي.' });
+        } finally {
+            setIsGeneratingVoucher(false);
+        }
+    };
+
+    generateVoucherNumber();
+  }, [firestore, toast]);
 
   useEffect(() => {
     setDate(new Date().toISOString().split('T')[0]);
@@ -207,34 +237,57 @@ export default function NewCashReceiptPage() {
         return;
     }
 
+    if (isGeneratingVoucher) {
+        toast({ variant: 'destructive', title: 'الرجاء الانتظار', description: 'جاري توليد رقم السند.' });
+        return;
+    }
+
     setIsSaving(true);
     try {
-        const selectedClient = clients.find(c => c.id === selectedClientId);
-        const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+        await runTransaction(firestore, async (transaction_fs) => {
+            const currentYear = new Date().getFullYear();
+            const counterRef = doc(firestore, 'counters', 'cashReceipts');
+            const counterDoc = await transaction_fs.get(counterRef);
+            let nextNumber = 1;
+            if (counterDoc.exists()) {
+                const counts = counterDoc.data()?.counts || {};
+                nextNumber = (counts[currentYear] || 0) + 1;
+            }
+            
+            transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
-        const newReceiptData: any = { // Use 'any' to dynamically add properties
-            clientId: selectedClientId,
-            clientNameAr: selectedClient?.nameAr || '',
-            clientNameEn: selectedClient?.nameEn || '',
-            amount: parseFloat(amount),
-            amountInWords: amountInWords,
-            receiptDate: Timestamp.fromDate(new Date(date)),
-            paymentMethod: paymentMethod,
-            description: description, // Use auto-generated or manually entered description
-            reference: reference,
-            createdAt: serverTimestamp(),
-        };
-        
-        if (selectedProjectId && selectedProject) {
-            newReceiptData.projectId = selectedProjectId;
-            newReceiptData.projectNameAr = selectedProject.transactionType;
-        }
+            const selectedClient = clients.find(c => c.id === selectedClientId);
+            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
 
-        if(type) {
-            newReceiptData.type = type;
-        }
+            const newReceiptData: any = { 
+                voucherNumber: newVoucherNumber,
+                voucherSequence: nextNumber,
+                voucherYear: currentYear,
+                clientId: selectedClientId,
+                clientNameAr: selectedClient?.nameAr || '',
+                clientNameEn: selectedClient?.nameEn || '',
+                amount: parseFloat(amount),
+                amountInWords: amountInWords,
+                receiptDate: Timestamp.fromDate(new Date(date)),
+                paymentMethod: paymentMethod,
+                description: description,
+                reference: reference,
+                createdAt: serverTimestamp(),
+            };
+            
+            if (selectedProjectId && selectedProject) {
+                newReceiptData.projectId = selectedProjectId;
+                newReceiptData.projectNameAr = selectedProject.transactionType;
+            }
 
-        await addDoc(collection(firestore, 'cashReceipts'), newReceiptData);
+            if(type) {
+                newReceiptData.type = type;
+            }
+
+            const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
+            transaction_fs.set(newReceiptRef, newReceiptData);
+        });
         
         toast({
             title: 'نجاح',
@@ -270,7 +323,7 @@ export default function NewCashReceiptPage() {
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle>سـنـد قـبـض / Cash Receipt Voucher</CardTitle>
-                <CardDescription>CRV-2024-002 : رقم السند</CardDescription>
+                <CardDescription>{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
             </div>
             {companyLoading ? (
                 <div className='text-left space-y-1'>
@@ -401,7 +454,7 @@ export default function NewCashReceiptPage() {
             <Printer className="ml-2 h-4 w-4" />
             طباعة
         </Button>
-        <Button onClick={handleSave} disabled={isSaving}>
+        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ'}
         </Button>
