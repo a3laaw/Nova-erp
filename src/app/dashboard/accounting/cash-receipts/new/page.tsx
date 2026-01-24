@@ -23,7 +23,7 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, limit, doc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, runTransaction, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import type { Client, Company, ClientTransaction } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
