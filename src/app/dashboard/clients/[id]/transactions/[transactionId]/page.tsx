@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -224,6 +222,15 @@ export default function TransactionDetailPage() {
   const handleStageStatusChange = async (stageIndex: number, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser) return;
 
+    if (newStatus === 'in-progress' && stageIndex > 0 && stages[stageIndex - 1].status !== 'completed') {
+        toast({
+            variant: 'destructive',
+            title: 'لا يمكن بدء هذه المرحلة',
+            description: 'الرجاء إكمال المرحلة السابقة أولاً.',
+        });
+        return;
+    }
+
     const updatedStages = [...stages];
     const stage = updatedStages[stageIndex];
     stage.status = newStatus;
@@ -423,7 +430,7 @@ export default function TransactionDetailPage() {
                                         </div>
                                         <div className="flex gap-2">
                                             {stage.status === 'pending' && (
-                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(index, 'in-progress')}>
+                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(index, 'in-progress')} disabled={index > 0 && stages[index - 1].status !== 'completed'}>
                                                     <Play className="ml-2 h-4 w-4" />
                                                     بدء
                                                 </Button>
@@ -484,5 +491,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
-    
