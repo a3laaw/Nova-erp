@@ -132,19 +132,42 @@ const defaultChartOfAccounts: Omit<Account, 'id'>[] = [
 ];
 
 
-function AccountForm({ isOpen, onClose, onSave, account, parentAccount }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null }) {
+function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null, accounts: Account[] }) {
     const isEditing = !!account;
     const [formData, setFormData] = useState<Partial<Account>>({});
 
     useEffect(() => {
         if (isEditing && account) {
             setFormData({ code: account.code, name: account.name, type: account.type });
-        } else if (parentAccount) {
-            setFormData({ type: parentAccount.type, code: '', name: '' });
-        } else {
-            setFormData({ type: 'asset', code: '', name: '' });
+        } else if (isOpen) { // Only calculate on open for new accounts
+            let nextCode = '';
+            let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
+
+            const relevantAccounts = parentAccount
+                ? accounts.filter(acc => acc.level === parentAccount.level + 1 && acc.code.startsWith(parentAccount.code))
+                : accounts.filter(acc => acc.level === 0);
+            
+            if (relevantAccounts.length === 0) {
+                if (parentAccount) {
+                    // First child. Let's try to follow the default data's logic for padding.
+                    if (parentAccount.level === 0) { // Parent '1', child becomes '11'
+                        nextCode = parentAccount.code + '1';
+                    } else { // Parent '11', child becomes '1101'
+                        nextCode = parentAccount.code + '01';
+                    }
+                } else {
+                    // First main account
+                    nextCode = '1';
+                }
+            } else {
+                const lastCodeNum = Math.max(...relevantAccounts.map(acc => parseInt(acc.code, 10)));
+                nextCode = String(lastCodeNum + 1);
+            }
+            
+            setFormData({ type: newType, code: nextCode, name: '' });
         }
-    }, [account, parentAccount, isEditing, isOpen]);
+    }, [account, parentAccount, isEditing, isOpen, accounts]);
+
 
     const getLevelFromCode = (code: string): number => {
         if (code.length <= 1) return 0;
@@ -179,8 +202,8 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount }: { isOp
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="code">رمز الحساب</Label>
-                            <Input id="code" value={formData.code || ''} onChange={(e) => setFormData(p => ({...p, code: e.target.value}))} required dir="ltr" />
+                            <Label htmlFor="code">رمز الحساب (تلقائي)</Label>
+                            <Input id="code" value={formData.code || ''} readOnly disabled required dir="ltr" className="bg-muted/50" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="name">اسم الحساب</Label>
@@ -188,7 +211,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount }: { isOp
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="type">نوع الحساب</Label>
-                            <Select value={formData.type} onValueChange={(v) => setFormData(p => ({...p, type: v as Account['type']}))}>
+                            <Select value={formData.type} onValueChange={(v) => setFormData(p => ({...p, type: v as Account['type']}))} disabled={!!parentAccount || isEditing}>
                                 <SelectTrigger><SelectValue placeholder="اختر النوع..." /></SelectTrigger>
                                 <SelectContent>
                                     {Object.entries(accountTypeTranslations).map(([key, value]) => (
@@ -425,6 +448,7 @@ export default function ChartOfAccountsPage() {
                 onSave={handleSave} 
                 account={editingAccount} 
                 parentAccount={parentAccount}
+                accounts={accounts}
             />
             
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
