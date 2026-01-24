@@ -114,8 +114,8 @@ export default function ViewCashReceiptPage() {
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print-container-reset" dir="rtl">
-        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper">
+    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print-container-reset print:bg-white" dir="rtl">
+        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
             <div id="printable-area" className="p-8 md:p-12 printable-content">
                 <header className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
                      <div className="text-left flex-shrink-0">
@@ -208,3 +208,4 @@ export default function ViewCashReceiptPage() {
   );
 }
     
+
