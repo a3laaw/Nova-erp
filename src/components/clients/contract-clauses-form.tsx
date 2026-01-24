@@ -242,7 +242,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
     if (!firestore || !transaction?.id || !currentUser) return;
     setIsSaving(true);
     try {
-        // Get parent account 'العملاء' before starting the transaction
+        // Read parent account OUTSIDE transaction. This is fine.
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
         const parentAccountSnap = await getDocs(parentAccountQuery);
         if (parentAccountSnap.empty) {
@@ -252,19 +252,25 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
         const parentCode = parentAccount.code as string;
         const parentLevel = parentAccount.level as number;
 
-
         await runTransaction(firestore, async (transaction_firestore) => {
-            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id);
+            // --- ALL READS MUST GO FIRST ---
             const clientRef = doc(firestore, 'clients', clientId);
-            const clientSnap = await transaction_firestore.get(clientRef);
+            const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
 
+            // Read 1: Client data
+            const clientSnap = await transaction_firestore.get(clientRef);
             if (!clientSnap.exists()) {
                 throw new Error("Client not found.");
             }
-
             const clientData = clientSnap.data();
+            
+            // Read 2: Counter data (read it regardless, just in case it's needed)
+            const coaClientCounterDoc = await transaction_firestore.get(coaClientCounterRef);
 
-            // Update transaction with contract
+            // --- ALL WRITES GO AFTER READS ---
+            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id);
+
+            // Write 1: Update the transaction with the contract data
             transaction_firestore.update(transactionRef, {
                 contract: {
                     clauses: clauses,
@@ -276,11 +282,17 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                 }
             });
 
-            // If this is the first contract (client status is 'new'), update status and create chart of account.
+            // Conditionally perform more writes if it's a new client contract
             if (clientData.status === 'new') {
+                // Now we can use the data we read earlier
+                const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
+                const nextClientCodeNumber = lastClientCodeNumber + 1;
+                const newAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+                
+                // Write 2: update client status
                 transaction_firestore.update(clientRef, { status: 'contracted' });
 
-                // Log status change
+                // Write 3: Log status change
                 const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
                 const logContent = `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`;
                 transaction_firestore.set(doc(historyCollectionRef), {
@@ -291,18 +303,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
                     userAvatar: currentUser.avatarUrl || '',
                     createdAt: serverTimestamp(),
                 });
-
-                // --- Create Chart of Account for the client ---
                 
-                // Get next client account number from counter
-                const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
-                const coaClientCounterDoc = await transaction_firestore.get(coaClientCounterRef);
-                const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
-                const nextClientCodeNumber = lastClientCodeNumber + 1;
-                const newAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+                // Write 4: update counter
                 transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
                 
-                // Create the new account document
+                // Write 5: Create the new account document
                 const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
                 const newAccountData = {
                     name: clientData.nameAr,
