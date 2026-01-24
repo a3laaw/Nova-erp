@@ -1,10 +1,11 @@
 
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -227,10 +228,10 @@ export default function TransactionDetailPage() {
     const stage = updatedStages[stageIndex];
     stage.status = newStatus;
     if (newStatus === 'in-progress' && !stage.startDate) {
-        stage.startDate = serverTimestamp();
+        stage.startDate = Timestamp.now();
     }
     if (newStatus === 'completed') {
-        stage.endDate = serverTimestamp();
+        stage.endDate = Timestamp.now();
     }
     
     setStages(updatedStages); // Optimistic update
