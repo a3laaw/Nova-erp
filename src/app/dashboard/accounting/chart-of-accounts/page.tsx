@@ -132,17 +132,19 @@ const defaultChartOfAccounts: Omit<Account, 'id'>[] = [
 ];
 
 
-function AccountForm({ isOpen, onClose, onSave, account }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null }) {
+function AccountForm({ isOpen, onClose, onSave, account, parentAccount }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null }) {
     const isEditing = !!account;
     const [formData, setFormData] = useState<Partial<Account>>({});
 
     useEffect(() => {
-        if (account) {
+        if (isEditing && account) {
             setFormData({ code: account.code, name: account.name, type: account.type });
+        } else if (parentAccount) {
+            setFormData({ type: parentAccount.type, code: '', name: '' });
         } else {
-            setFormData({ type: 'asset' });
+            setFormData({ type: 'asset', code: '', name: '' });
         }
-    }, [account, isOpen]);
+    }, [account, parentAccount, isEditing, isOpen]);
 
     const getLevelFromCode = (code: string): number => {
         if (code.length <= 1) return 0;
@@ -162,8 +164,18 @@ function AccountForm({ isOpen, onClose, onSave, account }: { isOpen: boolean, on
             <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>{isEditing ? 'تعديل حساب' : 'إضافة حساب جديد'}</DialogTitle>
-                        <DialogDescription>أدخل تفاصيل الحساب. سيتم تحديد المستوى تلقائياً بناءً على طول الرمز.</DialogDescription>
+                        <DialogTitle>
+                           {isEditing ? 'تعديل حساب' : parentAccount ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {isEditing 
+                                ? 'أدخل تفاصيل الحساب الجديدة.' 
+                                : parentAccount 
+                                    ? `إضافة حساب جديد تحت "${parentAccount.name}".`
+                                    : 'أدخل تفاصيل الحساب الرئيسي الجديد.'
+                            }
+                            {' '}سيتم تحديد المستوى تلقائياً بناءً على طول الرمز.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -177,7 +189,7 @@ function AccountForm({ isOpen, onClose, onSave, account }: { isOpen: boolean, on
                         <div className="grid gap-2">
                             <Label htmlFor="type">نوع الحساب</Label>
                             <Select value={formData.type} onValueChange={(v) => setFormData(p => ({...p, type: v as Account['type']}))}>
-                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="اختر النوع..." /></SelectTrigger>
                                 <SelectContent>
                                     {Object.entries(accountTypeTranslations).map(([key, value]) => (
                                         <SelectItem key={key} value={key}>{value}</SelectItem>
@@ -208,6 +220,7 @@ export default function ChartOfAccountsPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+    const [parentAccount, setParentAccount] = useState<Account | null>(null);
 
     const accountsQuery = useMemo(() => {
         if (!firestore) return null;
@@ -223,10 +236,18 @@ export default function ChartOfAccountsPage() {
 
     const handleAddClick = () => {
         setEditingAccount(null);
+        setParentAccount(null);
+        setIsFormOpen(true);
+    };
+
+    const handleAddSubAccountClick = (parent: Account) => {
+        setParentAccount(parent);
+        setEditingAccount(null);
         setIsFormOpen(true);
     };
     
     const handleEditClick = (account: Account) => {
+        setParentAccount(null);
         setEditingAccount(account);
         setIsFormOpen(true);
     };
@@ -252,6 +273,7 @@ export default function ChartOfAccountsPage() {
             }
             setIsFormOpen(false);
             setEditingAccount(null);
+            setParentAccount(null);
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الحساب.' });
@@ -314,7 +336,7 @@ export default function ChartOfAccountsPage() {
                         </div>
                         <Button onClick={handleAddClick}>
                             <PlusCircle className="ml-2 h-4 w-4" />
-                            إضافة حساب جديد
+                            إضافة حساب رئيسي
                         </Button>
                     </div>
                 </CardHeader>
@@ -356,7 +378,18 @@ export default function ChartOfAccountsPage() {
                                             {account.code}
                                         </TableCell>
                                         <TableCell className="font-medium" style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
-                                            {account.name}
+                                            <div className="flex items-center gap-2 group">
+                                                <span>{account.name}</span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => { e.stopPropagation(); handleAddSubAccountClick(account); }}
+                                                >
+                                                    <PlusCircle className="h-4 w-4 text-primary" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className={accountTypeColors[account.type]}>
@@ -391,6 +424,7 @@ export default function ChartOfAccountsPage() {
                 onClose={() => setIsFormOpen(false)} 
                 onSave={handleSave} 
                 account={editingAccount} 
+                parentAccount={parentAccount}
             />
             
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
