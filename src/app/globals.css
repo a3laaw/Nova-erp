@@ -77,7 +77,7 @@
 @layer utilities {
     @media print {
         body {
-            background-color: white !important;
+            background: white !important;
         }
         .no-print {
             display: none !important;
@@ -85,17 +85,6 @@
         .printable-wrapper {
             box-shadow: none !important;
             border: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-        }
-        .printable-content {
-             padding: 0 !important;
-        }
-        * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
         }
     }
 }

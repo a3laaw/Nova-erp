@@ -114,8 +114,8 @@ export default function ViewCashReceiptPage() {
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8" dir="rtl">
-        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper">
+    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
+        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
             <div id="printable-area" className="p-8 md:p-12 printable-content">
                 <header className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
                      <div className="text-left flex-shrink-0">
@@ -126,8 +126,8 @@ export default function ViewCashReceiptPage() {
                      <div className="flex items-center gap-4">
                        {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-16 w-16 !p-3" />}
                         <div>
-                           <h1 className="font-bold text-lg">{company?.name || 'سكوب للاستشارات الهندسية'}</h1>
-                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'scoop Engineering Consultants'}</p>
+                           <h1 className="font-bold text-lg">{company?.name || 'درافت للاستشارات الهندسية'}</h1>
+                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'Draft Engineering Consultants'}</p>
                            <p className="text-xs text-muted-foreground mt-2">{company?.address}</p>
                         </div>
                     </div>
