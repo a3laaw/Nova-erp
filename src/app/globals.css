@@ -81,6 +81,8 @@
       }
       .printable-content, .printable-content * {
         visibility: visible;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
       .printable-content {
         position: absolute;
