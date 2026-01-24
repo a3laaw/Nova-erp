@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { PlusCircle, Sparkles, Library } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import { format } from 'date-fns';
+import { CashReceiptsList } from '@/components/accounting/cash-receipts-list';
 
 
 const statusStyles: Record<InvoiceStatus, string> = {
@@ -106,12 +107,7 @@ export default function AccountingPage() {
                     </Link>
                 </Button>
             </div>
-            <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                <h3 className="mt-4 text-lg font-medium">قائمة سندات القبض</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    سيتم عرض قائمة بجميع سندات القبض هنا.
-                </p>
-            </div>
+            <CashReceiptsList />
           </TabsContent>
           <TabsContent value="chart-of-accounts" className="mt-4">
             <div className="p-8 text-center border-2 border-dashed rounded-lg">

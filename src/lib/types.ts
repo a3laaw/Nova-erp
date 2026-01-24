@@ -155,13 +155,21 @@ export type Invoice = {
 export type CashReceipt = {
     id: string;
     voucherNumber: string;
-    date: string;
+    voucherSequence: number;
+    voucherYear: number;
     clientId: string;
+    clientNameAr: string;
+    clientNameEn?: string;
+    projectId?: string;
+    projectNameAr?: string;
     amount: number;
-    amountInWords: MultilingualString;
-    paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer';
-    reference?: string; // Cheque number or transfer reference
-    description: MultilingualString;
+    amountInWords: string;
+    receiptDate: any; // Timestamp
+    paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'K-Net';
+    description: string;
+    reference?: string;
+    type?: 'advance' | 'milestone' | 'final' | 'other';
+    createdAt: any; // Timestamp
 };
 
 export type Transaction = {
@@ -443,4 +451,14 @@ export interface Contract {
   openClauses?: ContractTerm[];
   createdAt?: any;
   createdBy?: string;
+}
+
+export interface Notification {
+  id?: string;
+  userId: string;
+  title: string;
+  body: string;
+  link: string;
+  isRead: boolean;
+  createdAt: any;
 }
