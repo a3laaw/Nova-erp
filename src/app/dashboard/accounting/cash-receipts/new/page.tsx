@@ -32,6 +32,7 @@ import { numberToArabicWords, formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -245,6 +246,9 @@ export default function NewCashReceiptPage() {
     }
 
     setIsSaving(true);
+    let newVoucherNumberForNotification: string | null = null;
+    const selectedClient = clients.find(c => c.id === selectedClientId);
+    
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
@@ -258,8 +262,8 @@ export default function NewCashReceiptPage() {
             
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+            newVoucherNumberForNotification = newVoucherNumber;
 
-            const selectedClient = clients.find(c => c.id === selectedClientId);
             const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
 
             const newReceiptData: any = { 
@@ -308,6 +312,26 @@ export default function NewCashReceiptPage() {
             title: 'نجاح',
             description: 'تم حفظ سند القبض بنجاح.',
         });
+
+        // --- Notification Logic (outside transaction) ---
+        if (selectedProjectId && description && newVoucherNumberForNotification) {
+            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+            const assignedEngineerId = selectedProject?.assignedEngineerId;
+
+            if (assignedEngineerId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, assignedEngineerId);
+                // Notify only if the assignee is not the person creating the receipt
+                if (targetUserId && targetUserId !== currentUser.id) {
+                    await createNotification(firestore, {
+                        userId: targetUserId,
+                        title: 'تم تسجيل دفعة مالية',
+                        body: `قام ${currentUser.fullName} بتسجيل دفعة مالية (سند رقم ${newVoucherNumberForNotification}) على معاملة "${selectedProject?.transactionType}" الخاصة بالعميل ${selectedClient?.nameAr}.`,
+                        link: `/dashboard/clients/${selectedClientId}/transactions/${selectedProjectId}`
+                    });
+                }
+            }
+        }
+        // --- End Notification Logic ---
 
         router.push('/dashboard/accounting');
 
