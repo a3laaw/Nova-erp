@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { format } from 'date-fns';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -183,11 +184,13 @@ export default function NewCashReceiptPage() {
       searchKey: c.mobile,
   })), [clients]);
 
-  const projectOptions = useMemo(() => clientProjects.map(p => ({
-      value: p.id!,
-      label: p.transactionType,
-      searchKey: p.id
-  })), [clientProjects]);
+  const projectOptions = useMemo(() => clientProjects.map(p => {
+    const dateString = p.createdAt?.toDate ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '';
+    return {
+        value: p.id!,
+        label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
+    }
+  }), [clientProjects]);
 
   const handleSave = async () => {
     if (!firestore) {
