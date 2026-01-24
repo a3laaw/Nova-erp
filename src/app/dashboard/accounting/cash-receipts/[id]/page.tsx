@@ -1,14 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, Printer, Pencil } from 'lucide-react';
@@ -19,18 +11,22 @@ import type { CashReceipt, Company } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/layout/logo';
 
-function InfoDisplay({ label, value }: { label: string, value: string | undefined }) {
-    return (
-        <div className="grid gap-2">
-            <Label>{label}</Label>
-            <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50 print:bg-transparent print:border-gray-300'>
-                {value || '-'}
-            </div>
-        </div>
-    );
-}
+const paymentMethodTranslations: Record<string, string> = {
+    'Cash': 'نقداً',
+    'Cheque': 'شيك',
+    'Bank Transfer': 'تحويل بنكي',
+    'K-Net': 'كي-نت'
+};
+
+const InfoRow = ({ label, value }: { label: string, value: string | undefined | null }) => (
+    <div className="flex items-baseline">
+        <span className="w-40 font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
+        <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-gray-800 dark:text-gray-200">{value || '---'}</span>
+    </div>
+);
+
 
 export default function ViewCashReceiptPage() {
   const router = useRouter();
@@ -56,18 +52,15 @@ export default function ViewCashReceiptPage() {
   }, [receiptSnap]);
 
 
-  // Effect to fetch initial company data
   useEffect(() => {
     if (!firestore) return;
-
     const fetchCompany = async () => {
         setCompanyLoading(true);
         try {
             const q = query(collection(firestore, 'companies'), limit(1));
             const snapshot = await getDocs(q);
             if (!snapshot.empty) {
-                const companyData = snapshot.docs[0].data() as Company;
-                setCompany({ id: snapshot.docs[0].id, ...companyData });
+                setCompany({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() as Company });
             }
         } catch (error) {
             console.error("Error fetching company data:", error);
@@ -85,7 +78,7 @@ export default function ViewCashReceiptPage() {
   const formattedDate = useMemo(() => {
       if (!receipt?.receiptDate) return '';
       try {
-          return format(receipt.receiptDate.toDate(), 'yyyy-MM-dd');
+          return format(receipt.receiptDate.toDate(), 'dd / MM / yyyy');
       } catch {
           return '';
       }
@@ -94,29 +87,18 @@ export default function ViewCashReceiptPage() {
 
   if (receiptLoading || companyLoading) {
       return (
-         <Card className="max-w-4xl mx-auto printable-content">
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <Skeleton className="h-8 w-64" />
-                        <Skeleton className="h-4 w-32 mt-2" />
-                    </div>
-                    <div className='text-left space-y-1'>
-                        <Skeleton className="h-5 w-48" />
-                        <Skeleton className="h-4 w-32" />
-                    </div>
-                </div>
-            </CardHeader>
-             <CardContent className="space-y-6">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
-             </CardContent>
-             <CardFooter className="flex justify-end gap-2 no-print">
-                <Skeleton className="h-10 w-24" />
-                <Skeleton className="h-10 w-24" />
-             </CardFooter>
-        </Card>
+         <div className="p-8 max-w-4xl mx-auto bg-white space-y-8">
+            <header className="flex justify-between items-center pb-4 border-b">
+                <Skeleton className="h-20 w-1/3" />
+                <Skeleton className="h-20 w-1/4" />
+            </header>
+            <main className="space-y-8 mt-8">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-16 w-full" />
+            </main>
+        </div>
       );
   }
 
@@ -125,102 +107,99 @@ export default function ViewCashReceiptPage() {
         <div className="text-center py-10" dir="rtl">
             <p className="text-destructive">لم يتم العثور على سند القبض المطلوب.</p>
             <Button onClick={() => router.push('/dashboard/accounting')} className="mt-4">
-            العودة إلى المحاسبة
+                العودة إلى المحاسبة
             </Button>
         </div>
       );
   }
 
   return (
-    <Card className="max-w-4xl mx-auto printable-content print:shadow-none print:border-none">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
-                <CardTitle>سـنـد قـبـض / Cash Receipt Voucher</CardTitle>
-                <CardDescription>{receipt.voucherNumber} : رقم السند</CardDescription>
-            </div>
-            {company ? (
-                <div className='text-left'>
-                    <p className='font-semibold'>{company.nameEn || company.name}</p>
-                    <p className='text-sm text-muted-foreground'>{company.address}</p>
-                    <p className='text-sm text-muted-foreground'>CR: {company.crNumber}</p>
-                </div>
-            ) : (
-                <div className='text-left'>
-                    <p className='font-semibold'>Dar Belaih Al-Mesfir Engineering Consultants</p>
-                </div>
-            )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-            <div className="md:col-span-2">
-                <InfoDisplay label="استلمنا من السيد/السادة" value={receipt.clientNameAr} />
-            </div>
-             <div className="grid gap-2">
-                <Label>التاريخ</Label>
-                <Input value={formattedDate} type="date" readOnly disabled className="bg-muted/50 print:bg-transparent" />
-            </div>
-        </div>
-        
-        {receipt.projectNameAr && (
-            <InfoDisplay label="بخصوص العقد/المشروع" value={receipt.projectNameAr} />
-        )}
+    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8" dir="rtl">
+        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg">
+            <div id="printable-area" className="p-8 md:p-12 printable-content">
+                <header className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                     <div className="text-left flex-shrink-0">
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">سـنـد قـبـض</h2>
+                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Cash Receipt Voucher</p>
+                        <p className="font-mono text-sm mt-2 text-muted-foreground">{receipt.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
+                    </div>
+                     <div className="flex items-center gap-4">
+                       {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-16 w-16 !p-3" />}
+                        <div>
+                           <h1 className="font-bold text-lg">{company?.name || 'سكوب للاستشارات الهندسية'}</h1>
+                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'scoop Engineering Consultants'}</p>
+                           <p className="text-xs text-muted-foreground mt-2">{company?.address}</p>
+                        </div>
+                    </div>
+                </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="grid gap-2">
-                <Label>المبلغ</Label>
-                <Input value={receipt.amount.toFixed(3)} className='text-left dir-ltr bg-muted/50 print:bg-transparent' readOnly disabled />
-            </div>
-            <div className="md:col-span-2 grid gap-2">
-              <Label>مبلغ وقدره (كتابة)</Label>
-               <div className='p-2 text-sm border rounded-md min-h-[40px] print:border-gray-300'>
-                 {receipt.amountInWords}
-              </div>
-            </div>
-        </div>
-        <div className="grid gap-2">
-            <Label>وذلك عن</Label>
-            <div className='p-2 text-sm border rounded-md min-h-[80px] whitespace-pre-wrap print:border-gray-300'>
-                {receipt.description || '-'}
-            </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <InfoDisplay label="طريقة الدفع" value={receipt.paymentMethod} />
-            <InfoDisplay label="نوع الدفعة" value={receipt.type} />
-            <InfoDisplay label="رقم الشيك/المرجع" value={receipt.reference} />
-        </div>
+                <main className="py-8 space-y-8">
+                     <div className="grid grid-cols-5 gap-x-8 gap-y-4">
+                        <div className="col-span-3">
+                            <InfoRow label="استلمنا من السيد/السادة" value={receipt.clientNameAr} />
+                        </div>
+                        <div className="col-span-2">
+                             <div className="flex items-baseline">
+                                <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">التاريخ:</span>
+                                <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-center font-mono text-gray-800 dark:text-gray-200">{formattedDate}</span>
+                            </div>
+                        </div>
+                         {receipt.projectNameAr && <div className="col-span-5"><InfoRow label="بخصوص العقد/المشروع" value={receipt.projectNameAr} /></div>}
+                    </div>
+                    
+                    <div className="flex items-center gap-6">
+                        <InfoRow label="مبلغ وقدره" value={formatCurrency(receipt.amount)} />
+                    </div>
 
-        <div className="grid grid-cols-2 gap-20 pt-16">
-            <div className="text-center">
-                <div className="border-t pt-2">
-                    <p className="font-semibold">المستلم</p>
-                    <p className="text-sm text-muted-foreground">Receiver's Signature</p>
-                </div>
+                    <InfoRow label="وذلك مبلغ وقدره" value={receipt.amountInWords} />
+                    
+                    <div className="space-y-2">
+                        <Label className="font-semibold text-gray-600 dark:text-gray-400">وذلك عن:</Label>
+                        <div className='p-3 text-sm border rounded-md min-h-[100px] bg-gray-50 dark:bg-gray-800/50 whitespace-pre-wrap text-gray-800 dark:text-gray-200'>
+                            {receipt.description || '-'}
+                        </div>
+                    </div>
+                    
+                     <div className="grid grid-cols-3 gap-8 pt-4">
+                         <InfoRow label="طريقة الدفع" value={paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod} />
+                         <InfoRow label="نوع الدفعة" value={receipt.type} />
+                         <InfoRow label="رقم الشيك/المرجع" value={receipt.reference} />
+                    </div>
+                </main>
+                
+                 <footer className="pt-24">
+                    <div className="grid grid-cols-2 gap-20">
+                        <div className="text-center">
+                            <div className="border-t-2 border-gray-300 pt-2">
+                                <p className="font-semibold">المستلم</p>
+                                <p className="text-sm text-muted-foreground">Receiver's Signature</p>
+                            </div>
+                        </div>
+                        <div className="text-center">
+                            <div className="border-t-2 border-gray-300 pt-2">
+                                <p className="font-semibold">المحاسب</p>
+                                <p className="text-sm text-muted-foreground">Accountant's Signature</p>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
             </div>
-            <div className="text-center">
-                <div className="border-t pt-2">
-                    <p className="font-semibold">المحاسب</p>
-                     <p className="text-sm text-muted-foreground">Accountant's Signature</p>
-                </div>
+             <div className="p-6 bg-muted/50 rounded-b-lg flex justify-end gap-2 no-print">
+                <Button variant="outline" onClick={() => router.push('/dashboard/accounting')}>
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                    العودة
+                </Button>
+                <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}>
+                    <Pencil className="ml-2 h-4 w-4" />
+                    تعديل
+                </Button>
+                <Button onClick={handlePrint}>
+                    <Printer className="ml-2 h-4 w-4" />
+                    طباعة
+                </Button>
             </div>
         </div>
-        
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2 no-print">
-        <Button variant="outline" onClick={() => router.push('/dashboard/accounting')}>
-            <ArrowRight className="ml-2 h-4 w-4" />
-            العودة
-        </Button>
-         <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}>
-            <Pencil className="ml-2 h-4 w-4" />
-            تعديل
-        </Button>
-        <Button onClick={handlePrint}>
-            <Printer className="ml-2 h-4 w-4" />
-            طباعة
-        </Button>
-      </CardFooter>
-    </Card>
+    </div>
   );
 }
+    

@@ -76,45 +76,30 @@
 
 @layer utilities {
     @media print {
-        body {
-            background-color: #fff !important;
-        }
+      body {
+        background-color: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      
+      .printable-content {
+        display: block;
+      }
+      
+      .no-print {
+        display: none !important;
+      }
 
-        /* 1. Hide everything on the page by default */
-        body * {
-            visibility: hidden;
-        }
-
-        /* 2. Make only the printable content and its children visible */
-        .printable-content, .printable-content * {
-            visibility: visible;
-        }
-        
-        /* 3. Position the printable content to fill the page */
-        .printable-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            border: none !important;
-            box-shadow: none !important;
-        }
-
-        /* 4. Explicitly hide no-print elements */
-        .no-print {
-            display: none !important;
-        }
-
-        /* 5. Force printing of background colors */
-        * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
+      /* Hide everything except the printable content */
+      body > *:not(.printable-content) {
+        display: none;
+      }
     }
 }
 
-/* Page setup for printing */
 @page {
     size: A4 portrait;
-    margin: 1cm;
+    margin: 1.5cm;
 }
+
+    
