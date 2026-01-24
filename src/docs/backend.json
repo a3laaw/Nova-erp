@@ -199,6 +199,11 @@
             "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },
             "updatedAt": { "type": "string", "format": "date-time" },
+            "stages": {
+                "type": "array",
+                "description": "The lifecycle stages of the transaction.",
+                "items": { "$ref": "#/entities/TransactionStage" }
+            },
             "contract": {
                 "type": "object",
                 "description": "Stores the customized contract clauses and total amount for this specific transaction.",
@@ -208,15 +213,33 @@
                         "items": {
                             "type": "object",
                             "properties": {
-                                "id": { "type": "number" },
+                                "id": { "type": "string" },
                                 "name": { "type": "string" },
                                 "amount": { "type": "number" },
-                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] }
+                                "status": { "type": "string", "enum": ["مدفوعة", "مستحقة", "غير مستحقة"] },
+                                "percentage": { "type": "number", "description": "The original percentage value if the financial type was 'percentage'."}
                             },
                             "required": ["id", "name", "amount", "status"]
                         }
                     },
-                    "totalAmount": { "type": "number" }
+                    "termsAndConditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+                        "required": ["id", "text"]
+                      }
+                    },
+                    "openClauses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+                        "required": ["id", "text"]
+                      }
+                    },
+                    "totalAmount": { "type": "number" },
+                    "financialsType": { "type": "string", "enum": ["fixed", "percentage"] }
                 },
                 "required": ["clauses", "totalAmount"]
             }
@@ -256,6 +279,23 @@
         }
       },
       "required": [ "type", "content", "userId", "userName", "createdAt" ]
+    },
+    "TransactionStage": {
+      "title": "Transaction Stage",
+      "description": "A single stage within a client transaction's lifecycle.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the stage (e.g., 'Basement Design')." },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in-progress", "completed", "skipped"],
+          "description": "The current status of the stage."
+        },
+        "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
+        "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
+        "notes": { "type": "string", "description": "Notes specific to this stage." }
+      },
+      "required": ["name", "status"]
     },
     "Counter": {
       "title": "Counter",
@@ -617,11 +657,74 @@
             }
           }
         },
-        "openClauses": { "type": "string" },
+        "openClauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
       },
       "required": ["clientId", "title", "contractDate", "createdAt"]
+    },
+    "ContractTemplate": {
+      "title": "Contract Template",
+      "description": "A reusable template for generating contracts.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "transactionTypes": { "type": "array", "items": { "type": "string" } },
+        "scopeOfWork": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } },
+            "required": ["id", "title"]
+          }
+        },
+        "termsAndConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        },
+        "financials": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["fixed", "percentage"] },
+            "totalAmount": { "type": "number" },
+            "discount": { "type": "number" },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "condition": { "type": "string" },
+                  "value": { "type": "number" }
+                },
+                "required": ["id", "name", "value"]
+              }
+            }
+          }
+        },
+        "openClauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["id", "text"]
+          }
+        }
+      },
+      "required": ["title"]
     }
   },
   "auth": {
@@ -733,6 +836,12 @@
         "$ref": "#/entities/Contract"
       },
       "description": "Stores dynamically generated contracts."
+    },
+    "/contractTemplates/{templateId}": {
+      "schema": {
+        "$ref": "#/entities/ContractTemplate"
+      },
+      "description": "Stores reusable contract templates for various transaction types."
     }
   }
 }

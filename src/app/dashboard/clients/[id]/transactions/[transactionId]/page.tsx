@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDocs, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -15,11 +15,11 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -32,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
+import { cn } from '@/lib/utils';
 
 
 // Using the same translation objects from client profile page
@@ -47,6 +48,20 @@ const transactionStatusColors: Record<string, string> = {
   'in-progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   completed: 'bg-green-100 text-green-800 border-green-200',
   submitted: 'bg-purple-100 text-purple-800 border-purple-200',
+};
+
+const stageStatusColors: Record<string, string> = {
+  pending: 'bg-gray-100 text-gray-800',
+  'in-progress': 'bg-blue-100 text-blue-800',
+  completed: 'bg-green-100 text-green-800',
+  skipped: 'bg-yellow-100 text-yellow-800',
+};
+
+const stageStatusTranslations: Record<string, string> = {
+  pending: 'معلقة',
+  'in-progress': 'قيد التنفيذ',
+  completed: 'مكتملة',
+  skipped: 'تم تخطيها',
 };
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
@@ -75,6 +90,7 @@ export default function TransactionDetailPage() {
   const [newEngineerId, setNewEngineerId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
+  const [stages, setStages] = useState<TransactionStage[]>([]);
 
 
   // --- Data Fetching ---
@@ -121,6 +137,7 @@ export default function TransactionDetailPage() {
     if (transaction) {
         setNewStatus(transaction.status);
         setNewEngineerId(transaction.assignedEngineerId || '');
+        setStages(transaction.stages || []);
     }
   }, [transaction]);
 
@@ -202,6 +219,49 @@ export default function TransactionDetailPage() {
         setIsSaving(false);
     }
 };
+
+  const handleStageStatusChange = async (stageIndex: number, newStatus: TransactionStage['status']) => {
+    if (!firestore || !transaction || !currentUser) return;
+
+    const updatedStages = [...stages];
+    const stage = updatedStages[stageIndex];
+    stage.status = newStatus;
+    if (newStatus === 'in-progress' && !stage.startDate) {
+        stage.startDate = serverTimestamp();
+    }
+    if (newStatus === 'completed') {
+        stage.endDate = serverTimestamp();
+    }
+    
+    setStages(updatedStages); // Optimistic update
+
+    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+    const timelineCollectionRef = collection(transactionRef, 'timelineEvents');
+    
+    try {
+        const batch = writeBatch(firestore);
+        batch.update(transactionRef, { stages: updatedStages });
+        
+        const logContent = `قام بتغيير حالة المرحلة "${stage.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        batch.set(doc(timelineCollectionRef), {
+            type: 'log',
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        });
+
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
+    } catch (e) {
+        console.error("Failed to update stage status:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' });
+        // Revert optimistic update on error
+        setStages(transaction.stages || []);
+    }
+  };
 
 
   // --- Render Logic ---
@@ -335,11 +395,64 @@ export default function TransactionDetailPage() {
             </CardFooter>
         </Card>
         
-         <Tabs defaultValue="comments" dir="rtl">
-            <TabsList className="grid w-full grid-cols-2">
+         <Tabs defaultValue="stages" dir="rtl">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="stages">مراحل المعاملة</TabsTrigger>
                 <TabsTrigger value="comments">التعليقات والمتابعة</TabsTrigger>
                 <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
             </TabsList>
+            <TabsContent value="stages" className="mt-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> مراحل المعاملة</CardTitle>
+                        <CardDescription>تتبع التقدم في كل مرحلة من مراحل المعاملة.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {stages.length === 0 ? (
+                            <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
+                        ) : (
+                            <div className="space-y-4">
+                                {stages.map((stage, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                        <div className="flex items-center gap-4">
+                                            <Badge variant="outline" className={cn("w-24 justify-center", stageStatusColors[stage.status])}>
+                                                {stageStatusTranslations[stage.status]}
+                                            </Badge>
+                                            <div className="font-semibold">{stage.name}</div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {stage.status === 'pending' && (
+                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(index, 'in-progress')}>
+                                                    <Play className="ml-2 h-4 w-4" />
+                                                    بدء
+                                                </Button>
+                                            )}
+                                            {stage.status === 'in-progress' && (
+                                                <>
+                                                    <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(index, 'completed')}>
+                                                        <Check className="ml-2 h-4 w-4" />
+                                                        إكمال
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(index, 'pending')}>
+                                                        <Pause className="ml-2 h-4 w-4" />
+                                                        إيقاف مؤقت
+                                                    </Button>
+                                                </>
+                                            )}
+                                            {stage.status === 'completed' && (
+                                                <div className="text-sm text-green-600 flex items-center gap-2">
+                                                    <Check className="h-4 w-4" />
+                                                    مكتملة في {formatDate(stage.endDate)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </TabsContent>
             <TabsContent value="comments" className="mt-6">
                 <TransactionTimeline
                   clientId={clientId}

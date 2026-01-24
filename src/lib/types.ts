@@ -318,6 +318,14 @@ export type Payslip = {
     status: 'draft' | 'processed' | 'paid';
     createdAt: any;
 };
+
+export interface TransactionStage {
+  name: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'skipped';
+  startDate: any | null;
+  endDate: any | null;
+  notes?: string;
+}
       
 export type ClientTransaction = {
     id?: string;
@@ -328,6 +336,7 @@ export type ClientTransaction = {
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;
+    stages?: TransactionStage[];
     // For display
     engineerName?: string;
     contract?: {

@@ -32,6 +32,34 @@ interface ClientTransactionFormProps {
   clientName: string;
 }
 
+const transactionStageTemplates: Record<string, string[]> = {
+  'تصميم بلدية (سكن خاص)': [
+    'التعاقد',
+    'مراجعة واعتماد المخططات الابتدائية',
+    'تصميم دور السرداب',
+    'تصميم الدور الأرضي',
+    'تصميم الدور الأول',
+    'تصميم الدور الثاني',
+    'تصميم السطح',
+    'الواجهات والقطاعات',
+    'التسليم النهائي للبلدية'
+  ],
+  'تصميم كهرباء': [
+    'التعاقد',
+    'مراجعة المخططات المعمارية',
+    'تصميم مخططات الكهرباء',
+    'تسليم للمراجعة',
+    'اعتماد نهائي'
+  ],
+  'تصميم إنشائي': [
+    'التعاقد',
+    'دراسة التربة',
+    'التصميم الإنشائي الأولي',
+    'التصميم النهائي',
+    'اعتماد نهائي'
+  ]
+};
+
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -168,6 +196,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             }
 
             const engineer = engineers.find(e => e.id === engineerForTransactionId);
+            
+            const stagesTemplate = transactionStageTemplates[transactionType];
+            const initialStages = stagesTemplate ? stagesTemplate.map(name => ({
+                name,
+                status: 'pending',
+                startDate: null,
+                endDate: null,
+                notes: ''
+            })) : [];
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
@@ -175,6 +212,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 description,
                 assignedEngineerId: engineerForTransactionId,
                 status: 'new',
+                stages: initialStages,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };
@@ -249,12 +287,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             <DialogContent
                 dir="rtl"
                 className="sm:max-w-lg"
-                onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                        e.preventDefault();
-                    }
-                }}
                 onInteractOutside={(e) => {
                     const target = e.target as HTMLElement;
                     if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
