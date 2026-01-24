@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, writeBatch, getDoc, collection, serverTimestamp, getDocs, query } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -242,50 +242,86 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId }: 
     if (!firestore || !transaction?.id || !currentUser) return;
     setIsSaving(true);
     try {
-      const batch = writeBatch(firestore);
-      const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id);
-      const clientRef = doc(firestore, 'clients', clientId);
-
-      // Update the transaction with contract details
-      batch.update(transactionRef, {
-        contract: {
-          clauses: clauses,
-          scopeOfWork: scopeOfWork,
-          termsAndConditions: terms,
-          openClauses: openClauses,
-          totalAmount: totalAmount,
-          financialsType: chosenTemplate?.financials.type,
+        // Get parent account 'العملاء' before starting the transaction
+        const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
+        const parentAccountSnap = await getDocs(parentAccountQuery);
+        if (parentAccountSnap.empty) {
+            throw new Error('لم يتم العثور على حساب "العملاء" الرئيسي في شجرة الحسابات. يرجى إضافته أولاً.');
         }
-      });
+        const parentAccount = parentAccountSnap.docs[0].data();
+        const parentCode = parentAccount.code as string;
+        const parentLevel = parentAccount.level as number;
 
-      // Check client status and update if it's 'new'
-      const clientSnap = await getDoc(clientRef); // Get latest status
 
-      if (clientSnap.exists() && clientSnap.data().status === 'new') {
-        batch.update(clientRef, { status: 'contracted' });
+        await runTransaction(firestore, async (transaction_firestore) => {
+            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id);
+            const clientRef = doc(firestore, 'clients', clientId);
+            const clientSnap = await transaction_firestore.get(clientRef);
 
-        // Add a history log for the status change
-        const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
-        const logContent = `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`;
-        batch.set(doc(historyCollectionRef), {
-            type: 'log',
-            content: logContent,
-            userId: currentUser.id,
-            userName: currentUser.fullName || 'النظام',
-            userAvatar: currentUser.avatarUrl || '',
-            createdAt: serverTimestamp(),
+            if (!clientSnap.exists()) {
+                throw new Error("Client not found.");
+            }
+
+            const clientData = clientSnap.data();
+
+            // Update transaction with contract
+            transaction_firestore.update(transactionRef, {
+                contract: {
+                    clauses: clauses,
+                    scopeOfWork: scopeOfWork,
+                    termsAndConditions: terms,
+                    openClauses: openClauses,
+                    totalAmount: totalAmount,
+                    financialsType: chosenTemplate?.financials.type,
+                }
+            });
+
+            // If this is the first contract (client status is 'new'), update status and create chart of account.
+            if (clientData.status === 'new') {
+                transaction_firestore.update(clientRef, { status: 'contracted' });
+
+                // Log status change
+                const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+                const logContent = `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`;
+                transaction_firestore.set(doc(historyCollectionRef), {
+                    type: 'log',
+                    content: logContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName || 'النظام',
+                    userAvatar: currentUser.avatarUrl || '',
+                    createdAt: serverTimestamp(),
+                });
+
+                // --- Create Chart of Account for the client ---
+                
+                // Get next client account number from counter
+                const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
+                const coaClientCounterDoc = await transaction_firestore.get(coaClientCounterRef);
+                const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
+                const nextClientCodeNumber = lastClientCodeNumber + 1;
+                const newAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+                transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
+                
+                // Create the new account document
+                const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
+                const newAccountData = {
+                    name: clientData.nameAr,
+                    code: newAccountCode,
+                    type: parentAccount.type,
+                    level: parentLevel + 1,
+                };
+                transaction_firestore.set(newAccountRef, newAccountData);
+            }
         });
-      }
-      
-      await batch.commit();
 
-      toast({ title: 'نجاح', description: 'تم حفظ بنود العقد بنجاح.' });
-      onClose();
+        toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وربط العميل بالحسابات بنجاح.' });
+        onClose();
     } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ بنود العقد.' });
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : 'فشل حفظ بنود العقد.';
+        toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
     } finally {
-      setIsSaving(false);
+        setIsSaving(false);
     }
   };
 
