@@ -31,10 +31,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/auth-context';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
   const [date, setDate] = useState('');
@@ -223,8 +225,8 @@ export default function NewCashReceiptPage() {
   }), [clientProjects]);
 
   const handleSave = async () => {
-    if (!firestore) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح.' });
+    if (!firestore || !currentUser) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح أو المستخدم غير مسجل.' });
         return;
     }
     // Validation
@@ -287,6 +289,19 @@ export default function NewCashReceiptPage() {
 
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             transaction_fs.set(newReceiptRef, newReceiptData);
+            
+            // If a project is linked, add the description as a comment to its timeline
+            if (selectedProjectId && description) {
+                const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
+                transaction_fs.set(timelineCommentRef, {
+                    type: 'comment',
+                    content: `[سند قبض رقم: ${newVoucherNumber}]\n${description}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                });
+            }
         });
         
         toast({
@@ -383,10 +398,10 @@ export default function NewCashReceiptPage() {
             <div className="md:col-span-2 grid gap-2">
               <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
                <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50 print:hidden'>
-                 {amountInWords ? `فقط ${amountInWords} لا غير` : '(سيتم ملؤه تلقائياً للطباعة)'}
+                 {amountInWords ? `${amountInWords}` : '(سيتم ملؤه تلقائياً للطباعة)'}
               </div>
               <div className="hidden print:block p-2 border rounded-md min-h-[40px]">
-                {amountInWords ? `فقط ${amountInWords} لا غير` : ''}
+                {amountInWords ? `${amountInWords}` : ''}
               </div>
             </div>
         </div>
