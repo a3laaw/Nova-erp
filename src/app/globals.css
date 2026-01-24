@@ -76,23 +76,23 @@
 
 @layer utilities {
     @media print {
-      body {
-        background-color: #fff !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+      body * {
+        visibility: hidden;
       }
-      
+      .printable-content, .printable-content * {
+        visibility: visible;
+      }
       .printable-content {
-        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: none;
       }
-      
       .no-print {
         display: none !important;
-      }
-
-      /* Hide everything except the printable content */
-      body > *:not(.printable-content) {
-        display: none;
       }
     }
 }
@@ -101,5 +101,3 @@
     size: A4 portrait;
     margin: 1.5cm;
 }
-
-    
