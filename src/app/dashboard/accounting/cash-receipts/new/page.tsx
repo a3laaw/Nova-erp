@@ -397,11 +397,8 @@ export default function NewCashReceiptPage() {
             </div>
             <div className="md:col-span-2 grid gap-2">
               <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
-               <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50 print:hidden'>
-                 {amountInWords ? `${amountInWords}` : '(سيتم ملؤه تلقائياً للطباعة)'}
-              </div>
-              <div className="hidden print:block p-2 border rounded-md min-h-[40px]">
-                {amountInWords ? `${amountInWords}` : ''}
+               <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
+                 {amountInWords || '(سيتم ملؤه تلقائياً)'}
               </div>
             </div>
         </div>

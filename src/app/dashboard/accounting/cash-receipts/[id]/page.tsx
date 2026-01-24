@@ -25,7 +25,7 @@ function InfoDisplay({ label, value }: { label: string, value: string | undefine
     return (
         <div className="grid gap-2">
             <Label>{label}</Label>
-            <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
+            <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50 print:bg-transparent print:border-gray-300'>
                 {value || '-'}
             </div>
         </div>
@@ -132,7 +132,7 @@ export default function ViewCashReceiptPage() {
   }
 
   return (
-    <Card className="max-w-4xl mx-auto printable-content">
+    <Card className="max-w-4xl mx-auto printable-content print:shadow-none print:border-none">
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
@@ -159,7 +159,7 @@ export default function ViewCashReceiptPage() {
             </div>
              <div className="grid gap-2">
                 <Label>التاريخ</Label>
-                <Input value={formattedDate} type="date" readOnly disabled className="bg-muted/50" />
+                <Input value={formattedDate} type="date" readOnly disabled className="bg-muted/50 print:bg-transparent" />
             </div>
         </div>
         
@@ -170,18 +170,18 @@ export default function ViewCashReceiptPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              <div className="grid gap-2">
                 <Label>المبلغ</Label>
-                <Input value={receipt.amount.toFixed(3)} className='text-left dir-ltr bg-muted/50' readOnly disabled />
+                <Input value={receipt.amount.toFixed(3)} className='text-left dir-ltr bg-muted/50 print:bg-transparent' readOnly disabled />
             </div>
             <div className="md:col-span-2 grid gap-2">
               <Label>مبلغ وقدره (كتابة)</Label>
-               <div className='p-2 text-sm border rounded-md min-h-[40px]'>
+               <div className='p-2 text-sm border rounded-md min-h-[40px] print:border-gray-300'>
                  {receipt.amountInWords}
               </div>
             </div>
         </div>
         <div className="grid gap-2">
             <Label>وذلك عن</Label>
-            <div className='p-2 text-sm border rounded-md min-h-[80px] whitespace-pre-wrap'>
+            <div className='p-2 text-sm border rounded-md min-h-[80px] whitespace-pre-wrap print:border-gray-300'>
                 {receipt.description || '-'}
             </div>
         </div>

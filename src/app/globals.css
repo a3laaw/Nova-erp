@@ -76,6 +76,10 @@
 
 @layer utilities {
     @media print {
+        body {
+            background-color: #fff !important;
+        }
+
         /* 1. Hide everything on the page by default */
         body * {
             visibility: hidden;
@@ -92,17 +96,25 @@
             left: 0;
             top: 0;
             width: 100%;
+            border: none !important;
+            box-shadow: none !important;
         }
 
         /* 4. Explicitly hide no-print elements */
         .no-print {
             display: none !important;
         }
+
+        /* 5. Force printing of background colors */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
     }
 }
 
 /* Page setup for printing */
 @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 1cm;
 }
