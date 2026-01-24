@@ -28,7 +28,7 @@ import type { InvoiceStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import { format } from 'date-fns';
 
@@ -45,10 +45,20 @@ export default function AccountingPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>المحاسبة</CardTitle>
-        <CardDescription>
-          إدارة الفواتير وتتبع الإيرادات والمصروفات وعرض التقارير المالية.
-        </CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle>المحاسبة</CardTitle>
+                <CardDescription>
+                إدارة الفواتير وتتبع الإيرادات والمصروفات وعرض التقارير المالية.
+                </CardDescription>
+            </div>
+            <Button asChild variant="outline">
+                <Link href="/dashboard/accounting/assistant">
+                    <Sparkles className="ml-2 h-4 w-4" />
+                    المساعد الذكي
+                </Link>
+            </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="invoices" dir="rtl">
