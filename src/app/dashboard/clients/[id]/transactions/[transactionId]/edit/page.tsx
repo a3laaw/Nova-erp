@@ -99,14 +99,15 @@ export default function EditTransactionPage() {
 
   // --- Populate Form with existing data ---
   useEffect(() => {
-      if (transactionSnap?.exists() && departments.length > 0) {
+      // This effect should only run ONCE when the transaction data is loaded
+      // to populate the form for the first time.
+      if (transactionSnap?.exists() && departments.length > 0 && !originalData) {
           const data = transactionSnap.data() as ClientTransaction;
           setOriginalData(data);
           
-          const dept = departments.find(d => transactionTypes.some(t => t.name === data.transactionType));
-          
           let departmentId = '';
-          const foundDept = departments.find(d => data.transactionType.includes(d.name.substring(0, 3)));
+          // Try to find the department based on the transaction type name
+          const foundDept = departments.find(d => data.transactionType?.includes(d.name.substring(0, 3)));
           if (foundDept) {
             departmentId = foundDept.id;
           }
@@ -118,7 +119,7 @@ export default function EditTransactionPage() {
               assignedEngineerId: data.assignedEngineerId || ''
           });
       }
-  }, [transactionSnap, departments, transactionTypes]);
+  }, [transactionSnap, departments, originalData]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
