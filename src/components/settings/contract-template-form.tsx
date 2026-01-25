@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
@@ -135,7 +136,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     const newClauses = [...openClauses];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newClauses.length) return;
-    [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
+    [newClauses[index], newClauses[newIndex]] = [newClauses[index], newClauses[index]];
     setOpenClauses(newClauses);
   };
 
@@ -285,12 +286,12 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             {financials.milestones.map((m, i) => (
                                  <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
                                     <Label className="col-span-3 font-semibold">{m.name}</Label>
-                                    <Select value={m.condition} onValueChange={v => updateMilestone(m.id, 'condition', v)}>
+                                    <Select value={m.condition || '_NONE_'} onValueChange={v => updateMilestone(m.id, 'condition', v === '_NONE_' ? '' : v)}>
                                         <SelectTrigger className="col-span-5">
                                             <SelectValue placeholder="اختر مرحلة العمل كشرط..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">بدون شرط</SelectItem>
+                                            <SelectItem value="_NONE_">بدون شرط</SelectItem>
                                             {allWorkStages.map(stage => (
                                                 <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>
                                             ))}

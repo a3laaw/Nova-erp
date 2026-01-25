@@ -250,7 +250,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newClauses = [...openClauses];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newClauses.length) return;
-      [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
+      [newClauses[index], newClauses[newIndex]] = [newClauses[index], newClauses[index]];
       setOpenClauses(newClauses);
   };
 
@@ -483,12 +483,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                               />
                             </TableCell>
                             <TableCell>
-                               <Select value={clause.condition} onValueChange={(v) => handleClauseChange(index, 'condition', v)}>
+                               <Select value={clause.condition || '_NONE_'} onValueChange={(v) => handleClauseChange(index, 'condition', v === '_NONE_' ? '' : v)}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="اختر مرحلة العمل" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">بدون شرط</SelectItem>
+                                        <SelectItem value="_NONE_">بدون شرط</SelectItem>
                                         {stageOptions.map(opt => (
                                             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                                         ))}
