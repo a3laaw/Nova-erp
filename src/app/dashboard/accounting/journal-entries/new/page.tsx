@@ -90,14 +90,16 @@ export default function NewJournalEntryPage() {
   });
 
   const lines = watch('lines');
+  
   const totalDebit = useMemo(
-    () => lines.reduce((sum, line) => sum + (line.debit || 0), 0),
+    () => lines.reduce((sum, line) => sum + (parseFloat(String(line.debit)) || 0), 0),
     [lines]
   );
   const totalCredit = useMemo(
-    () => lines.reduce((sum, line) => sum + (line.credit || 0), 0),
+    () => lines.reduce((sum, line) => sum + (parseFloat(String(line.credit)) || 0), 0),
     [lines]
   );
+
   const balance = totalDebit - totalCredit;
 
   // Fetch accounts for combobox
@@ -155,8 +157,8 @@ export default function NewJournalEntryPage() {
   useEffect(() => {
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
-      const debit = lastLine.debit || 0;
-      const credit = lastLine.credit || 0;
+      const debit = parseFloat(String(lastLine.debit)) || 0;
+      const credit = parseFloat(String(lastLine.credit)) || 0;
       if (lastLine && lastLine.accountId && (debit > 0 || credit > 0)) {
         append({ accountId: '', debit: 0, credit: 0, notes: '' }, { shouldFocus: false });
       }
@@ -182,7 +184,9 @@ export default function NewJournalEntryPage() {
             
             const newEntryRef = doc(collection(firestore, 'journalEntries'));
             
-            const linesWithNames = data.lines.map(line => {
+            const linesWithNames = data.lines
+              .filter(line => line.accountId) // Filter out the last empty line
+              .map(line => {
                 const account = accounts.find(acc => acc.id === line.accountId);
                 return {
                     ...line,
@@ -277,10 +281,10 @@ export default function NewJournalEntryPage() {
                                         {errors.lines?.[index]?.accountId && <p className="text-xs text-destructive mt-1">{errors.lines[index]?.accountId?.message}</p>}
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`, { valueAsNumber: true })} />
+                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`)} />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`, { valueAsNumber: true })} />
+                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`)} />
                                     </TableCell>
                                     <TableCell>
                                         <Input {...register(`lines.${index}.notes`)} />
