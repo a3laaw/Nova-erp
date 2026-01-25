@@ -48,11 +48,12 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
 
   const [allTransactionTypes, setAllTransactionTypes] = useState<MultiSelectOption[]>([]);
+  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const fetchTransactionTypes = async () => {
+    const fetchRefData = async () => {
       if (!firestore) return;
       setLoadingRefData(true);
       try {
@@ -62,14 +63,28 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
           types.push({ value: typeDoc.data().name, label: typeDoc.data().name });
         });
         setAllTransactionTypes(types);
+        
+        const stages: MultiSelectOption[] = [];
+        const stagesSnapshot = await getDocs(query(collectionGroup(firestore, 'workStages')));
+        const uniqueStages = new Map<string, MultiSelectOption>();
+        stagesSnapshot.forEach(stageDoc => {
+          const stageName = stageDoc.data().name;
+          if (stageName && !uniqueStages.has(stageName)) {
+              uniqueStages.set(stageName, { value: stageName, label: stageName });
+          }
+        });
+        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label)));
+
       } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب أنواع المعاملات.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
       } finally {
         setLoadingRefData(false);
       }
     };
-    fetchTransactionTypes();
-  }, [firestore, toast]);
+    if (isOpen) {
+        fetchRefData();
+    }
+  }, [firestore, toast, isOpen]);
   
   useEffect(() => {
     if (template) {
@@ -270,7 +285,17 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             {financials.milestones.map((m, i) => (
                                  <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
                                     <Label className="col-span-3 font-semibold">{m.name}</Label>
-                                    <Input placeholder="شرط الاستحقاق" value={m.condition} onChange={e => updateMilestone(m.id, 'condition', e.target.value)} className="col-span-5"/>
+                                    <Select value={m.condition} onValueChange={v => updateMilestone(m.id, 'condition', v)}>
+                                        <SelectTrigger className="col-span-5">
+                                            <SelectValue placeholder="اختر مرحلة العمل كشرط..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">بدون شرط</SelectItem>
+                                            {allWorkStages.map(stage => (
+                                                <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <div className="col-span-3 flex items-center gap-1">
                                         <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
                                         <span className="text-sm">{financials.type === 'fixed' ? 'د.ك' : '%'}</span>
