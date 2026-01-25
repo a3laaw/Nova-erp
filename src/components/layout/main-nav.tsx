@@ -50,6 +50,7 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting', label: 'لوحة التحكم المحاسبية' },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
@@ -72,6 +73,7 @@ const navItems = {
           children: [
             { href: '/dashboard/accounting', label: 'Accounting Dashboard' },
             { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
+            { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
             { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
             { href: '/dashboard/accounting/invoices', label: 'Invoices' },
             { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },

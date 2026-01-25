@@ -464,3 +464,36 @@ export interface Notification {
   isRead: boolean;
   createdAt: any;
 }
+
+export interface Account {
+    id?: string;
+    code: string;
+    name: string;
+    type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+    level: number;
+}
+
+export interface JournalEntryLine {
+  id?: string;
+  accountId: string;
+  accountName: string;
+  partnerId?: string;
+  partnerName?: string;
+  debit: number;
+  credit: number;
+  notes?: string;
+}
+
+export interface JournalEntry {
+  id?: string;
+  entryNumber: string;
+  date: any; // Timestamp
+  narration: string;
+  reference?: string;
+  totalDebit: number;
+  totalCredit: number;
+  status: 'draft' | 'posted';
+  lines: JournalEntryLine[];
+  createdAt: any; // Timestamp
+  createdBy?: string;
+}

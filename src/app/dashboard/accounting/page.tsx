@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, BookUser, FileText, Receipt } from 'lucide-react';
+import { ArrowRight, Sparkles, BookUser, FileText, Receipt, BookOpen } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 
 const accountingSections = [
@@ -17,6 +17,12 @@ const accountingSections = [
         description: 'عرض وإدارة جميع سندات القبض الواردة من العملاء.',
         link: '/dashboard/accounting/cash-receipts',
         icon: <Receipt className="h-8 w-8 text-primary" />,
+    },
+    {
+        title: 'قيود اليومية',
+        description: 'إنشاء وتصفح قيود اليومية العامة.',
+        link: '/dashboard/accounting/journal-entries',
+        icon: <BookOpen className="h-8 w-8 text-primary" />,
     },
     {
         title: 'شجرة الحسابات',
