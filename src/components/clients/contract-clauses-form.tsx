@@ -318,15 +318,29 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             // 1. Update the transaction with contract details
             const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
+            
+            const contractData: {
+                clauses: ContractClause[];
+                scopeOfWork: ContractScopeItem[];
+                termsAndConditions: ContractTerm[];
+                openClauses: ContractTerm[];
+                totalAmount: number;
+                financialsType?: 'fixed' | 'percentage';
+            } = {
+                clauses: clauses,
+                scopeOfWork: scopeOfWork,
+                termsAndConditions: terms,
+                openClauses: openClauses,
+                totalAmount: totalAmount,
+            };
+
+            const financialTypeFromTemplate = chosenTemplate?.financials?.type;
+            if (financialTypeFromTemplate) {
+                contractData.financialsType = financialTypeFromTemplate;
+            }
+
             transaction_firestore.update(transactionRef, {
-                contract: {
-                    clauses: clauses,
-                    scopeOfWork: scopeOfWork,
-                    termsAndConditions: terms,
-                    openClauses: openClauses,
-                    totalAmount: totalAmount,
-                    financialsType: chosenTemplate?.financials.type,
-                }
+                contract: contractData
             });
             
             let clientAccountId: string;
