@@ -91,11 +91,11 @@ export default function NewJournalEntryPage() {
 
   const lines = watch('lines');
   const totalDebit = useMemo(
-    () => lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0),
+    () => lines.reduce((sum, line) => sum + (line.debit || 0), 0),
     [lines]
   );
   const totalCredit = useMemo(
-    () => lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0),
+    () => lines.reduce((sum, line) => sum + (line.credit || 0), 0),
     [lines]
   );
   const balance = totalDebit - totalCredit;
@@ -155,8 +155,8 @@ export default function NewJournalEntryPage() {
   useEffect(() => {
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
-      const debit = Number(lastLine.debit) || 0;
-      const credit = Number(lastLine.credit) || 0;
+      const debit = lastLine.debit || 0;
+      const credit = lastLine.credit || 0;
       if (lastLine && lastLine.accountId && (debit > 0 || credit > 0)) {
         append({ accountId: '', debit: 0, credit: 0, notes: '' }, { shouldFocus: false });
       }
@@ -277,10 +277,10 @@ export default function NewJournalEntryPage() {
                                         {errors.lines?.[index]?.accountId && <p className="text-xs text-destructive mt-1">{errors.lines[index]?.accountId?.message}</p>}
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`)} />
+                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`, { valueAsNumber: true })} />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`)} />
+                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`, { valueAsNumber: true })} />
                                     </TableCell>
                                     <TableCell>
                                         <Input {...register(`lines.${index}.notes`)} />
