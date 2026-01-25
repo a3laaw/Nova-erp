@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -71,7 +71,7 @@ export default function NewJournalEntryPage() {
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [entryNumber, setEntryNumber] = useState('جاري التوليد...');
   
-  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<JournalEntryFormValues>({
+  const { register, handleSubmit, control, formState: { errors } } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
     mode: 'onChange',
     defaultValues: {
@@ -90,10 +90,10 @@ export default function NewJournalEntryPage() {
     name: 'lines',
   });
 
-  const lines = watch('lines');
+  const lines = useWatch({ control, name: "lines" });
   
-  const totalDebit = lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
-  const totalCredit = lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
+  const totalDebit = useMemo(() => (lines || []).reduce((sum, line) => sum + (Number(line.debit) || 0), 0), [lines]);
+  const totalCredit = useMemo(() => (lines || []).reduce((sum, line) => sum + (Number(line.credit) || 0), 0), [lines]);
   const balance = totalDebit - totalCredit;
 
   // Fetch accounts for combobox
@@ -149,7 +149,7 @@ export default function NewJournalEntryPage() {
 
   // Automatically add a new line when the last one is filled
   useEffect(() => {
-    if (fields.length > 0) {
+    if (fields.length > 0 && lines && lines.length === fields.length) {
       const lastLine = lines[fields.length - 1];
       if (lastLine && lastLine.accountId && (Number(lastLine.debit) > 0 || Number(lastLine.credit) > 0)) {
         append({ accountId: '', debit: '', credit: '', notes: '' }, { shouldFocus: false });
