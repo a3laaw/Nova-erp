@@ -103,7 +103,10 @@ export default function NewClientPage() {
                 const fetchedEngineers: Employee[] = [];
                 engSnapshot.forEach(doc => {
                     const employee = { id: doc.id, ...doc.data() } as Employee;
-                    if (employee.jobTitle?.includes('مهندس') || employee.jobTitle?.toLowerCase().includes('architect')) {
+                    if (
+                        (employee.jobTitle?.includes('مهندس') || employee.jobTitle?.toLowerCase().includes('architect')) &&
+                        employee.department?.includes('المعماري')
+                    ) {
                         fetchedEngineers.push(employee);
                     }
                 });
@@ -166,6 +169,11 @@ export default function NewClientPage() {
 
         if (!formData.nameAr || !formData.mobile) {
             toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء تعبئة اسم العميل بالعربية ورقم الجوال.' });
+            return;
+        }
+        
+        if (!assignedEngineerId) {
+            toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء اختيار المهندس المسؤول.' });
             return;
         }
 
@@ -241,7 +249,7 @@ export default function NewClientPage() {
         nameEnPlaceholder: 'e.g., Jassim Mohammed',
         mobile: 'رقم الجوال',
         mobilePlaceholder: '+965 1234 5678',
-        engineer: 'المهندس المسؤول (اختياري)',
+        engineer: 'المهندس المسؤول',
         engineerPlaceholder: 'اختر مهندسًا...',
         address: 'عنوان العميل',
         governorate: 'المحافظة',
@@ -267,7 +275,7 @@ export default function NewClientPage() {
         nameEnPlaceholder: 'e.g., Jassim Mohammed',
         mobile: 'Mobile Number',
         mobilePlaceholder: '+965 1234 5678',
-        engineer: 'Assigned Engineer (Optional)',
+        engineer: 'Assigned Engineer',
         engineerPlaceholder: 'Select an engineer...',
         address: 'Client Address',
         governorate: 'Governorate',
@@ -319,8 +327,8 @@ export default function NewClientPage() {
                     </div>
 
                      <div className="grid gap-2">
-                        <Label htmlFor="assignedEngineerId">{t.engineer}</Label>
-                        <Select dir="rtl" value={assignedEngineerId} onValueChange={setAssignedEngineerId} disabled={engineersLoading}>
+                        <Label htmlFor="assignedEngineerId">{t.engineer} <span className="text-destructive">*</span></Label>
+                        <Select dir="rtl" value={assignedEngineerId} onValueChange={setAssignedEngineerId} disabled={engineersLoading} required>
                             <SelectTrigger>
                                 <SelectValue placeholder={engineersLoading ? "تحميل..." : t.engineerPlaceholder} />
                             </SelectTrigger>
