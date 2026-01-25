@@ -213,15 +213,15 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
-  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(t => t.id !== id));
+  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
+  const removeTerm = (id: string) => setTerms(prev => prev.filter(t => t.id !== id));
   const handleTermChange = (id: string, text: string) => setTerms(prev => prev.map(t => (t.id === id ? { ...t, text } : t)));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
-      const newTerms = [...termsAndConditions];
+      const newTerms = [...terms];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newTerms.length) return;
       [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-      setTermsAndConditions(newTerms);
+      setTerms(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
@@ -250,15 +250,15 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
         const [parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
             getDocs(parentAccountQuery),
-            getDocs(revenueAccountQuery),
+            getDocs(revenueAccountSnap),
             getDocs(clientAccountQuery)
         ]);
 
         if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
         if (revenueAccountSnap.empty) throw new Error('حساب "إيرادات استشارات هندسية" غير موجود في شجرة الحسابات.');
 
-        const customersAccount = parentAccountSnap.docs[0].data();
-        const revenueAccount = revenueAccountSnap.docs[0].data();
+        const customersAccountDoc = parentAccountSnap.docs[0];
+        const revenueAccountDoc = revenueAccountSnap.docs[0];
         
         // --- Firestore Transaction ---
         await runTransaction(firestore, async (transaction_firestore) => {
@@ -270,7 +270,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef)
+                transaction_firestore.get(journalEntryCounterDoc)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -291,14 +291,14 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 }
             });
             
-            let clientAccountCode: string | undefined;
+            let clientAccountId: string;
             
-            // 2. Handle client account creation if it's the first contract
+            // 2. Handle client account creation
             if (clientData.status === 'new') {
-                const parentCode = customersAccount.code as string;
+                const parentCode = customersAccountDoc.data().code as string;
                 const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
                 const nextClientCodeNumber = lastClientCodeNumber + 1;
-                clientAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+                const clientAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
                 
                 transaction_firestore.update(clientRef, { status: 'contracted' });
                 const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
@@ -311,20 +311,48 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                     createdAt: serverTimestamp(),
                 });
                 transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
+                
                 const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
                 transaction_firestore.set(newAccountRef, {
                     name: clientData.nameAr,
                     code: clientAccountCode,
-                    type: customersAccount.type,
-                    level: (customersAccount.level as number) + 1,
+                    type: customersAccountDoc.data().type,
+                    level: (customersAccountDoc.data().level as number) + 1,
                 });
+                clientAccountId = newAccountRef.id;
             } else {
                  if (!clientAccountSnap.empty) {
-                    clientAccountCode = clientAccountSnap.docs[0].data().code;
+                    clientAccountId = clientAccountSnap.docs[0].id;
+                } else {
+                    // Failsafe: if client is not new but has no account, create it.
+                    const parentCode = customersAccountDoc.data().code as string;
+                    const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
+                    const nextClientCodeNumber = lastClientCodeNumber + 1;
+                    const clientAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+
+                    transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
+                    const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
+                    transaction_firestore.set(newAccountRef, {
+                        name: clientData.nameAr,
+                        code: clientAccountCode,
+                        type: customersAccountDoc.data().type,
+                        level: (customersAccountDoc.data().level as number) + 1,
+                    });
+                    clientAccountId = newAccountRef.id;
+                    
+                    const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+                    transaction_firestore.set(doc(historyCollectionRef), {
+                        type: 'log',
+                        content: `تم إنشاء حساب محاسبي للعميل تلقائياً لأنه لم يكن موجوداً.`,
+                        userId: currentUser.id,
+                        userName: currentUser.fullName || 'النظام',
+                        userAvatar: currentUser.avatarUrl || '',
+                        createdAt: serverTimestamp(),
+                    });
                 }
             }
 
-            if (!clientAccountCode) {
+            if (!clientAccountId) {
                  throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${clientData.nameAr}`);
             }
             
@@ -334,8 +362,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
             const journalLines = [
-                { accountName: clientData.nameAr, accountCode: clientAccountCode, debit: totalAmount, credit: 0 },
-                { accountName: revenueAccount.name, accountCode: revenueAccount.code, debit: 0, credit: totalAmount }
+                { accountId: clientAccountId, accountName: clientData.nameAr, debit: totalAmount, credit: 0 },
+                { accountId: revenueAccountDoc.id, accountName: revenueAccountDoc.data().name, debit: 0, credit: totalAmount }
             ];
 
             transaction_firestore.set(newJournalEntryRef, {
