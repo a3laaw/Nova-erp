@@ -184,7 +184,7 @@ export function JournalEntriesList() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" dir="rtl">
                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => { /* router.push(`/dashboard/accounting/journal-entries/${entry.id}`) */ }}>
+                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)}>
                                     <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                 </DropdownMenuItem>
                                 
@@ -195,7 +195,7 @@ export function JournalEntriesList() {
                                             <CheckCircle className="ml-2 h-4 w-4" />
                                             ترحيل القيد
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => { /* router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`) */ }}>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)}>
                                             <Pencil className="ml-2 h-4 w-4" /> تعديل
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
