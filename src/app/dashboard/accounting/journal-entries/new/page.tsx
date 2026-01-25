@@ -145,6 +145,16 @@ export default function NewJournalEntryPage() {
       }))
   , [accounts]);
 
+  // Automatically add a new line when the last one is filled
+  useEffect(() => {
+    if (lines.length > 0) {
+      const lastLine = lines[lines.length - 1];
+      if (lastLine && lastLine.accountId && (Number(lastLine.debit) > 0 || Number(lastLine.credit) > 0)) {
+        append({ accountId: '', debit: 0, credit: 0, notes: '' }, { shouldFocus: false });
+      }
+    }
+  }, [lines, append]);
+
 
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore) return;
@@ -291,10 +301,6 @@ export default function NewJournalEntryPage() {
                             </TableRow>
                         </TableFooter>
                     </Table>
-                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ accountId: '', debit: 0, credit: 0, notes: '' })}>
-                        <PlusCircle className="ml-2 h-4 w-4"/>
-                        إضافة سطر
-                    </Button>
                 </div>
 
                  {errors.lines && (
