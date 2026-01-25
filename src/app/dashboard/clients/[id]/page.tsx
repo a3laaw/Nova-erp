@@ -186,8 +186,8 @@ export default function ClientProfilePage() {
         const hasOtherContracts = otherTransactions.some(tx => !!tx.contract);
 
         if (!hasOtherContracts && client.status === 'contracted') {
-            const clientRef = doc(firestore, 'clients', client.id);
-            batch.update(clientRef, { status: 'new' });
+            const clientRefDoc = doc(firestore, 'clients', client.id);
+            batch.update(clientRefDoc, { status: 'new' });
             
             const statusLogContent = `تغيرت حالة الملف من "تم التعاقد" إلى "جديد" بعد إلغاء آخر عقد.`;
             batch.set(doc(historyCollectionRef), {
@@ -265,7 +265,6 @@ export default function ClientProfilePage() {
     return (
         <div className="space-y-6" dir="rtl">
             <div className='flex justify-end items-center no-print'>
-                <Skeleton className="h-10 w-48" />
             </div>
              <Card>
                 <CardHeader className='flex-row items-center gap-4'>
@@ -332,12 +331,6 @@ export default function ClientProfilePage() {
     <div className='space-y-6' dir='rtl'>
         <div className='flex justify-end items-center no-print'>
             <div className='flex gap-2'>
-                <Button asChild>
-                    <Link href={`/dashboard/clients/${id}/edit`}>
-                        <Pencil className="ml-2 h-4 w-4" />
-                        تعديل بيانات العميل
-                    </Link>
-                </Button>
             </div>
         </div>
         <Card>

@@ -172,8 +172,8 @@ export default function TransactionDetailPage() {
     setIsSaving(true);
     
     const batch = writeBatch(firestore);
-    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-    const timelineRef = collection(transactionRef, 'timelineEvents');
+    const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+    const timelineRef = collection(transactionRefDoc, 'timelineEvents');
     
     const updateData: any = { updatedAt: serverTimestamp() };
 
@@ -205,12 +205,12 @@ export default function TransactionDetailPage() {
         });
         
         if (transaction.transactionType === 'بلدية سكن خاص') {
-            const clientRef = doc(firestore, 'clients', clientId);
-            batch.update(clientRef, { assignedEngineer: newEngineerId || null });
+            const clientRefDoc = doc(firestore, 'clients', clientId);
+            batch.update(clientRefDoc, { assignedEngineer: newEngineerId || null });
         }
     }
 
-    batch.update(transactionRef, updateData);
+    batch.update(transactionRefDoc, updateData);
     
     try {
         await batch.commit();
@@ -261,12 +261,12 @@ export default function TransactionDetailPage() {
     
     setStages(updatedStages); // Optimistic update
 
-    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-    const timelineCollectionRef = collection(transactionRef, 'timelineEvents');
+    const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+    const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
     
     try {
         const batch = writeBatch(firestore);
-        batch.update(transactionRef, { stages: updatedStages });
+        batch.update(transactionRefDoc, { stages: updatedStages });
         
         const logContent = `قام بتغيير حالة المرحلة "${stage.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         batch.set(doc(timelineCollectionRef), {

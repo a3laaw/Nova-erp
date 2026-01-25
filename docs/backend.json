@@ -194,7 +194,7 @@
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
-                "enum": ["new", "in-progress", "completed", "submitted"]
+                "enum": ["new", "in-progress", "completed", "submitted", "on-hold"]
             },
             "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },

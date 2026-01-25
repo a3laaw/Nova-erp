@@ -140,8 +140,8 @@ export default function EditTransactionPage() {
     }
     const originalEngineerId = originalData.assignedEngineerId || '';
     if (formData.assignedEngineerId !== originalEngineerId) {
-        const oldEngName = employees.find(e => e.id === originalEngineerId)?.fullName || 'غير مسند';
-        const newEngName = employees.find(e => e.id === formData.assignedEngineerId)?.fullName || 'غير مسند';
+        const oldEngName = engineers.find(e => e.id === originalEngineerId)?.fullName || 'غير مسند';
+        const newEngName = engineers.find(e => e.id === formData.assignedEngineerId)?.fullName || 'غير مسند';
         changes.push(`تغير المهندس المسؤول من "${oldEngName}" إلى "${newEngName}".`);
         updatePayload.assignedEngineerId = formData.assignedEngineerId;
     }
