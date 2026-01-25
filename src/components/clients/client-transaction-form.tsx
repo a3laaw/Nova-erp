@@ -17,7 +17,7 @@ import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, Department } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, Department, WorkStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
@@ -31,34 +31,6 @@ interface ClientTransactionFormProps {
   clientId: string;
   clientName: string;
 }
-
-const transactionStageTemplates: Record<string, string[]> = {
-  'بلدية سكن خاص': [
-    'التعاقد',
-    'مراجعة واعتماد المخططات الابتدائية',
-    'تصميم دور السرداب',
-    'تصميم الدور الأرضي',
-    'تصميم الدور الأول',
-    'تصميم الدور الثاني',
-    'تصميم السطح',
-    'الواجهات والقطاعات',
-    'التسليم النهائي للبلدية'
-  ],
-  'تصميم كهرباء': [
-    'التعاقد',
-    'مراجعة المخططات المعمارية',
-    'تصميم مخططات الكهرباء',
-    'تسليم للمراجعة',
-    'اعتماد نهائي'
-  ],
-  'تصميم إنشائي': [
-    'التعاقد',
-    'دراسة التربة',
-    'التصميم الإنشائي الأولي',
-    'التصميم النهائي',
-    'اعتماد نهائي'
-  ]
-};
 
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -74,6 +46,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
     const [typesLoading, setTypesLoading] = useState(false);
+
+    const [workStages, setWorkStages] = useState<WorkStage[]>([]);
+    const [stagesLoading, setStagesLoading] = useState(false);
 
     const [transactionType, setTransactionType] = useState('');
     const [description, setDescription] = useState('');
@@ -122,25 +97,38 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
     useEffect(() => {
         if (!firestore || !selectedDepartment) {
             setTransactionTypes([]);
+            setWorkStages([]);
             return;
         }
 
-        const fetchTransactionTypes = async () => {
+        const fetchDepartmentData = async () => {
             setTypesLoading(true);
+            setStagesLoading(true);
             try {
                 const typesQuery = query(collection(firestore, `departments/${selectedDepartment}/transactionTypes`), orderBy('name'));
-                const typesSnapshot = await getDocs(typesQuery);
+                const stagesQuery = query(collection(firestore, `departments/${selectedDepartment}/workStages`), orderBy('name'));
+
+                const [typesSnapshot, stagesSnapshot] = await Promise.all([
+                    getDocs(typesQuery),
+                    getDocs(stagesQuery)
+                ]);
+                
                 const fetchedTypes = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
                 setTransactionTypes(fetchedTypes);
+
+                const fetchedStages = stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage));
+                setWorkStages(fetchedStages);
+
             } catch (error) {
-                console.error("Failed to fetch transaction types:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب أنواع المعاملات.' });
+                console.error("Failed to fetch department data:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات القسم.' });
             } finally {
                 setTypesLoading(false);
+                setStagesLoading(false);
             }
         };
 
-        fetchTransactionTypes();
+        fetchDepartmentData();
     }, [firestore, selectedDepartment, toast]);
 
     const resetForm = () => {
@@ -148,6 +136,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         setDescription('');
         setAssignedEngineerId('');
         setSelectedDepartment('');
+        setWorkStages([]);
     };
 
     const handleDepartmentChange = (deptId: string) => {
@@ -197,9 +186,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             const engineer = engineers.find(e => e.id === engineerForTransactionId);
             
-            const stagesTemplate = transactionStageTemplates[transactionType];
-            const initialStages = stagesTemplate ? stagesTemplate.map(name => ({
-                name,
+            const initialStages = workStages.length > 0 ? workStages.map(stage => ({
+                name: stage.name,
                 status: 'pending' as const,
                 startDate: null,
                 endDate: null,
@@ -322,7 +310,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                                     onSelect={setTransactionType} 
                                     options={transactionTypeOptions} 
                                     placeholder={!selectedDepartment ? "اختر قسمًا أولاً" : typesLoading ? "تحميل..." : "اختر نوع المعاملة..."} 
-                                    disabled={!selectedDepartment || typesLoading}
+                                    disabled={!selectedDepartment || typesLoading || stagesLoading}
                                 />
                             </div>
                         </div>
@@ -370,5 +358,3 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         </Dialog>
     );
 }
-
-    

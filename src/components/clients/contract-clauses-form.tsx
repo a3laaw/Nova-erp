@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,9 +22,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem } from '@/lib/types';
+import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -42,7 +41,7 @@ interface ContractClausesFormProps {
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
-const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
+const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
 
 
 // --- Sub-component for Template Selection ---
@@ -102,10 +101,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
 
+  const [localTransactionStages, setLocalTransactionStages] = useState<TransactionStage[]>([]);
+
   const stageOptions = useMemo(() => {
-    if (!transaction?.stages) return [];
-    return transaction.stages.map(stage => ({ value: stage.name, label: stage.name }));
-  }, [transaction?.stages]);
+    return localTransactionStages.map(stage => ({ value: stage.name, label: stage.name }));
+  }, [localTransactionStages]);
 
   // This effect resets the entire component's state when the dialog is closed.
   useEffect(() => {
@@ -118,6 +118,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setStep('loading');
       setAvailableTemplates([]);
       setChosenTemplate(null);
+      setLocalTransactionStages([]);
     }
   }, [isOpen]);
 
@@ -148,6 +149,29 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     const findAndSetData = async () => {
       setStep('loading');
       try {
+        // --- Fetch stages dynamically if they are missing ---
+        let stages: TransactionStage[] = transaction.stages || [];
+        if (!stages || stages.length === 0) {
+            const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'), where('name', '==', transaction.transactionType));
+            const typeSnap = await getDocs(transTypesQuery);
+            if (!typeSnap.empty) {
+                const departmentRef = typeSnap.docs[0].ref.parent.parent;
+                if (departmentRef) {
+                    const stagesQuery = query(collection(departmentRef, 'workStages'), orderBy('name'));
+                    const stagesSnap = await getDocs(stagesQuery);
+                    stages = stagesSnap.docs.map(doc => ({
+                        name: doc.data().name,
+                        status: 'pending',
+                        startDate: null,
+                        endDate: null,
+                        notes: ''
+                    } as TransactionStage));
+                }
+            }
+        }
+        setLocalTransactionStages(stages);
+        // --- End of stage fetching ---
+
         if (transaction.contract) {
           // If a contract already exists, we go straight to editing it.
           setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses || [])));
@@ -284,7 +308,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef)
+                transaction_firestore.get(journalEntryCounterDoc)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
