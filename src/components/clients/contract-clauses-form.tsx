@@ -30,6 +30,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -99,6 +100,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [step, setStep] = useState<'loading' | 'select' | 'edit'>('loading');
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
+
+  const stageOptions = useMemo(() => {
+    if (!transaction?.stages) return [];
+    return transaction.stages.map(stage => ({ value: stage.name, label: stage.name }));
+  }, [transaction?.stages]);
 
   // This effect resets the entire component's state when the dialog is closed.
   useEffect(() => {
@@ -184,7 +190,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
           name: m.name,
           amount: isPercentage ? ((m.value || 0) / 100) * totalContractAmount : (m.value || 0),
           status: 'غير مستحقة',
-          percentage: isPercentage ? m.value : undefined
+          percentage: isPercentage ? m.value : undefined,
+          condition: m.condition || ''
       } as ContractClause));
 
       setClauses(JSON.parse(JSON.stringify(calculatedClauses)));
@@ -195,10 +202,21 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   }, [chosenTemplate, step, isOpen, transaction?.contract]);
 
 
-  const handleAmountChange = (index: number, newAmount: string) => {
+  const handleClauseChange = (index: number, field: keyof ContractClause, value: any) => {
     const updatedClauses = [...clauses];
-    updatedClauses[index].amount = Number(newAmount) || 0;
+    const clauseToUpdate = { ...updatedClauses[index] };
+    (clauseToUpdate as any)[field] = value;
+    updatedClauses[index] = clauseToUpdate;
     setClauses(updatedClauses);
+  };
+  
+  const addClause = () => {
+    const newName = `الدفعة ${milestoneNames[clauses.length] || `(${clauses.length + 1})`}`;
+    setClauses(prev => [...prev, { id: generateId(), name: newName, amount: 0, status: 'غير مستحقة', condition: '' }]);
+  };
+
+  const removeClause = (id: string) => {
+    setClauses(prev => prev.filter(c => c.id !== id));
   };
   
   const addScopeItem = () => setScopeOfWork(prev => [...prev, { id: generateId(), title: '', description: '' }]);
@@ -221,7 +239,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newTerms = [...terms];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newTerms.length) return;
-      [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
+      [newTerms[index], newTerms[newIndex]] = [newTerms[index], newTerms[index]];
       setTerms(newTerms);
   };
 
@@ -237,7 +255,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   };
 
   const totalAmount = useMemo(() => {
-    return clauses.reduce((acc, clause) => acc + clause.amount, 0);
+    return clauses.reduce((acc, clause) => acc + Number(clause.amount), 0);
   }, [clauses]);
 
   const handleSubmit = async () => {
@@ -449,33 +467,61 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                       <TableHeader>
                         <TableRow>
                           <TableHead>البند</TableHead>
+                          <TableHead>شرط الاستحقاق</TableHead>
                           <TableHead className="w-[150px] text-left">المبلغ (د.ك)</TableHead>
+                          <TableHead><span className="sr-only">إجراءات</span></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {clauses.map((clause, index) => (
                           <TableRow key={clause.id}>
-                            <TableCell className="font-medium">{clause.name}</TableCell>
+                            <TableCell className="font-medium">
+                               <Input 
+                                value={clause.name}
+                                onChange={(e) => handleClauseChange(index, 'name', e.target.value)}
+                                placeholder={`دفعة ${index + 1}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                               <Select value={clause.condition} onValueChange={(v) => handleClauseChange(index, 'condition', v)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="اختر مرحلة العمل" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="">بدون شرط</SelectItem>
+                                        {stageOptions.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </TableCell>
                             <TableCell>
                               <Input 
                                 type="number"
                                 value={clause.amount}
-                                onChange={(e) => handleAmountChange(index, e.target.value)}
+                                onChange={(e) => handleClauseChange(index, 'amount', Number(e.target.value))}
                                 className="text-left dir-ltr"
                               />
+                            </TableCell>
+                            <TableCell>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeClause(clause.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                       <TableFooter>
                         <TableRow>
-                          <TableCell className="font-bold">الإجمالي</TableCell>
+                          <TableCell colSpan={2} className="font-bold">الإجمالي</TableCell>
                           <TableCell className="text-left font-bold font-mono">
                             {formatCurrency(totalAmount)}
                           </TableCell>
+                          <TableCell></TableCell>
                         </TableRow>
                       </TableFooter>
                     </Table>
+                    <div className="flex justify-end mt-2">
+                        <Button type="button" size="sm" variant="outline" onClick={addClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة دفعة</Button>
+                    </div>
                 </div>
                 
                 <div className="grid gap-2 pt-4">

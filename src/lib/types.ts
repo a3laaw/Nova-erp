@@ -401,6 +401,7 @@ export type ContractClause = {
   amount: number;
   status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; // Paid, Due, Not Due
   percentage?: number;
+  condition?: string;
 };
 
 export interface ContractTerm {
