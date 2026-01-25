@@ -31,7 +31,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -172,22 +172,20 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const allTemplatesSnapshot = await getDocs(allTemplatesQuery);
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
 
-        // Fetch all possible work stages
-        let stages: MultiSelectOption[] = [];
-        if (transaction.stages && transaction.stages.length > 0) {
-            stages = transaction.stages.map(stage => ({ value: stage.name, label: stage.name }));
-        } else {
-             // Fallback for older transactions: query all work stages from all departments
-            const stagesQuery = query(collectionGroup(firestore, 'workStages'));
-            const stagesSnapshot = await getDocs(stagesQuery);
-            const uniqueStages = new Map<string, MultiSelectOption>();
-            stagesSnapshot.forEach(stageDoc => {
-                const stageName = stageDoc.data().name as string;
-                if (stageName && !uniqueStages.has(stageName)) {
-                    uniqueStages.set(stageName, { value: stageName, label: stageName });
-                }
-            });
-            stages = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
+        // Fetch all possible work stages robustly
+        const stagesQuery = query(collectionGroup(firestore, 'workStages'));
+        const stagesSnapshot = await getDocs(stagesQuery);
+        const uniqueStages = new Map<string, MultiSelectOption>();
+        stagesSnapshot.forEach(stageDoc => {
+            const stageName = stageDoc.data().name as string;
+            if (stageName && !uniqueStages.has(stageName)) {
+                uniqueStages.set(stageName, { value: stageName, label: stageName });
+            }
+        });
+        const stages = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
+
+        if (stages.length === 0) {
+            console.warn("Firebase Studio: No work stages found in any 'workStages' subcollection. The condition dropdown will be empty.");
         }
         
         setReferenceData({ templates, stages });
