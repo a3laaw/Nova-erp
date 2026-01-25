@@ -31,7 +31,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -172,7 +172,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const allTemplatesSnapshot = await getDocs(allTemplatesQuery);
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
 
-        // NEW LOGIC: Fetch all work stages from all departments using collectionGroup
+        // Fetch all work stages from all departments using collectionGroup
         const stagesQuery = query(collectionGroup(firestore, 'workStages'));
         const stagesSnapshot = await getDocs(stagesQuery);
         const uniqueStages = new Map<string, MultiSelectOption>();
@@ -319,25 +319,14 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             // 1. Update the transaction with contract details
             const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
             
-            const contractData: {
-                clauses: ContractClause[];
-                scopeOfWork: ContractScopeItem[];
-                termsAndConditions: ContractTerm[];
-                openClauses: ContractTerm[];
-                totalAmount: number;
-                financialsType?: 'fixed' | 'percentage';
-            } = {
+            const contractData = {
                 clauses: clauses,
                 scopeOfWork: scopeOfWork,
                 termsAndConditions: terms,
                 openClauses: openClauses,
                 totalAmount: totalAmount,
+                financialsType: chosenTemplate?.financials?.type || 'fixed',
             };
-
-            const financialTypeFromTemplate = chosenTemplate?.financials?.type;
-            if (financialTypeFromTemplate) {
-                contractData.financialsType = financialTypeFromTemplate;
-            }
 
             transaction_firestore.update(transactionRef, {
                 contract: contractData
