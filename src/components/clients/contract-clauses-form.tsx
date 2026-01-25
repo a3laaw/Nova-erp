@@ -250,8 +250,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
         const [parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
             getDocs(parentAccountQuery),
-            getDocs(revenueAccountSnap),
-            getDocs(clientAccountSnap)
+            getDocs(revenueAccountQuery),
+            getDocs(clientAccountQuery)
         ]);
 
         if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
@@ -491,12 +491,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                     <Input
                                         placeholder={`عنوان البند ${index + 1}`}
                                         value={item.title}
-                                        onChange={(e) => handleScopeChange(item.id, 'title', e.target.value)}
+                                        onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)}
                                     />
                                     <Textarea
                                         placeholder={`وصف تفصيلي للبند...`}
                                         value={item.description}
-                                        onChange={(e) => handleScopeChange(item.id, 'description', e.target.value)}
+                                        onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)}
                                         rows={2}
                                     />
                                 </div>
