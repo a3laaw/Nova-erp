@@ -170,10 +170,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
           });
           setStep('edit');
         } else {
-          // If no contract exists, find matching templates.
-          const templatesQuery = query(collection(firestore, 'contractTemplates'), where('transactionTypes', 'array-contains', transaction.transactionType));
-          const templatesSnapshot = await getDocs(templatesQuery);
-          const matchingTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
+          // If no contract exists, find matching templates by fetching all and filtering client-side.
+          const allTemplatesQuery = query(collection(firestore, 'contractTemplates'));
+          const allTemplatesSnapshot = await getDocs(allTemplatesQuery);
+          const allTemplates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
+          const matchingTemplates = allTemplates.filter(t => t.transactionTypes?.includes(transaction.transactionType));
 
           if (matchingTemplates.length > 1) {
             setAvailableTemplates(matchingTemplates);
