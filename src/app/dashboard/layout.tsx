@@ -55,7 +55,7 @@ export default function DashboardLayout({
         <Sidebar side={language === 'ar' ? 'right' : 'left'} className="no-print">
           <MainNav currentUser={user} onLogout={handleLogout} />
         </Sidebar>
-        <div className="flex flex-col w-full">
+        <div className="flex flex-col flex-1 min-w-0">
           <Header currentUser={user} onLogout={handleLogout} className="no-print" />
           <SidebarInset>
             <main className="flex-1 p-4 md:p-6 lg:p-8">
