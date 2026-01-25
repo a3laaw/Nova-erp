@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -172,42 +172,17 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const allTemplatesSnapshot = await getDocs(allTemplatesQuery);
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
 
-        // Fetch stages
-        let stagesForTransaction: TransactionStage[] = transaction.stages || [];
-
-        // If stages are not embedded, try to find them
-        if (!stagesForTransaction || stagesForTransaction.length === 0) {
-            let deptIdToQuery: string | null = (transaction as any).departmentId || null;
-
-            // Fallback for older transactions without departmentId using a more efficient query
-            if (!deptIdToQuery) {
-                const transTypesQuery = query(
-                    collectionGroup(firestore, 'transactionTypes'),
-                    where('name', '==', transaction.transactionType)
-                );
-                const transTypesSnap = await getDocs(transTypesQuery);
-                if (!transTypesSnap.empty) {
-                    const typeDoc = transTypesSnap.docs[0];
-                    // Path is departments/{deptId}/transactionTypes/{typeId}
-                    deptIdToQuery = typeDoc.ref.parent.parent!.id;
-                }
+        // NEW LOGIC: Fetch all work stages from all departments using collectionGroup
+        const stagesQuery = query(collectionGroup(firestore, 'workStages'));
+        const stagesSnapshot = await getDocs(stagesQuery);
+        const uniqueStages = new Map<string, MultiSelectOption>();
+        stagesSnapshot.forEach(stageDoc => {
+            const stageName = stageDoc.data().name as string;
+            if (stageName && !uniqueStages.has(stageName)) {
+                uniqueStages.set(stageName, { value: stageName, label: stageName });
             }
-
-            // If we found a department ID (either directly or through fallback), query its stages
-            if (deptIdToQuery) {
-                const stagesQuery = query(collection(firestore, `departments/${deptIdToQuery}/workStages`), orderBy('name'));
-                const stagesSnap = await getDocs(stagesQuery);
-                stagesForTransaction = stagesSnap.docs.map(doc => ({
-                    name: doc.data().name,
-                    status: 'pending' as const,
-                    startDate: null,
-                    endDate: null,
-                    notes: ''
-                }));
-            }
-        }
-        
-        const stageOptions = stagesForTransaction.map(stage => ({ value: stage.name, label: stage.name }));
+        });
+        const stageOptions = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
 
         setReferenceData({ templates, stages: stageOptions });
 
