@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Account } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -37,8 +37,8 @@ import { InlineSearchList, type SearchOption } from '@/components/ui/inline-sear
 // Zod Schema for validation
 const lineSchema = z.object({
   accountId: z.string().min(1, { message: 'الحساب مطلوب.' }),
-  debit: z.number().min(0, 'القيمة يجب أن تكون موجبة.'),
-  credit: z.number().min(0, 'القيمة يجب أن تكون موجبة.'),
+  debit: z.coerce.number().min(0, 'القيمة يجب أن تكون موجبة.'),
+  credit: z.coerce.number().min(0, 'القيمة يجب أن تكون موجبة.'),
   notes: z.string().optional(),
 }).refine(data => data.debit > 0 || data.credit > 0, {
     message: 'يجب إدخال قيمة للمدين أو الدائن.',
@@ -99,10 +99,9 @@ export default function NewJournalEntryPage() {
     const fetchAccounts = async () => {
         setAccountsLoading(true);
         try {
-            const q = query(collection(firestore, 'chartOfAccounts'));
+            const q = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
             const snapshot = await getDocs(q);
             const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-            fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
             setAccounts(fetchedAccounts);
         } catch (error) {
             console.error("Error fetching chart of accounts: ", error);
@@ -269,10 +268,10 @@ export default function NewJournalEntryPage() {
                                         {errors.lines?.[index]?.accountId && <p className="text-xs text-destructive mt-1">{errors.lines[index]?.accountId?.message}</p>}
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`, { valueAsNumber: true })} />
+                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`)} />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`, { valueAsNumber: true })} />
+                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`)} />
                                     </TableCell>
                                     <TableCell>
                                         <Input {...register(`lines.${index}.notes`)} />
