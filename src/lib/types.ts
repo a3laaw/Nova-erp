@@ -390,6 +390,11 @@ export interface TransactionType {
     name: string;
 }
 
+export interface WorkStage {
+    id: string;
+    name: string;
+}
+
 export type ContractClause = {
   id: string;
   name: string;

@@ -311,9 +311,9 @@ export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const router = useRouter();
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
 
     // Fetch counts for the dashboard
@@ -329,14 +329,16 @@ export function ReferenceDataManager() {
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 const areasQuery = query(collectionGroup(firestore, 'areas'));
                 const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
+                const workStagesQuery = query(collectionGroup(firestore, 'workStages'));
                 
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap, workStagesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(govsQuery),
                     getDocs(jobsQuery),
                     getDocs(areasQuery),
                     getDocs(transTypesQuery),
                     getDocs(companiesQuery),
+                    getDocs(workStagesQuery),
                 ]);
 
                 setCounts({
@@ -346,6 +348,7 @@ export function ReferenceDataManager() {
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
                     companies: companiesSnap.size,
+                    workStages: workStagesSnap.size,
                 });
 
             } catch (error) {
@@ -399,6 +402,19 @@ export function ReferenceDataManager() {
         />
     }
 
+    if (view === 'workStages') {
+        return <ManagerView
+            primaryTitle="الأقسام"
+            primarySingularTitle="قسم"
+            primaryCollectionName="departments"
+            secondaryTitle="مراحل العمل"
+            secondarySingularTitle="مرحلة عمل"
+            secondaryCollectionName="workStages"
+            icon={<Workflow className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
+
     if (view === 'companies') {
         return <CompanyManager onBack={() => setView('dashboard')} />
     }
@@ -442,6 +458,14 @@ export function ReferenceDataManager() {
                     icon={<FileText className="h-full w-full" />} 
                     onNavigate={() => setView('transTypes')} 
                     color="red" 
+                    loading={loadingCounts} 
+                />
+                 <StatCard 
+                    title="مراحل العمل" 
+                    count={counts.workStages} 
+                    icon={<Workflow className="h-full w-full" />} 
+                    onNavigate={() => setView('workStages')} 
+                    color="purple" 
                     loading={loadingCounts} 
                 />
             </CardContent>

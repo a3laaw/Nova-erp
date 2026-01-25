@@ -558,6 +558,18 @@
       },
       "required": ["name"]
     },
+    "WorkStage": {
+      "title": "Work Stage",
+      "description": "Represents a standard work stage that can be associated with a department.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the work stage."
+        }
+      },
+      "required": ["name"]
+    },
     "Appointment": {
       "title": "Appointment",
       "description": "Represents a scheduled meeting or visit.",
@@ -924,6 +936,10 @@
     "/departments/{departmentId}/transactionTypes/{transactionTypeId}": {
         "schema": { "$ref": "#/entities/TransactionType" },
         "description": "Stores transaction types for a specific department."
+    },
+    "/departments/{departmentId}/workStages/{workStageId}": {
+        "schema": { "$ref": "#/entities/WorkStage" },
+        "description": "Stores standard work stages for a specific department."
     },
     "/governorates/{governorateId}": {
       "schema": { "$ref": "#/entities/Governorate" },
