@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,7 @@ interface ContractClausesFormProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
 
 
@@ -120,20 +121,40 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     }
   }, [isOpen]);
 
-  // This effect fetches templates and decides which step to show.
+  const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
+      const totalContractAmount = template?.financials.totalAmount || 0;
+      const isPercentage = template?.financials.type === 'percentage';
+
+      const calculatedClauses = (template?.financials.milestones || []).map(m => ({
+          id: m.id || generateId(),
+          name: m.name,
+          amount: isPercentage ? ((m.value || 0) / 100) * totalContractAmount : (m.value || 0),
+          status: 'غير مستحقة' as const,
+          percentage: isPercentage ? m.value : undefined,
+          condition: m.condition || ''
+      }));
+
+      setClauses(calculatedClauses);
+      setScopeOfWork(template?.scopeOfWork || []);
+      setTerms(template?.termsAndConditions || []);
+      setOpenClauses(template?.openClauses || []);
+      setChosenTemplate(template);
+  }, []);
+
+  // This effect fetches data and decides which step to show.
   useEffect(() => {
     if (!isOpen || !transaction || !firestore) return;
 
-    const findAndSetTemplate = async () => {
+    const findAndSetData = async () => {
       setStep('loading');
       try {
         if (transaction.contract) {
           // If a contract already exists, we go straight to editing it.
-          setScopeOfWork(JSON.parse(JSON.stringify(transaction.contract.scopeOfWork || [])));
           setClauses(JSON.parse(JSON.stringify(transaction.contract.clauses || [])));
+          setScopeOfWork(JSON.parse(JSON.stringify(transaction.contract.scopeOfWork || [])));
           setTerms(JSON.parse(JSON.stringify(transaction.contract.termsAndConditions || [])));
           setOpenClauses(JSON.parse(JSON.stringify(transaction.contract.openClauses || [])));
-          setChosenTemplate({
+          setChosenTemplate({ // Create a mock template object for consistency
             title: transaction.transactionType,
             financials: {
               type: transaction.contract.financialsType || 'fixed',
@@ -150,56 +171,29 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
           setStep('edit');
         } else {
           // If no contract exists, find matching templates.
-          const templatesQuery = query(collection(firestore, 'contractTemplates'));
+          const templatesQuery = query(collection(firestore, 'contractTemplates'), where('transactionTypes', 'array-contains', transaction.transactionType));
           const templatesSnapshot = await getDocs(templatesQuery);
-          const matchingTemplates = templatesSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate))
-            .filter(t => t.transactionTypes.includes(transaction.transactionType));
+          const matchingTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
 
           if (matchingTemplates.length > 1) {
             setAvailableTemplates(matchingTemplates);
-            setStep('select'); // Let the user choose
-          } else if (matchingTemplates.length === 1) {
-            setChosenTemplate(matchingTemplates[0]);
-            setStep('edit'); // Only one found, use it
+            setStep('select');
           } else {
-            setChosenTemplate(null);
-            setStep('edit'); // No templates found, manual creation
+            const templateToUse = matchingTemplates.length === 1 ? matchingTemplates[0] : null;
+            populateFormFromTemplate(templateToUse);
+            setStep('edit');
           }
         }
       } catch (error) {
         console.error("Error fetching contract templates:", error);
         toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب نماذج العقود." });
-        setStep('edit'); // Fallback to manual edit on error
+        populateFormFromTemplate(null); // Fallback to manual edit on error
+        setStep('edit');
       }
     };
 
-    findAndSetTemplate();
-  }, [isOpen, transaction, firestore, toast]);
-
-  // This effect populates the form fields once a template is chosen or if we enter edit mode.
-  useEffect(() => {
-      if (step !== 'edit' || !isOpen) return;
-      if (transaction?.contract) return; // If editing an existing contract, data is already set.
-
-      const totalContractAmount = chosenTemplate?.financials.totalAmount || 0;
-      const isPercentage = chosenTemplate?.financials.type === 'percentage';
-
-      const calculatedClauses = (chosenTemplate?.financials.milestones || []).map(m => ({
-          id: m.id || generateId(),
-          name: m.name,
-          amount: isPercentage ? ((m.value || 0) / 100) * totalContractAmount : (m.value || 0),
-          status: 'غير مستحقة',
-          percentage: isPercentage ? m.value : undefined,
-          condition: m.condition || ''
-      } as ContractClause));
-
-      setClauses(JSON.parse(JSON.stringify(calculatedClauses)));
-      setScopeOfWork(JSON.parse(JSON.stringify(chosenTemplate?.scopeOfWork || [])));
-      setTerms(JSON.parse(JSON.stringify(chosenTemplate?.termsAndConditions || [])));
-      setOpenClauses(JSON.parse(JSON.stringify(chosenTemplate?.openClauses || [])));
-      
-  }, [chosenTemplate, step, isOpen, transaction?.contract]);
+    findAndSetData();
+  }, [isOpen, transaction, firestore, toast, populateFormFromTemplate]);
 
 
   const handleClauseChange = (index: number, field: keyof ContractClause, value: any) => {
@@ -239,7 +233,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newTerms = [...terms];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newTerms.length) return;
-      [newTerms[index], newTerms[newIndex]] = [newTerms[index], newTerms[index]];
+      [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
       setTerms(newTerms);
   };
 
@@ -250,7 +244,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newClauses = [...openClauses];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newClauses.length) return;
-      [newClauses[index], newClauses[newIndex]] = [newClauses[index], newClauses[index]];
+      [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
       setOpenClauses(newClauses);
   };
 
@@ -270,7 +264,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const [parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
             getDocs(parentAccountQuery),
             getDocs(revenueAccountQuery),
-            getDocs(clientAccountQuery)
+            getDocs(clientAccountSnap)
         ]);
 
         if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
@@ -442,11 +436,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
           <TemplateSelectionView 
             templates={availableTemplates}
             onSelect={(selected) => {
-              setChosenTemplate(selected);
+              populateFormFromTemplate(selected);
               setStep('edit');
             }}
             onContinueWithout={() => {
-              setChosenTemplate(null);
+              populateFormFromTemplate(null);
               setStep('edit');
             }}
           />
