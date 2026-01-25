@@ -496,4 +496,6 @@ export interface JournalEntry {
   lines: JournalEntryLine[];
   createdAt: any; // Timestamp
   createdBy?: string;
+  clientId?: string;
+  transactionId?: string;
 }

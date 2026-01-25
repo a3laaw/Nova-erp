@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getDocs, getDoc, deleteField, serverTimestamp } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -22,6 +22,7 @@ import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/auth-context';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -36,6 +37,7 @@ const statusColors: Record<string, string> = {
 
 export function JournalEntriesList() {
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -97,14 +99,70 @@ export function JournalEntriesList() {
   };
 
   const handleDelete = async () => {
-    if (!entryToDelete || !firestore) return;
+    if (!entryToDelete || !firestore || !currentUser) return;
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(firestore, 'journalEntries', entryToDelete.id!));
-        toast({ title: 'نجاح', description: 'تم حذف قيد اليومية بنجاح.' });
+        const batch = writeBatch(firestore);
+        const entryRef = doc(firestore, 'journalEntries', entryToDelete.id!);
+
+        // 1. Check if this is an auto-generated contract entry
+        if (entryToDelete.clientId && entryToDelete.transactionId) {
+            const transactionRef = doc(firestore, 'clients', entryToDelete.clientId, 'transactions', entryToDelete.transactionId);
+            
+            // 2. Remove the contract from the transaction
+            batch.update(transactionRef, { contract: deleteField() });
+
+            // 3. Log this action in the client's main history
+            const historyCollectionRef = collection(firestore, `clients/${entryToDelete.clientId}/history`);
+            const logContent = `تم إلغاء عقد المعاملة المرتبط بالقيد المحاسبي "${entryToDelete.entryNumber}" الذي تم حذفه.`;
+            batch.set(doc(historyCollectionRef), {
+                type: 'log',
+                content: logContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            });
+
+            // Check if we need to revert client status
+            const clientTransactionsQuery = query(collection(firestore, 'clients', entryToDelete.clientId, 'transactions'));
+            // We need to fetch the documents outside the batch write to check their content.
+            const clientTransactionsSnap = await getDocs(clientTransactionsQuery);
+            const otherTransactions = clientTransactionsSnap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(tx => tx.id !== entryToDelete.transactionId);
+            
+            const hasOtherContracts = otherTransactions.some(tx => !!tx.contract);
+
+            if (!hasOtherContracts) {
+                const clientRef = doc(firestore, 'clients', entryToDelete.clientId);
+                const clientSnap = await getDoc(clientRef);
+                if (clientSnap.exists() && clientSnap.data().status === 'contracted') {
+                     batch.update(clientRef, { status: 'new' });
+                     // Log status change
+                     const statusLogContent = `تغيرت حالة الملف إلى "جديد" بعد إلغاء آخر عقد مرتبط.`;
+                     batch.set(doc(historyCollectionRef), {
+                        type: 'log',
+                        content: statusLogContent,
+                        userId: currentUser.id,
+                        userName: currentUser.fullName,
+                        userAvatar: currentUser.avatarUrl,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            }
+        }
+        
+        // 4. Delete the journal entry itself
+        batch.delete(entryRef);
+        
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: 'تم حذف قيد اليومية وإلغاء العقد المرتبط بنجاح.' });
     } catch (error) {
-        console.error('Error deleting journal entry:', error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف قيد اليومية.' });
+        console.error('Error deleting journal entry and contract:', error);
+        const errorMessage = error instanceof Error ? error.message : 'فشل حذف قيد اليومية.';
+        toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
     } finally {
         setIsDeleting(false);
         setEntryToDelete(null);
@@ -227,7 +285,7 @@ export function JournalEntriesList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
+                        سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم. إذا كان هذا القيد مرتبطًا بعقد، فسيتم إلغاء العقد أيضًا. لا يمكن التراجع عن هذا الإجراء.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

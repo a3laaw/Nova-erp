@@ -815,6 +815,14 @@
             "$ref": "#/entities/JournalEntryLine"
           }
         },
+        "clientId": {
+            "type": "string",
+            "description": "The ID of the client related to this entry, if applicable."
+        },
+        "transactionId": {
+            "type": "string",
+            "description": "The ID of the client transaction related to this entry, if applicable."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"

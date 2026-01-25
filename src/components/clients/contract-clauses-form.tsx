@@ -251,7 +251,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const [parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
             getDocs(parentAccountQuery),
             getDocs(revenueAccountSnap),
-            getDocs(clientAccountQuery)
+            getDocs(clientAccountSnap)
         ]);
 
         if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
@@ -376,6 +376,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 lines: journalLines,
                 createdAt: serverTimestamp(),
                 createdBy: currentUser.id,
+                clientId: clientId,
+                transactionId: transaction.id!,
             });
 
             // 4. Update the journal entry counter
