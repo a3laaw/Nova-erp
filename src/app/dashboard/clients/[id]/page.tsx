@@ -277,6 +277,7 @@ export default function ClientProfilePage() {
         onClose={() => setContractTransaction(null)}
         transaction={contractTransaction}
         clientId={id}
+        clientName={client.nameAr}
     />
     <div className='space-y-6' dir='rtl'>
         <div className='flex justify-between items-center no-print'>
