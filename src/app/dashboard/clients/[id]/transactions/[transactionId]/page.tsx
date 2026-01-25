@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -239,17 +239,17 @@ export default function TransactionDetailPage() {
     stage.status = newStatus;
 
     if (newStatus === 'in-progress' && oldStatus !== 'in-progress') {
-        const startDate = Timestamp.now();
+        const startDate = new Date();
         stage.startDate = startDate;
         if (stage.durationDays && stage.durationDays > 0) {
-            const expectedEndDate = new Date(startDate.toDate().getTime());
+            const expectedEndDate = new Date(startDate.getTime());
             expectedEndDate.setDate(expectedEndDate.getDate() + stage.durationDays);
-            stage.expectedEndDate = Timestamp.fromDate(expectedEndDate);
+            stage.expectedEndDate = expectedEndDate;
         }
     }
     
     if (newStatus === 'completed' && oldStatus !== 'completed') {
-        stage.endDate = Timestamp.now();
+        stage.endDate = new Date();
     }
 
     if (newStatus === 'pending' && oldStatus === 'in-progress') {
@@ -292,7 +292,7 @@ export default function TransactionDetailPage() {
         return null;
     }
     
-    const expectedEndDate = stage.expectedEndDate.toDate();
+    const expectedEndDate = stage.expectedEndDate.toDate ? stage.expectedEndDate.toDate() : new Date(stage.expectedEndDate);
     const now = new Date();
     const isOverdue = isPast(expectedEndDate);
     
