@@ -44,6 +44,7 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   secondaryCollectionName,
   icon,
   onBack,
+  disablePrimaryActions
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -53,6 +54,7 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   secondaryCollectionName?: string;
   icon: React.ReactNode;
   onBack: () => void;
+  disablePrimaryActions?: boolean;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -192,7 +194,7 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
         <div>
           <div className="flex justify-between items-center mb-2">
             <h4 className="font-semibold">{primaryTitle}</h4>
-            <Button size="sm" onClick={() => openDialog('primary')}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+            <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
           </div>
           <ScrollArea className="h-72 border rounded-md p-2">
             {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
@@ -201,8 +203,8 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
                   <span>{item.name}</span>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }} disabled={disablePrimaryActions}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }} disabled={disablePrimaryActions}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
               ))
@@ -398,6 +400,7 @@ export function ReferenceDataManager() {
             secondarySingularTitle="نوع معاملة"
             secondaryCollectionName="transactionTypes"
             icon={<FileText className="h-full w-full" />}
+            disablePrimaryActions={true}
             onBack={() => setView('dashboard')}
         />
     }
@@ -411,6 +414,7 @@ export function ReferenceDataManager() {
             secondarySingularTitle="مرحلة عمل"
             secondaryCollectionName="workStages"
             icon={<Workflow className="h-full w-full" />}
+            disablePrimaryActions={true}
             onBack={() => setView('dashboard')}
         />
     }
