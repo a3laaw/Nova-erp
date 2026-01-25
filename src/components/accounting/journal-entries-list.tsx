@@ -15,7 +15,7 @@ import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle } from 'lucide-react';
+import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -42,6 +42,8 @@ export function JournalEntriesList() {
   const [entryToDelete, setEntryToDelete] = useState<JournalEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [isUnposting, setIsUnposting] = useState(false);
+
 
   const entriesQuery = useMemo(() => {
     if (!firestore) return null;
@@ -65,7 +67,7 @@ export function JournalEntriesList() {
   };
 
   const handlePostEntry = async (entryId: string) => {
-    if (!firestore || isPosting) return;
+    if (!firestore || isPosting || isUnposting) return;
     setIsPosting(true);
     try {
         const entryRef = doc(firestore, 'journalEntries', entryId);
@@ -79,6 +81,21 @@ export function JournalEntriesList() {
     }
   };
   
+  const handleUnpostEntry = async (entryId: string) => {
+    if (!firestore || isPosting || isUnposting) return;
+    setIsUnposting(true);
+    try {
+        const entryRef = doc(firestore, 'journalEntries', entryId);
+        await updateDoc(entryRef, { status: 'draft' });
+        toast({ title: 'نجاح', description: 'تم التراجع عن ترحيل القيد بنجاح.' });
+    } catch (error) {
+        console.error('Error un-posting journal entry:', error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن ترحيل القيد.' });
+    } finally {
+        setIsUnposting(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!entryToDelete || !firestore) return;
     setIsDeleting(true);
@@ -174,7 +191,7 @@ export function JournalEntriesList() {
                                 {entry.status === 'draft' && (
                                     <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} disabled={isPosting} className="text-green-600 focus:text-green-700 focus:bg-green-50">
+                                        <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} disabled={isPosting || isUnposting} className="text-green-600 focus:text-green-700 focus:bg-green-50">
                                             <CheckCircle className="ml-2 h-4 w-4" />
                                             ترحيل القيد
                                         </DropdownMenuItem>
@@ -184,6 +201,15 @@ export function JournalEntriesList() {
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-destructive focus:text-destructive">
                                             <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                {entry.status === 'posted' && (
+                                     <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} disabled={isUnposting || isPosting} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
+                                            <Undo2 className="ml-2 h-4 w-4" />
+                                            التراجع عن الترحيل
                                         </DropdownMenuItem>
                                     </>
                                 )}
