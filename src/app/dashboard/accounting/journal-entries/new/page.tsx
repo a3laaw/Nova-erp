@@ -91,12 +91,12 @@ export default function NewJournalEntryPage() {
 
   const lines = watch('lines');
   const totalDebit = useMemo(
-    () => lines.reduce((sum, line) => sum + (typeof line.debit === 'number' && !isNaN(line.debit) ? line.debit : 0), 0),
+    () => lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0),
     [lines]
   );
   const totalCredit = useMemo(
-      () => lines.reduce((sum, line) => sum + (typeof line.credit === 'number' && !isNaN(line.credit) ? line.credit : 0), 0),
-      [lines]
+    () => lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0),
+    [lines]
   );
   const balance = totalDebit - totalCredit;
 
@@ -155,8 +155,8 @@ export default function NewJournalEntryPage() {
   useEffect(() => {
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
-      const debit = typeof lastLine.debit === 'number' && !isNaN(lastLine.debit) ? lastLine.debit : 0;
-      const credit = typeof lastLine.credit === 'number' && !isNaN(lastLine.credit) ? lastLine.credit : 0;
+      const debit = Number(lastLine.debit) || 0;
+      const credit = Number(lastLine.credit) || 0;
       if (lastLine && lastLine.accountId && (debit > 0 || credit > 0)) {
         append({ accountId: '', debit: 0, credit: 0, notes: '' }, { shouldFocus: false });
       }
