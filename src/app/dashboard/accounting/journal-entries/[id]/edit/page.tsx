@@ -194,15 +194,6 @@ export default function EditJournalEntryPage() {
         setIsSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    if (fields.length > 0 && lines && lines.length === fields.length) {
-      const lastLine = lines[fields.length - 1];
-      if (lastLine && lastLine.accountId && (Number(lastLine.debit) > 0 || Number(lastLine.credit) > 0)) {
-        append({ accountId: '', debit: '', credit: '', notes: '' }, { shouldFocus: false });
-      }
-    }
-  }, [lines, fields, append]);
   
   if (entryLoading || accountsLoading) {
     return <Card className="max-w-4xl mx-auto" dir="rtl"><CardHeader><Skeleton className="h-8 w-48" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>
@@ -356,6 +347,12 @@ export default function EditJournalEntryPage() {
                             </TableRow>
                         </TableFooter>
                     </Table>
+                     <div className="flex justify-start mt-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '' })}>
+                            <PlusCircle className="ml-2 h-4 w-4" />
+                            إضافة سطر
+                        </Button>
+                     </div>
                 </div>
 
                  {errors.lines && (
