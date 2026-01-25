@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cleanFirestoreData } from '@/lib/utils';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -292,7 +293,10 @@ export default function EditClientPage() {
 
 
             if (Object.keys(updatedClientData).length > 0) {
-                batch.update(clientRef, updatedClientData);
+                const safeUpdatedClientData = cleanFirestoreData(updatedClientData);
+                console.log("البيانات قبل التنظيف (Client Edit):", JSON.stringify(updatedClientData, null, 2));
+                console.log("البيانات بعد التنظيف (Client Edit):", JSON.stringify(safeUpdatedClientData, null, 2));
+                batch.update(clientRef, safeUpdatedClientData);
                 await batch.commit();
                 toast({ title: 'نجاح', description: 'تم تحديث بيانات العميل بنجاح.' });
             } else {

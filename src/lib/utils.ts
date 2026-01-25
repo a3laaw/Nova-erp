@@ -101,3 +101,28 @@ export function numberToArabicWords(inputNumber: number | string): string {
     
     return 'فقط ' + result.join(' و') + ' لا غير';
 }
+
+
+export function cleanFirestoreData(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(v => cleanFirestoreData(v));
+  }
+
+  // Do not recurse into Date or Timestamp objects
+  if (typeof obj !== 'object' || obj instanceof Date || (obj.constructor && obj.constructor.name === 'Timestamp')) {
+    return obj;
+  }
+
+  const cleaned: { [key: string]: any } = {};
+  for (const key of Object.keys(obj)) {
+    if (obj[key] !== undefined) {
+      cleaned[key] = cleanFirestoreData(obj[key]);
+    }
+  }
+  
+  return cleaned;
+}

@@ -30,7 +30,7 @@ import { useFirebase, useDoc } from '@/firebase';
 import { doc, updateDoc, getDocs, collection, query, orderBy } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -175,14 +175,19 @@ export default function EditJournalEntryPage() {
             };
         });
 
-        await updateDoc(entryRefDoc, {
+        const updatePayload = {
             date: new Date(data.date),
             narration: data.narration,
             reference: data.reference,
             lines: linesWithNames,
             totalDebit,
             totalCredit,
-        });
+        };
+        const safeUpdatePayload = cleanFirestoreData(updatePayload);
+        console.log("البيانات قبل التنظيف (Journal Entry Edit):", JSON.stringify(updatePayload, null, 2));
+        console.log("البيانات بعد التنظيف (Journal Entry Edit):", JSON.stringify(safeUpdatePayload, null, 2));
+
+        await updateDoc(entryRefDoc, safeUpdatePayload);
         
         toast({ title: 'نجاح', description: 'تم تحديث قيد اليومية بنجاح.' });
         router.push('/dashboard/accounting/journal-entries');

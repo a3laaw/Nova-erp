@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
+import { cleanFirestoreData } from '@/lib/utils';
 
 export default function EditTransactionPage() {
   const router = useRouter();
@@ -155,7 +156,12 @@ export default function EditTransactionPage() {
     
     try {
         const batch = writeBatch(firestore);
-        batch.update(transactionRef, updatePayload);
+        
+        const safeUpdatePayload = cleanFirestoreData(updatePayload);
+        console.log("البيانات قبل التنظيف (Transaction Edit):", JSON.stringify(updatePayload, null, 2));
+        console.log("البيانات بعد التنظيف (Transaction Edit):", JSON.stringify(safeUpdatePayload, null, 2));
+        
+        batch.update(transactionRef, safeUpdatePayload);
         
         const logRef = doc(collection(transactionRef, 'timelineEvents'));
         batch.set(logRef, {

@@ -25,7 +25,7 @@ import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -167,24 +167,30 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setLoadingRefData(true);
       setStep('loading');
       try {
-        // Fetch templates
+        // Fetch all available contract templates
         const allTemplatesQuery = query(collection(firestore, 'contractTemplates'));
         const allTemplatesSnapshot = await getDocs(allTemplatesQuery);
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
 
-        // Fetch all work stages from all departments using collectionGroup
-        const stagesQuery = query(collectionGroup(firestore, 'workStages'));
-        const stagesSnapshot = await getDocs(stagesQuery);
-        const uniqueStages = new Map<string, MultiSelectOption>();
-        stagesSnapshot.forEach(stageDoc => {
-            const stageName = stageDoc.data().name as string;
-            if (stageName && !uniqueStages.has(stageName)) {
-                uniqueStages.set(stageName, { value: stageName, label: stageName });
-            }
-        });
-        const stageOptions = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
-
-        setReferenceData({ templates, stages: stageOptions });
+        // Fetch all possible work stages
+        let stages: MultiSelectOption[] = [];
+        if (transaction.stages && transaction.stages.length > 0) {
+            stages = transaction.stages.map(stage => ({ value: stage.name, label: stage.name }));
+        } else {
+             // Fallback for older transactions: query all work stages from all departments
+            const stagesQuery = query(collectionGroup(firestore, 'workStages'));
+            const stagesSnapshot = await getDocs(stagesQuery);
+            const uniqueStages = new Map<string, MultiSelectOption>();
+            stagesSnapshot.forEach(stageDoc => {
+                const stageName = stageDoc.data().name as string;
+                if (stageName && !uniqueStages.has(stageName)) {
+                    uniqueStages.set(stageName, { value: stageName, label: stageName });
+                }
+            });
+            stages = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
+        }
+        
+        setReferenceData({ templates, stages });
 
       } catch (error) {
         console.error("Error fetching reference data:", error);
@@ -327,10 +333,13 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 totalAmount: totalAmount,
                 financialsType: chosenTemplate?.financials?.type || 'fixed',
             };
+            
+            console.log("البيانات قبل التنظيف:", JSON.stringify({ contract: contractData }, null, 2));
+            const safeContractData = cleanFirestoreData({ contract: contractData });
+            console.log("البيانات بعد التنظيف:", JSON.stringify(safeContractData, null, 2));
 
-            transaction_firestore.update(transactionRef, {
-                contract: contractData
-            });
+
+            transaction_firestore.update(transactionRef, safeContractData);
             
             let clientAccountId: string;
             

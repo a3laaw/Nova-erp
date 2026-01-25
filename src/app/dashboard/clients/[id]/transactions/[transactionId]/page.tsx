@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import { cn } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { format, isPast, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -210,7 +210,10 @@ export default function TransactionDetailPage() {
         }
     }
 
-    batch.update(transactionRefDoc, updateData);
+    const safeUpdateData = cleanFirestoreData(updateData);
+    console.log("البيانات قبل التنظيف:", JSON.stringify(updateData, null, 2));
+    console.log("البيانات بعد التنظيف:", JSON.stringify(safeUpdateData, null, 2));
+    batch.update(transactionRefDoc, safeUpdateData);
     
     try {
         await batch.commit();
@@ -266,7 +269,10 @@ export default function TransactionDetailPage() {
     
     try {
         const batch = writeBatch(firestore);
-        batch.update(transactionRefDoc, { stages: updatedStages });
+        const safeUpdatedStages = cleanFirestoreData({ stages: updatedStages });
+        console.log("البيانات قبل التنظيف:", JSON.stringify({ stages: updatedStages }, null, 2));
+        console.log("البيانات بعد التنظيف:", JSON.stringify(safeUpdatedStages, null, 2));
+        batch.update(transactionRefDoc, safeUpdatedStages);
         
         const logContent = `قام بتغيير حالة المرحلة "${stage.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         batch.set(doc(timelineCollectionRef), {
