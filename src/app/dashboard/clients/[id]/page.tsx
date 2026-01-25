@@ -280,11 +280,7 @@ export default function ClientProfilePage() {
         clientName={client.nameAr}
     />
     <div className='space-y-6' dir='rtl'>
-        <div className='flex justify-between items-center no-print'>
-             <Button variant="outline" onClick={() => router.push('/dashboard/clients')}>
-                <ArrowRight className="ml-2 h-4 w-4" />
-                العودة إلى قائمة العملاء
-            </Button>
+        <div className='flex justify-end items-center no-print'>
             <div className='flex gap-2'>
                 <Button asChild>
                     <Link href={`/dashboard/clients/${id}/edit`}>

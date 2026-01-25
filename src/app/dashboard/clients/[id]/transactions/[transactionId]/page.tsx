@@ -349,11 +349,6 @@ export default function TransactionDetailPage() {
         />
     )}
     <div className='space-y-6' dir='rtl'>
-        <Button variant="outline" onClick={() => router.push(`/dashboard/clients/${clientId}`)}>
-            <ArrowRight className="ml-2 h-4 w-4" />
-            العودة إلى ملف العميل: {client.nameAr}
-        </Button>
-
         <Card>
             <CardHeader>
                 <div className='flex justify-between items-start'>

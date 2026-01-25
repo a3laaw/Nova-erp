@@ -216,10 +216,6 @@ export default function ReportsPage() {
 
   return (
     <div className='space-y-6'>
-         <Button variant="outline" onClick={() => router.push('/dashboard/hr')} className="print:hidden">
-            <ArrowRight className="ml-2 h-4 w-4" />
-            العودة إلى الموارد البشرية
-        </Button>
         <Card dir="rtl" className="print:shadow-none print:border-none">
             <CardHeader className="print:hidden">
                 <CardTitle>التقارير الشاملة للموظفين</CardTitle>

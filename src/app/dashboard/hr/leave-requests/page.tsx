@@ -276,10 +276,6 @@ export default function LeaveRequestsPage() {
 
   return (
     <div className='space-y-6'>
-        <Button variant="outline" onClick={() => router.push('/dashboard/hr')}>
-            <ArrowRight className="ml-2 h-4 w-4" />
-            العودة إلى الموارد البشرية
-        </Button>
         <Card dir="rtl">
             <CardHeader>
                 <div className='flex justify-between items-center'>

@@ -375,10 +375,6 @@ export default function ChartOfAccountsPage() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Button variant="outline" onClick={() => router.push('/dashboard/accounting')}>
-                <ArrowRight className="ml-2 h-4 w-4" />
-                العودة إلى المحاسبة
-            </Button>
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">

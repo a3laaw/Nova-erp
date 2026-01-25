@@ -7,10 +7,14 @@ import { doc, collection, query, getDocs, limit } from 'firebase/firestore';
 import { TransactionContract } from '@/components/clients/transaction-contract';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Client, ClientTransaction, Company } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Printer, ArrowRight } from 'lucide-react';
 
 
 export default function TransactionContractPage() {
   const params = useParams();
+  const router = useRouter();
   const { firestore } = useFirebase();
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -67,6 +71,22 @@ export default function TransactionContractPage() {
   }, [transactionSnap]);
 
   const isLoading = clientLoading || transactionLoading || companyLoading;
+  
+  const handlePrint = () => {
+    import('html2pdf.js').then(module => {
+        const html2pdf = module.default;
+        const element = document.getElementById('contract-content');
+        if (!element) return;
+        const opt = {
+          margin:       0.5,
+          filename:     `scoop_Contract_${client?.nameAr}_${transaction?.transactionType}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().from(element).set(opt).save();
+    });
+  };
 
   if (isLoading) {
       return (
@@ -101,5 +121,12 @@ export default function TransactionContractPage() {
       );
   }
 
-  return <TransactionContract client={client} transaction={transaction} company={company} />;
+  return (
+    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
+        <div className="print:hidden mb-6 flex justify-end items-center no-print">
+            <Button onClick={handlePrint}><Printer className="ml-2 h-4 w-4" /> تصدير PDF</Button>
+        </div>
+        <TransactionContract client={client} transaction={transaction} company={company} />
+    </div>
+  );
 }

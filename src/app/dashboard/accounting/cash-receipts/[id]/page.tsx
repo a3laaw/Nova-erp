@@ -190,10 +190,6 @@ export default function ViewCashReceiptPage() {
                 </footer>
             </div>
              <div className="p-6 bg-muted/50 rounded-b-lg flex justify-end gap-2 no-print">
-                <Button variant="outline" onClick={() => router.push('/dashboard/accounting')}>
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                    العودة
-                </Button>
                 <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}>
                     <Pencil className="ml-2 h-4 w-4" />
                     تعديل
