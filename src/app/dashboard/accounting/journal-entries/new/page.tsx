@@ -72,6 +72,7 @@ export default function NewJournalEntryPage() {
   
   const { register, handleSubmit, control, watch, formState: { errors } } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
+    mode: 'onChange',
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
       narration: '',
@@ -89,8 +90,14 @@ export default function NewJournalEntryPage() {
   });
 
   const lines = watch('lines');
-  const totalDebit = useMemo(() => lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0), [lines]);
-  const totalCredit = useMemo(() => lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0), [lines]);
+  const totalDebit = useMemo(
+    () => lines.reduce((sum, line) => sum + (typeof line.debit === 'number' && !isNaN(line.debit) ? line.debit : 0), 0),
+    [lines]
+  );
+  const totalCredit = useMemo(
+      () => lines.reduce((sum, line) => sum + (typeof line.credit === 'number' && !isNaN(line.credit) ? line.credit : 0), 0),
+      [lines]
+  );
   const balance = totalDebit - totalCredit;
 
   // Fetch accounts for combobox
@@ -148,7 +155,9 @@ export default function NewJournalEntryPage() {
   useEffect(() => {
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
-      if (lastLine && lastLine.accountId && (Number(lastLine.debit) > 0 || Number(lastLine.credit) > 0)) {
+      const debit = typeof lastLine.debit === 'number' && !isNaN(lastLine.debit) ? lastLine.debit : 0;
+      const credit = typeof lastLine.credit === 'number' && !isNaN(lastLine.credit) ? lastLine.credit : 0;
+      if (lastLine && lastLine.accountId && (debit > 0 || credit > 0)) {
         append({ accountId: '', debit: 0, credit: 0, notes: '' }, { shouldFocus: false });
       }
     }
