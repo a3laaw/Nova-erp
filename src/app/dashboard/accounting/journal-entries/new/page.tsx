@@ -34,9 +34,9 @@ import { formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 
-// Zod Schema for validation - Simplified for better live updates
+// Zod Schema for validation
 const lineSchema = z.object({
-  accountId: z.string(),
+  accountId: z.string().min(1, "الحساب مطلوب."),
   debit: z.any(),
   credit: z.any(),
   notes: z.string().optional(),
@@ -46,21 +46,19 @@ const journalEntrySchema = z.object({
   date: z.string().min(1, 'التاريخ مطلوب.'),
   narration: z.string().min(1, 'البيان مطلوب.'),
   reference: z.string().optional(),
-  lines: z.array(lineSchema),
+  lines: z.array(lineSchema).min(2, 'يجب أن يحتوي القيد على سطرين على الأقل.')
 }).refine(data => {
     const validLines = data.lines.filter(l => l.accountId && (Number(l.debit) > 0 || Number(l.credit) > 0));
-    return validLines.length >= 2;
-}, {
-    message: 'يجب أن يحتوي القيد على سطرين صالحين على الأقل.',
-    path: ['lines'],
-}).refine(data => {
-    const totalDebit = data.lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
-    const totalCredit = data.lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
+    if (validLines.length < 2) return false;
+
+    const totalDebit = validLines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
+    const totalCredit = validLines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
     return Math.abs(totalDebit - totalCredit) < 0.001; // Use tolerance for float comparison
 }, {
-    message: 'إجمالي المدين يجب أن يساوي إجمالي الدائن.',
+    message: 'إجمالي المدين يجب أن يساوي إجمالي الدائن ويجب أن يكون هناك سطرين على الأقل.',
     path: ['lines'],
 });
+
 
 type JournalEntryFormValues = z.infer<typeof journalEntrySchema>;
 
@@ -94,15 +92,8 @@ export default function NewJournalEntryPage() {
 
   const lines = watch('lines');
   
-  const totalDebit = useMemo(
-    () => lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0),
-    [lines]
-  );
-  const totalCredit = useMemo(
-    () => lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0),
-    [lines]
-  );
-
+  const totalDebit = lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
+  const totalCredit = lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
   const balance = totalDebit - totalCredit;
 
   // Fetch accounts for combobox
@@ -285,13 +276,45 @@ export default function NewJournalEntryPage() {
                                         {errors.lines?.[index]?.accountId && <p className="text-xs text-destructive mt-1">{errors.lines[index]?.accountId?.message}</p>}
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.debit`)} />
+                                        <Controller
+                                            name={`lines.${index}.debit`}
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    type="number"
+                                                    step="0.001"
+                                                    className='dir-ltr'
+                                                    {...field}
+                                                    onChange={e => field.onChange(e.target.value)}
+                                                    value={field.value || ''}
+                                                />
+                                            )}
+                                        />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" className='dir-ltr' {...register(`lines.${index}.credit`)} />
+                                        <Controller
+                                            name={`lines.${index}.credit`}
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    type="number"
+                                                    step="0.001"
+                                                    className='dir-ltr'
+                                                    {...field}
+                                                    onChange={e => field.onChange(e.target.value)}
+                                                    value={field.value || ''}
+                                                />
+                                            )}
+                                        />
                                     </TableCell>
                                     <TableCell>
-                                        <Input {...register(`lines.${index}.notes`)} />
+                                        <Controller
+                                            name={`lines.${index}.notes`}
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input {...field} value={field.value || ''} />
+                                            )}
+                                        />
                                     </TableCell>
                                     <TableCell>
                                         <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2}>
