@@ -20,8 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlusCircle, ArrowRight, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -245,17 +245,29 @@ export default function ChartOfAccountsPage() {
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
     const [parentAccount, setParentAccount] = useState<Account | null>(null);
 
-    const accountsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
-    }, [firestore]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const [snapshot, loading, error] = useCollection(accountsQuery);
-    
-    const accounts = useMemo(() => {
-        if (!snapshot) return [];
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-    }, [snapshot]);
+    useEffect(() => {
+        if (!firestore) return;
+        const fetchAccounts = async () => {
+            setLoading(true);
+            try {
+                const q = query(collection(firestore, 'chartOfAccounts'));
+                const snapshot = await getDocs(q);
+                const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+                fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
+                setAccounts(fetchedAccounts);
+            } catch (e) {
+                console.error("Error fetching chart of accounts: ", e);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب شجرة الحسابات.' });
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAccounts();
+    }, [firestore, toast]);
+
 
     const handleAddClick = () => {
         setEditingAccount(null);
@@ -297,6 +309,13 @@ export default function ChartOfAccountsPage() {
             setIsFormOpen(false);
             setEditingAccount(null);
             setParentAccount(null);
+            // Re-fetch accounts
+            const q = query(collection(firestore, 'chartOfAccounts'));
+            const snapshot = await getDocs(q);
+            const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+            fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
+            setAccounts(fetchedAccounts);
+
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الحساب.' });
@@ -313,6 +332,12 @@ export default function ChartOfAccountsPage() {
             toast({ title: 'نجاح', description: 'تم حذف الحساب.' });
             setIsAlertOpen(false);
             setAccountToDelete(null);
+             // Re-fetch accounts
+            const q = query(collection(firestore, 'chartOfAccounts'));
+            const snapshot = await getDocs(q);
+            const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+            fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
+            setAccounts(fetchedAccounts);
         } catch (e) {
              console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الحساب. قد يكون مرتبطًا ببيانات أخرى.' });
@@ -333,6 +358,12 @@ export default function ChartOfAccountsPage() {
             });
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تنزيل شجرة الحسابات الأساسية بنجاح.' });
+            // Re-fetch accounts
+             const q = query(collection(firestore, 'chartOfAccounts'));
+            const snapshot = await getDocs(q);
+            const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+            fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
+            setAccounts(fetchedAccounts);
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنزيل شجرة الحسابات.' });

@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, runTransaction, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { Account } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -99,11 +99,13 @@ export default function NewJournalEntryPage() {
     const fetchAccounts = async () => {
         setAccountsLoading(true);
         try {
-            const q = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
+            const q = query(collection(firestore, 'chartOfAccounts'));
             const snapshot = await getDocs(q);
             const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+            fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
             setAccounts(fetchedAccounts);
         } catch (error) {
+            console.error("Error fetching chart of accounts: ", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب شجرة الحسابات.' });
         } finally {
             setAccountsLoading(false);
