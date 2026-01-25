@@ -175,24 +175,37 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
         // Fetch stages
         let stagesForTransaction: TransactionStage[] = transaction.stages || [];
+
+        // If stages are not embedded, try to find them
         if (!stagesForTransaction || stagesForTransaction.length === 0) {
-          const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'), where('name', '==', transaction.transactionType));
-          const typeSnap = await getDocs(transTypesQuery);
-          if (!typeSnap.empty) {
-            const departmentRef = typeSnap.docs[0].ref.parent.parent;
-            if (departmentRef) {
-              const stagesQuery = query(collection(firestore, `departments/${departmentRef.id}/workStages`), orderBy('name'));
-              const stagesSnap = await getDocs(stagesQuery);
-              stagesForTransaction = stagesSnap.docs.map(doc => ({
-                name: doc.data().name,
-                status: 'pending',
-                startDate: null,
-                endDate: null,
-                notes: ''
-              } as TransactionStage));
+            let deptIdToQuery: string | null = (transaction as any).departmentId || null;
+
+            // Fallback for older transactions without departmentId
+            if (!deptIdToQuery) {
+                const departmentsSnapshot = await getDocs(query(collection(firestore, 'departments')));
+                for (const deptDoc of departmentsSnapshot.docs) {
+                    const transactionTypesSnapshot = await getDocs(query(collection(deptDoc.ref, 'transactionTypes'), where('name', '==', transaction.transactionType)));
+                    if (!transactionTypesSnapshot.empty) {
+                        deptIdToQuery = deptDoc.id;
+                        break;
+                    }
+                }
             }
-          }
+
+            // If we found a department ID (either directly or through fallback), query its stages
+            if (deptIdToQuery) {
+                const stagesQuery = query(collection(firestore, `departments/${deptIdToQuery}/workStages`), orderBy('name'));
+                const stagesSnap = await getDocs(stagesQuery);
+                stagesForTransaction = stagesSnap.docs.map(doc => ({
+                    name: doc.data().name,
+                    status: 'pending',
+                    startDate: null,
+                    endDate: null,
+                    notes: ''
+                } as TransactionStage));
+            }
         }
+        
         const stageOptions = stagesForTransaction.map(stage => ({ value: stage.name, label: stage.name }));
 
         setReferenceData({ templates, stages: stageOptions });
@@ -318,7 +331,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
-                transaction_firestore.get(coaClientCounterRef),
+                transaction_firestore.get(coaClientCounterDoc),
                 transaction_firestore.get(journalEntryCounterDoc)
             ]);
 
@@ -447,7 +460,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-3xl" 
+        className="max-w-3xl h-[90vh]" 
         dir="rtl"
         onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
@@ -657,8 +670,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t">
-              <Button variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-              <Button onClick={handleSubmit} disabled={isSaving}>
+              <Button variant="outline" type="button" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+              <Button type="button" onClick={handleSubmit} disabled={isSaving}>
                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
                 حفظ التغييرات
               </Button>

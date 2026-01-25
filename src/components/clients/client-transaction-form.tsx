@@ -203,6 +203,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 assignedEngineerId: engineerForTransactionId,
                 status: 'new',
                 stages: initialStages,
+                departmentId: selectedDepartment,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };

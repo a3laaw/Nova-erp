@@ -343,6 +343,7 @@ export type ClientTransaction = {
     transactionType: string;
     description?: string;
     status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
+    departmentId?: string;
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;
@@ -391,8 +392,8 @@ export interface TransactionType {
 }
 
 export interface WorkStage {
-    id: string;
-    name: string;
+  id: string;
+  name: string;
 }
 
 export type ContractClause = {
