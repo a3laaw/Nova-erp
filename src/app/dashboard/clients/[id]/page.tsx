@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2 } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -39,6 +39,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
     AlertDialog,
@@ -86,6 +88,7 @@ const transactionStatusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
   submitted: 'تم تسليمها',
+  'on-hold': 'مجمدة',
 };
 
 const transactionStatusColors: Record<string, string> = {
@@ -93,6 +96,7 @@ const transactionStatusColors: Record<string, string> = {
   'in-progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   completed: 'bg-green-100 text-green-800 border-green-200',
   submitted: 'bg-purple-100 text-purple-800 border-purple-200',
+  'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
 
@@ -109,7 +113,8 @@ export default function ClientProfilePage() {
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
 
   const [transactionToCancel, setTransactionToCancel] = useState<ClientTransaction | null>(null);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // --- Data Fetching ---
   const clientRef = useMemo(() => {
@@ -156,7 +161,7 @@ export default function ClientProfilePage() {
   const handleConfirmCancelContract = async () => {
     if (!firestore || !currentUser || !client || !transactionToCancel) return;
 
-    setIsCancelling(true);
+    setIsProcessing(true);
     try {
         const batch = writeBatch(firestore);
 
@@ -202,18 +207,66 @@ export default function ClientProfilePage() {
         console.error("Error cancelling contract:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء العقد.' });
     } finally {
-        setIsCancelling(false);
+        setIsProcessing(false);
         setTransactionToCancel(null);
     }
   };
+  
+  const handleDeleteTransaction = async () => {
+    if (!firestore || !transactionToDelete) return;
+    setIsProcessing(true);
+    try {
+        const transactionRef = doc(firestore, 'clients', id, 'transactions', transactionToDelete.id!);
+        await deleteDoc(transactionRef);
+        toast({ title: 'نجاح', description: 'تم حذف المعاملة بنجاح.' });
+    } catch(error) {
+        console.error("Error deleting transaction:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف المعاملة.' });
+    } finally {
+        setIsProcessing(false);
+        setTransactionToDelete(null);
+    }
+  };
 
+  const handleToggleFreeze = async (tx: ClientTransaction) => {
+    if (!firestore || !currentUser) return;
+    setIsProcessing(true);
+    try {
+        const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
+        const transactionRef = doc(firestore, 'clients', id, 'transactions', tx.id!);
+        
+        const batch = writeBatch(firestore);
+        batch.update(transactionRef, { status: newStatus });
+        
+        const logContent = `قام ${newStatus === 'on-hold' ? 'بتجميد' : 'بإلغاء تجميد'} المعاملة: "${tx.transactionType}".`;
+        const historyRef = doc(collection(firestore, `clients/${id}/history`));
+        batch.set(historyRef, {
+            type: 'log',
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        });
+        
+        await batch.commit();
+        toast({ title: 'نجاح', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إلغاء تجميد'} المعاملة.` });
+    } catch(error) {
+         console.error("Error toggling transaction freeze state:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تغيير حالة المعاملة.' });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
 
   // --- Render Logic ---
 
   if (clientLoading) {
     return (
         <div className="space-y-6" dir="rtl">
-            <Skeleton className="h-9 w-48" />
+            <div className='flex justify-end items-center no-print'>
+                <Skeleton className="h-10 w-48" />
+            </div>
              <Card>
                 <CardHeader className='flex-row items-center gap-4'>
                     <Skeleton className="h-16 w-16 rounded-full" />
@@ -235,9 +288,6 @@ export default function ClientProfilePage() {
     return (
       <div className="text-center py-10" dir="rtl">
         <p className="text-destructive">{clientError ? 'فشل تحميل بيانات العميل.' : 'لم يتم العثور على العميل.'}</p>
-        <Button onClick={() => router.push('/dashboard/clients')} className="mt-4">
-          العودة إلى قائمة العملاء
-        </Button>
       </div>
     );
   }
@@ -366,12 +416,7 @@ export default function ClientProfilePage() {
                                 <TableBody>
                                     {transactions.map(tx => (
                                         <TableRow key={tx.id}>
-                                            <TableCell 
-                                                className="font-medium hover:underline cursor-pointer"
-                                                onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}
-                                            >
-                                                {tx.transactionType}
-                                            </TableCell>
+                                            <TableCell className="font-medium">{tx.transactionType}</TableCell>
                                             <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className={transactionStatusColors[tx.status]}>
@@ -380,30 +425,33 @@ export default function ClientProfilePage() {
                                             </TableCell>
                                             <TableCell>{formatDate(tx.createdAt)}</TableCell>
                                             <TableCell>
-                                                {tx.contract ? (
-                                                     <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="outline" size="sm">
-                                                                الإجراءات <ChevronDown className="mr-2 h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent dir="rtl">
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/dashboard/clients/${id}/transactions/${tx.id}/contract`}>
-                                                                    عرض العقد
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => setTransactionToCancel(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                                <Trash2 className="ml-2 h-4 w-4" />
-                                                                إلغاء العقد
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                ) : (
-                                                    <Button variant="default" size="sm" onClick={() => setContractTransaction(tx)}>
-                                                        تعاقد
-                                                    </Button>
-                                                )}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" disabled={isProcessing}><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent dir="rtl">
+                                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}><Eye className="ml-2 h-4 w-4"/> عرض التفاصيل</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}/edit`)}><Pencil className="ml-2 h-4 w-4"/> تعديل</DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        {tx.contract ? (
+                                                            <>
+                                                                <DropdownMenuItem onClick={() => setContractTransaction(tx)}>تعديل العقد</DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => setTransactionToCancel(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">إلغاء العقد</DropdownMenuItem>
+                                                            </>
+                                                        ) : (
+                                                            <DropdownMenuItem onClick={() => setContractTransaction(tx)}>إنشاء عقد</DropdownMenuItem>
+                                                        )}
+                                                         <DropdownMenuItem onClick={() => handleToggleFreeze(tx)}>
+                                                            {tx.status === 'on-hold' ? <FolderOpen className="ml-2 h-4 w-4"/> : <FolderLock className="ml-2 h-4 w-4"/>}
+                                                            {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد'}
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={() => setTransactionToDelete(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                           <Trash2 className="ml-2 h-4 w-4" /> حذف المعاملة
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -428,9 +476,25 @@ export default function ClientProfilePage() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel disabled={isCancelling}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmCancelContract} disabled={isCancelling} className="bg-destructive hover:bg-destructive/90">
-                    {isCancelling ? 'جاري الإلغاء...' : 'نعم، قم بالإلغاء'}
+                <AlertDialogCancel disabled={isProcessing}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmCancelContract} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90">
+                    {isProcessing ? 'جاري الإلغاء...' : 'نعم، قم بالإلغاء'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+     <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد حذف المعاملة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في حذف المعاملة "{transactionToDelete?.transactionType}"؟ سيتم حذف هذه المعاملة وجميع بياناتها المرتبطة بها (مثل التعليقات والسجلات والعقد) بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteTransaction} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90">
+                    {isProcessing ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

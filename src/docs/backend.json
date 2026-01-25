@@ -194,7 +194,7 @@
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
-                "enum": ["new", "in-progress", "completed", "submitted"]
+                "enum": ["new", "in-progress", "completed", "submitted", "on-hold"]
             },
             "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },
@@ -725,6 +725,114 @@
         }
       },
       "required": ["title"]
+    },
+    "Account": {
+        "title": "Account",
+        "description": "An account in the Chart of Accounts.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "code": { "type": "string" },
+            "type": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
+            "level": { "type": "number", "description": "The hierarchy level of the account (0 for main, 1 for sub, etc.)" }
+        },
+        "required": ["name", "code", "type", "level"]
+    },
+    "JournalEntryLine": {
+      "title": "Journal Entry Line",
+      "description": "A single line in a journal entry, representing a debit or credit to an account.",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "The ID of the account from the chart of accounts."
+        },
+        "accountName": {
+          "type": "string",
+          "description": "The name of the account."
+        },
+        "partnerId": {
+          "type": "string",
+          "description": "Optional ID of the partner (client, vendor)."
+        },
+        "partnerName": {
+          "type": "string",
+          "description": "Optional name of the partner."
+        },
+        "debit": {
+          "type": "number",
+          "description": "The debit amount."
+        },
+        "credit": {
+          "type": "number",
+          "description": "The credit amount."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes for this line."
+        }
+      },
+      "required": ["accountId", "accountName", "debit", "credit"]
+    },
+    "JournalEntry": {
+      "title": "Journal Entry",
+      "description": "Represents a general journal entry with multiple debit/credit lines.",
+      "type": "object",
+      "properties": {
+        "entryNumber": {
+          "type": "string",
+          "description": "A sequential number for the journal entry (e.g., JV-2024-0001)."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date of the journal entry."
+        },
+        "narration": {
+          "type": "string",
+          "description": "A general description or narration for the entry."
+        },
+        "reference": {
+          "type": "string",
+          "description": "An optional external reference number."
+        },
+        "totalDebit": {
+          "type": "number",
+          "description": "The total of all debit lines, for validation."
+        },
+        "totalCredit": {
+          "type": "number",
+          "description": "The total of all credit lines, for validation."
+        },
+        "status": {
+            "type": "string",
+            "enum": ["draft", "posted"],
+            "description": "The status of the journal entry."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/JournalEntryLine"
+          }
+        },
+        "clientId": {
+            "type": "string",
+            "description": "The ID of the client related to this entry, if applicable."
+        },
+        "transactionId": {
+            "type": "string",
+            "description": "The ID of the client transaction related to this entry, if applicable."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "The ID of the user who created the entry."
+        }
+      },
+      "required": ["entryNumber", "date", "narration", "totalDebit", "totalCredit", "status", "lines", "createdAt"]
     }
   },
   "auth": {
@@ -842,6 +950,18 @@
         "$ref": "#/entities/ContractTemplate"
       },
       "description": "Stores reusable contract templates for various transaction types."
+    },
+    "/chartOfAccounts/{accountId}": {
+        "schema": {
+            "$ref": "#/entities/Account"
+        },
+        "description": "Stores the company's chart of accounts."
+    },
+    "/journalEntries/{journalEntryId}": {
+      "schema": {
+        "$ref": "#/entities/JournalEntry"
+      },
+      "description": "Stores general journal entries created manually or by other processes."
     }
   }
 }

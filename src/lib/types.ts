@@ -342,7 +342,7 @@ export type ClientTransaction = {
     clientId: string;
     transactionType: string;
     description?: string;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted';
+    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;

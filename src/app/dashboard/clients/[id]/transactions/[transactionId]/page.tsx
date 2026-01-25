@@ -42,6 +42,7 @@ const transactionStatusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
   submitted: 'تم تسليمها',
+  'on-hold': 'مجمدة',
 };
 
 const transactionStatusColors: Record<string, string> = {
@@ -49,6 +50,7 @@ const transactionStatusColors: Record<string, string> = {
   'in-progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   completed: 'bg-green-100 text-green-800 border-green-200',
   submitted: 'bg-purple-100 text-purple-800 border-purple-200',
+  'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
 const stageStatusColors: Record<string, string> = {
@@ -312,7 +314,6 @@ export default function TransactionDetailPage() {
   if (isLoading) {
     return (
         <div className="space-y-6" dir="rtl">
-            <Skeleton className="h-9 w-48" />
              <Card>
                 <CardHeader>
                     <Skeleton className="h-8 w-64" />
@@ -331,9 +332,6 @@ export default function TransactionDetailPage() {
     return (
       <div className="text-center py-10" dir="rtl">
         <p className="text-destructive">{transactionError || clientError ? 'فشل تحميل البيانات.' : 'لم يتم العثور على المعاملة أو العميل.'}</p>
-        <Button onClick={() => router.back()} className="mt-4">
-          العودة
-        </Button>
       </div>
     );
   }
@@ -354,16 +352,24 @@ export default function TransactionDetailPage() {
                 <div className='flex justify-between items-start'>
                     <div className='flex items-center gap-4'>
                         <CardTitle className='text-2xl'>{transaction.transactionType}</CardTitle>
-                         <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
-                            <Pencil className="ml-2 h-4 w-4" />
-                            تعديل بنود العقد
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={`/dashboard/clients/${clientId}/transactions/${transactionId}/contract`}>
-                                <Printer className="ml-2 h-4 w-4" />
-                                عرض وطباعة العقد
-                            </Link>
-                        </Button>
+                        {transaction.contract ? (
+                           <>
+                                <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
+                                    <Pencil className="ml-2 h-4 w-4" />
+                                    تعديل بنود العقد
+                                </Button>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/dashboard/clients/${clientId}/transactions/${transactionId}/contract`}>
+                                        <Printer className="ml-2 h-4 w-4" />
+                                        عرض وطباعة العقد
+                                    </Link>
+                                </Button>
+                           </>
+                        ) : (
+                            <Button variant="default" size="sm" onClick={() => setIsContractFormOpen(true)}>
+                                إنشاء عقد
+                            </Button>
+                        )}
                     </div>
                     <Badge variant="outline" className={transactionStatusColors[transaction.status]}>
                         {transactionStatusTranslations[transaction.status]}
