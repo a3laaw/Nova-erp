@@ -31,12 +31,11 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveSuccess: () => void;
   transaction: ClientTransaction | null;
   clientId: string;
   clientName: string;
@@ -180,15 +179,17 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         if (!stagesForTransaction || stagesForTransaction.length === 0) {
             let deptIdToQuery: string | null = (transaction as any).departmentId || null;
 
-            // Fallback for older transactions without departmentId
+            // Fallback for older transactions without departmentId using a more efficient query
             if (!deptIdToQuery) {
-                const departmentsSnapshot = await getDocs(query(collection(firestore, 'departments')));
-                for (const deptDoc of departmentsSnapshot.docs) {
-                    const transactionTypesSnapshot = await getDocs(query(collection(deptDoc.ref, 'transactionTypes'), where('name', '==', transaction.transactionType)));
-                    if (!transactionTypesSnapshot.empty) {
-                        deptIdToQuery = deptDoc.id;
-                        break;
-                    }
+                const transTypesQuery = query(
+                    collectionGroup(firestore, 'transactionTypes'),
+                    where('name', '==', transaction.transactionType)
+                );
+                const transTypesSnap = await getDocs(transTypesQuery);
+                if (!transTypesSnap.empty) {
+                    const typeDoc = transTypesSnap.docs[0];
+                    // Path is departments/{deptId}/transactionTypes/{typeId}
+                    deptIdToQuery = typeDoc.ref.parent.parent!.id;
                 }
             }
 
@@ -198,11 +199,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 const stagesSnap = await getDocs(stagesQuery);
                 stagesForTransaction = stagesSnap.docs.map(doc => ({
                     name: doc.data().name,
-                    status: 'pending',
+                    status: 'pending' as const,
                     startDate: null,
                     endDate: null,
                     notes: ''
-                } as TransactionStage));
+                }));
             }
         }
         
@@ -282,7 +283,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newTerms = [...terms];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newTerms.length) return;
-      [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
+      [newTerms[index], newTerms[newIndex]] = [newTerms[index], newTerms[index]];
       setTerms(newTerms);
   };
 
@@ -331,8 +332,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
-                transaction_firestore.get(coaClientCounterDoc),
-                transaction_firestore.get(journalEntryCounterDoc)
+                transaction_firestore.get(coaClientCounterRef),
+                transaction_firestore.get(journalEntryCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -673,7 +674,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
               <Button variant="outline" type="button" onClick={onClose} disabled={isSaving}>إلغاء</Button>
               <Button type="button" onClick={handleSubmit} disabled={isSaving}>
                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                حفظ التغييرات
+                {transaction?.contract ? 'حفظ التعديلات' : 'إنشاء العقد والقيد المحاسبي'}
               </Button>
             </DialogFooter>
           </>
