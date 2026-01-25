@@ -9,7 +9,11 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Home,
   Briefcase,
@@ -22,6 +26,7 @@ import {
   Bell,
   HeartHandshake,
   FileText,
+  ChevronDown,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -37,7 +42,19 @@ const navItems = {
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
-    { href: '/dashboard/accounting', label: 'المحاسبة', icon: Wallet, roles: ['Admin', 'Accountant'] },
+    { 
+      label: 'المحاسبة', 
+      icon: Wallet, 
+      roles: ['Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/accounting',
+      children: [
+        { href: '/dashboard/accounting', label: 'لوحة التحكم المحاسبية' },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
+        { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
+        { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
+      ]
+    },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
     { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
   ],
@@ -47,7 +64,19 @@ const navItems = {
       { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
       { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
       { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
-      { href: '/dashboard/accounting', label: 'Accounting', icon: Wallet, roles: ['Admin', 'Accountant'] },
+      { 
+          label: 'Accounting', 
+          icon: Wallet, 
+          roles: ['Admin', 'Accountant'],
+          hrefPrefix: '/dashboard/accounting',
+          children: [
+            { href: '/dashboard/accounting', label: 'Accounting Dashboard' },
+            { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
+            { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
+            { href: '/dashboard/accounting/invoices', label: 'Invoices' },
+            { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
+          ]
+        },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
       { href: '/dashboard/hr', label: 'Human Resources', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
   ]
@@ -87,18 +116,53 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
       <SidebarContent className="p-2">
         <SidebarMenu>
           {currentNavItems.map((item) => (
-            <SidebarMenuItem key={item.label}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
-                tooltip={item.label}
-              >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            item.children ? (
+              <Collapsible asChild key={item.label} defaultOpen={pathname.startsWith(item.hrefPrefix)}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className="justify-between"
+                      isActive={pathname.startsWith(item.hrefPrefix)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {item.children.map((child) => (
+                        <SidebarMenuSubItem key={child.href}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === child.href}
+                          >
+                            <Link href={child.href}>
+                              <span>{child.label}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            ) : (
+              <SidebarMenuItem key={item.label}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
+                  tooltip={item.label}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
           ))}
         </SidebarMenu>
       </SidebarContent>
