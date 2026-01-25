@@ -89,8 +89,8 @@ export default function NewJournalEntryPage() {
   });
 
   const lines = watch('lines');
-  const totalDebit = useMemo(() => lines.reduce((sum, line) => sum + Number(line.debit || 0), 0), [lines]);
-  const totalCredit = useMemo(() => lines.reduce((sum, line) => sum + Number(line.credit || 0), 0), [lines]);
+  const totalDebit = useMemo(() => lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0), [lines]);
+  const totalCredit = useMemo(() => lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0), [lines]);
   const balance = totalDebit - totalCredit;
 
   // Fetch accounts for combobox
