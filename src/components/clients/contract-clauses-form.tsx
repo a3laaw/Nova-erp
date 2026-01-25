@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -270,7 +271,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterDoc)
+                transaction_firestore.get(journalEntryCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -395,7 +396,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     }
   };
 
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
@@ -491,12 +491,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                     <Input
                                         placeholder={`عنوان البند ${index + 1}`}
                                         value={item.title}
-                                        onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)}
+                                        onChange={(e) => handleScopeChange(item.id, 'title', e.target.value)}
                                     />
                                     <Textarea
                                         placeholder={`وصف تفصيلي للبند...`}
                                         value={item.description}
-                                        onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)}
+                                        onChange={(e) => handleScopeChange(item.id, 'description', e.target.value)}
                                         rows={2}
                                     />
                                 </div>
