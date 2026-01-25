@@ -34,25 +34,28 @@ import { formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 
-// Zod Schema for validation
+// Zod Schema for validation - Simplified for better live updates
 const lineSchema = z.object({
-  accountId: z.string().min(1, { message: 'الحساب مطلوب.' }),
-  debit: z.coerce.number().min(0, 'القيمة يجب أن تكون موجبة.'),
-  credit: z.coerce.number().min(0, 'القيمة يجب أن تكون موجبة.'),
+  accountId: z.string(),
+  debit: z.any(),
+  credit: z.any(),
   notes: z.string().optional(),
-}).refine(data => data.debit > 0 || data.credit > 0, {
-    message: 'يجب إدخال قيمة للمدين أو الدائن.',
-    path: ['debit'], // arbitrary path
 });
 
 const journalEntrySchema = z.object({
   date: z.string().min(1, 'التاريخ مطلوب.'),
   narration: z.string().min(1, 'البيان مطلوب.'),
   reference: z.string().optional(),
-  lines: z.array(lineSchema).min(2, 'يجب أن يحتوي القيد على سطرين على الأقل.'),
+  lines: z.array(lineSchema),
 }).refine(data => {
-    const totalDebit = data.lines.reduce((sum, line) => sum + (line.debit || 0), 0);
-    const totalCredit = data.lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    const validLines = data.lines.filter(l => l.accountId && (Number(l.debit) > 0 || Number(l.credit) > 0));
+    return validLines.length >= 2;
+}, {
+    message: 'يجب أن يحتوي القيد على سطرين صالحين على الأقل.',
+    path: ['lines'],
+}).refine(data => {
+    const totalDebit = data.lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
+    const totalCredit = data.lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
     return Math.abs(totalDebit - totalCredit) < 0.001; // Use tolerance for float comparison
 }, {
     message: 'إجمالي المدين يجب أن يساوي إجمالي الدائن.',
@@ -78,8 +81,8 @@ export default function NewJournalEntryPage() {
       narration: '',
       reference: '',
       lines: [
-        { accountId: '', debit: 0, credit: 0, notes: '' },
-        { accountId: '', debit: 0, credit: 0, notes: '' },
+        { accountId: '', debit: '', credit: '', notes: '' },
+        { accountId: '', debit: '', credit: '', notes: '' },
       ],
     },
   });
@@ -92,11 +95,11 @@ export default function NewJournalEntryPage() {
   const lines = watch('lines');
   
   const totalDebit = useMemo(
-    () => lines.reduce((sum, line) => sum + (parseFloat(String(line.debit)) || 0), 0),
+    () => lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0),
     [lines]
   );
   const totalCredit = useMemo(
-    () => lines.reduce((sum, line) => sum + (parseFloat(String(line.credit)) || 0), 0),
+    () => lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0),
     [lines]
   );
 
@@ -155,15 +158,13 @@ export default function NewJournalEntryPage() {
 
   // Automatically add a new line when the last one is filled
   useEffect(() => {
-    if (lines.length > 0) {
-      const lastLine = lines[lines.length - 1];
-      const debit = parseFloat(String(lastLine.debit)) || 0;
-      const credit = parseFloat(String(lastLine.credit)) || 0;
-      if (lastLine && lastLine.accountId && (debit > 0 || credit > 0)) {
-        append({ accountId: '', debit: 0, credit: 0, notes: '' }, { shouldFocus: false });
+    if (fields.length > 0) {
+      const lastLine = lines[fields.length - 1];
+      if (lastLine && lastLine.accountId && (Number(lastLine.debit) > 0 || Number(lastLine.credit) > 0)) {
+        append({ accountId: '', debit: '', credit: '', notes: '' }, { shouldFocus: false });
       }
     }
-  }, [lines, append]);
+  }, [lines, fields, append]);
 
 
   const onSubmit = async (data: JournalEntryFormValues) => {
@@ -185,23 +186,26 @@ export default function NewJournalEntryPage() {
             const newEntryRef = doc(collection(firestore, 'journalEntries'));
             
             const linesWithNames = data.lines
-              .filter(line => line.accountId) // Filter out the last empty line
+              .filter(line => line.accountId && (Number(line.debit) > 0 || Number(line.credit) > 0))
               .map(line => {
                 const account = accounts.find(acc => acc.id === line.accountId);
                 return {
                     ...line,
+                    debit: Number(line.debit) || 0,
+                    credit: Number(line.credit) || 0,
                     accountName: account?.name || 'Unknown Account'
                 };
             });
 
             transaction.set(newEntryRef, {
-                ...data,
+                date: new Date(data.date),
+                narration: data.narration,
+                reference: data.reference,
                 lines: linesWithNames,
                 entryNumber: newEntryNumber,
                 totalDebit,
                 totalCredit,
                 status: 'draft',
-                date: new Date(data.date),
                 createdAt: serverTimestamp(),
             });
         });
@@ -217,7 +221,7 @@ export default function NewJournalEntryPage() {
 
   return (
     <Card className="max-w-4xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
@@ -306,7 +310,7 @@ export default function NewJournalEntryPage() {
                             </TableRow>
                             <TableRow>
                                 <TableCell className="font-bold">الفرق</TableCell>
-                                <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.0001 ? 'text-destructive' : 'text-green-600'}`}>
+                                <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrency(balance)}
                                 </TableCell>
                                 <TableCell colSpan={2}></TableCell>
