@@ -31,10 +31,12 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
   onClose: () => void;
+  onSaveSuccess: () => void;
   transaction: ClientTransaction | null;
   clientId: string;
   clientName: string;
@@ -278,7 +280,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newClauses = [...openClauses];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newClauses.length) return;
-      [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
+      [newClauses[index], newClauses[newIndex]] = [newClauses[index], newClauses[index]];
       setOpenClauses(newClauses);
   };
 
