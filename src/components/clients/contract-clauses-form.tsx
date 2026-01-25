@@ -31,7 +31,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -289,7 +289,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const [parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
             getDocs(parentAccountQuery),
             getDocs(revenueAccountQuery),
-            getDocs(clientAccountSnap)
+            getDocs(clientAccountQuery)
         ]);
 
         if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
