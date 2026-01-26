@@ -357,6 +357,7 @@ export interface TransactionStage {
   stageId: string;
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped';
+  role?: UserRole;
   startDate: any | null;
   endDate: any | null;
   notes?: string;
@@ -422,6 +423,7 @@ export interface WorkStage {
   id: string;
   name: string;
   order?: number;
+  role?: UserRole;
 }
 
 export type ContractClause = {

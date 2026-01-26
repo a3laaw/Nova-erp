@@ -293,6 +293,11 @@
           "enum": ["pending", "in-progress", "completed", "skipped"],
           "description": "The current status of the stage."
         },
+        "role": {
+            "type": "string",
+            "description": "The role responsible for this stage, copied from the WorkStage template.",
+            "enum": ["Engineer", "Secretary", "Accountant", "HR", "Admin"]
+        },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
         "expectedEndDate": { "type": "string", "format": "date-time", "description": "The expected completion date for countdowns." },
@@ -573,6 +578,11 @@
         "order": {
             "type": "number",
             "description": "The display and logical order of the stage."
+        },
+        "role": {
+            "type": "string",
+            "description": "The role responsible for this stage.",
+            "enum": ["Engineer", "Secretary", "Accountant", "HR", "Admin"]
         }
       },
       "required": ["name"]

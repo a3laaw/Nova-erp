@@ -196,6 +196,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 ? workStages.map((stage) => ({
                     stageId: stage.id,
                     name: stage.name,
+                    role: stage.role,
                     status: 'pending' as const,
                     startDate: null,
                     endDate: null,
