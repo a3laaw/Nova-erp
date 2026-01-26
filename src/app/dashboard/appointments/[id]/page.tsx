@@ -226,10 +226,13 @@ export default function AppointmentDetailsPage() {
                         إغلاق الزيارة
                     </Button>
                     {!appointment.workStageUpdated && (
-                         <p className="text-sm text-destructive flex items-center gap-1">
+                         <Alert variant="destructive" className="w-full">
                             <AlertCircle className="h-4 w-4" />
-                            يجب تحديث مرحلة العمل أولاً قبل إغلاق الزيارة
-                         </p>
+                            <AlertTitle>إجراء مطلوب</AlertTitle>
+                            <AlertDescription>
+                                يجب تحديث مرحلة العمل أولاً قبل إغلاق الزيارة.
+                            </AlertDescription>
+                        </Alert>
                     )}
                 </CardFooter>
             </Card>
