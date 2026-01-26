@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Badge } from '../ui/badge';
 
 
 // Reusable component for the management UI (previously the whole component)
