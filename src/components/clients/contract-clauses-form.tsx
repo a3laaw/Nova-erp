@@ -24,7 +24,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-re
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage } from '@/lib/types';
+import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, WorkStage } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -225,28 +225,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract]);
 
 
-  const handleClauseChange = (index: number, field: keyof ContractClause, value: any) => {
-    const updatedClauses = [...clauses];
-    const clauseToUpdate = { ...updatedClauses[index] };
-    (clauseToUpdate as any)[field] = value;
-    updatedClauses[index] = clauseToUpdate;
-    setClauses(updatedClauses);
-  };
-  
-  const addClause = () => {
-    const newName = `الدفعة ${milestoneNames[clauses.length] || `(${clauses.length + 1})`}`;
-    setClauses(prev => [...prev, { id: generateId(), name: newName, amount: 0, status: 'غير مستحقة', condition: '' }]);
-  };
-
-  const removeClause = (id: string) => {
-    setClauses(prev => prev.filter(c => c.id !== id));
-  };
-  
   const addScopeItem = () => setScopeOfWork(prev => [...prev, { id: generateId(), title: '', description: '' }]);
-  const removeScopeItem = (id: string) => setScopeOfWork(prev => prev.filter(s => s.id !== id));
-  const handleScopeChange = (id: string, field: 'title' | 'description', value: string) => {
-      setScopeOfWork(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+  const updateScopeItem = (id: string, field: 'title' | 'description', value: string) => {
+    setScopeOfWork(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
+  const removeScopeItem = (id: string) => setScopeOfWork(prev => prev.filter(item => item.id !== id));
   const reorderScopeItem = (index: number, direction: 'up' | 'down') => {
       const newItems = [...scopeOfWork];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
@@ -255,37 +238,56 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
-  const removeTerm = (id: string) => setTerms(prev => prev.filter(t => t.id !== id));
-  const handleTermChange = (id: string, text: string) => setTerms(prev => prev.map(t => (t.id === id ? { ...t, text } : t)));
+
+  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
+  const updateTerm = (id: string, value: string) => {
+    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+  };
+  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
-      const newTerms = [...terms];
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= newTerms.length) return;
-      [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-      setTerms(newTerms);
+    const newTerms = [...termsAndConditions];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newTerms.length) return;
+    [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
+    setTermsAndConditions(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
-  const removeOpenClause = (id: string) => setOpenClauses(prev => prev.filter(t => t.id !== id));
-  const handleOpenClauseChange = (id: string, text: string) => setOpenClauses(prev => prev.map(t => (t.id === id ? { ...t, text } : t)));
+  const updateOpenClause = (id: string, value: string) => {
+    setOpenClauses(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+  };
+  const removeOpenClause = (id: string) => setOpenClauses(prev => prev.filter(term => term.id !== id));
   const reorderOpenClause = (index: number, direction: 'up' | 'down') => {
-      const newClauses = [...openClauses];
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= newClauses.length) return;
-      [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
-      setOpenClauses(newClauses);
+    const newClauses = [...openClauses];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newClauses.length) return;
+    [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
+    setOpenClauses(newClauses);
   };
 
-  const totalAmount = useMemo(() => {
-    return clauses.reduce((acc, clause) => acc + Number(clause.amount), 0);
-  }, [clauses]);
+  const addMilestone = () => {
+    setFinancials(prev => {
+      const newIndex = prev.milestones.length;
+      const newName = `الدفعة ${milestoneNames[newIndex] || `(${newIndex + 1})`}`;
+      return {
+        ...prev,
+        milestones: [...prev.milestones, { id: generateId(), name: newName, condition: '', value: 0 }]
+      };
+    });
+  };
+  const updateMilestone = (id: string, field: keyof ContractFinancialMilestone, value: string | number) => {
+    setFinancials(prev => ({ ...prev, milestones: prev.milestones.map(m => m.id === id ? { ...m, [field]: value } : m) }));
+  };
+  const removeMilestone = (id: string) => {
+    setFinancials(prev => ({ ...prev, milestones: prev.milestones.filter(m => m.id !== id) }));
+  };
+  
+  const totalMilestoneValue = useMemo(() => financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0), [financials.milestones]);
 
   const handleSubmit = async () => {
     if (!firestore || !transaction?.id || !currentUser) return;
     setIsSaving(true);
     try {
-        // --- Reads Outside Transaction ---
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
@@ -302,9 +304,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         const customersAccountDoc = parentAccountSnap.docs[0];
         const revenueAccountDoc = revenueAccountSnap.docs[0];
         
-        // --- Firestore Transaction ---
         await runTransaction(firestore, async (transaction_firestore) => {
-            // --- Transactional Reads ---
             const clientRef = doc(firestore, 'clients', clientId);
             const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
@@ -323,33 +323,46 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const clientData = clientSnap.data();
             const currentTransactionData = currentTransactionSnap.data() as ClientTransaction;
 
-            // --- Transactional Writes ---
-
-            // 1. Prepare contract and stage data
-            const contractData = {
-                clauses: clauses,
-                scopeOfWork: scopeOfWork,
-                termsAndConditions: terms,
-                openClauses: openClauses,
-                totalAmount: totalAmount,
-                financialsType: chosenTemplate?.financials?.type || 'fixed',
-            };
-
-            const updatedStages = currentTransactionData.stages?.map(stage => {
-                if (stage.name === 'توقيع العقد' && stage.status !== 'completed') {
-                    return { ...stage, status: 'completed' as const, endDate: new Date() };
-                }
-                return stage;
-            });
-
-            // 2. Update the transaction with contract details and updated stage
-            const updatePayload: any = { 
-                contract: contractData,
-                stages: updatedStages || currentTransactionData.stages 
-            };
+            // Prepare contract and stage data
+            const contractData = { clauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
             
-            const safeUpdatePayload = cleanFirestoreData(updatePayload);
-            transaction_firestore.update(transactionRef, safeUpdatePayload);
+            const updatedStages = [...(currentTransactionData.stages || [])];
+            const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
+            let wasContractSigned = false;
+            
+            if (contractStageIndex > -1 && updatedStages[contractStageIndex].status !== 'completed') {
+                updatedStages[contractStageIndex] = { ...updatedStages[contractStageIndex], status: 'completed' as const, endDate: new Date() };
+                wasContractSigned = true;
+            }
+
+            if (wasContractSigned && currentTransactionData.departmentId) {
+                const workStagesQuery = query(collection(firestore, `departments/${currentTransactionData.departmentId}/workStages`), orderBy('order', 'asc'));
+                const workStagesSnap = await transaction_firestore.get(workStagesQuery);
+                const departmentWorkStages = workStagesSnap.docs.map(d => ({ id: d.id, ...d.data() as WorkStage }));
+                
+                const signedStageTemplate = departmentWorkStages.find(ws => ws.id === updatedStages[contractStageIndex].stageId);
+                const signedStageOrder = signedStageTemplate?.order;
+
+                if (signedStageOrder !== undefined) {
+                    const nextStageTemplate = departmentWorkStages.find(ws => ws.order === signedStageOrder + 1);
+
+                    if (nextStageTemplate) {
+                        const nextStageIndexInProg = updatedStages.findIndex(s => s.stageId === nextStageTemplate.id);
+                        if (nextStageIndexInProg > -1) {
+                            if (updatedStages[nextStageIndexInProg].status === 'pending') {
+                                updatedStages[nextStageIndexInProg] = { ...updatedStages[nextStageIndexInProg], status: 'in-progress', startDate: new Date() };
+                            }
+                        } else {
+                            updatedStages.push({
+                                stageId: nextStageTemplate.id, name: nextStageTemplate.name, status: 'in-progress', startDate: new Date(), endDate: null
+                            });
+                        }
+                    }
+                }
+            }
+
+            const updatePayload = { contract: contractData, stages: updatedStages };
+            transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             
             // This logic only runs when creating a contract for the first time for a client
             if (clientData.status === 'new') {
@@ -360,10 +373,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 transaction_firestore.set(doc(historyCollectionRef), {
                     type: 'log',
                     content: `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName || 'النظام',
-                    userAvatar: currentUser.avatarUrl || '',
-                    createdAt: serverTimestamp(),
+                    userId: currentUser.id, userName: currentUser.fullName || 'النظام', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
                 });
                 
                 if (clientAccountSnap.empty) {
@@ -375,19 +385,14 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                     transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
                     const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
                     transaction_firestore.set(newAccountRef, {
-                        name: clientData.nameAr,
-                        code: clientAccountCode,
-                        type: customersAccountDoc.data().type,
-                        level: (customersAccountDoc.data().level as number) + 1,
+                        name: clientData.nameAr, code: clientAccountCode, type: customersAccountDoc.data().type, level: (customersAccountDoc.data().level as number) + 1,
                     });
                     clientAccountId = newAccountRef.id;
                 } else {
                     clientAccountId = clientAccountSnap.docs[0].id;
                 }
                 
-                // Create the Journal Entry
                 const currentYear = new Date().getFullYear();
-                
                 let nextJournalEntryNumber = 1;
                 if (journalEntryCounterDoc.exists()) {
                     const counts = journalEntryCounterDoc.data()?.counts || {};
@@ -404,13 +409,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                     date: serverTimestamp(),
                     narration: `إثبات مديونية العميل ${clientData.nameAr} عن عقد معاملة "${transaction.transactionType}"`,
                     totalDebit: totalAmount,
-                    totalCredit: totalAmount,
-                    status: 'draft',
-                    lines: journalLines,
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser.id,
-                    clientId: clientId,
-                    transactionId: transaction.id!,
+                    totalCredit: totalAmount, status: 'draft', lines: journalLines, createdAt: serverTimestamp(), createdBy: currentUser.id, clientId: clientId, transactionId: transaction.id!,
                 });
                 transaction_firestore.set(journalEntryCounterRef, { counts: { [currentYear]: nextJournalEntryNumber } }, { merge: true });
             }

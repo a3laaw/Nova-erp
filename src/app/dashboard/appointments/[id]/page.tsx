@@ -160,36 +160,35 @@ export default function AppointmentDetailsPage() {
             
             let logContent = `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
 
-            // --- 2. Find and update the NEXT stage to 'in-progress' ---
-            const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
-            const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
-
-            if (nextStageInTemplate) {
-                const nextStageId = nextStageInTemplate.id!;
-                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
-
-                if (nextStageIndexInProg !== -1) {
-                    // Next stage already exists in progress, update it to 'in-progress' if it's 'pending'
-                    const stageToStart = { ...currentStages[nextStageIndexInProg] };
-                    if (stageToStart.status === 'pending') {
-                        stageToStart.status = 'in-progress';
-                        stageToStart.startDate = now;
-                        currentStages[nextStageIndexInProg] = stageToStart;
-                        logContent += ` وتم بدء المرحلة التالية: "${nextStageInTemplate.name}".`;
+            // --- 2. Conditionally start the NEXT stage if contract was signed ---
+            if (selectedStage.name === 'توقيع العقد') {
+                const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
+                const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
+    
+                if (nextStageInTemplate) {
+                    const nextStageId = nextStageInTemplate.id!;
+                    const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+    
+                    if (nextStageIndexInProg !== -1) {
+                        const stageToStart = { ...currentStages[nextStageIndexInProg] };
+                        if (stageToStart.status === 'pending') {
+                            stageToStart.status = 'in-progress';
+                            stageToStart.startDate = now;
+                            currentStages[nextStageIndexInProg] = stageToStart;
+                            logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+                        }
+                    } else {
+                        currentStages.push({
+                            stageId: nextStageId,
+                            name: nextStageInTemplate.name,
+                            status: 'in-progress',
+                            startDate: now,
+                            endDate: null,
+                        });
+                        logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
                     }
-                } else {
-                    // Next stage doesn't exist, add it as 'in-progress'
-                    currentStages.push({
-                        stageId: nextStageId,
-                        name: nextStageInTemplate.name,
-                        status: 'in-progress',
-                        startDate: now,
-                        endDate: null,
-                    });
-                    logContent += ` وتم بدء المرحلة التالية: "${nextStageInTemplate.name}".`;
                 }
             }
-
     
             // 1. Update the transaction with the new stages progress
             batch.update(transactionRef, { stages: currentStages });
