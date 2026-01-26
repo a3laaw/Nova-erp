@@ -228,8 +228,11 @@ export default function TransactionDetailPage() {
 
   const handleStageStatusChange = async (stageIndex: number, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser) return;
-
-    if (newStatus === 'in-progress' && stageIndex > 0 && stages[stageIndex - 1].status !== 'completed') {
+    
+    const stage = stages[stageIndex];
+    
+    // Allow 'تعديلات ومناقشات' to be started at any time
+    if (newStatus === 'in-progress' && stage.name !== 'تعديلات ومناقشات' && stageIndex > 0 && stages[stageIndex - 1].status !== 'completed') {
         toast({
             variant: 'destructive',
             title: 'لا يمكن بدء هذه المرحلة',
@@ -239,27 +242,21 @@ export default function TransactionDetailPage() {
     }
 
     const updatedStages = [...stages];
-    const stage = updatedStages[stageIndex];
-    const oldStatus = stage.status;
-    stage.status = newStatus;
+    const stageToUpdate = updatedStages[stageIndex];
+    const oldStatus = stageToUpdate.status;
+    stageToUpdate.status = newStatus;
 
     if (newStatus === 'in-progress' && oldStatus !== 'in-progress') {
-        const startDate = new Date();
-        stage.startDate = startDate;
-        if (stage.durationDays && stage.durationDays > 0) {
-            const expectedEndDate = new Date(startDate.getTime());
-            expectedEndDate.setDate(expectedEndDate.getDate() + stage.durationDays);
-            stage.expectedEndDate = expectedEndDate;
-        }
+        stageToUpdate.startDate = new Date();
     }
     
     if (newStatus === 'completed' && oldStatus !== 'completed') {
-        stage.endDate = new Date();
+        stageToUpdate.endDate = new Date();
     }
 
     if (newStatus === 'pending' && oldStatus === 'in-progress') {
-      stage.startDate = null;
-      stage.expectedEndDate = null;
+      stageToUpdate.startDate = null;
+      stageToUpdate.expectedEndDate = null;
     }
     
     setStages(updatedStages); // Optimistic update
@@ -274,7 +271,7 @@ export default function TransactionDetailPage() {
         console.log("البيانات بعد التنظيف:", JSON.stringify(safeUpdatedStages, null, 2));
         batch.update(transactionRefDoc, safeUpdatedStages);
         
-        const logContent = `قام بتغيير حالة المرحلة "${stage.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        const logContent = `قام بتغيير حالة المرحلة "${stageToUpdate.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         batch.set(doc(timelineCollectionRef), {
             type: 'log',
             content: logContent,
@@ -472,7 +469,7 @@ export default function TransactionDetailPage() {
                                         </div>
                                         <div className="flex gap-2">
                                             {stage.status === 'pending' && (
-                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(index, 'in-progress')} disabled={index > 0 && stages[index - 1].status !== 'completed'}>
+                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(index, 'in-progress')}>
                                                     <Play className="ml-2 h-4 w-4" />
                                                     بدء
                                                 </Button>

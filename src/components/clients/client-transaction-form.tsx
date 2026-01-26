@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, Department, WorkStage } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, Department, WorkStage, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
@@ -169,7 +169,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             let engineerForTransactionId: string | null = assignedEngineerId || null;
 
             // Special logic for "بلدية سكن خاص"
-            if (transactionType === 'بلدية سكن خاص') {
+            if (transactionType === 'تصميم بلدية سكن خاص') {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
                 if (clientSnap.exists()) {
@@ -186,15 +186,37 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             const engineer = engineers.find(e => e.id === engineerForTransactionId);
             
-            const initialStages = workStages.length > 0 ? workStages.map(stage => ({
-                name: stage.name,
-                status: 'pending' as const,
-                startDate: null,
-                endDate: null,
-                durationDays: 2, // Default duration
-                expectedEndDate: null,
-                notes: ''
-            })) : [];
+            let initialStages: Partial<TransactionStage>[] = [];
+
+            if (transactionType === 'تصميم بلدية سكن خاص') {
+                const predefinedStages = [
+                    'استفسارات عامة',
+                    'توقيع العقد',
+                    'إرسال فحص التربة',
+                    'استلام فحص التربة',
+                    'الانتهاء من دور السرداب والأرضي',
+                    'الانتهاء من الدور الأول',
+                    'الانتهاء من الدور الثاني والسطح',
+                    'إصدار واستلام رخصة البناء',
+                    'تعديلات ومناقشات',
+                ];
+                initialStages = predefinedStages.map(name => ({
+                    name: name,
+                    status: 'pending' as const,
+                    startDate: null,
+                    endDate: null,
+                    notes: ''
+                }));
+            } else {
+                initialStages = workStages.length > 0 ? workStages.map(stage => ({
+                    name: stage.name,
+                    status: 'pending' as const,
+                    startDate: null,
+                    endDate: null,
+                    notes: ''
+                })) : [];
+            }
+
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
@@ -316,7 +338,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                             </div>
                         </div>
 
-                        {transactionType === 'بلدية سكن خاص' ? (
+                        {transactionType === 'تصميم بلدية سكن خاص' ? (
                             <Alert>
                                 <Info className="h-4 w-4" />
                                 <AlertTitle>إسناد تلقائي</AlertTitle>
