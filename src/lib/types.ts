@@ -121,6 +121,9 @@ export type Appointment = {
   department?: string;
   type: 'architectural' | 'room';
   notes?: string;
+  transactionId?: string;
+  workStageUpdated?: boolean;
+  workStageProgressId?: string;
   // For architectural appointments with color logic
   session?: 'صباحية' | 'مسائية';
   visitCount?: number;
@@ -528,4 +531,14 @@ export interface JournalEntry {
   createdBy?: string;
   clientId?: string;
   transactionId?: string;
+}
+
+export interface WorkStageProgress {
+  id?: string;
+  transactionId?: string;
+  visitId: string;
+  stageId: string;
+  stageName: string;
+  selectedBy: string; // Employee ID
+  selectedAt: any; // Timestamp
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -20,23 +21,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Pencil, Trash2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
-import { Checkbox } from '../ui/checkbox';
+import Link from 'next/link';
 
 // --- Constants & Helpers ---
 const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
@@ -60,9 +53,6 @@ export function ArchitecturalAppointmentsView() {
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-
-    const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
@@ -156,90 +146,12 @@ export function ArchitecturalAppointmentsView() {
         setIsDialogOpen(true);
     };
 
-    const handleEditClick = (booking: Appointment) => {
-        setDialogData({
-            ...booking,
-            id: booking.id, // Make sure ID is passed
-            appointmentDate: booking.appointmentDate.toDate(), // Convert timestamp to Date for dialog
-            appointments, // Pass current appointments to dialog
-        });
-        setIsDialogOpen(true);
-    };
-
     const handleSave = async () => {
         if (date) { // Re-fetch data for the current date
             await fetchData(date);
         }
     };
     
-    const handleDeleteBooking = async () => {
-        if (!appointmentToDelete || !firestore) return;
-        setIsDeleting(true);
-        try {
-            const clientId = appointmentToDelete.clientId;
-            const batch = writeBatch(firestore);
-
-            // 1. Delete the selected appointment
-            const appointmentRef = doc(firestore, 'appointments', appointmentToDelete.id!);
-            batch.delete(appointmentRef);
-
-            // 2. Fetch all OTHER appointments for this client
-            const allClientApptsQuery = query(
-                collection(firestore, 'appointments'),
-                where('clientId', '==', clientId),
-                where('type', '==', 'architectural')
-            );
-            const allClientApptsSnap = await getDocs(allClientApptsQuery);
-
-            // Filter out the one we are deleting
-            const remainingAppointments = allClientApptsSnap.docs
-                .map(d => ({ id: d.id, ...d.data() } as Appointment))
-                .filter(appt => appt.id !== appointmentToDelete.id);
-
-            // 3. Get client status for coloring
-            const clientRef = doc(firestore, 'clients', clientId);
-            const clientSnap = await getDoc(clientRef);
-            const clientData = clientSnap.exists() ? clientSnap.data() as Client : null;
-            const contractSigned = clientData?.status === 'contracted' || clientData?.status === 'reContracted';
-            
-            // 4. Sort remaining appointments by date
-            remainingAppointments.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
-
-            // 5. Recalculate visitCount and color for remaining appointments and add to batch
-            remainingAppointments.forEach((appt, index) => {
-                const visitCount = index + 1;
-                const newColor = getVisitColor({ visitCount, contractSigned });
-
-                const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
-
-                if (needsUpdate) {
-                    const apptRefToUpdate = doc(firestore, 'appointments', appt.id!);
-                    batch.update(apptRefToUpdate, {
-                        visitCount: visitCount,
-                        color: newColor
-                    });
-                }
-            });
-            
-            // 6. Commit the batch
-            await batch.commit();
-
-            toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد وتحديث الزيارات بنجاح.' });
-            
-            // 7. Refresh the data for the current view
-            if (date) {
-                fetchData(date);
-            }
-
-        } catch (error) {
-            console.error("Error deleting appointment and recalculating:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد أو تحديث الزيارات.' });
-        } finally {
-            setIsDeleting(false);
-            setAppointmentToDelete(null);
-        }
-    };
-
     const handlePrint = () => {
         const element = document.getElementById('architectural-appointments-printable-area');
         if (!element || !date) return;
@@ -310,33 +222,18 @@ export function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <div
-                                                        className="h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
-                                                        style={{ backgroundColor: booking.color }}
-                                                    >
-                                                        <p className="font-bold">{booking.clientName}</p>
-                                                        {booking.visitCount && (
-                                                            <span className="text-xs mt-1 opacity-75">
-                                                                (الزيارة رقم {booking.visitCount})
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent dir="rtl">
-                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleEditClick(booking)}>
-                                                        <Pencil className="ml-2 h-4 w-4" />
-                                                        <span>تعديل الموعد</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                        <Trash2 className="ml-2 h-4 w-4" />
-                                                        <span>إلغاء الموعد</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <Link
+                                                href={`/dashboard/appointments/${booking.id}`}
+                                                className="h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
+                                                style={{ backgroundColor: booking.color }}
+                                            >
+                                                <p className="font-bold">{booking.clientName}</p>
+                                                {booking.visitCount && (
+                                                    <span className="text-xs mt-1 opacity-75">
+                                                        (الزيارة رقم {booking.visitCount})
+                                                    </span>
+                                                )}
+                                            </Link>
                                         ) : (
                                             <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
                                         )}
@@ -415,23 +312,6 @@ export function ArchitecturalAppointmentsView() {
                     firestore={firestore}
                 />
             )}
-            
-            <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد من الإلغاء؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيتم حذف هذا الموعد بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteBooking} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                            {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
@@ -442,14 +322,10 @@ export function ArchitecturalAppointmentsView() {
 function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
-    const isEditing = !!dialogData?.id;
     
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
     
-    const [newDate, setNewDate] = useState('');
-    const [newTime, setNewTime] = useState('');
-
     const filteredClients = useMemo(() => {
         if (!dialogData?.engineerId) return [];
         // Show clients assigned to the selected engineer OR clients with no assigned engineer.
@@ -457,23 +333,11 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     }, [clients, dialogData?.engineerId]);
 
     useEffect(() => {
-        if (isOpen && dialogData) {
-            if (isEditing) {
-                const appointmentDate = dialogData.appointmentDate;
-                if (appointmentDate instanceof Date) {
-                    setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
-                    setNewTime(format(appointmentDate, 'HH:mm'));
-                }
-                setSelectedClientId(dialogData.clientId || '');
-                setTitle(dialogData.title || '');
-            } else {
-                setSelectedClientId('');
-                setTitle('');
-                setNewDate(''); 
-                setNewTime('');
-            }
+        if (isOpen) {
+            setSelectedClientId('');
+            setTitle('');
         }
-    }, [isOpen, dialogData, isEditing]);
+    }, [isOpen]);
 
     useEffect(() => {
         if (selectedClientId && !filteredClients.some(c => c.id === selectedClientId)) {
@@ -494,41 +358,30 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         setIsSaving(true);
         
         try {
-            // --- Conflict Validation ---
-            const appointmentDateTime = isEditing 
-                ? new Date(`${newDate}T${newTime}`) 
-                : dialogData.appointmentDate;
+            const appointmentDateTime = dialogData.appointmentDate;
             
-            // Get the latest appointments for the day right before saving
             const dayStart = startOfDay(appointmentDateTime);
             const dayEnd = endOfDay(appointmentDateTime);
 
             const dayApptsQuery = query(collection(firestore, 'appointments'), where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
             const dayApptsSnap = await getDocs(dayApptsQuery);
-            const latestDayAppointments = dayApptsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+            const latestDayAppointments = dayApptsSnap.docs.map(d => d.data());
             
             const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
             
-            const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                if (isEditing && appt.id === dialogData.id) return false;
-                return appt.engineerId === dialogData.engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
-            });
+            const engineerHasConflict = latestDayAppointments.some((appt: any) => appt.engineerId === dialogData.engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd);
             if (engineerHasConflict) {
                 toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
                 setIsSaving(false); return;
             }
 
-            const clientHasConflict = latestDayAppointments.some((appt: any) => {
-                if (isEditing && appt.id === dialogData.id) return false;
-                return appt.clientId === selectedClientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
-            });
+            const clientHasConflict = latestDayAppointments.some((appt: any) => appt.clientId === selectedClientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd);
             if (clientHasConflict) {
                 toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
                 setIsSaving(false); return;
             }
             
-            // --- Color & Batch Write Logic ---
             const batch = writeBatch(firestore);
 
             const allClientApptsQuery = query(
@@ -542,7 +395,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
             
             const currentAppointmentObject = {
-                id: isEditing ? dialogData.id : 'new-temp-id',
+                id: 'new-temp-id',
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 clientId: client.id,
                 title: title || client.nameAr,
@@ -551,14 +404,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 type: 'architectural' as const,
             };
 
-            let processingList: (Partial<Appointment> & { id: string })[];
-            if (isEditing) {
-                processingList = existingAppointments.map(appt => 
-                    appt.id === currentAppointmentObject.id ? { ...appt, ...currentAppointmentObject } : appt
-                );
-            } else {
-                processingList = [...existingAppointments, currentAppointmentObject];
-            }
+            let processingList = [...existingAppointments, currentAppointmentObject];
             
             processingList.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
 
@@ -587,12 +433,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     if (existingData?.visitCount !== visitCount) {
                         updatePayload.visitCount = visitCount;
                         needsUpdate = true;
-                    }
-
-                    if (isEditing && appt.id === dialogData.id) {
-                         const { id, ...dataToSave } = currentAppointmentObject;
-                         Object.assign(updatePayload, dataToSave);
-                         needsUpdate = true;
                     }
 
                     if (needsUpdate) {
@@ -629,10 +469,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
              >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
+                        <DialogTitle>حجز موعد جديد</DialogTitle>
                         <DialogDescription>
                             للمهندس: {dialogData.engineerName}
-                            {!isEditing && ` في ${format(dialogData.appointmentDate, "PPP 'الساعة' HH:mm", { locale: ar })}`}
+                            في ${format(dialogData.appointmentDate, "PPP 'الساعة' HH:mm", { locale: ar })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
@@ -649,24 +489,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                                 placeholder={clientOptions.length === 0 && dialogData?.engineerId ? "لا يوجد عملاء متاحون لهذا المهندس" : "ابحث بالاسم أو رقم الجوال..."}
                             />
                         </div>
-                        {isEditing && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="date">التاريخ</Label>
-                                    <Input id="date" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="time">الوقت</Label>
-                                    <Input id="time" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required step="1800" />
-                                </div>
-                            </div>
-                        )}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                         <Button type="submit" disabled={isSaving || !selectedClientId}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                            {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
+                            حفظ الموعد
                         </Button>
                     </DialogFooter>
                 </form>
@@ -674,4 +502,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-    

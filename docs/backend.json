@@ -619,9 +619,43 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "The ID of the client transaction this appointment is related to."
+        },
+        "workStageUpdated": {
+            "type": "boolean",
+            "description": "Indicates if the work stage has been updated for this visit."
+        },
+        "workStageProgressId": {
+            "type": "string",
+            "description": "Reference to the document in work_stages_progress."
+        },
+        "visitCount": {
+            "type": "number",
+            "description": "The sequential visit number for this client's architectural appointments."
+        },
+        "color": {
+            "type": "string",
+            "description": "Hex color code for calendar display based on visit status."
         }
       },
       "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+    },
+    "WorkStageProgress": {
+        "title": "Work Stage Progress",
+        "description": "Logs the selection of a work stage for a specific architectural visit.",
+        "type": "object",
+        "properties": {
+            "transactionId": { "type": "string", "description": "The ID of the client transaction this visit is related to." },
+            "visitId": { "type": "string", "description": "The ID of the architectural visit document." },
+            "stageId": { "type": "string", "description": "The ID of the selected work stage." },
+            "stageName": { "type": "string", "description": "The name of the selected work stage." },
+            "selectedBy": { "type": "string", "description": "The ID of the employee who updated the stage." },
+            "selectedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["visitId", "stageId", "stageName", "selectedBy", "selectedAt"]
     },
     "Contract": {
       "title": "Contract",
@@ -1006,6 +1040,12 @@
       },
       "description": "Stores all scheduled appointments."
     },
+    "/work_stages_progress/{progressId}": {
+        "schema": {
+            "$ref": "#/entities/WorkStageProgress"
+        },
+        "description": "Stores logs of work stage updates from architectural visits."
+    },
     "/contracts/{contractId}": {
       "schema": {
         "$ref": "#/entities/Contract"
@@ -1040,4 +1080,3 @@
     }
   }
 }
-

@@ -1,3 +1,4 @@
+
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import { TaskPrioritization } from '@/components/dashboard/task-prioritization';
 import { RecentActivity } from '@/components/dashboard/recent-activity';
 import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments';
 import { UpcomingAppointmentsCard } from '@/components/dashboard/upcoming-appointments-card';
+import { PendingVisits } from '@/components/dashboard/pending-visits';
 
 export default function DashboardPage() {
 
@@ -71,6 +73,10 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
              <UpcomingAppointmentsCard />
+        </div>
+        
+        <div className="grid gap-4">
+            <PendingVisits />
         </div>
 
         <div className="grid gap-4 xl:col-span-2">
