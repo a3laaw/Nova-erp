@@ -34,10 +34,11 @@ import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, role?: UserRole}, S extends {id: string, name: string, role?: UserRole}>({
+function ManagerView<T extends {id: string, name: string, role?: string}, S extends {id: string, name: string, role?: string}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -72,15 +73,37 @@ function ManagerView<T extends {id: string, name: string, role?: UserRole}, S ex
   const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const [editingItem, setEditingItem] = useState<{ id: string, name: string, role?: UserRole } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string, name: string, role?: string } | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   const [itemName, setItemName] = useState('');
-  const [itemRole, setItemRole] = useState<UserRole | ''>('');
+  const [itemRole, setItemRole] = useState<string>('');
   const isWorkStageView = secondaryCollectionName === 'workStages';
+  const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
 
 
   const primaryQuery = useMemo(() => firestore ? query(collection(firestore, primaryCollectionName)) : null, [firestore, primaryCollectionName]);
   const [primarySnapshot, primaryLoading, primaryError] = useCollection(primaryQuery);
+  
+   useEffect(() => {
+    if (!firestore) return;
+
+    const fetchAllJobs = async () => {
+      const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
+      const uniqueJobs = new Map<string, { value: string, label: string }>();
+      jobsSnapshot.forEach(doc => {
+        const jobName = doc.data().name;
+        if (jobName && !uniqueJobs.has(jobName)) {
+          uniqueJobs.set(jobName, { value: jobName, label: jobName });
+        }
+      });
+      setJobs(Array.from(uniqueJobs.values()));
+    };
+
+    if (isWorkStageView) {
+      fetchAllJobs();
+    }
+  }, [firestore, isWorkStageView]);
+
 
   useEffect(() => {
     setLoadingPrimary(primaryLoading);
@@ -141,7 +164,7 @@ function ManagerView<T extends {id: string, name: string, role?: UserRole}, S ex
   }, [primaryItems, selectedPrimary, handleSelectPrimary]);
 
 
-  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, role?: UserRole} | null = null) => {
+  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, role?: string} | null = null) => {
     setEditingItem(item);
     setItemName(item?.name || '');
     if (isWorkStageView && type === 'secondary') {
@@ -198,7 +221,7 @@ function ManagerView<T extends {id: string, name: string, role?: UserRole}, S ex
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
     try {
-      const dataToSave: { name: string, order?: number, role?: UserRole } = { name: itemName };
+      const dataToSave: { name: string, order?: number, role?: string } = { name: itemName };
        if (isWorkStageView && type === 'secondary' && itemRole) {
           dataToSave.role = itemRole;
       }
@@ -330,7 +353,14 @@ function ManagerView<T extends {id: string, name: string, role?: UserRole}, S ex
       </CardContent>
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
-        <DialogContent>
+        <DialogContent
+            onInteractOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]')) {
+                    e.preventDefault();
+                }
+            }}
+        >
           <DialogHeader>
             <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} عنصر جديد</DialogTitle>
             <DialogDescription>
@@ -345,19 +375,13 @@ function ManagerView<T extends {id: string, name: string, role?: UserRole}, S ex
 
             {isWorkStageView && !isPrimaryDialogOpen && (
                 <div className="grid gap-2">
-                    <Label htmlFor="item-role">الدور المسؤول</Label>
-                    <Select dir="rtl" value={itemRole} onValueChange={(v) => setItemRole(v as UserRole)}>
-                        <SelectTrigger id="item-role">
-                            <SelectValue placeholder="اختر الدور..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Admin">مدير</SelectItem>
-                            <SelectItem value="Engineer">مهندس</SelectItem>
-                            <SelectItem value="Accountant">محاسب</SelectItem>
-                            <SelectItem value="Secretary">سكرتارية</SelectItem>
-                            <SelectItem value="HR">موارد بشرية</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <Label htmlFor="item-role">الدور المسؤول (المسمى الوظيفي)</Label>
+                    <InlineSearchList 
+                        value={itemRole}
+                        onSelect={setItemRole}
+                        options={jobs}
+                        placeholder="اختر المسمى الوظيفي المسؤول..."
+                    />
                 </div>
             )}
           </div>

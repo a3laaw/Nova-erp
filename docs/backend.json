@@ -295,8 +295,7 @@
         },
         "role": {
             "type": "string",
-            "description": "The role responsible for this stage, copied from the WorkStage template.",
-            "enum": ["Engineer", "Secretary", "Accountant", "HR", "Admin"]
+            "description": "The job title responsible for this stage, copied from the WorkStage template."
         },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
@@ -581,8 +580,7 @@
         },
         "role": {
             "type": "string",
-            "description": "The role responsible for this stage.",
-            "enum": ["Engineer", "Secretary", "Accountant", "HR", "Admin"]
+            "description": "The job title responsible for this stage."
         }
       },
       "required": ["name"]

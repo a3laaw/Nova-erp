@@ -32,6 +32,7 @@ export type UserProfile = {
   createdBy?: string; // UID of the admin who created the user
   avatarUrl?: string; // Optional, from employee record
   fullName?:string; // Optional, from employee record
+  jobTitle?: string; // Optional, from employee record
 };
 
 export type Client = {
@@ -357,7 +358,7 @@ export interface TransactionStage {
   stageId: string;
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped';
-  role?: UserRole;
+  role?: string; // Changed from UserRole
   startDate: any | null;
   endDate: any | null;
   notes?: string;
@@ -423,7 +424,7 @@ export interface WorkStage {
   id: string;
   name: string;
   order?: number;
-  role?: UserRole;
+  role?: string; // Changed from UserRole
 }
 
 export type ContractClause = {

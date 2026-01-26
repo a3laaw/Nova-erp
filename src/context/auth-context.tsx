@@ -31,6 +31,7 @@ const mockAdminUser: AuthenticatedUser = {
     isActive: true,
     employeeId: 'emp-admin',
     fullName: 'المدير العام',
+    jobTitle: 'Admin',
     avatarUrl: 'https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
     passwordHash: '',
     createdAt: new Timestamp(1672531200, 0), // Jan 1, 2023 - static date
@@ -74,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userProfileData = userDoc.data() as UserProfile;
 
         // Selectively fetch and attach only necessary employee data
-        let fullName, avatarUrl;
+        let fullName, avatarUrl, jobTitle;
         if (userProfileData.employeeId) {
           const employeeDocRef = doc(firestore, 'employees', userProfileData.employeeId);
           const employeeSnap = await getDoc(employeeDocRef);
@@ -82,6 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const employeeData = employeeSnap.data() as Employee;
             fullName = employeeData.fullName;
             avatarUrl = employeeData.profilePicture;
+            jobTitle = employeeData.jobTitle;
           }
         }
         
@@ -92,6 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Augment with employee data, providing fallbacks
           fullName: fullName || userProfileData.username,
           avatarUrl: avatarUrl || '',
+          jobTitle: jobTitle || '',
         });
 
       } else {

@@ -67,13 +67,6 @@ const stageStatusTranslations: Record<string, string> = {
   skipped: 'تم تخطيها',
 };
 
-const roleTranslations: Record<UserRole, string> = {
-  Admin: 'مدير',
-  Engineer: 'مهندس',
-  Accountant: 'محاسب',
-  Secretary: 'سكرتارية',
-  HR: 'موارد بشرية',
-};
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
@@ -565,7 +558,7 @@ export default function TransactionDetailPage() {
                         ) : (
                             <div className="space-y-4">
                                 {stages.map((stage, index) => {
-                                    const canInteract = currentUser?.role === 'Admin' || currentUser?.role === stage.role;
+                                    const canInteract = currentUser?.role === 'Admin' || currentUser?.jobTitle === stage.role;
                                     return (
                                         <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-4">
@@ -574,7 +567,7 @@ export default function TransactionDetailPage() {
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
                                                 {stage.role && (
-                                                    <Badge variant="outline" className="text-xs font-normal">{roleTranslations[stage.role as UserRole] || stage.role}</Badge>
+                                                    <Badge variant="secondary" className="font-normal">{stage.role}</Badge>
                                                 )}
                                                 {renderStageTiming(stage)}
                                             </div>
