@@ -37,22 +37,26 @@ export function PendingVisits() {
         const fetchPendingVisits = async () => {
             setLoading(true);
             try {
-                // Simplified query to avoid composite index
+                // Further simplified query: Only filter by engineer.
+                // Sorting and other filters will be done client-side to avoid index issues.
                 const appointmentsQuery = query(
                     collection(firestore, 'appointments'),
-                    where('engineerId', '==', user.employeeId),
-                    orderBy('appointmentDate', 'desc')
+                    where('engineerId', '==', user.employeeId)
                 );
 
                 const appointmentsSnapshot = await getDocs(appointmentsQuery);
                 const allUserAppointments = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-                
+
                 // Client-side filtering
                 const filteredPending = allUserAppointments.filter(appt => 
                     appt.type === 'architectural' &&
+                    appt.appointmentDate && // Ensure date exists
                     isPast(appt.appointmentDate.toDate()) &&
                     !appt.workStageUpdated
                 );
+                
+                // Client-side sorting
+                filteredPending.sort((a, b) => b.appointmentDate.toDate().getTime() - a.appointmentDate.toDate().getTime());
 
                 if (filteredPending.length === 0) {
                     setPendingVisits([]);
