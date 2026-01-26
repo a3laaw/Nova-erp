@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, BookUser, FileText, Receipt, BookOpen } from 'lucide-react';
+import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 
 const accountingSections = [
@@ -16,7 +16,13 @@ const accountingSections = [
         title: 'سندات القبض',
         description: 'عرض وإدارة جميع سندات القبض الواردة من العملاء.',
         link: '/dashboard/accounting/cash-receipts',
-        icon: <Receipt className="h-8 w-8 text-primary" />,
+        icon: <ArrowDownCircle className="h-8 w-8 text-green-600" />,
+    },
+    {
+        title: 'سندات الصرف',
+        description: 'إدارة الشيكات والمدفوعات الصادرة للموردين والموظفين.',
+        link: '/dashboard/accounting/payment-vouchers',
+        icon: <ArrowUpCircle className="h-8 w-8 text-red-600" />,
     },
     {
         title: 'قيود اليومية',
@@ -61,7 +67,7 @@ export default function AccountingPage() {
             </CardHeader>
         </Card>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {accountingSections.map((section) => (
                 <Card key={section.link}>
                     <CardHeader className="flex flex-row items-center gap-4">

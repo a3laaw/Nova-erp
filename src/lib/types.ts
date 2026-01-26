@@ -172,6 +172,28 @@ export type CashReceipt = {
     createdAt: any; // Timestamp
 };
 
+export interface PaymentVoucher {
+  id?: string;
+  voucherNumber: string;
+  voucherSequence: number;
+  voucherYear: number;
+  payeeName: string;
+  payeeType: 'vendor' | 'employee' | 'other';
+  amount: number;
+  amountInWords: string;
+  paymentDate: any; // Timestamp
+  paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer';
+  description: string;
+  reference?: string;
+  debitAccountId: string;
+  debitAccountName: string;
+  creditAccountId: string;
+  creditAccountName: string;
+  status: 'draft' | 'paid' | 'cancelled';
+  journalEntryId?: string;
+  createdAt: any; // Timestamp
+}
+
 export type Transaction = {
   id: string;
   date: string;

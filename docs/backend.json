@@ -846,6 +846,56 @@
         }
       },
       "required": ["entryNumber", "date", "narration", "totalDebit", "totalCredit", "status", "lines", "createdAt"]
+    },
+    "PaymentVoucher": {
+      "title": "Payment Voucher",
+      "description": "Represents a payment voucher for disbursing funds.",
+      "type": "object",
+      "properties": {
+        "voucherNumber": { "type": "string" },
+        "voucherSequence": { "type": "number" },
+        "voucherYear": { "type": "number" },
+        "payeeName": { "type": "string" },
+        "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
+        "amount": { "type": "number" },
+        "amountInWords": { "type": "string" },
+        "paymentDate": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer"] },
+        "description": { "type": "string" },
+        "reference": { "type": "string", "description": "e.g., Cheque number or transfer reference" },
+        "debitAccountId": { "type": "string" },
+        "debitAccountName": { "type": "string" },
+        "creditAccountId": { "type": "string" },
+        "creditAccountName": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "paid", "cancelled"] },
+        "journalEntryId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["voucherNumber", "payeeName", "amount", "paymentDate", "paymentMethod", "debitAccountId", "creditAccountId", "status"]
+    },
+    "CashReceipt": {
+      "title": "Cash Receipt",
+      "description": "Represents a cash receipt voucher.",
+      "type": "object",
+      "properties": {
+        "voucherNumber": { "type": "string" },
+        "voucherSequence": { "type": "number" },
+        "voucherYear": { "type": "number" },
+        "clientId": { "type": "string" },
+        "clientNameAr": { "type": "string" },
+        "clientNameEn": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectNameAr": { "type": "string" },
+        "amount": { "type": "number" },
+        "amountInWords": { "type": "string" },
+        "receiptDate": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "K-Net"] },
+        "description": { "type": "string" },
+        "reference": { "type": "string" },
+        "type": { "type": "string", "enum": ["advance", "milestone", "final", "other"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["voucherNumber", "clientId", "amount", "receiptDate", "paymentMethod"]
     }
   },
   "auth": {
@@ -979,6 +1029,15 @@
         "$ref": "#/entities/JournalEntry"
       },
       "description": "Stores general journal entries created manually or by other processes."
+    },
+    "/paymentVouchers/{voucherId}": {
+      "schema": { "$ref": "#/entities/PaymentVoucher" },
+      "description": "Stores all payment vouchers issued by the company."
+    },
+    "/cashReceipts/{receiptId}": {
+      "schema": { "$ref": "#/entities/CashReceipt" },
+      "description": "Stores all cash receipt vouchers received by the company."
     }
   }
 }
+
