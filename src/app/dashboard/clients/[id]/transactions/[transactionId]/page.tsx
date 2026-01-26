@@ -166,7 +166,7 @@ export default function TransactionDetailPage() {
                     stageId: template.id!,
                     name: template.name,
                     order: (template as any).order,
-                    role: template.role,
+                    allowedRoles: template.allowedRoles,
                     status: progress?.status || 'pending',
                     startDate: progress?.startDate || null,
                     endDate: progress?.endDate || null,
@@ -292,7 +292,7 @@ export default function TransactionDetailPage() {
         updatedProgress = {
             stageId: stageId,
             name: templateStageInfo.name,
-            role: templateStageInfo.role,
+            allowedRoles: templateStageInfo.allowedRoles,
         };
     }
     
@@ -558,17 +558,17 @@ export default function TransactionDetailPage() {
                         ) : (
                             <div className="space-y-4">
                                 {stages.map((stage, index) => {
-                                    const canInteract = currentUser?.role === 'Admin' || currentUser?.jobTitle === stage.role;
+                                    const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
                                     return (
                                         <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <Badge variant="outline" className={cn("w-24 justify-center", stageStatusColors[stage.status])}>
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
-                                                {stage.role && (
-                                                    <Badge variant="secondary" className="font-normal">{stage.role}</Badge>
-                                                )}
+                                                {stage.allowedRoles?.map(role => (
+                                                    <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
+                                                ))}
                                                 {renderStageTiming(stage)}
                                             </div>
                                             <div className="flex gap-2">

@@ -293,9 +293,10 @@
           "enum": ["pending", "in-progress", "completed", "skipped"],
           "description": "The current status of the stage."
         },
-        "role": {
-            "type": "string",
-            "description": "The job title responsible for this stage, copied from the WorkStage template."
+        "allowedRoles": {
+            "type": "array",
+            "description": "The job titles responsible for this stage, copied from the WorkStage template.",
+            "items": { "type": "string" }
         },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
@@ -578,9 +579,10 @@
             "type": "number",
             "description": "The display and logical order of the stage."
         },
-        "role": {
-            "type": "string",
-            "description": "The job title responsible for this stage."
+        "allowedRoles": {
+            "type": "array",
+            "description": "A list of job titles responsible for this stage.",
+            "items": { "type": "string" }
         }
       },
       "required": ["name"]

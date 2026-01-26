@@ -34,11 +34,11 @@ import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { InlineSearchList } from '../ui/inline-search-list';
+import { MultiSelect } from '../ui/multi-select';
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, role?: string}, S extends {id: string, name: string, role?: string}>({
+function ManagerView<T extends {id: string, name: string, allowedRoles?: string[]}, S extends {id: string, name: string, allowedRoles?: string[]}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -73,10 +73,10 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
   const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const [editingItem, setEditingItem] = useState<{ id: string, name: string, role?: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string, name: string, allowedRoles?: string[] } | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   const [itemName, setItemName] = useState('');
-  const [itemRole, setItemRole] = useState<string>('');
+  const [itemRoles, setItemRoles] = useState<string[]>([]);
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
 
@@ -164,11 +164,11 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
   }, [primaryItems, selectedPrimary, handleSelectPrimary]);
 
 
-  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, role?: string} | null = null) => {
+  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, allowedRoles?: string[]} | null = null) => {
     setEditingItem(item);
     setItemName(item?.name || '');
     if (isWorkStageView && type === 'secondary') {
-        setItemRole(item?.role || '');
+        setItemRoles(item?.allowedRoles || []);
     }
     if (type === 'primary') setIsPrimaryDialogOpen(true);
     else setIsSecondaryDialogOpen(true);
@@ -179,7 +179,7 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
     setIsSecondaryDialogOpen(false);
     setEditingItem(null);
     setItemName('');
-    setItemRole('');
+    setItemRoles([]);
   }
   
   const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
@@ -221,9 +221,9 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
     try {
-      const dataToSave: { name: string, order?: number, role?: string } = { name: itemName };
-       if (isWorkStageView && type === 'secondary' && itemRole) {
-          dataToSave.role = itemRole;
+      const dataToSave: { name: string, order?: number, allowedRoles?: string[] } = { name: itemName };
+       if (isWorkStageView && type === 'secondary') {
+          dataToSave.allowedRoles = itemRoles;
       }
 
       if (editingItem) { // Update
@@ -326,11 +326,11 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
                 {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
                   secondaryItems.map((item, index) => (
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span>{item.name}</span>
-                        {isWorkStageView && item.role && (
-                            <Badge variant="secondary" className="font-normal">{item.role}</Badge>
-                        )}
+                        {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
+                            <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
+                        ))}
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="flex flex-col">
@@ -354,10 +354,10 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
-            onInteractOutside={(e) => {
+             onInteractOutside={(e) => {
                 const target = e.target as HTMLElement;
-                if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]')) {
-                    e.preventDefault();
+                if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[role="dialog"]')) {
+                  e.preventDefault();
                 }
             }}
         >
@@ -375,12 +375,12 @@ function ManagerView<T extends {id: string, name: string, role?: string}, S exte
 
             {isWorkStageView && !isPrimaryDialogOpen && (
                 <div className="grid gap-2">
-                    <Label htmlFor="item-role">الدور المسؤول (المسمى الوظيفي)</Label>
-                    <InlineSearchList 
-                        value={itemRole}
-                        onSelect={setItemRole}
+                    <Label htmlFor="item-role">الأدوار المسؤولة (المسميات الوظيفية)</Label>
+                    <MultiSelect
                         options={jobs}
-                        placeholder="اختر المسمى الوظيفي المسؤول..."
+                        selected={itemRoles}
+                        onChange={setItemRoles}
+                        placeholder="اختر دورًا أو أكثر..."
                     />
                 </div>
             )}
