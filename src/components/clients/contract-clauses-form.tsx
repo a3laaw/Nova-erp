@@ -337,7 +337,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const updatedStages = currentTransactionData.stages?.map(stage => {
                 if (stage.name === 'توقيع العقد' && stage.status !== 'completed') {
-                    return { ...stage, status: 'completed' as const, endDate: serverTimestamp() };
+                    return { ...stage, status: 'completed' as const, endDate: new Date() };
                 }
                 return stage;
             });
@@ -551,12 +551,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                         <Input
                                             placeholder={`عنوان البند ${index + 1}`}
                                             value={item.title}
-                                            onChange={(e) => handleScopeChange(item.id, 'title', e.target.value)}
+                                            onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)}
                                         />
                                         <Textarea
                                             placeholder={`وصف تفصيلي للبند...`}
                                             value={item.description}
-                                            onChange={(e) => handleScopeChange(item.id, 'description', e.target.value)}
+                                            onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)}
                                             rows={2}
                                         />
                                     </div>

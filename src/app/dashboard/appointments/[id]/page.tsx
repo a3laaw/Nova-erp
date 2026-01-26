@@ -60,6 +60,11 @@ export default function AppointmentDetailsPage() {
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
 
     useEffect(() => {
+        if (!id && !appointmentLoading) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'معرف الموعد غير موجود.' });
+            router.push('/dashboard/appointments');
+            return;
+        }
         if (appointmentSnap?.exists()) {
             setAppointment({ id: appointmentSnap.id, ...appointmentSnap.data() } as Appointment);
         } else if (id && !appointmentLoading && !appointmentSnap?.exists()) {
@@ -131,15 +136,17 @@ export default function AppointmentDetailsPage() {
             const stageIndex = currentStages.findIndex(s => s.stageId === selectedStage.id);
     
             let newStages;
+            const now = new Date(); // Use client-side timestamp
+
             if (stageIndex !== -1) {
                 newStages = [...currentStages];
                 const stageToUpdate = { ...newStages[stageIndex] };
                 if (stageToUpdate.status !== 'completed') {
                     stageToUpdate.status = 'completed';
-                    stageToUpdate.endDate = serverTimestamp();
+                    stageToUpdate.endDate = now;
                     if (!stageToUpdate.startDate) {
                         // If it was pending, set start date as well
-                        stageToUpdate.startDate = serverTimestamp();
+                        stageToUpdate.startDate = now;
                     }
                     newStages[stageIndex] = stageToUpdate;
                 }
@@ -149,8 +156,8 @@ export default function AppointmentDetailsPage() {
                     stageId: selectedStage.id,
                     name: selectedStage.name,
                     status: 'completed',
-                    startDate: serverTimestamp(),
-                    endDate: serverTimestamp(),
+                    startDate: now,
+                    endDate: now,
                 }];
             }
             
