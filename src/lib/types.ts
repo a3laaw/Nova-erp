@@ -361,6 +361,7 @@ export interface TransactionStage {
   durationDays?: number;
   expectedEndDate?: any | null;
   notes?: string;
+  order?: number;
 }
       
 export type ClientTransaction = {

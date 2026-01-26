@@ -142,29 +142,13 @@ export default function TransactionDetailPage() {
         setNewEngineerId(transaction.assignedEngineerId || '');
         
         let stagesToSort = [...(transaction.stages || [])];
-        if (transaction.transactionType.includes('بلدية') && transaction.transactionType.includes('سكن خاص')) {
-            const correctOrder = [
-                'استفسارات عامه',
-                'توقيع العقد',
-                'الانتهاء من الدور (الارضي والسرداب)',
-                'الانتهاء من الدور الارضي',
-                'الانتهاء من الدور الاول',
-                'الانتهاء من الدور الثاني والسطح',
-                'إصدار واستلام رخصة البناء',
-                'تعديلات ومناقشات',
-            ];
-            
-            stagesToSort.sort((a, b) => {
-                const indexA = correctOrder.indexOf(a.name);
-                const indexB = correctOrder.indexOf(b.name);
-
-                if (indexA === -1 && indexB === -1) return 0;
-                if (indexA === -1) return 1;
-                if (indexB === -1) return -1;
-
-                return indexA - indexB;
-            });
-        }
+        // Sort stages based on the 'order' property if it exists,
+        // otherwise maintain the existing order (or sort by name as a fallback).
+        stagesToSort.sort((a, b) => {
+            const orderA = (a as any).order;
+            const orderB = (b as any).order;
+            return (orderA ?? 999) - (orderB ?? 999);
+        });
         setStages(stagesToSort);
     }
   }, [transaction]);

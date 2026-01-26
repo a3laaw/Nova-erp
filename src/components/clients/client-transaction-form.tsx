@@ -105,8 +105,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             setTypesLoading(true);
             setStagesLoading(true);
             try {
-                const typesQuery = query(collection(firestore, `departments/${selectedDepartment}/transactionTypes`), orderBy('name'));
-                const stagesQuery = query(collection(firestore, `departments/${selectedDepartment}/workStages`), orderBy('name'));
+                const typesQuery = query(collection(firestore, `departments/${selectedDepartment}/transactionTypes`));
+                const stagesQuery = query(collection(firestore, `departments/${selectedDepartment}/workStages`));
 
                 const [typesSnapshot, stagesSnapshot] = await Promise.all([
                     getDocs(typesQuery),
@@ -116,7 +116,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 const fetchedTypes = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
                 setTransactionTypes(fetchedTypes);
 
-                const fetchedStages = stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage));
+                let fetchedStages = stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage));
+                fetchedStages.sort((a, b) => {
+                    const orderA = (a as any).order;
+                    const orderB = (b as any).order;
+                    return (orderA ?? 99) - (orderB ?? 99);
+                });
                 setWorkStages(fetchedStages);
 
             } catch (error) {
@@ -186,35 +191,17 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             const engineer = engineers.find(e => e.id === engineerForTransactionId);
             
-            let initialStages: Partial<TransactionStage>[] = [];
-
-            if (transactionType.includes('بلدية') && transactionType.includes('سكن خاص')) {
-                const predefinedStages = [
-                    'استفسارات عامه',
-                    'توقيع العقد',
-                    'الانتهاء من الدور (الارضي والسرداب)',
-                    'الانتهاء من الدور الارضي',
-                    'الانتهاء من الدور الاول',
-                    'الانتهاء من الدور الثاني والسطح',
-                    'إصدار واستلام رخصة البناء',
-                    'تعديلات ومناقشات',
-                ];
-                initialStages = predefinedStages.map(name => ({
-                    name: name,
-                    status: 'pending' as const,
-                    startDate: null,
-                    endDate: null,
-                    notes: ''
-                }));
-            } else {
-                initialStages = workStages.length > 0 ? workStages.map(stage => ({
+            // Create stages based on the sorted reference data
+            const initialStages: Partial<TransactionStage>[] = workStages.length > 0
+                ? workStages.map((stage, index) => ({
                     name: stage.name,
                     status: 'pending' as const,
+                    order: (stage as any).order ?? index,
                     startDate: null,
                     endDate: null,
-                    notes: ''
-                })) : [];
-            }
+                    notes: '',
+                }))
+                : [];
 
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
