@@ -16,7 +16,7 @@
         },
         "address": {
           "type": "string",
-          "description": "The full address of the company."
+          "description": "The company's contact phone number."
         },
         "phone": {
           "type": "string",
@@ -294,7 +294,10 @@
         },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
-        "notes": { "type": "string", "description": "Notes specific to this stage." }
+        "notes": { "type": "string", "description": "Notes specific to this stage." },
+        "order": { "type": "number", "description": "The display and logical order of the stage." },
+        "durationDays": { "type": "number", "description": "The expected duration of the stage in days." },
+        "expectedEndDate": { "type": "string", "format": "date-time", "description": "The calculated expected end date." }
       },
       "required": ["name", "status"]
     },

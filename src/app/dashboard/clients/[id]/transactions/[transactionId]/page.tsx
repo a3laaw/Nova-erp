@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -94,6 +94,7 @@ export default function TransactionDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
   const [stages, setStages] = useState<TransactionStage[]>([]);
+  const [loadingStages, setLoadingStages] = useState(true);
 
 
   // --- Data Fetching ---
@@ -137,21 +138,63 @@ export default function TransactionDetailPage() {
   }, [transactionSnapshot]);
   
   useEffect(() => {
-    if (transaction) {
-        setNewStatus(transaction.status);
-        setNewEngineerId(transaction.assignedEngineerId || '');
-        
+    if (!transaction || !firestore) return;
+
+    const sortAndSetStages = async () => {
+        setLoadingStages(true);
         let stagesToSort = [...(transaction.stages || [])];
-        // Sort stages based on the 'order' property if it exists,
-        // otherwise maintain the existing order (or sort by name as a fallback).
-        stagesToSort.sort((a, b) => {
-            const orderA = (a as any).order;
-            const orderB = (b as any).order;
-            return (orderA ?? 999) - (orderB ?? 999);
-        });
+
+        // If stages already have an order property, just sort by it.
+        if (stagesToSort.every(s => typeof (s as any).order === 'number')) {
+            stagesToSort.sort((a, b) => ((a as any).order ?? 999) - ((b as any).order ?? 999));
+            setStages(stagesToSort);
+            setLoadingStages(false);
+            return;
+        }
+
+        // --- Fallback for old data: Fetch order from reference data ---
+        if (transaction.departmentId) {
+            try {
+                const stagesQuery = query(
+                    collection(firestore, `departments/${transaction.departmentId}/workStages`),
+                    orderBy('order', 'asc')
+                );
+                const stagesSnapshot = await getDocs(stagesQuery);
+                const orderMap = new Map<string, number>();
+                stagesSnapshot.docs.forEach(doc => {
+                    orderMap.set(doc.data().name, doc.data().order);
+                });
+                
+                stagesToSort.sort((a, b) => {
+                    const orderA = orderMap.get(a.name) ?? 999;
+                    const orderB = orderMap.get(b.name) ?? 999;
+                    // Add secondary sort by name for stability if orders are equal
+                    if (orderA === orderB) {
+                        return a.name.localeCompare(b.name);
+                    }
+                    return orderA - orderB;
+                });
+
+            } catch (e) {
+                console.error("Could not fetch reference order for stages, using default sort.", e);
+                // Fallback to alphabetical if fetching reference fails
+                stagesToSort.sort((a, b) => a.name.localeCompare(b.name));
+            }
+        } else {
+             // If there's no departmentId, just sort alphabetically.
+             stagesToSort.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        
         setStages(stagesToSort);
-    }
-  }, [transaction]);
+        setLoadingStages(false);
+    };
+
+    sortAndSetStages();
+    // Also update basic data
+    setNewStatus(transaction.status);
+    setNewEngineerId(transaction.assignedEngineerId || '');
+    
+  }, [transaction, firestore]);
 
   const client = useMemo(() => {
     if (clientSnapshot?.exists()) {
@@ -463,7 +506,7 @@ export default function TransactionDetailPage() {
                         <CardDescription>تتبع التقدم في كل مرحلة من مراحل المعاملة.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {stages.length === 0 ? (
+                        {loadingStages ? <Skeleton className="h-48 w-full" /> : stages.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
