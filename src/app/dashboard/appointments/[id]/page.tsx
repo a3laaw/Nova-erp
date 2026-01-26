@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -57,17 +56,17 @@ export default function AppointmentDetailsPage() {
     const [selectedStageId, setSelectedStageId] = useState('');
 
     // Fetch main appointment data
-    const appointmentRef = useMemo(() => firestore ? doc(firestore, 'appointments', id) : null, [firestore, id]);
+    const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
 
     useEffect(() => {
         if (appointmentSnap?.exists()) {
             setAppointment({ id: appointmentSnap.id, ...appointmentSnap.data() } as Appointment);
-        } else if (!appointmentLoading && !appointmentSnap?.exists()) {
+        } else if (id && !appointmentLoading && !appointmentSnap?.exists()) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموعد المطلوب.' });
             router.push('/dashboard/appointments');
         }
-    }, [appointmentSnap, appointmentLoading, router, toast]);
+    }, [appointmentSnap, appointmentLoading, id, router, toast]);
 
     // Fetch related data once appointment is loaded
     useEffect(() => {
