@@ -361,6 +361,7 @@ export interface TransactionStage {
   endDate: any | null;
   notes?: string;
   order?: number; // For UI sorting, derived from template
+  expectedEndDate?: any;
 }
       
 export type ClientTransaction = {
@@ -543,4 +544,3 @@ export interface WorkStageProgress {
   selectedBy: string; // Employee ID
   selectedAt: any; // Timestamp
 }
-

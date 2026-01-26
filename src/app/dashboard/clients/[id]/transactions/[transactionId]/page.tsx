@@ -169,6 +169,7 @@ export default function TransactionDetailPage() {
                     startDate: progress?.startDate || null,
                     endDate: progress?.endDate || null,
                     notes: progress?.notes || '',
+                    expectedEndDate: progress?.expectedEndDate || null,
                 };
             });
 
@@ -273,7 +274,6 @@ export default function TransactionDetailPage() {
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser) return;
 
-    // Use the raw progress data from the transaction for modification
     const originalProgress = [...(transaction.stages || [])];
     const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
 
@@ -289,13 +289,13 @@ export default function TransactionDetailPage() {
         }
         updatedProgress = {
             stageId: stageId,
-            name: templateStageInfo.name, // Keep name for convenience
+            name: templateStageInfo.name,
         };
     }
     
     const oldStatus = updatedProgress.status || 'pending';
+    const wasContractSigned = updatedProgress.name === 'توقيع العقد' && newStatus === 'completed' && oldStatus !== 'completed';
 
-    // Sequence check
     const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
     if (newStatus === 'in-progress' && stages[currentIndexInUI].name !== 'تعديلات ومناقشات' && currentIndexInUI > 0) {
         const previousStageInUI = stages[currentIndexInUI - 1];
@@ -330,6 +330,31 @@ export default function TransactionDetailPage() {
         newProgressForFirestore = [...originalProgress, updatedProgress as TransactionStage];
     }
     
+    if (wasContractSigned) {
+        const stagesToUpdate = ['ارسال فحص التربه', 'الانتهاء من الدور (الارضي والسرداب)'];
+        const deadline = new Date();
+        deadline.setDate(deadline.getDate() + 7); // 7-day countdown
+
+        stagesToUpdate.forEach(stageName => {
+            const stageInfo = stages.find(s => s.name === stageName);
+            if (stageInfo) {
+                const stageIndexToUpdate = newProgressForFirestore.findIndex(s => s.stageId === stageInfo.stageId);
+                if (stageIndexToUpdate > -1) {
+                    (newProgressForFirestore[stageIndexToUpdate] as any).expectedEndDate = deadline;
+                } else {
+                    newProgressForFirestore.push({
+                        stageId: stageInfo.stageId,
+                        name: stageInfo.name,
+                        status: 'pending',
+                        expectedEndDate: deadline,
+                        startDate: null,
+                        endDate: null,
+                    });
+                }
+            }
+        });
+    }
+    
     const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
     
@@ -361,7 +386,7 @@ export default function TransactionDetailPage() {
 
 
   const renderStageTiming = (stage: TransactionStage) => {
-    if (stage.status !== 'in-progress' || !stage.expectedEndDate) {
+    if (!stage.expectedEndDate || stage.status === 'completed') {
         return null;
     }
     

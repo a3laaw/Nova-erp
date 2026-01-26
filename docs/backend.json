@@ -295,6 +295,7 @@
         },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
+        "expectedEndDate": { "type": "string", "format": "date-time", "description": "The expected completion date for countdowns." },
         "notes": { "type": "string", "description": "Notes specific to this stage." }
       },
       "required": ["stageId", "name", "status"]
@@ -1085,4 +1086,3 @@
     }
   }
 }
-
