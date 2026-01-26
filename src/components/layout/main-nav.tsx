@@ -50,6 +50,7 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting', label: 'لوحة التحكم المحاسبية' },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف' },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
@@ -73,6 +74,7 @@ const navItems = {
           children: [
             { href: '/dashboard/accounting', label: 'Accounting Dashboard' },
             { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
+            { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
             { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
             { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
             { href: '/dashboard/accounting/invoices', label: 'Invoices' },
