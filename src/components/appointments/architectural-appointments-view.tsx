@@ -30,7 +30,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -300,38 +300,54 @@ export function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <div
-                                                        className="h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
-                                                        style={{ backgroundColor: booking.color }}
-                                                    >
-                                                        <p className="font-bold">{booking.clientName}</p>
-                                                        {booking.visitCount && (
-                                                            <span className="text-xs mt-1 opacity-75">
-                                                                (الزيارة رقم {booking.visitCount})
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent dir="rtl">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/dashboard/appointments/${booking.id}`}>
-                                                            <Eye className="ml-2 h-4 w-4" />
-                                                            <span>عرض التفاصيل</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenDialogForEdit(booking)}>
-                                                        <Pencil className="ml-2 h-4 w-4" />
-                                                        <span>تعديل/جدولة</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10">
-                                                        <Trash2 className="ml-2 h-4 w-4" />
-                                                        <span>إلغاء الموعد</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            booking.workStageUpdated ? (
+                                                <div
+                                                    className="relative h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-75"
+                                                    style={{ backgroundColor: booking.color }}
+                                                    title="تم إغلاق هذه الزيارة."
+                                                >
+                                                    <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />
+                                                    <p className="font-bold">{booking.clientName}</p>
+                                                    {booking.visitCount && (
+                                                        <span className="text-xs mt-1 opacity-75">
+                                                            (الزيارة رقم {booking.visitCount})
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <div
+                                                            className="h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
+                                                            style={{ backgroundColor: booking.color }}
+                                                        >
+                                                            <p className="font-bold">{booking.clientName}</p>
+                                                            {booking.visitCount && (
+                                                                <span className="text-xs mt-1 opacity-75">
+                                                                    (الزيارة رقم {booking.visitCount})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent dir="rtl">
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/dashboard/appointments/${booking.id}`}>
+                                                                <Eye className="ml-2 h-4 w-4" />
+                                                                <span>عرض التفاصيل</span>
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleOpenDialogForEdit(booking)}>
+                                                            <Pencil className="ml-2 h-4 w-4" />
+                                                            <span>تعديل/جدولة</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive focus:bg-destructive/10">
+                                                            <Trash2 className="ml-2 h-4 w-4" />
+                                                            <span>إلغاء الموعد</span>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )
                                         ) : (
                                             <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
                                         )}
