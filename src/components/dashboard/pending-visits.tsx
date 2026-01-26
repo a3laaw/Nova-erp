@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -30,27 +29,30 @@ export function PendingVisits() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!firestore || !user) return;
+        if (!firestore || !user?.employeeId) {
+            setLoading(false);
+            return;
+        }
         
         const fetchPendingVisits = async () => {
             setLoading(true);
             try {
-                const today = new Date();
-                
-                // Query for past appointments for the current user
+                // Simplified query to avoid composite index
                 const appointmentsQuery = query(
                     collection(firestore, 'appointments'),
                     where('engineerId', '==', user.employeeId),
-                    where('type', '==', 'architectural'),
-                    where('appointmentDate', '<', Timestamp.fromDate(today)),
                     orderBy('appointmentDate', 'desc')
                 );
 
                 const appointmentsSnapshot = await getDocs(appointmentsQuery);
-                const allPastAppointments = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+                const allUserAppointments = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
                 
-                // Filter for visits that are not updated
-                const filteredPending = allPastAppointments.filter(appt => !appt.workStageUpdated);
+                // Client-side filtering
+                const filteredPending = allUserAppointments.filter(appt => 
+                    appt.type === 'architectural' &&
+                    isPast(appt.appointmentDate.toDate()) &&
+                    !appt.workStageUpdated
+                );
 
                 if (filteredPending.length === 0) {
                     setPendingVisits([]);
@@ -60,16 +62,22 @@ export function PendingVisits() {
 
                 // Fetch client names for the pending visits
                 const clientIds = [...new Set(filteredPending.map(a => a.clientId))];
-                const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', clientIds));
-                const clientsSnapshot = await getDocs(clientsQuery);
-                const clientsMap = new Map(clientsSnapshot.docs.map(doc => [doc.id, doc.data() as Client]));
 
-                const augmentedPendingVisits = filteredPending.map(appt => ({
-                    ...appt,
-                    clientName: clientsMap.get(appt.clientId)?.nameAr || 'عميل غير معروف'
-                }));
+                if (clientIds.length > 0) {
+                    const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', clientIds));
+                    const clientsSnapshot = await getDocs(clientsQuery);
+                    const clientsMap = new Map(clientsSnapshot.docs.map(doc => [doc.id, doc.data() as Client]));
+    
+                    const augmentedPendingVisits = filteredPending.map(appt => ({
+                        ...appt,
+                        clientName: clientsMap.get(appt.clientId)?.nameAr || 'عميل غير معروف'
+                    }));
+    
+                    setPendingVisits(augmentedPendingVisits);
+                } else {
+                     setPendingVisits([]);
+                }
 
-                setPendingVisits(augmentedPendingVisits);
 
             } catch (error) {
                 console.error("Error fetching pending visits:", error);
