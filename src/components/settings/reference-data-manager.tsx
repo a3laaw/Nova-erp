@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -75,7 +75,7 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   const [itemName, setItemName] = useState('');
 
 
-  const primaryQuery = useMemo(() => firestore ? query(collection(firestore, primaryCollectionName), orderBy('name')) : null, [firestore, primaryCollectionName]);
+  const primaryQuery = useMemo(() => firestore ? query(collection(firestore, primaryCollectionName)) : null, [firestore, primaryCollectionName]);
   const [primarySnapshot, primaryLoading, primaryError] = useCollection(primaryQuery);
 
   useEffect(() => {
@@ -84,7 +84,15 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
         toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: primaryError.message });
     }
     if (primarySnapshot) {
-      const items = primarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      let items = primarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      items.sort((a, b) => {
+          const orderA = (a as any).order;
+          const orderB = (b as any).order;
+          if (orderA !== undefined && orderB !== undefined) {
+              return orderA - orderB;
+          }
+          return a.name.localeCompare(b.name, 'ar');
+      });
       setPrimaryItems(items);
     }
   }, [primarySnapshot, primaryLoading, primaryError, primaryTitle, toast]);
@@ -100,36 +108,13 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
       const secondarySnapshot = await getDocs(secondaryQuery);
       let fetchedItems = secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
       
-      // Custom sort for architectural work stages
-      if (primaryCollectionName === 'departments' && item.name === 'القسم المعماري' && secondaryCollectionName === 'workStages') {
-        const customOrder = [
-            'استفسارات عامة',
-            'توقيع العقد',
-            'الانتهاء من الدور (الارضي والسرداب)',
-            'الانتهاء من الدور الارضي',
-            'الانتهاء من الدور الاول',
-            'الانتهاء من الدور الثاني والسطح',
-            'إصدار واستلام رخصة البناء',
-            'تعديلات ومناقشات',
-            'ارسال فحص التربه',
-            'استلام فحص التربه',
-        ];
+      fetchedItems.sort((a: any, b: any) => {
+          if (a.order !== undefined && b.order !== undefined) {
+              return a.order - b.order;
+          }
+          return a.name.localeCompare(b.name, 'ar');
+      });
 
-        fetchedItems.sort((a, b) => {
-            const indexA = customOrder.indexOf(a.name);
-            const indexB = customOrder.indexOf(b.name);
-            
-            if (indexA !== -1 && indexB !== -1) {
-              return indexA - indexB;
-            }
-            if (indexA !== -1) return -1;
-            if (indexB !== -1) return 1;
-            return a.name.localeCompare(b.name, 'ar');
-          });
-      } else {
-          // Default alphabetical sort for others
-          fetchedItems.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-      }
       setSecondaryItems(fetchedItems);
     } catch (e) {
       console.error(e);
@@ -165,6 +150,39 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
     setEditingItem(null);
     setItemName('');
   }
+  
+  const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
+    const list = type === 'primary' ? primaryItems : secondaryItems;
+    const setList = type === 'primary' ? setPrimaryItems : setSecondaryItems;
+    if (!list || list.length < 2) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= list.length) return;
+
+    const reorderedList = [...list];
+    [reorderedList[index], reorderedList[newIndex]] = [reorderedList[newIndex], reorderedList[index]];
+    
+    setList(reorderedList as any); // Optimistic update of UI
+
+    if (!firestore) return;
+    const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
+    if (!collectionPath) return;
+
+    try {
+        const batch = writeBatch(firestore);
+        reorderedList.forEach((item, idx) => {
+            const docRef = doc(firestore, collectionPath, item.id);
+            batch.update(docRef, { order: idx });
+        });
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم تحديث الترتيب.' });
+    } catch (e) {
+        console.error('Failed to save order:', e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
+        setList(list as any); // Revert UI on failure
+    }
+  };
+
 
   const handleSave = async (type: 'primary' | 'secondary') => {
     if (!firestore || !itemName.trim()) return;
@@ -177,7 +195,10 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
         await updateDoc(itemRef, { name: itemName });
         toast({ title: 'نجاح', description: 'تم تحديث العنصر.' });
       } else { // Create
-        await addDoc(collection(firestore, collectionPath), { name: itemName });
+        const collectionRef = collection(firestore, collectionPath);
+        const currentList = type === 'primary' ? primaryItems : secondaryItems;
+        const newOrder = currentList.length;
+        await addDoc(collectionRef, { name: itemName, order: newOrder });
         toast({ title: 'نجاح', description: 'تمت إضافة العنصر.' });
       }
       if (type === 'secondary' && selectedPrimary) {
@@ -232,11 +253,19 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
           </div>
           <ScrollArea className="h-72 border rounded-md p-2">
             {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-              primaryItems.map(item => (
+              primaryItems.map((item, index) => (
                 <div key={item.id} onClick={() => handleSelectPrimary(item)}
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
                   <span>{item.name}</span>
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
+                    <div className="flex flex-col">
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); reorderItems('primary', index, 'up'); }} disabled={index === 0}>
+                            <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); reorderItems('primary', index, 'down'); }} disabled={index === primaryItems.length - 1}>
+                            <ArrowDown className="h-3 w-3" />
+                        </Button>
+                    </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }} disabled={disablePrimaryActions}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }} disabled={disablePrimaryActions}><Trash2 className="h-4 w-4" /></Button>
                   </div>
@@ -257,10 +286,18 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
               </div>
               <ScrollArea className="h-72 border rounded-md p-2">
                 {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-                  secondaryItems.map(item => (
+                  secondaryItems.map((item, index) => (
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
                       <span>{item.name}</span>
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1">
+                        <div className="flex flex-col">
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems('secondary', index, 'up')} disabled={index === 0}>
+                                <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems('secondary', index, 'down')} disabled={index === secondaryItems.length - 1}>
+                                <ArrowDown className="h-3 w-3" />
+                            </Button>
+                        </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
                       </div>
