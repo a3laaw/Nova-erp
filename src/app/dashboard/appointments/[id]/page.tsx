@@ -221,7 +221,11 @@ export default function AppointmentDetailsPage() {
                     )}
                  </CardContent>
                 <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
-                    <Button disabled={!appointment.workStageUpdated}>
+                    <Button 
+                        disabled={!appointment.workStageUpdated}
+                        onClick={() => router.push('/dashboard/appointments')}
+                    >
+                        <ArrowRight className="ml-2 h-4 w-4" />
                         إغلاق الزيارة
                     </Button>
                     {!appointment.workStageUpdated && (
