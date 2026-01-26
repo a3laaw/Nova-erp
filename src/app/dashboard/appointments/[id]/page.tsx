@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
-import type { Appointment, Client, Employee, WorkStage, Department } from '@/lib/types';
+import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -86,7 +86,7 @@ export default function AppointmentDetailsPage() {
                 const deptSnap = await getDocs(deptQuery);
                 if (!deptSnap.empty) {
                     const archDeptId = deptSnap.docs[0].id;
-                    const stagesQuery = query(collection(firestore, `departments/${archDeptId}/workStages`), orderBy('name'));
+                    const stagesQuery = query(collection(firestore, `departments/${archDeptId}/workStages`), orderBy('order'));
                     const stagesSnap = await getDocs(stagesQuery);
                     setWorkStages(stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage)));
                 }
@@ -107,15 +107,57 @@ export default function AppointmentDetailsPage() {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء اختيار مرحلة عمل. تأكد من أن هذه الزيارة مرتبطة بمعاملة.' });
             return;
         }
-
+    
         setIsSaving(true);
         const selectedStage = workStages.find(s => s.id === selectedStageId);
-        if (!selectedStage) return;
+        if (!selectedStage) {
+            setIsSaving(false);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'المرحلة المختارة غير صالحة.' });
+            return;
+        }
         
         try {
             const batch = writeBatch(firestore);
-
-            // 1. Create WorkStageProgress document
+            const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
+    
+            // --- Get the transaction document to update its stages array ---
+            const transactionSnap = await getDoc(transactionRef);
+            if (!transactionSnap.exists()) {
+                throw new Error("لم يتم العثور على المعاملة المرتبطة بهذا الموعد.");
+            }
+            const transactionData = transactionSnap.data() as ClientTransaction;
+            const currentStages = transactionData.stages || [];
+            
+            const stageIndex = currentStages.findIndex(s => s.stageId === selectedStage.id);
+    
+            let newStages;
+            if (stageIndex !== -1) {
+                newStages = [...currentStages];
+                const stageToUpdate = { ...newStages[stageIndex] };
+                if (stageToUpdate.status !== 'completed') {
+                    stageToUpdate.status = 'completed';
+                    stageToUpdate.endDate = serverTimestamp();
+                    if (!stageToUpdate.startDate) {
+                        // If it was pending, set start date as well
+                        stageToUpdate.startDate = serverTimestamp();
+                    }
+                    newStages[stageIndex] = stageToUpdate;
+                }
+            } else {
+                // If the stage is not in the array, add it.
+                 newStages = [...currentStages, {
+                    stageId: selectedStage.id,
+                    name: selectedStage.name,
+                    status: 'completed',
+                    startDate: serverTimestamp(),
+                    endDate: serverTimestamp(),
+                }];
+            }
+            
+            // 1. Update the transaction with the new stages progress
+            batch.update(transactionRef, { stages: newStages });
+    
+            // 2. Create WorkStageProgress document for auditing
             const progressRef = doc(collection(firestore, 'work_stages_progress'));
             batch.set(progressRef, {
                 visitId: appointment.id,
@@ -125,24 +167,37 @@ export default function AppointmentDetailsPage() {
                 selectedBy: currentUser.employeeId,
                 selectedAt: serverTimestamp(),
             });
-
-            // 2. Update the appointment
+    
+            // 3. Update the appointment itself
             const apptRef = doc(firestore, 'appointments', appointment.id);
             batch.update(apptRef, {
                 workStageUpdated: true,
                 workStageProgressId: progressRef.id
             });
-
+            
+            // 4. Add a log entry to the transaction's timeline
+            const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
+            batch.set(timelineRef, {
+                type: 'log',
+                content: `قام ${currentUser.fullName} بتحديث مرحلة العمل إلى "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            });
+    
+    
             await batch.commit();
-
+    
             toast({ title: 'نجاح', description: `تم تحديث مرحلة العمل إلى: ${selectedStage.name}` });
             
             // Manually update local state to reflect change immediately
             setAppointment(prev => prev ? { ...prev, workStageUpdated: true, workStageProgressId: progressRef.id } : null);
-
+    
         } catch (error) {
             console.error("Error updating work stage:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ تحديث مرحلة العمل.' });
+            const errorMessage = error instanceof Error ? error.message : 'فشل حفظ تحديث مرحلة العمل.';
+            toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
         } finally {
             setIsSaving(false);
         }
