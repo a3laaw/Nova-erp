@@ -25,7 +25,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Account } from '@/lib/types';
@@ -85,7 +85,7 @@ export default function NewJournalEntryPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'lines',
   });
@@ -242,6 +242,7 @@ export default function NewJournalEntryPage() {
                                 <TableHead className="w-1/5">مدين</TableHead>
                                 <TableHead className="w-1/5">دائن</TableHead>
                                 <TableHead className="w-1/5">ملاحظات</TableHead>
+                                <TableHead><span className="sr-only">ترتيب</span></TableHead>
                                 <TableHead><span className="sr-only">حذف</span></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -306,6 +307,16 @@ export default function NewJournalEntryPage() {
                                         />
                                     </TableCell>
                                     <TableCell>
+                                        <div className="flex flex-col items-center">
+                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index - 1)} disabled={index === 0}>
+                                                <ArrowUp className="h-4 w-4" />
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index + 1)} disabled={index === fields.length - 1}>
+                                                <ArrowDown className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
                                         <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2}>
                                             <Trash2 className="h-4 w-4 text-destructive" />
                                         </Button>
@@ -318,14 +329,14 @@ export default function NewJournalEntryPage() {
                                 <TableCell className="font-bold">الإجمالي</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalCredit)}</TableCell>
-                                <TableCell colSpan={2}></TableCell>
+                                <TableCell colSpan={3}></TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="font-bold">الفرق</TableCell>
                                 <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrency(balance)}
                                 </TableCell>
-                                <TableCell colSpan={2}></TableCell>
+                                <TableCell colSpan={3}></TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
