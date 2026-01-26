@@ -37,8 +37,8 @@ export function PendingVisits() {
         const fetchPendingVisits = async () => {
             setLoading(true);
             try {
-                // Further simplified query: Only filter by engineer.
-                // Sorting and other filters will be done client-side to avoid index issues.
+                // SIMPLE QUERY: Only filter by engineer.
+                // Sorting and other filters will be done client-side to avoid the composite index requirement.
                 const appointmentsQuery = query(
                     collection(firestore, 'appointments'),
                     where('engineerId', '==', user.employeeId)
@@ -47,7 +47,7 @@ export function PendingVisits() {
                 const appointmentsSnapshot = await getDocs(appointmentsQuery);
                 const allUserAppointments = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
-                // Client-side filtering
+                // CLIENT-SIDE FILTERING:
                 const filteredPending = allUserAppointments.filter(appt => 
                     appt.type === 'architectural' &&
                     appt.appointmentDate && // Ensure date exists
@@ -55,7 +55,7 @@ export function PendingVisits() {
                     !appt.workStageUpdated
                 );
                 
-                // Client-side sorting
+                // CLIENT-SIDE SORTING:
                 filteredPending.sort((a, b) => b.appointmentDate.toDate().getTime() - a.appointmentDate.toDate().getTime());
 
                 if (filteredPending.length === 0) {
@@ -68,6 +68,7 @@ export function PendingVisits() {
                 const clientIds = [...new Set(filteredPending.map(a => a.clientId))];
 
                 if (clientIds.length > 0) {
+                    // Use a 'in' query which is efficient for up to 30 IDs.
                     const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', clientIds));
                     const clientsSnapshot = await getDocs(clientsQuery);
                     const clientsMap = new Map(clientsSnapshot.docs.map(doc => [doc.id, doc.data() as Client]));
@@ -85,6 +86,7 @@ export function PendingVisits() {
 
             } catch (error) {
                 console.error("Error fetching pending visits:", error);
+                // I won't toast here to avoid spamming the user if the error persists.
             } finally {
                 setLoading(false);
             }
