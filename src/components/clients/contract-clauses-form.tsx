@@ -387,7 +387,13 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 
                 // Create the Journal Entry
                 const currentYear = new Date().getFullYear();
-                const nextJournalEntryNumber = (journalEntryCounterDoc.exists() ? journalEntryCounterDoc.data()?.counts?.[currentYear] || 0 : 0) : 0) + 1;
+                
+                let nextJournalEntryNumber = 1;
+                if (journalEntryCounterDoc.exists()) {
+                    const counts = journalEntryCounterDoc.data()?.counts || {};
+                    nextJournalEntryNumber = (counts[currentYear] || 0) + 1;
+                }
+                
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
                 const journalLines = [
                     { accountId: clientAccountId, accountName: clientData.nameAr, debit: totalAmount, credit: 0 },
