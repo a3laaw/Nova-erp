@@ -103,8 +103,8 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
       // Custom sort for architectural work stages
       if (primaryCollectionName === 'departments' && item.name === 'القسم المعماري' && secondaryCollectionName === 'workStages') {
         const customOrder = [
-            'استفسارات عامه',
-            'عند توقيع العقد',
+            'استفسارات عامة',
+            'توقيع العقد',
             'الانتهاء من الدور (الارضي والسرداب)',
             'الانتهاء من الدور الارضي',
             'الانتهاء من الدور الاول',
