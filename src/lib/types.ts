@@ -354,14 +354,13 @@ export type Payslip = {
 };
 
 export interface TransactionStage {
+  stageId: string;
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped';
   startDate: any | null;
   endDate: any | null;
-  durationDays?: number;
-  expectedEndDate?: any | null;
   notes?: string;
-  order?: number;
+  order?: number; // For UI sorting, derived from template
 }
       
 export type ClientTransaction = {
@@ -374,7 +373,7 @@ export type ClientTransaction = {
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;
-    stages?: TransactionStage[];
+    stages?: Partial<TransactionStage>[]; // Now stores progress
     // For display
     engineerName?: string;
     contract?: {
@@ -421,6 +420,7 @@ export interface TransactionType {
 export interface WorkStage {
   id: string;
   name: string;
+  order?: number;
 }
 
 export type ContractClause = {
@@ -543,3 +543,4 @@ export interface WorkStageProgress {
   selectedBy: string; // Employee ID
   selectedAt: any; // Timestamp
 }
+

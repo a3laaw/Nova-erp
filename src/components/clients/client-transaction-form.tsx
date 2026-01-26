@@ -193,10 +193,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             
             // Create stages based on the sorted reference data
             const initialStages: Partial<TransactionStage>[] = workStages.length > 0
-                ? workStages.map((stage, index) => ({
+                ? workStages.map((stage) => ({
+                    stageId: stage.id,
                     name: stage.name,
                     status: 'pending' as const,
-                    order: (stage as any).order ?? index,
                     startDate: null,
                     endDate: null,
                     notes: '',

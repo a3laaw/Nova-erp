@@ -18,7 +18,7 @@ import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Lo
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction, TransactionStage } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage, WorkStage } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -138,63 +138,55 @@ export default function TransactionDetailPage() {
   }, [transactionSnapshot]);
   
   useEffect(() => {
-    if (!transaction || !firestore) return;
-
-    const sortAndSetStages = async () => {
-        setLoadingStages(true);
-        let stagesToSort = [...(transaction.stages || [])];
-
-        // If stages already have an order property, just sort by it.
-        if (stagesToSort.every(s => typeof (s as any).order === 'number')) {
-            stagesToSort.sort((a, b) => ((a as any).order ?? 999) - ((b as any).order ?? 999));
-            setStages(stagesToSort);
-            setLoadingStages(false);
-            return;
-        }
-
-        // --- Fallback for old data: Fetch order from reference data ---
-        if (transaction.departmentId) {
-            try {
-                const stagesQuery = query(
-                    collection(firestore, `departments/${transaction.departmentId}/workStages`),
-                    orderBy('order', 'asc')
-                );
-                const stagesSnapshot = await getDocs(stagesQuery);
-                const orderMap = new Map<string, number>();
-                stagesSnapshot.docs.forEach(doc => {
-                    orderMap.set(doc.data().name, doc.data().order);
-                });
-                
-                stagesToSort.sort((a, b) => {
-                    const orderA = orderMap.get(a.name) ?? 999;
-                    const orderB = orderMap.get(b.name) ?? 999;
-                    // Add secondary sort by name for stability if orders are equal
-                    if (orderA === orderB) {
-                        return a.name.localeCompare(b.name);
-                    }
-                    return orderA - orderB;
-                });
-
-            } catch (e) {
-                console.error("Could not fetch reference order for stages, using default sort.", e);
-                // Fallback to alphabetical if fetching reference fails
-                stagesToSort.sort((a, b) => a.name.localeCompare(b.name));
-            }
-        } else {
-             // If there's no departmentId, just sort alphabetically.
-             stagesToSort.sort((a, b) => a.name.localeCompare(b.name));
-        }
-        
-        setStages(stagesToSort);
-        setLoadingStages(false);
+    if (!transaction || !firestore) {
+        if (!transaction) setLoadingStages(false);
+        return;
     };
 
-    sortAndSetStages();
-    // Also update basic data
+    const mergeAndSetStages = async () => {
+        setLoadingStages(true);
+        try {
+            let templateStages: WorkStage[] = [];
+            if (transaction.departmentId) {
+                const stagesQuery = query(
+                    collection(firestore, `departments/${transaction.departmentId}/workStages`),
+                    orderBy('order', 'asc') // Rely on order property from reference data
+                );
+                const stagesSnapshot = await getDocs(stagesQuery);
+                templateStages = stagesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
+            }
+
+            const progressData = transaction.stages || [];
+            const progressMap = new Map(progressData.map(p => [p.stageId, p]));
+
+            const mergedStages: TransactionStage[] = templateStages.map(template => {
+                const progress = progressMap.get(template.id!);
+                return {
+                    stageId: template.id!,
+                    name: template.name,
+                    order: (template as any).order,
+                    status: progress?.status || 'pending',
+                    startDate: progress?.startDate || null,
+                    endDate: progress?.endDate || null,
+                    notes: progress?.notes || '',
+                };
+            });
+
+            setStages(mergedStages);
+        } catch (e) {
+            console.error("Error merging stages:", e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل مراحل المعاملة بشكل صحيح.' });
+        } finally {
+            setLoadingStages(false);
+        }
+    };
+    
+    mergeAndSetStages();
+    
     setNewStatus(transaction.status);
     setNewEngineerId(transaction.assignedEngineerId || '');
     
-  }, [transaction, firestore]);
+  }, [transaction, firestore, toast]);
 
   const client = useMemo(() => {
     if (clientSnapshot?.exists()) {
@@ -278,52 +270,78 @@ export default function TransactionDetailPage() {
     }
 };
 
-  const handleStageStatusChange = async (stageIndex: number, newStatus: TransactionStage['status']) => {
+  const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser) return;
+
+    // Use the raw progress data from the transaction for modification
+    const originalProgress = [...(transaction.stages || [])];
+    const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
+
+    let updatedProgress: Partial<TransactionStage>;
+
+    if (stageProgressIndex > -1) {
+        updatedProgress = { ...originalProgress[stageProgressIndex] };
+    } else {
+        const templateStageInfo = stages.find(s => s.stageId === stageId);
+        if (!templateStageInfo) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
+            return;
+        }
+        updatedProgress = {
+            stageId: stageId,
+            name: templateStageInfo.name, // Keep name for convenience
+        };
+    }
     
-    const stage = stages[stageIndex];
-    
-    // Allow 'تعديلات ومناقشات' to be started at any time
-    if (newStatus === 'in-progress' && stage.name !== 'تعديلات ومناقشات' && stageIndex > 0 && stages[stageIndex - 1].status !== 'completed') {
-        toast({
-            variant: 'destructive',
-            title: 'لا يمكن بدء هذه المرحلة',
-            description: 'الرجاء إكمال المرحلة السابقة أولاً.',
-        });
-        return;
+    const oldStatus = updatedProgress.status || 'pending';
+
+    // Sequence check
+    const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
+    if (newStatus === 'in-progress' && stages[currentIndexInUI].name !== 'تعديلات ومناقشات' && currentIndexInUI > 0) {
+        const previousStageInUI = stages[currentIndexInUI - 1];
+        if (previousStageInUI.status !== 'completed') {
+            toast({
+                variant: 'destructive',
+                title: 'لا يمكن بدء هذه المرحلة',
+                description: 'الرجاء إكمال المرحلة السابقة أولاً.',
+            });
+            return;
+        }
     }
 
-    const updatedStages = [...stages];
-    const stageToUpdate = updatedStages[stageIndex];
-    const oldStatus = stageToUpdate.status;
-    stageToUpdate.status = newStatus;
+    updatedProgress.status = newStatus;
 
     if (newStatus === 'in-progress' && oldStatus !== 'in-progress') {
-        stageToUpdate.startDate = new Date();
+        updatedProgress.startDate = new Date();
     }
-    
     if (newStatus === 'completed' && oldStatus !== 'completed') {
-        stageToUpdate.endDate = new Date();
+        updatedProgress.endDate = new Date();
+    }
+     if (newStatus === 'pending') {
+      updatedProgress.startDate = null;
+      updatedProgress.endDate = null;
     }
 
-    if (newStatus === 'pending' && oldStatus === 'in-progress') {
-      stageToUpdate.startDate = null;
-      stageToUpdate.expectedEndDate = null;
+    let newProgressForFirestore;
+    if (stageProgressIndex > -1) {
+        newProgressForFirestore = [...originalProgress];
+        newProgressForFirestore[stageProgressIndex] = updatedProgress as TransactionStage;
+    } else {
+        newProgressForFirestore = [...originalProgress, updatedProgress as TransactionStage];
     }
     
-    setStages(updatedStages); // Optimistic update
-
     const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
     
     try {
         const batch = writeBatch(firestore);
-        const safeUpdatedStages = cleanFirestoreData({ stages: updatedStages });
-        console.log("البيانات قبل التنظيف:", JSON.stringify({ stages: updatedStages }, null, 2));
-        console.log("البيانات بعد التنظيف:", JSON.stringify(safeUpdatedStages, null, 2));
-        batch.update(transactionRefDoc, safeUpdatedStages);
         
-        const logContent = `قام بتغيير حالة المرحلة "${stageToUpdate.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        const dataToUpdate = { stages: newProgressForFirestore };
+        const safeDataToUpdate = cleanFirestoreData(dataToUpdate);
+        
+        batch.update(transactionRefDoc, safeDataToUpdate);
+        
+        const logContent = `قام بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         batch.set(doc(timelineCollectionRef), {
             type: 'log',
             content: logContent,
@@ -334,15 +352,13 @@ export default function TransactionDetailPage() {
         });
 
         await batch.commit();
-
         toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
     } catch (e) {
         console.error("Failed to update stage status:", e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' });
-        // Revert optimistic update on error
-        setStages(transaction.stages || []);
     }
   };
+
 
   const renderStageTiming = (stage: TransactionStage) => {
     if (stage.status !== 'in-progress' || !stage.expectedEndDate) {
@@ -511,7 +527,7 @@ export default function TransactionDetailPage() {
                         ) : (
                             <div className="space-y-4">
                                 {stages.map((stage, index) => (
-                                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                    <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                         <div className="flex items-center gap-4">
                                             <Badge variant="outline" className={cn("w-24 justify-center", stageStatusColors[stage.status])}>
                                                 {stageStatusTranslations[stage.status]}
@@ -521,18 +537,18 @@ export default function TransactionDetailPage() {
                                         </div>
                                         <div className="flex gap-2">
                                             {stage.status === 'pending' && (
-                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(index, 'in-progress')}>
+                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')}>
                                                     <Play className="ml-2 h-4 w-4" />
                                                     بدء
                                                 </Button>
                                             )}
                                             {stage.status === 'in-progress' && (
                                                 <>
-                                                    <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(index, 'completed')}>
+                                                    <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')}>
                                                         <Check className="ml-2 h-4 w-4" />
                                                         إكمال
                                                     </Button>
-                                                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(index, 'pending')}>
+                                                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'pending')}>
                                                         <Pause className="ml-2 h-4 w-4" />
                                                         إيقاف مؤقت
                                                     </Button>

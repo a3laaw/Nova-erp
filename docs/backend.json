@@ -283,10 +283,11 @@
     },
     "TransactionStage": {
       "title": "Transaction Stage",
-      "description": "A single stage within a client transaction's lifecycle.",
+      "description": "Tracks the progress of a single stage within a client transaction's lifecycle. It is linked to a reference WorkStage via stageId.",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Name of the stage (e.g., 'Basement Design')." },
+        "stageId": { "type": "string", "description": "The ID of the reference WorkStage document from the department's workStages subcollection." },
+        "name": { "type": "string", "description": "Name of the stage, stored for convenience. The name in the reference data is the source of truth." },
         "status": {
           "type": "string",
           "enum": ["pending", "in-progress", "completed", "skipped"],
@@ -294,12 +295,9 @@
         },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
-        "notes": { "type": "string", "description": "Notes specific to this stage." },
-        "order": { "type": "number", "description": "The display and logical order of the stage." },
-        "durationDays": { "type": "number", "description": "The expected duration of the stage in days." },
-        "expectedEndDate": { "type": "string", "format": "date-time", "description": "The calculated expected end date." }
+        "notes": { "type": "string", "description": "Notes specific to this stage." }
       },
-      "required": ["name", "status"]
+      "required": ["stageId", "name", "status"]
     },
     "Counter": {
       "title": "Counter",
@@ -570,6 +568,10 @@
         "name": {
           "type": "string",
           "description": "The name of the work stage."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display and logical order of the stage."
         }
       },
       "required": ["name"]
@@ -1083,3 +1085,4 @@
     }
   }
 }
+
