@@ -89,35 +89,69 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
     }
   }, [primarySnapshot, primaryLoading, primaryError, primaryTitle, toast]);
   
-  useEffect(() => {
-    const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
-    if (!primaryExists && primaryItems.length > 0) {
-        handleSelectPrimary(primaryItems[0]);
-    } else if (primaryItems.length === 0) {
-        setSelectedPrimary(null);
-        setSecondaryItems([]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [primaryItems, selectedPrimary]);
 
-
-  const handleSelectPrimary = async (item: T) => {
+  const handleSelectPrimary = useCallback(async (item: T) => {
     setSelectedPrimary(item);
     if (!firestore || !secondaryCollectionName) return;
     setLoadingSecondary(true);
     setSecondaryItems([]);
     try {
-      const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${item.id}/${secondaryCollectionName}`), orderBy('name'));
+      const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${item.id}/${secondaryCollectionName}`));
       const secondarySnapshot = await getDocs(secondaryQuery);
-      setSecondaryItems(secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S)));
+      let fetchedItems = secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
+      
+      // Custom sort for architectural work stages
+      if (primaryCollectionName === 'departments' && item.name === 'القسم المعماري' && secondaryCollectionName === 'workStages') {
+        const customOrder = [
+            'استفسارات عامه',
+            'عند توقيع العقد',
+            'الانتهاء من الدور (الارضي والسرداب)',
+            'الانتهاء من الدور الارضي',
+            'الانتهاء من الدور الاول',
+            'الانتهاء من الدور الثاني والسطح',
+            'إصدار واستلام رخصة البناء',
+            'تعديلات ومناقشات',
+            'ارسال فحص التربه',
+            'استلام فحص التربه',
+        ];
+
+        fetchedItems.sort((a, b) => {
+            const indexA = customOrder.indexOf(a.name);
+            const indexB = customOrder.indexOf(b.name);
+            
+            if (indexA !== -1 && indexB !== -1) {
+              return indexA - indexB;
+            }
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return a.name.localeCompare(b.name, 'ar');
+          });
+      } else {
+          // Default alphabetical sort for others
+          fetchedItems.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      }
+      setSecondaryItems(fetchedItems);
     } catch (e) {
       console.error(e);
       toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
     } finally {
       setLoadingSecondary(false);
     }
-  };
+  }, [firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
   
+  useEffect(() => {
+    const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
+    if (!primaryExists && primaryItems.length > 0) {
+        handleSelectPrimary(primaryItems[0]);
+    } else if (selectedPrimary && primaryExists) {
+        handleSelectPrimary(selectedPrimary);
+    } else if (primaryItems.length === 0) {
+        setSelectedPrimary(null);
+        setSecondaryItems([]);
+    }
+  }, [primaryItems, selectedPrimary, handleSelectPrimary]);
+
+
   const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string} | null = null) => {
     setEditingItem(item);
     setItemName(item?.name || '');
@@ -407,7 +441,7 @@ export function ReferenceDataManager() {
 
     if (view === 'workStages') {
         return <ManagerView
-            primaryTitle="الأقسام"
+            primaryTitle="مراحل العمل حسب القسم"
             primarySingularTitle="قسم"
             primaryCollectionName="departments"
             secondaryTitle="مراحل العمل"
