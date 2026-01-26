@@ -169,7 +169,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             let engineerForTransactionId: string | null = assignedEngineerId || null;
 
             // Special logic for "بلدية سكن خاص"
-            if (transactionType === 'تصميم بلدية سكن خاص') {
+            if (transactionType.includes('بلدية') && transactionType.includes('سكن خاص')) {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
                 if (clientSnap.exists()) {
@@ -188,7 +188,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             
             let initialStages: Partial<TransactionStage>[] = [];
 
-            if (transactionType === 'تصميم بلدية سكن خاص') {
+            if (transactionType.includes('بلدية') && transactionType.includes('سكن خاص')) {
                 const predefinedStages = [
                     'استفسارات عامة',
                     'توقيع العقد',
@@ -337,7 +337,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                             </div>
                         </div>
 
-                        {transactionType === 'تصميم بلدية سكن خاص' ? (
+                        {transactionType.includes('بلدية') && transactionType.includes('سكن خاص') ? (
                             <Alert>
                                 <Info className="h-4 w-4" />
                                 <AlertTitle>إسناد تلقائي</AlertTitle>

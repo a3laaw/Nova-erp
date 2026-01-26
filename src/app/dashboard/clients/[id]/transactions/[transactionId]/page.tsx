@@ -140,7 +140,32 @@ export default function TransactionDetailPage() {
     if (transaction) {
         setNewStatus(transaction.status);
         setNewEngineerId(transaction.assignedEngineerId || '');
-        setStages(transaction.stages || []);
+        
+        let stagesToSort = [...(transaction.stages || [])];
+        if (transaction.transactionType.includes('بلدية') && transaction.transactionType.includes('سكن خاص')) {
+            const correctOrder = [
+                'استفسارات عامة',
+                'توقيع العقد',
+                'الانتهاء من الدور (الارضي والسرداب)',
+                'الانتهاء من الدور الارضي',
+                'الانتهاء من الدور الاول',
+                'الانتهاء من الدور الثاني والسطح',
+                'إصدار واستلام رخصة البناء',
+                'تعديلات ومناقشات',
+            ];
+            
+            stagesToSort.sort((a, b) => {
+                const indexA = correctOrder.indexOf(a.name);
+                const indexB = correctOrder.indexOf(b.name);
+
+                if (indexA === -1 && indexB === -1) return 0;
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+
+                return indexA - indexB;
+            });
+        }
+        setStages(stagesToSort);
     }
   }, [transaction]);
 
