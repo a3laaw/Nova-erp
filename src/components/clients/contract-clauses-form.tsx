@@ -262,7 +262,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newTerms = [...terms];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newTerms.length) return;
-      [newTerms[index], newTerms[newIndex]] = [newTerms[index], newTerms[index]];
+      [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
       setTerms(newTerms);
   };
 
@@ -273,7 +273,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       const newClauses = [...openClauses];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= newClauses.length) return;
-      [newClauses[index], newClauses[newIndex]] = [newClauses[index], newClauses[index]];
+      [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
       setOpenClauses(newClauses);
   };
 
@@ -312,9 +312,9 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const [clientSnap, currentTransactionSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
-                transaction_firestore.get(transactionRef),
+                transaction_firestore.get(currentTransactionSnap),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterDoc)
+                transaction_firestore.get(journalEntryCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");

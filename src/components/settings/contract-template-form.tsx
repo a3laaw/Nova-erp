@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
@@ -113,6 +112,14 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     setScopeOfWork(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
   const removeScopeItem = (id: string) => setScopeOfWork(prev => prev.filter(item => item.id !== id));
+  const reorderScopeItem = (index: number, direction: 'up' | 'down') => {
+    const newItems = [...scopeOfWork];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newItems.length) return;
+    [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
+    setScopeOfWork(newItems);
+  };
+
 
   const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
@@ -136,7 +143,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     const newClauses = [...openClauses];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newClauses.length) return;
-    [newClauses[index], newClauses[newIndex]] = [newClauses[index], newClauses[index]];
+    [newClauses[index], newClauses[newIndex]] = [newClauses[newIndex], newClauses[index]];
     setOpenClauses(newClauses);
   };
 
@@ -230,13 +237,21 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             <Button size="sm" variant="outline" type="button" onClick={addScopeItem}><PlusCircle className="ml-2"/> إضافة بند</Button>
                         </div>
                         {scopeOfWork.map((item, index) => (
-                            <div key={item.id} className="flex gap-2 items-start p-2 border rounded-md">
+                            <div key={item.id} className="flex items-start gap-2 p-2 border rounded-md">
                                <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <div className="flex-grow space-y-2">
                                  <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} />
                                  <Textarea placeholder="وصف تفصيلي للبند..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} />
                                </div>
-                               <Button variant="ghost" size="icon" type="button" onClick={() => removeScopeItem(item.id)} className="shrink-0"><Trash2 className="text-destructive h-4 w-4"/></Button>
+                                <div className="flex flex-col">
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'up')} disabled={index === 0}>
+                                        <ArrowUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'down')} disabled={index === scopeOfWork.length - 1}>
+                                        <ArrowDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <Button variant="ghost" size="icon" type="button" onClick={() => removeScopeItem(item.id)} className="shrink-0"><Trash2 className="text-destructive h-4 w-4"/></Button>
                             </div>
                         ))}
                     </section>
@@ -247,7 +262,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             <Button size="sm" variant="outline" type="button" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
                         </div>
                          {termsAndConditions.map((term, index) => (
-                            <div key={term.id} className="flex gap-2 items-start">
+                            <div key={term.id} className="flex items-center gap-2">
                                <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow"/>
                                <div className="flex flex-col">
@@ -323,7 +338,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2"/> إضافة بند</Button>
                         </div>
                          {openClauses.map((clause, index) => (
-                            <div key={clause.id} className="flex gap-2 items-start">
+                            <div key={clause.id} className="flex items-center gap-2">
                                <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <Textarea value={clause.text} onChange={(e) => updateOpenClause(clause.id, e.target.value)} rows={2} className="flex-grow" placeholder={`نص البند الإضافي ${index + 1}`}/>
                                <div className="flex flex-col">
