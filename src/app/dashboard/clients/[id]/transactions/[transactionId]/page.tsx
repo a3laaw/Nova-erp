@@ -144,7 +144,7 @@ export default function TransactionDetailPage() {
         let stagesToSort = [...(transaction.stages || [])];
         if (transaction.transactionType.includes('بلدية') && transaction.transactionType.includes('سكن خاص')) {
             const correctOrder = [
-                'استفسارات عامة',
+                'استفسارات عامه',
                 'توقيع العقد',
                 'الانتهاء من الدور (الارضي والسرداب)',
                 'الانتهاء من الدور الارضي',
