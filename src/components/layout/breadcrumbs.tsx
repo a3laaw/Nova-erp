@@ -92,7 +92,7 @@ export function Breadcrumbs() {
   const segments = pathname.split('/').filter(Boolean);
 
   if (segments.length <= 1 || !pathname.startsWith('/dashboard')) {
-    return null; 
+    return <h1 className="text-xl font-semibold">{breadcrumbNameMap[language].dashboard}</h1>; 
   }
 
   const dashboardSegments = segments.slice(1);
@@ -117,7 +117,7 @@ export function Breadcrumbs() {
   const homeBreadcrumb = { label: breadcrumbNameMap[language].dashboard, href: '/dashboard' };
 
   return (
-    <nav aria-label="Breadcrumb" className="mb-6 no-print" dir={direction}>
+    <nav aria-label="Breadcrumb" className="no-print" dir={direction}>
       <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <li>
           <Link href={homeBreadcrumb.href} className="hover:text-primary transition-colors">

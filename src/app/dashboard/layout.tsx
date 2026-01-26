@@ -9,7 +9,6 @@ import { Loader, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
-import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 
 export default function DashboardLayout({
   children,
@@ -59,7 +58,6 @@ export default function DashboardLayout({
         <SidebarInset>
           <Header currentUser={user} onLogout={handleLogout} className="no-print" />
           <main className="flex-1 p-4 md:p-6 lg:p-8">
-            <Breadcrumbs />
             {children}
           </main>
         </SidebarInset>

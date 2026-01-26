@@ -1,4 +1,5 @@
 'use client';
+
 import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/layout/user-nav';
@@ -9,70 +10,7 @@ import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { Notifications } from './notifications';
 import Link from 'next/link';
-
-const titles = {
-    ar: {
-        '/dashboard': 'لوحة التحكم',
-        '/dashboard/projects': 'المشاريع',
-        '/dashboard/clients': 'العملاء',
-        '/dashboard/appointments': 'المواعيد',
-        '/dashboard/accounting': 'المحاسبة',
-        '/dashboard/warehouse': 'المستودع',
-        '/dashboard/hr': 'الموارد البشرية',
-        '/dashboard/settings': 'الإعدادات',
-        '/dashboard/notifications': 'تنبيهات النظام',
-    },
-    en: {
-        '/dashboard': 'Dashboard',
-        '/dashboard/projects': 'Projects',
-        '/dashboard/clients': 'Clients',
-        '/dashboard/appointments': 'Appointments',
-        '/dashboard/accounting': 'Accounting',
-        '/dashboard/warehouse': 'Warehouse',
-        '/dashboard/hr': 'Human Resources',
-        '/dashboard/settings': 'Settings',
-        '/dashboard/notifications': 'System Alerts',
-    }
-};
-
-const getTitleInfo = (pathname: string, lang: 'ar' | 'en'): { title: string; path: string | null } => {
-    // 1. Exact matches first. These are main pages, not links.
-    const exactMatch = titles[lang][pathname as keyof typeof titles.ar];
-    if (exactMatch) {
-      return { title: exactMatch, path: null };
-    }
-
-    // 2. Dynamic matches for specific pages that have their own title
-    const dynamicRoutes = [
-        { path: '/dashboard/projects/', title: { ar: 'تفاصيل المشروع', en: 'Project Details' } },
-        { path: '/dashboard/accounting/cash-receipts/new', title: { ar: 'سند قبض جديد', en: 'New Cash Receipt' } },
-        { path: '/dashboard/hr/employees/new', title: { ar: 'إضافة موظف جديد', en: 'New Employee' } },
-        { path: '/dashboard/hr/employees/[id]/edit', title: { ar: 'تعديل بيانات الموظف', en: 'Edit Employee' } },
-        { path: '/dashboard/hr/employees/[id]', title: { ar: 'الملف الشخصي للموظف', en: 'Employee Profile' } },
-        { path: '/dashboard/hr/leave-requests', title: { ar: 'طلبات الإجازة', en: 'Leave Requests' } },
-    ];
-
-    for (const route of dynamicRoutes) {
-        const pattern = new RegExp(`^${route.path.replace(/\[id\]/, '[^/]+')}$`);
-        if (pattern.test(pathname)) {
-            return { title: route.title[lang], path: null }; // Specific page title, no link
-        }
-    }
-    
-    // 3. Fallback to parent section title for any other sub-page. These SHOULD be links.
-    const segments = pathname.split('/').filter(Boolean);
-    if (segments.length > 1) { // e.g. /dashboard/clients/..., /dashboard/hr/...
-        const parentPath = `/${segments[0]}/${segments[1]}`;
-        const parentTitle = titles[lang][parentPath as keyof typeof titles.ar];
-        if (parentTitle) {
-            return { title: parentTitle, path: parentPath };
-        }
-    }
-    
-    // 4. Default
-    return { title: titles[lang]['/dashboard'], path: null };
-};
-
+import { Breadcrumbs } from './breadcrumbs';
 
 interface HeaderProps {
     currentUser: AuthenticatedUser;
@@ -81,26 +19,12 @@ interface HeaderProps {
 }
 
 export function Header({ currentUser, onLogout, className }: HeaderProps) {
-    const pathname = usePathname();
-    const { language, toggleLanguage } = useLanguage();
-    const { title, path } = getTitleInfo(pathname, language);
-
-    const titleElement = (
-        <h1 className="text-xl font-semibold font-headline">{title}</h1>
-    );
+    const { toggleLanguage } = useLanguage();
 
     return (
         <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6", className)}>
             <SidebarTrigger />
-            <div className="flex items-center gap-2">
-                 {path ? (
-                    <Link href={path} className="hover:underline">
-                        {titleElement}
-                    </Link>
-                 ) : (
-                    titleElement
-                 )}
-            </div>
+            <Breadcrumbs />
             <div className="ml-auto flex items-center gap-2">
                 <Button variant="outline" size="icon" asChild>
                   <Link href="/dashboard/appointments">
