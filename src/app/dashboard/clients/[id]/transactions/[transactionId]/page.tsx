@@ -18,7 +18,7 @@ import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Lo
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction, TransactionStage, WorkStage } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -65,6 +65,14 @@ const stageStatusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
   skipped: 'تم تخطيها',
+};
+
+const roleTranslations: Record<UserRole, string> = {
+  Admin: 'مدير',
+  Engineer: 'مهندس',
+  Accountant: 'محاسب',
+  Secretary: 'سكرتارية',
+  HR: 'موارد بشرية',
 };
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
@@ -165,6 +173,7 @@ export default function TransactionDetailPage() {
                     stageId: template.id!,
                     name: template.name,
                     order: (template as any).order,
+                    role: template.role,
                     status: progress?.status || 'pending',
                     startDate: progress?.startDate || null,
                     endDate: progress?.endDate || null,
@@ -290,6 +299,7 @@ export default function TransactionDetailPage() {
         updatedProgress = {
             stageId: stageId,
             name: templateStageInfo.name,
+            role: templateStageInfo.role,
         };
     }
     
@@ -554,43 +564,49 @@ export default function TransactionDetailPage() {
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
-                                {stages.map((stage, index) => (
-                                    <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                                        <div className="flex items-center gap-4">
-                                            <Badge variant="outline" className={cn("w-24 justify-center", stageStatusColors[stage.status])}>
-                                                {stageStatusTranslations[stage.status]}
-                                            </Badge>
-                                            <div className="font-semibold">{stage.name}</div>
-                                            {renderStageTiming(stage)}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            {stage.status === 'pending' && (
-                                                <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')}>
-                                                    <Play className="ml-2 h-4 w-4" />
-                                                    بدء
-                                                </Button>
-                                            )}
-                                            {stage.status === 'in-progress' && (
-                                                <>
-                                                    <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')}>
-                                                        <Check className="ml-2 h-4 w-4" />
-                                                        إكمال
+                                {stages.map((stage, index) => {
+                                    const canInteract = currentUser?.role === 'Admin' || currentUser?.role === stage.role;
+                                    return (
+                                        <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                            <div className="flex items-center gap-4">
+                                                <Badge variant="outline" className={cn("w-24 justify-center", stageStatusColors[stage.status])}>
+                                                    {stageStatusTranslations[stage.status]}
+                                                </Badge>
+                                                <div className="font-semibold">{stage.name}</div>
+                                                {stage.role && (
+                                                    <Badge variant="outline" className="text-xs font-normal">{roleTranslations[stage.role as UserRole] || stage.role}</Badge>
+                                                )}
+                                                {renderStageTiming(stage)}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {stage.status === 'pending' && (
+                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract}>
+                                                        <Play className="ml-2 h-4 w-4" />
+                                                        بدء
                                                     </Button>
-                                                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'pending')}>
-                                                        <Pause className="ml-2 h-4 w-4" />
-                                                        إيقاف مؤقت
-                                                    </Button>
-                                                </>
-                                            )}
-                                            {stage.status === 'completed' && (
-                                                <div className="text-sm text-green-600 flex items-center gap-2">
-                                                    <Check className="h-4 w-4" />
-                                                    مكتملة في {formatDate(stage.endDate)}
-                                                </div>
-                                            )}
+                                                )}
+                                                {stage.status === 'in-progress' && (
+                                                    <>
+                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
+                                                            <Check className="ml-2 h-4 w-4" />
+                                                            إكمال
+                                                        </Button>
+                                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'pending')} disabled={!canInteract}>
+                                                            <Pause className="ml-2 h-4 w-4" />
+                                                            إيقاف مؤقت
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {stage.status === 'completed' && (
+                                                    <div className="text-sm text-green-600 flex items-center gap-2">
+                                                        <Check className="h-4 w-4" />
+                                                        مكتملة في {formatDate(stage.endDate)}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </CardContent>

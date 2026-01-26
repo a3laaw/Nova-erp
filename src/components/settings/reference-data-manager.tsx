@@ -28,14 +28,15 @@ import {
 import { ScrollArea } from '../ui/scroll-area';
 import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Department, Job, Governorate, Area, TransactionType } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string}, S extends {id: string, name: string}>({
+function ManagerView<T extends {id: string, name: string, role?: UserRole}, S extends {id: string, name: string, role?: UserRole}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -70,9 +71,11 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const [editingItem, setEditingItem] = useState<{ id: string, name: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string, name: string, role?: UserRole } | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   const [itemName, setItemName] = useState('');
+  const [itemRole, setItemRole] = useState<UserRole | ''>('');
+  const isWorkStageView = secondaryCollectionName === 'workStages';
 
 
   const primaryQuery = useMemo(() => firestore ? query(collection(firestore, primaryCollectionName)) : null, [firestore, primaryCollectionName]);
@@ -137,9 +140,12 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
   }, [primaryItems, selectedPrimary, handleSelectPrimary]);
 
 
-  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string} | null = null) => {
+  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, role?: UserRole} | null = null) => {
     setEditingItem(item);
     setItemName(item?.name || '');
+    if (isWorkStageView && type === 'secondary') {
+        setItemRole(item?.role || '');
+    }
     if (type === 'primary') setIsPrimaryDialogOpen(true);
     else setIsSecondaryDialogOpen(true);
   }
@@ -149,6 +155,7 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
     setIsSecondaryDialogOpen(false);
     setEditingItem(null);
     setItemName('');
+    setItemRole('');
   }
   
   const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
@@ -190,15 +197,22 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
     try {
+      const dataToSave: { name: string, order?: number, role?: UserRole } = { name: itemName };
+       if (isWorkStageView && type === 'secondary' && itemRole) {
+          dataToSave.role = itemRole;
+      }
+
       if (editingItem) { // Update
         const itemRef = doc(firestore, collectionPath, editingItem.id);
-        await updateDoc(itemRef, { name: itemName });
+        const { order, ...updateData } = dataToSave as any;
+        await updateDoc(itemRef, updateData);
         toast({ title: 'نجاح', description: 'تم تحديث العنصر.' });
       } else { // Create
         const collectionRef = collection(firestore, collectionPath);
         const currentList = type === 'primary' ? primaryItems : secondaryItems;
         const newOrder = currentList.length;
-        await addDoc(collectionRef, { name: itemName, order: newOrder });
+        (dataToSave as any).order = newOrder;
+        await addDoc(collectionRef, dataToSave);
         toast({ title: 'نجاح', description: 'تمت إضافة العنصر.' });
       }
       if (type === 'secondary' && selectedPrimary) {
@@ -288,7 +302,12 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
                 {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
                   secondaryItems.map((item, index) => (
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
-                      <span>{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{item.name}</span>
+                        {isWorkStageView && item.role && (
+                            <Badge variant="secondary" className="font-normal">{item.role}</Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1">
                         <div className="flex flex-col">
                             <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems('secondary', index, 'up')} disabled={index === 0}>
@@ -318,8 +337,28 @@ function ManagerView<T extends {id: string, name: string}, S extends {id: string
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <Label htmlFor="item-name">الاسم</Label>
-            <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+            <div className='grid gap-2'>
+                <Label htmlFor="item-name">الاسم</Label>
+                <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+            </div>
+
+            {isWorkStageView && !isPrimaryDialogOpen && (
+                <div className="grid gap-2">
+                    <Label htmlFor="item-role">الدور المسؤول</Label>
+                    <Select dir="rtl" value={itemRole} onValueChange={(v) => setItemRole(v as UserRole)}>
+                        <SelectTrigger id="item-role">
+                            <SelectValue placeholder="اختر الدور..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Admin">مدير</SelectItem>
+                            <SelectItem value="Engineer">مهندس</SelectItem>
+                            <SelectItem value="Accountant">محاسب</SelectItem>
+                            <SelectItem value="Secretary">سكرتارية</SelectItem>
+                            <SelectItem value="HR">موارد بشرية</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>إلغاء</Button>
