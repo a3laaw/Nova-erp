@@ -190,7 +190,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             if (transactionType.includes('بلدية') && transactionType.includes('سكن خاص')) {
                 const predefinedStages = [
-                    'استفسارات عامه',
+                    'استفسارات عامة',
                     'توقيع العقد',
                     'الانتهاء من الدور (الارضي والسرداب)',
                     'الانتهاء من الدور الارضي',
