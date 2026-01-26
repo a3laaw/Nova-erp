@@ -409,7 +409,11 @@ export default function ClientProfilePage() {
                                 <TableBody>
                                     {transactions.map(tx => (
                                         <TableRow key={tx.id}>
-                                            <TableCell className="font-medium">{tx.transactionType}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <Link href={`/dashboard/clients/${id}/transactions/${tx.id!}`} className="hover:underline">
+                                                    {tx.transactionType}
+                                                </Link>
+                                            </TableCell>
                                             <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className={transactionStatusColors[tx.status]}>
