@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-// import { PaymentVouchersList } from '@/components/accounting/payment-vouchers-list';
+import { PaymentVouchersList } from '@/components/accounting/payment-vouchers-list';
 import {
     Card,
     CardContent,
@@ -31,8 +31,7 @@ export default function PaymentVouchersPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <p className="text-center text-muted-foreground p-8">سيتم عرض قائمة سندات الصرف هنا قريباً.</p>
-                {/* <PaymentVouchersList /> */}
+                <PaymentVouchersList />
             </CardContent>
         </Card>
     )

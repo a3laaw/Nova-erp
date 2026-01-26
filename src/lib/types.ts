@@ -118,6 +118,7 @@ export type Appointment = {
   engineerId: string;
   engineerName?: string;
   meetingRoom?: string;
+  department?: string;
   type: 'architectural' | 'room';
   notes?: string;
   // For architectural appointments with color logic
