@@ -83,7 +83,7 @@ export function ArchitecturalAppointmentsView() {
             ]);
 
             const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-            const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName));
+            const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.name));
             setEngineers(archEngineers);
             
             const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
@@ -325,6 +325,9 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
+    const [clientTransactions, setClientTransactions] = useState<any[]>([]);
+    const [loadingTransactions, setLoadingTransactions] = useState(false);
+    const [selectedTransactionId, setSelectedTransactionId] = useState('');
     
     const filteredClients = useMemo(() => {
         if (!dialogData?.engineerId) return [];
@@ -336,6 +339,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         if (isOpen) {
             setSelectedClientId('');
             setTitle('');
+            setClientTransactions([]);
+            setSelectedTransactionId('');
         }
     }, [isOpen]);
 
@@ -345,13 +350,44 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         }
     }, [filteredClients, selectedClientId]);
 
+    useEffect(() => {
+        if (!firestore || !selectedClientId) {
+            setClientTransactions([]);
+            setSelectedTransactionId('');
+            return;
+        }
+    
+        const fetchTransactions = async () => {
+            setLoadingTransactions(true);
+            try {
+                const transQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`));
+                const transSnap = await getDocs(transQuery);
+                const transactions = transSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setClientTransactions(transactions);
+            } catch (error) {
+                console.error("Error fetching client transactions:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب معاملات العميل.' });
+            } finally {
+                setLoadingTransactions(false);
+            }
+        };
+    
+        fetchTransactions();
+    }, [selectedClientId, firestore, toast]);
+
+    const transactionOptions = useMemo(() => clientTransactions.map((tx: any) => ({
+        value: tx.id,
+        label: tx.transactionType,
+        searchKey: tx.createdAt?.toDate ? format(tx.createdAt.toDate(), 'dd/MM/yyyy') : ''
+    })), [clientTransactions]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const client = clients.find((c: Client) => c.id === selectedClientId);
 
-        if (!client) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل.' });
+        if (!client || !selectedTransactionId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل والمعاملة المرتبطة.' });
             return;
         }
         
@@ -402,6 +438,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 engineerId: dialogData.engineerId,
                 contractSigned,
                 type: 'architectural' as const,
+                transactionId: selectedTransactionId,
             };
 
             let processingList = [...existingAppointments, currentAppointmentObject];
@@ -466,6 +503,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
              <DialogContent
                 dir="rtl"
                 className="w-[95vw] max-w-md"
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                        e.preventDefault();
+                    }
+                }}
              >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
@@ -489,10 +532,20 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                                 placeholder={clientOptions.length === 0 && dialogData?.engineerId ? "لا يوجد عملاء متاحون لهذا المهندس" : "ابحث بالاسم أو رقم الجوال..."}
                             />
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="transaction-search">المعاملة <span className="text-destructive">*</span></Label>
+                            <InlineSearchList
+                                value={selectedTransactionId}
+                                onSelect={setSelectedTransactionId}
+                                options={transactionOptions}
+                                placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : loadingTransactions ? 'جاري جلب المعاملات...' : 'اختر المعاملة...'}
+                                disabled={!selectedClientId || loadingTransactions}
+                            />
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !selectedClientId}>
+                        <Button type="submit" disabled={isSaving || !selectedClientId || !selectedTransactionId}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             حفظ الموعد
                         </Button>
