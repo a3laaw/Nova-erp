@@ -312,7 +312,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const [clientSnap, currentTransactionSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
-                transaction_firestore.get(currentTransactionSnap),
+                transaction_firestore.get(transactionRef),
                 transaction_firestore.get(coaClientCounterRef),
                 transaction_firestore.get(journalEntryCounterRef)
             ]);
@@ -348,9 +348,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 stages: updatedStages || currentTransactionData.stages 
             };
             
-            console.log("البيانات قبل التنظيف (Contract Form):", JSON.stringify(updatePayload, null, 2));
             const safeUpdatePayload = cleanFirestoreData(updatePayload);
-            console.log("البيانات بعد التنظيف (Contract Form):", JSON.stringify(safeUpdatePayload, null, 2));
             transaction_firestore.update(transactionRef, safeUpdatePayload);
             
             // This logic only runs when creating a contract for the first time for a client
@@ -389,7 +387,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 
                 // Create the Journal Entry
                 const currentYear = new Date().getFullYear();
-                const nextJournalEntryNumber = (journalEntryCounterDoc.exists() ? journalEntryCounterDoc.data()?.counts?.[currentYear] || 0 : 0) + 1;
+                const nextJournalEntryNumber = (journalEntryCounterDoc.exists() ? journalEntryCounterDoc.data()?.counts?.[currentYear] || 0 : 0) : 0) + 1;
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
                 const journalLines = [
                     { accountId: clientAccountId, accountName: clientData.nameAr, debit: totalAmount, credit: 0 },
@@ -588,16 +586,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                         rows={2}
                                     />
                                     <div className="flex flex-col">
-                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}>
-                                            <ArrowUp className="h-4 w-4" />
-                                        </Button>
-                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderTerm(index, 'down')} disabled={index === terms.length - 1}>
-                                            <ArrowDown className="h-4 w-4" />
-                                        </Button>
+                                        <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === terms.length - 1}><ArrowDown className="h-4 w-4"/></Button>
                                     </div>
-                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeTerm(term.id)}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
+                                    <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
                                 </div>
                             ))}
                         </div>
