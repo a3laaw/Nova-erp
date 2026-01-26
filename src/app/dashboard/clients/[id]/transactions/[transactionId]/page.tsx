@@ -436,7 +436,7 @@ export default function TransactionDetailPage() {
   
   return (
     <>
-    {transaction && (
+    {transaction && client && (
         <ContractClausesForm
             isOpen={isContractFormOpen}
             onClose={() => setIsContractFormOpen(false)}
@@ -626,5 +626,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
-    
