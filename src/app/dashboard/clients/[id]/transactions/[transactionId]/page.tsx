@@ -440,6 +440,7 @@ export default function TransactionDetailPage() {
             onClose={() => setIsContractFormOpen(false)}
             transaction={transaction}
             clientId={clientId}
+            clientName={client.nameAr}
         />
     )}
     <div className='space-y-6' dir='rtl'>
@@ -623,3 +624,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
