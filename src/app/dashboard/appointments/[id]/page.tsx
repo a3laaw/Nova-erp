@@ -131,38 +131,68 @@ export default function AppointmentDetailsPage() {
                 throw new Error("لم يتم العثور على المعاملة المرتبطة بهذا الموعد.");
             }
             const transactionData = transactionSnap.data() as ClientTransaction;
-            const currentStages = transactionData.stages || [];
-            
-            const stageIndex = currentStages.findIndex(s => s.stageId === selectedStage.id);
-    
-            let newStages;
-            const now = new Date(); // Use client-side timestamp
+            const currentStages = [...(transactionData.stages || [])]; // Make a mutable copy
+            const now = new Date();
 
-            if (stageIndex !== -1) {
-                newStages = [...currentStages];
-                const stageToUpdate = { ...newStages[stageIndex] };
+            // --- 1. Update the COMPLETED stage ---
+            const completedStageIndex = currentStages.findIndex(s => s.stageId === selectedStage.id);
+            if (completedStageIndex !== -1) {
+                // Stage exists, update it
+                const stageToUpdate = { ...currentStages[completedStageIndex] };
                 if (stageToUpdate.status !== 'completed') {
                     stageToUpdate.status = 'completed';
                     stageToUpdate.endDate = now;
                     if (!stageToUpdate.startDate) {
-                        // If it was pending, set start date as well
                         stageToUpdate.startDate = now;
                     }
-                    newStages[stageIndex] = stageToUpdate;
+                    currentStages[completedStageIndex] = stageToUpdate;
                 }
             } else {
-                // If the stage is not in the array, add it.
-                 newStages = [...currentStages, {
+                // Stage doesn't exist in progress, add it as completed
+                currentStages.push({
                     stageId: selectedStage.id,
                     name: selectedStage.name,
                     status: 'completed',
                     startDate: now,
                     endDate: now,
-                }];
+                });
             }
             
+            let logContent = `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
+
+            // --- 2. Find and update the NEXT stage to 'in-progress' ---
+            const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
+            const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
+
+            if (nextStageInTemplate) {
+                const nextStageId = nextStageInTemplate.id!;
+                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+
+                if (nextStageIndexInProg !== -1) {
+                    // Next stage already exists in progress, update it to 'in-progress' if it's 'pending'
+                    const stageToStart = { ...currentStages[nextStageIndexInProg] };
+                    if (stageToStart.status === 'pending') {
+                        stageToStart.status = 'in-progress';
+                        stageToStart.startDate = now;
+                        currentStages[nextStageIndexInProg] = stageToStart;
+                        logContent += ` وتم بدء المرحلة التالية: "${nextStageInTemplate.name}".`;
+                    }
+                } else {
+                    // Next stage doesn't exist, add it as 'in-progress'
+                    currentStages.push({
+                        stageId: nextStageId,
+                        name: nextStageInTemplate.name,
+                        status: 'in-progress',
+                        startDate: now,
+                        endDate: null,
+                    });
+                    logContent += ` وتم بدء المرحلة التالية: "${nextStageInTemplate.name}".`;
+                }
+            }
+
+    
             // 1. Update the transaction with the new stages progress
-            batch.update(transactionRef, { stages: newStages });
+            batch.update(transactionRef, { stages: currentStages });
     
             // 2. Create WorkStageProgress document for auditing
             const progressRef = doc(collection(firestore, 'work_stages_progress'));
@@ -186,7 +216,7 @@ export default function AppointmentDetailsPage() {
             const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log',
-                content: `قام ${currentUser.fullName} بتحديث مرحلة العمل إلى "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`,
+                content: logContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
