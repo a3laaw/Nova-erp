@@ -54,10 +54,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (!firestore) {
-      // Don't proceed if firestore is not available yet
-      setLoading(true);
+      console.warn("Firestore is not initialized. Firebase config might be missing. Falling back to mock admin user for development.");
+      setUser(mockAdminUser);
+      setLoading(false);
       return;
-    };
+    }
 
     if (!firebaseUser) {
       console.warn("No authenticated Firebase user found. Falling back to mock admin user for development.");
