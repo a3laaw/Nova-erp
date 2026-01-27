@@ -24,6 +24,8 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { createNotification } from '@/services/notification-service';
+import { formatCurrency } from '@/lib/utils';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     return (
@@ -62,64 +64,7 @@ export default function AppointmentDetailsPage() {
     // Fetch main appointment data
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
     
-    // Hooks are now called unconditionally at the top level
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
-
-    // Fetch the specific progress document for this visit
-    useEffect(() => {
-        if (!firestore || !appointment?.workStageProgressId) {
-            setProgressDoc(null);
-            return;
-        }
-        const fetchProgressDoc = async () => {
-            const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
-            try {
-                const progressSnap = await getDoc(progressRef);
-                if (progressSnap.exists()) {
-                    setProgressDoc(progressSnap);
-                }
-            } catch (error) {
-                console.error("Failed to fetch progress doc:", error);
-            }
-        };
-        fetchProgressDoc();
-    }, [firestore, appointment?.workStageProgressId]);
-
-
-    const workStageOptions = useMemo(() => {
-        if (!workStages || !currentUser) return [];
-
-        // Filter stages based on the current user's role and job title
-        const roleFilteredStages = workStages.filter(stage => {
-            if (currentUser.role === 'Admin') {
-                return true;
-            }
-            if (!stage.allowedRoles || stage.allowedRoles.length === 0) {
-                return true;
-            }
-            return currentUser.jobTitle ? stage.allowedRoles.includes(currentUser.jobTitle) : false;
-        });
-
-        if (!transaction) {
-            return roleFilteredStages.map(stage => ({ value: stage.id!, label: stage.name }));
-        }
-
-        const completedStageIds = new Set(
-            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
-        );
-
-        // If we are editing, the stage completed for THIS visit should be available in the list.
-        const stageIdForThisVisit = progressDoc?.data()?.stageId;
-        if (isEditingStage && stageIdForThisVisit) {
-            completedStageIds.delete(stageIdForThisVisit);
-        }
-
-        return roleFilteredStages
-            .filter(stage => !completedStageIds.has(stage.id!))
-            .map(stage => ({ value: stage.id!, label: stage.name }));
-            
-    }, [workStages, transaction, currentUser, isEditingStage, progressDoc]);
-
 
     useEffect(() => {
         if (!id && !appointmentLoading) {
@@ -140,6 +85,7 @@ export default function AppointmentDetailsPage() {
         if (!appointment || !firestore) return;
 
         const fetchRelatedData = async () => {
+            setLoading(true);
             try {
                 // Fetch client and engineer
                 const clientRef = doc(firestore, 'clients', appointment.clientId);
@@ -178,6 +124,58 @@ export default function AppointmentDetailsPage() {
         fetchRelatedData();
     }, [appointment, firestore, toast]);
 
+    // Fetch the specific progress document for this visit
+    useEffect(() => {
+        if (!firestore || !appointment?.workStageProgressId) {
+            setProgressDoc(null);
+            return;
+        }
+        const fetchProgressDoc = async () => {
+            const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
+            try {
+                const progressSnap = await getDoc(progressRef);
+                if (progressSnap.exists()) {
+                    setProgressDoc(progressSnap);
+                }
+            } catch (error) {
+                console.error("Failed to fetch progress doc:", error);
+            }
+        };
+        fetchProgressDoc();
+    }, [firestore, appointment?.workStageProgressId]);
+
+    const workStageOptions = useMemo(() => {
+        if (!workStages) return [];
+        
+        const roleFilteredStages = workStages.filter(stage => {
+            if (currentUser?.role === 'Admin') {
+                return true;
+            }
+            if (!stage.allowedRoles || stage.allowedRoles.length === 0) {
+                return true; // Stage is public
+            }
+            return currentUser?.jobTitle ? stage.allowedRoles.includes(currentUser.jobTitle) : false;
+        });
+
+        if (!transaction) {
+            return roleFilteredStages.map(stage => ({ value: stage.id!, label: stage.name }));
+        }
+        
+        const completedStageIds = new Set(
+            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
+        );
+
+        const stageIdForThisVisit = progressDoc?.data()?.stageId;
+        if (isEditingStage && stageIdForThisVisit) {
+            completedStageIds.delete(stageIdForThisVisit);
+        }
+
+        return roleFilteredStages
+            .filter(stage => !completedStageIds.has(stage.id!))
+            .map(stage => ({ value: stage.id!, label: stage.name }));
+            
+    }, [workStages, transaction, currentUser, isEditingStage, progressDoc]);
+
 
     const handleUpdateStage = async () => {
         if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId) {
@@ -194,6 +192,7 @@ export default function AppointmentDetailsPage() {
         }
         
         const isEditing = !!appointment.workStageUpdated;
+        let paymentClauses: any[] = [];
 
         try {
             const batch = writeBatch(firestore);
@@ -217,7 +216,6 @@ export default function AppointmentDetailsPage() {
                     const previousStageIndexInTemplate = workStages.findIndex(s => s.id === previousStageId);
 
                     if (previousStageIndexInTemplate !== -1) {
-                        // Revert previously completed stage
                         const previousStageIndexInProg = currentStages.findIndex(s => s.stageId === previousStageId);
                         if (previousStageIndexInProg !== -1 && currentStages[previousStageIndexInProg].status === 'completed') {
                             currentStages[previousStageIndexInProg].status = 'pending';
@@ -225,7 +223,6 @@ export default function AppointmentDetailsPage() {
                             currentStages[previousStageIndexInProg].startDate = null; 
                         }
 
-                        // Revert auto-started stage after it
                         const autoStartedStageTemplate = workStages[previousStageIndexInTemplate + 1];
                         if (autoStartedStageTemplate) {
                             const autoStartedStageIndexInProg = currentStages.findIndex(s => s.stageId === autoStartedStageTemplate.id);
@@ -306,11 +303,51 @@ export default function AppointmentDetailsPage() {
             batch.set(timelineRef, {
                 type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
             });
+            
+            // --- NEW: Check for payment due ---
+            const completedStageName = selectedStage.name;
+            paymentClauses = transactionData.contract?.clauses?.filter(
+                (c: any) => c.condition === completedStageName && c.status !== 'مدفوعة'
+            ) || [];
+
+            if (paymentClauses.length > 0) {
+                for (const clause of paymentClauses) {
+                    const paymentCommentRef = doc(collection(transactionRef, 'timelineEvents'));
+                    const commentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${completedStageName}"، أصبحت الدفعة "${clause.name}" مستحقة للدفع.`;
+                    batch.set(paymentCommentRef, {
+                        type: 'comment',
+                        content: commentContent,
+                        userId: currentUser.id,
+                        userName: "النظام الآلي",
+                        userAvatar: '',
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            }
     
             await batch.commit();
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
             
+            // --- NEW: Send notifications to accountants AFTER successful commit ---
+            if (paymentClauses.length > 0) {
+                const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
+                const accountantsSnap = await getDocs(accountantsQuery);
+                
+                for (const clause of paymentClauses) {
+                    const notificationBody = `استحقاق دفعة "${clause.name}" بقيمة ${formatCurrency(clause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${completedStageName}".`;
+                    
+                    for (const accountantDoc of accountantsSnap.docs) {
+                        await createNotification(firestore, {
+                            userId: accountantDoc.id,
+                            title: 'إشعار استحقاق دفعة مالية',
+                            body: notificationBody,
+                            link: `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId}`
+                        });
+                    }
+                }
+            }
+
             setAppointment(prev => prev ? { ...prev, workStageUpdated: true } : null);
             setIsEditingStage(false);
     
