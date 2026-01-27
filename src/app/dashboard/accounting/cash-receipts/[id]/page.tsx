@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
+import Link from 'next/link';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -20,7 +21,7 @@ const paymentMethodTranslations: Record<string, string> = {
     'K-Net': 'كي-نت'
 };
 
-const InfoRow = ({ label, value }: { label: string, value: string | undefined | null }) => (
+const InfoRow = ({ label, value }: { label: string, value: React.ReactNode | string | undefined | null }) => (
     <div className="flex items-baseline">
         <span className="w-40 font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
         <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-gray-800 dark:text-gray-200">{value || '---'}</span>
@@ -136,7 +137,7 @@ export default function ViewCashReceiptPage() {
                 <main className="py-8 space-y-8">
                      <div className="grid grid-cols-5 gap-x-8 gap-y-4">
                         <div className="col-span-3">
-                            <InfoRow label="استلمنا من السيد/السادة" value={receipt.clientNameAr} />
+                            <InfoRow label="استلمنا من السيد/السادة" value={<Link href={`/dashboard/clients/${receipt.clientId}`} className="text-primary hover:underline">{receipt.clientNameAr}</Link>} />
                         </div>
                         <div className="col-span-2">
                              <div className="flex items-baseline">

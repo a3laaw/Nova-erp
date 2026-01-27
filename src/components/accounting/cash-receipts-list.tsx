@@ -22,6 +22,7 @@ import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -135,7 +136,11 @@ export function CashReceiptsList() {
               {receipts.map((receipt) => (
                 <TableRow key={receipt.id}>
                   <TableCell className="font-mono">{receipt.voucherNumber}</TableCell>
-                  <TableCell>{receipt.clientNameAr}</TableCell>
+                  <TableCell>
+                    <Link href={`/dashboard/clients/${receipt.clientId}`} className="hover:underline">
+                      {receipt.clientNameAr}
+                    </Link>
+                  </TableCell>
                   <TableCell>{formatDate(receipt.receiptDate)}</TableCell>
                   <TableCell>
                       <Badge variant="outline">{paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod}</Badge>

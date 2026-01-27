@@ -127,7 +127,11 @@ function CreatedContractsList() {
                     {!loading && contracts.map(contract => (
                         <TableRow key={contract.id}>
                             <TableCell className="font-medium">{contract.title}</TableCell>
-                            <TableCell>{contract.clientName}</TableCell>
+                            <TableCell>
+                                <Link href={`/dashboard/clients/${contract.clientId}`} className="hover:underline">
+                                    {contract.clientName}
+                                </Link>
+                            </TableCell>
                             <TableCell>{formatDate(contract.contractDate)}</TableCell>
                             <TableCell className="text-left font-mono">{formatCurrency(contract.financials.totalAmount - contract.financials.discount)}</TableCell>
                             <TableCell className="text-center">

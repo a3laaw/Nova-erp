@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     return (
@@ -60,20 +61,6 @@ export default function AppointmentDetailsPage() {
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
 
-    const workStageOptions = useMemo(() => {
-        if (!workStages) return [];
-        // If transaction data is not loaded yet, show all stages to avoid flickering
-        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
-
-        const completedStageIds = new Set(
-            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
-        );
-
-        return workStages
-            .filter(stage => !completedStageIds.has(stage.id!))
-            .map(stage => ({ value: stage.id!, label: stage.name }));
-    }, [workStages, transaction]);
-
     useEffect(() => {
         if (!id && !appointmentLoading) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'معرف الموعد غير موجود.' });
@@ -98,7 +85,7 @@ export default function AppointmentDetailsPage() {
                 const clientRef = doc(firestore, 'clients', appointment.clientId);
                 const engineerRef = doc(firestore, 'employees', appointment.engineerId);
                 const [clientSnap, engineerSnap] = await Promise.all([getDoc(clientRef), getDoc(engineerRef)]);
-                if (clientSnap.exists()) setClient(clientSnap.data() as Client);
+                if (clientSnap.exists()) setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
                 if (engineerSnap.exists()) setEngineer(engineerSnap.data() as Employee);
 
                 // Fetch the transaction to get stage progress
@@ -130,6 +117,20 @@ export default function AppointmentDetailsPage() {
 
         fetchRelatedData();
     }, [appointment, firestore, toast]);
+
+    const workStageOptions = useMemo(() => {
+        if (!workStages) return [];
+        // If transaction data is not loaded yet, show all stages to avoid flickering
+        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
+
+        const completedStageIds = new Set(
+            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
+        );
+
+        return workStages
+            .filter(stage => !completedStageIds.has(stage.id!))
+            .map(stage => ({ value: stage.id!, label: stage.name }));
+    }, [workStages, transaction]);
 
     const handleUpdateStage = async () => {
         if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId) {
@@ -191,8 +192,9 @@ export default function AppointmentDetailsPage() {
             if (nextStageInTemplate) {
                 const nextStageId = nextStageInTemplate.id!;
                 const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+                const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
 
-                if (nextStageIndexInProg !== -1) {
+                if (!isDiscussionStage && nextStageIndexInProg !== -1) {
                     const stageToStart = { ...currentStages[nextStageIndexInProg] };
                     if (stageToStart.status === 'pending') {
                         stageToStart.status = 'in-progress';
@@ -200,7 +202,7 @@ export default function AppointmentDetailsPage() {
                         currentStages[nextStageIndexInProg] = stageToStart;
                         logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
                     }
-                } else {
+                } else if (!isDiscussionStage) {
                     currentStages.push({
                         stageId: nextStageId,
                         name: nextStageInTemplate.name,
@@ -291,7 +293,7 @@ export default function AppointmentDetailsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <InfoRow icon={<User />} label="العميل" value={client?.nameAr} />
+                    <InfoRow icon={<User />} label="العميل" value={client ? <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link> : null} />
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={engineer?.fullName} />
                     <InfoRow icon={<Calendar />} label="تاريخ الموعد" value={format(appointment.appointmentDate.toDate(), "eeee, dd MMMM yyyy", { locale: ar })} />
                     <InfoRow icon={<Clock />} label="وقت الموعد" value={format(appointment.appointmentDate.toDate(), "p", { locale: ar })} />
