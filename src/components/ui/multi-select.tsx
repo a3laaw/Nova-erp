@@ -94,7 +94,12 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                   onSelect={() => {
+                    console.log("تم كليك على:", option.value);
                     onChange(
                       selected.includes(option.value)
                         ? selected.filter((item) => item !== option.value)
@@ -102,6 +107,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
                     );
                     setOpen(true);
                   }}
+                  className={cn("cursor-pointer")}
                 >
                   <div
                     className={cn(
