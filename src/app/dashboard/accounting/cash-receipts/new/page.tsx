@@ -156,7 +156,7 @@ export default function NewCashReceiptPage() {
             const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
             const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-            setClientProjects(fetchedProjects);
+            setClientProjects(fetchedProjects.filter(p => !!p.contract));
         } catch (error) {
             console.error("Error fetching client projects:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب معاملات العميل.' });
@@ -244,6 +244,8 @@ export default function NewCashReceiptPage() {
     }
 
     setIsSaving(true);
+    const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
+    const newReceiptId = newReceiptRef.id;
     let newVoucherNumberForNotification: string | null = null;
     const selectedClient = clients.find(c => c.id === selectedClientId);
     
@@ -285,7 +287,6 @@ export default function NewCashReceiptPage() {
                 newReceiptData.projectNameAr = selectedProject.transactionType;
             }
 
-            const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             transaction_fs.set(newReceiptRef, newReceiptData);
             
             // If a project is linked, add the description as a comment to its timeline
@@ -308,26 +309,35 @@ export default function NewCashReceiptPage() {
         });
 
         // --- Notification Logic (outside transaction) ---
+        const recipients = new Set<string>();
+        if(currentUser?.id) recipients.add(currentUser.id);
+
         if (selectedProjectId && description && newVoucherNumberForNotification) {
             const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
             const assignedEngineerId = selectedProject?.assignedEngineerId;
 
             if (assignedEngineerId) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, assignedEngineerId);
-                // Notify only if the assignee is not the person creating the receipt
-                if (targetUserId && targetUserId !== currentUser.id) {
-                    await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: 'تم تسجيل دفعة مالية',
-                        body: `قام ${currentUser.fullName} بتسجيل دفعة مالية (سند رقم ${newVoucherNumberForNotification}) على معاملة "${selectedProject?.transactionType}" الخاصة بالعميل ${selectedClient?.nameAr}.`,
-                        link: `/dashboard/clients/${selectedClientId}/transactions/${selectedProjectId}`
-                    });
+                if (targetUserId) {
+                    recipients.add(targetUserId);
                 }
+            }
+
+            for (const recipientId of recipients) {
+                const isCreator = recipientId === currentUser?.id;
+                await createNotification(firestore, {
+                    userId: recipientId,
+                    title: isCreator ? `تم تسجيل دفعتك المالية بنجاح` : `تم تسجيل دفعة مالية جديدة`,
+                    body: isCreator
+                        ? `تم حفظ سند القبض رقم ${newVoucherNumberForNotification} بنجاح للمعاملة "${selectedProject?.transactionType}".`
+                        : `قام ${currentUser.fullName} بتسجيل دفعة مالية (سند رقم ${newVoucherNumberForNotification}) على معاملة "${selectedProject?.transactionType}" الخاصة بالعميل ${selectedClient?.nameAr}.`,
+                    link: `/dashboard/clients/${selectedClientId}/transactions/${selectedProjectId}`
+                });
             }
         }
         // --- End Notification Logic ---
 
-        router.push('/dashboard/accounting');
+        router.push(`/dashboard/accounting/cash-receipts/${newReceiptId}`);
 
     } catch (error) {
         console.error("Error saving cash receipt:", error);

@@ -32,6 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { format } from 'date-fns';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 export default function EditCashReceiptPage() {
   const router = useRouter();
@@ -164,7 +165,7 @@ export default function EditCashReceiptPage() {
             const projectsQuery = query(collection(firestore, `clients/${receipt.clientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
             const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-            setClientProjects(fetchedProjects);
+            setClientProjects(fetchedProjects.filter(p => !!p.contract));
         } catch (error) {
             console.error("Error fetching client projects:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب عقود العميل.' });
@@ -255,6 +256,36 @@ export default function EditCashReceiptPage() {
             
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تحديث سند القبض بنجاح.' });
+
+            // --- Notification Logic ---
+            if (changes.length > 0 && originalReceipt.projectId) {
+                 const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);
+                 const transactionSnap = await getDoc(transactionRef);
+                 if (transactionSnap.exists()) {
+                     const transactionData = transactionSnap.data() as ClientTransaction;
+                     const engineerId = transactionData.assignedEngineerId;
+
+                     const recipients = new Set<string>();
+                     if(currentUser.id) recipients.add(currentUser.id);
+                     if (engineerId) {
+                         const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
+                         if(targetUserId) recipients.add(targetUserId);
+                     }
+                    
+                     for (const recipientId of recipients) {
+                         const isCreator = recipientId === currentUser.id;
+                         await createNotification(firestore, {
+                            userId: recipientId,
+                            title: isCreator ? 'تم تحديث سند القبض' : 'تم تحديث سند قبض',
+                            body: isCreator 
+                                ? `لقد قمت بتحديث سند القبض رقم ${originalReceipt.voucherNumber}.`
+                                : `قام ${currentUser.fullName} بتحديث سند القبض رقم ${originalReceipt.voucherNumber} لمعاملة "${transactionData.transactionType}".`,
+                            link: `/dashboard/accounting/cash-receipts/${id}`
+                        });
+                     }
+                 }
+            }
+            // --- End Notification Logic ---
         } else {
             toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات.' });
         }

@@ -942,7 +942,6 @@
         "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "K-Net"] },
         "description": { "type": "string" },
         "reference": { "type": "string" },
-        "type": { "type": "string", "enum": ["advance", "milestone", "final", "other"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["voucherNumber", "clientId", "amount", "receiptDate", "paymentMethod"]

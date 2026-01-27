@@ -173,7 +173,6 @@ export type CashReceipt = {
     paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'K-Net';
     description: string;
     reference?: string;
-    type?: 'advance' | 'milestone' | 'final' | 'other';
     createdAt: any; // Timestamp
 };
 
