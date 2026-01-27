@@ -153,7 +153,7 @@ export default function NewCashReceiptPage() {
     const fetchClientProjects = async () => {
         setProjectsLoading(true);
         try {
-            const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`), where('contract', '!=', null));
+            const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
             const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
             setClientProjects(fetchedProjects);
@@ -231,7 +231,7 @@ export default function NewCashReceiptPage() {
         return;
     }
     // Validation
-    if (!selectedClientId || !amount || !date || !paymentMethod) {
+    if (!selectedClientId || !selectedProjectId || !amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -409,12 +409,12 @@ export default function NewCashReceiptPage() {
                 </div>
                 
                 <div className="grid gap-2">
-                    <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
+                    <Label htmlFor="project">ربط بعقد/مشروع <span className="text-destructive">*</span></Label>
                     <InlineSearchList 
                         value={selectedProjectId}
                         onSelect={setSelectedProjectId}
                         options={projectOptions}
-                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب العقود...' : 'اختر العقد المراد سداد دفعة له...'}
+                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب المشاريع...' : 'اختر المشروع...'}
                         disabled={!selectedClientId || projectsLoading || isSaving}
                     />
                 </div>
