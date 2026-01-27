@@ -32,6 +32,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -293,6 +294,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const handleSubmit = async () => {
     if (!firestore || !transaction?.id || !currentUser) return;
     setIsSaving(true);
+    let newTransactionData: ClientTransaction | null = null;
+
     try {
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
@@ -328,6 +331,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const clientData = clientSnap.data();
             const currentTransactionData = currentTransactionSnap.data() as ClientTransaction;
+            newTransactionData = currentTransactionData; // To be used in notification
 
             // Prepare contract and stage data
             const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
@@ -370,9 +374,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const updatePayload = { contract: contractData, stages: updatedStages };
             transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             
-             // --- Log contract creation/update in both timelines ---
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
 
-            // 1. Construct the detailed comment
+            // --- Log contract creation/update in both timelines ---
             let contractDetailsComment = `**تم توقيع/تحديث العقد**\n\n`;
             contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
             contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
@@ -386,20 +391,15 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             }
 
             const commentData = {
-                type: 'comment',
+                type: 'comment' as const,
                 content: contractDetailsComment,
                 userId: currentUser.id, 
                 userName: currentUser.fullName || 'النظام', 
                 userAvatar: currentUser.avatarUrl || '', 
                 createdAt: serverTimestamp(),
             };
-
-            // 2. Log in transaction timeline
-            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
+            
             transaction_firestore.set(doc(transactionTimelineRef), commentData);
-
-            // 3. Log in main client history
-            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
             transaction_firestore.set(doc(historyCollectionRef), commentData);
 
 
@@ -408,11 +408,13 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 let clientAccountId: string;
                 transaction_firestore.update(clientRef, { status: 'contracted' });
 
-                transaction_firestore.set(doc(historyCollectionRef), {
-                    type: 'log',
+                const statusLogData = {
+                    type: 'log' as const,
                     content: `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`,
                     userId: currentUser.id, userName: currentUser.fullName || 'النظام', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
-                });
+                }
+                transaction_firestore.set(doc(historyCollectionRef), statusLogData);
+                transaction_firestore.set(doc(transactionTimelineRef), statusLogData);
                 
                 if (clientAccountSnap.empty) {
                     const parentCode = customersAccountDoc.data().code as string;
@@ -452,7 +454,24 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         });
 
         toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء قيد المديونية بنجاح.' });
+        
+        // --- Notification Logic ---
+        const engineerId = newTransactionData?.assignedEngineerId;
+        if (engineerId && currentUser && engineerId !== currentUser.employeeId) {
+            const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
+            if (targetUserId) {
+                await createNotification(firestore, {
+                    userId: targetUserId,
+                    title: `تم توقيع عقد`,
+                    body: `قام ${currentUser.fullName} بتوقيع عقد لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`,
+                    link: `/dashboard/clients/${clientId}/transactions/${transaction.id!}`
+                });
+            }
+        }
+
         onClose();
+        onSaveSuccess();
+
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : 'فشل حفظ بنود العقد.';

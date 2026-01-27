@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -71,14 +71,20 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     setIsPosting(true);
     try {
       const timelineCollection = collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`);
-      await addDoc(timelineCollection, {
-        type: 'comment',
-        content: newComment,
-        userId: currentUser.id,
-        userName: currentUser.fullName,
-        userAvatar: currentUser.avatarUrl,
-        createdAt: serverTimestamp(),
-      });
+      const historyCollection = collection(firestore, `clients/${clientId}/history`);
+      const commentData = {
+          type: 'comment' as const,
+          content: newComment,
+          userId: currentUser.id,
+          userName: currentUser.fullName,
+          userAvatar: currentUser.avatarUrl,
+          createdAt: serverTimestamp(),
+      };
+
+      const batch = writeBatch(firestore);
+      batch.set(doc(timelineCollection), commentData);
+      batch.set(doc(historyCollection), commentData);
+      await batch.commit();
       
 
       // --- Notification Logic ---

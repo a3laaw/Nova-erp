@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
@@ -188,27 +189,20 @@ export default function ClientProfilePage() {
         
         batch.update(transactionRef, updateData);
 
-        // Log the event
+        // Log the event in both timelines
         const historyCollectionRef = collection(firestore, `clients/${client.id}/history`);
-        const logContent = `قام بإلغاء عقد المعاملة: "${transactionToCancel.transactionType}".`;
-        batch.set(doc(historyCollectionRef), {
-            type: 'log',
-            content: logContent,
-            userId: currentUser.id,
-            userName: currentUser.fullName,
-            userAvatar: currentUser.avatarUrl,
-            createdAt: serverTimestamp(),
-        });
-        
         const transactionTimelineRef = collection(firestore, `clients/${client.id}/transactions/${transactionToCancel.id}/timelineEvents`);
-        batch.set(doc(transactionTimelineRef), {
-            type: 'comment',
-            content: `**تم إلغاء العقد**\nقام ${currentUser.fullName} بإلغاء العقد المرتبط بهذه المعاملة.`,
-            userId: currentUser.id, 
-            userName: currentUser.fullName, 
-            userAvatar: currentUser.avatarUrl, 
-            createdAt: serverTimestamp(),
-        });
+        
+        const logContent = `قام بإلغاء عقد المعاملة: "${transactionToCancel.transactionType}".`;
+        const commentContent = `**تم إلغاء العقد**\nقام ${currentUser.fullName} بإلغاء العقد المرتبط بهذه المعاملة.`;
+
+        const logData = { type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
+        const commentData = { type: 'comment', content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
+
+        batch.set(doc(historyCollectionRef), logData);
+        batch.set(doc(transactionTimelineRef), logData);
+        batch.set(doc(historyCollectionRef), commentData);
+        batch.set(doc(transactionTimelineRef), commentData);
 
 
         // Check if this is the last contract to potentially revert client status
@@ -220,18 +214,27 @@ export default function ClientProfilePage() {
             batch.update(clientRefDoc, { status: 'new' });
             
             const statusLogContent = `تغيرت حالة الملف من "تم التعاقد" إلى "جديد" بعد إلغاء آخر عقد.`;
-            batch.set(doc(historyCollectionRef), {
-                type: 'log',
-                content: statusLogContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            });
+            const statusLogData = { type: 'log', content: statusLogContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
+            batch.set(doc(historyCollectionRef), statusLogData);
+            batch.set(doc(transactionTimelineRef), statusLogData);
         }
 
         await batch.commit();
         toast({ title: 'نجاح', description: 'تم إلغاء العقد وتحديث المراحل بنجاح.' });
+
+        // --- Notification Logic ---
+        const engineerId = transactionToCancel.assignedEngineerId;
+        if (engineerId && currentUser.employeeId !== engineerId) {
+            const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
+            if (targetUserId) {
+                await createNotification(firestore, {
+                    userId: targetUserId,
+                    title: `تم إلغاء عقد`,
+                    body: `قام ${currentUser.fullName} بإلغاء عقد معاملة "${transactionToCancel.transactionType}" للعميل ${client.nameAr}.`,
+                    link: `/dashboard/clients/${clientId}/transactions/${transactionToCancel.id!}`
+                });
+            }
+        }
 
     } catch (error) {
         console.error("Error cancelling contract:", error);
@@ -269,15 +272,21 @@ export default function ClientProfilePage() {
         batch.update(transactionRef, { status: newStatus });
         
         const logContent = `قام ${newStatus === 'on-hold' ? 'بتجميد' : 'بإلغاء تجميد'} المعاملة: "${tx.transactionType}".`;
-        const historyRef = doc(collection(firestore, `clients/${id}/history`));
-        batch.set(historyRef, {
+        
+        const logData = {
             type: 'log',
             content: logContent,
             userId: currentUser.id,
             userName: currentUser.fullName,
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
-        });
+        };
+        
+        const historyRef = doc(collection(firestore, `clients/${id}/history`));
+        const transactionTimelineRef = doc(collection(firestore, `clients/${id}/transactions/${tx.id!}/timelineEvents`));
+
+        batch.set(historyRef, logData);
+        batch.set(transactionTimelineRef, logData);
         
         await batch.commit();
         toast({ title: 'نجاح', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إلغاء تجميد'} المعاملة.` });

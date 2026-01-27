@@ -24,7 +24,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { createNotification } from '@/services/notification-service';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
@@ -197,6 +197,7 @@ export default function AppointmentDetailsPage() {
         try {
             const batch = writeBatch(firestore);
             const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
+            const historyRef = collection(firestore, 'clients', appointment.clientId, 'history');
     
             const transactionSnap = await getDoc(transactionRef);
             if (!transactionSnap.exists()) {
@@ -299,22 +300,25 @@ export default function AppointmentDetailsPage() {
                 batch.update(apptRef, { workStageUpdated: true, workStageProgressId: progressRef.id });
             }
             
-            const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
-            batch.set(timelineRef, {
+            const timelineRef = collection(transactionRef, 'timelineEvents');
+            const logData = {
                 type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
-            });
+            };
+            batch.set(doc(timelineRef), logData);
+            batch.set(doc(historyRef), logData); // Dual write log
 
             // Add Engineering Comment
             const engineeringCommentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
-            const engineeringCommentRef = doc(collection(transactionRef, 'timelineEvents'));
-            batch.set(engineeringCommentRef, {
-                type: 'comment',
+            const engineeringCommentData = {
+                type: 'comment' as const,
                 content: engineeringCommentContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
-            });
+            };
+            batch.set(doc(timelineRef), engineeringCommentData);
+            batch.set(doc(historyRef), engineeringCommentData); // Dual write comment
             
             // Check for payment due
             const completedStageName = selectedStage.name;
@@ -324,16 +328,17 @@ export default function AppointmentDetailsPage() {
 
             if (paymentClauses.length > 0) {
                 for (const clause of paymentClauses) {
-                    const paymentCommentRef = doc(collection(transactionRef, 'timelineEvents'));
-                    const commentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${completedStageName}"، أصبحت الدفعة "${clause.name}" مستحقة للدفع.`;
-                    batch.set(paymentCommentRef, {
-                        type: 'comment',
-                        content: commentContent,
+                    const paymentCommentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${completedStageName}"، أصبحت الدفعة "${clause.name}" مستحقة للدفع.`;
+                    const paymentCommentData = {
+                        type: 'comment' as const,
+                        content: paymentCommentContent,
                         userId: currentUser.id,
                         userName: "النظام الآلي",
                         userAvatar: '',
                         createdAt: serverTimestamp(),
-                    });
+                    };
+                    batch.set(doc(timelineRef), paymentCommentData);
+                    batch.set(doc(historyRef), paymentCommentData); // Dual write payment comment
                 }
             }
     
@@ -341,7 +346,23 @@ export default function AppointmentDetailsPage() {
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
             
-            // Send notifications to accountants AFTER successful commit
+            // --- Notifications (outside batch) ---
+            
+            // 1. Notify engineer of stage completion
+            const engineerId = appointment.engineerId;
+            if (engineerId && engineerId !== currentUser.employeeId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
+                if(targetUserId) {
+                    await createNotification(firestore, {
+                        userId: targetUserId,
+                        title: `تم إنجاز مرحلة`,
+                        body: `أنجز ${currentUser.fullName} مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`,
+                        link: `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId}`
+                    });
+                }
+            }
+
+            // 2. Notify accountants of payment due
             if (paymentClauses.length > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
