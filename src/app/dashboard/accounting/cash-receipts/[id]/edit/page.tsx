@@ -112,61 +112,90 @@ export default function EditCashReceiptPage() {
     }
   }, [amount]);
   
-    useEffect(() => {
-        const generateDescription = async () => {
-            if (!receipt?.projectId || !amount || parseFloat(amount) <= 0 || !firestore || !id) {
-                setDescription(receipt?.description || '');
-                return;
-            }
+  useEffect(() => {
+    const generateDescription = async () => {
+      // Use originalReceipt to get the project ID and creation date, ensuring a stable reference
+      if (!originalReceipt?.projectId || !amount || parseFloat(amount) <= 0 || !firestore) {
+        // Fallback to the stored description if we can't generate a new one
+        setDescription(originalReceipt?.description || '');
+        return;
+      }
 
-            let totalAlreadyPaid = 0;
-            try {
-                totalAlreadyPaid = await getTotalPaidForProject(receipt.projectId, firestore, id);
-            } catch (e) {
-                console.error("Could not fetch previous payments for description generation:", e);
-            }
+      // 1. Fetch all receipts for the project to establish the correct chronological order
+      const allReceiptsQuery = query(
+        collection(firestore, 'cashReceipts'),
+        where('projectId', '==', originalReceipt.projectId)
+      );
 
-            const project = clientProjects.find(p => p.id === receipt.projectId);
-            if (!project || !project.contract?.clauses) {
-                setDescription('');
-                return;
-            }
+      let totalPaidPreviously = 0;
+      try {
+        const allReceiptsSnap = await getDocs(allReceiptsQuery);
+        const allReceipts = allReceiptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as CashReceipt));
+        
+        // 2. Find the original creation date of the receipt being edited.
+        // Use originalReceipt which is a stable copy of the initial data.
+        const currentReceiptCreationDate = originalReceipt.createdAt.toDate();
 
-            let remainingAmountFromCurrentPayment = parseFloat(amount);
-            const descriptionParts: string[] = [];
-            let allocatedPaid = 0;
+        // 3. Filter receipts created *before* the one being edited and sum their amounts.
+        // This correctly represents the state of the contract when the current receipt was made.
+        totalPaidPreviously = allReceipts
+            .filter(r => {
+                const receiptDate = r.createdAt?.toDate();
+                // Exclude the current receipt itself and any receipt created after it.
+                return r.id !== id && receiptDate && receiptDate < currentReceiptCreationDate;
+            })
+            .reduce((sum, r) => sum + r.amount, 0);
 
-            for (const clause of project.contract.clauses) {
-                if (remainingAmountFromCurrentPayment <= 0) break;
-                
-                const clauseAmount = clause.amount;
-                const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalAlreadyPaid - allocatedPaid));
-                const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
+      } catch(e) {
+          console.error("Could not fetch previous payments for description generation:", e);
+          // If fetching fails, we can't generate a description, so we stop.
+          setDescription(originalReceipt?.description || '');
+          return;
+      }
+      
+      // 4. Now, use this corrected past total to generate the description for the current amount.
+      const project = clientProjects.find(p => p.id === originalReceipt.projectId);
+      if (!project || !project.contract?.clauses) {
+        setDescription('');
+        return;
+      }
 
-                if (remainingOnClause > 0) {
-                    const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
-                    
-                    if (paymentForThisClause >= remainingOnClause) {
-                        descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
-                    } else {
-                        descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
-                        const newRemaining = remainingOnClause - paymentForThisClause;
-                        descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
-                    }
-                    remainingAmountFromCurrentPayment -= paymentForThisClause;
-                }
-                allocatedPaid += clauseAmount;
-            }
+      let remainingAmountFromCurrentPayment = parseFloat(amount);
+      const descriptionParts: string[] = [];
+      let allocatedPaid = 0;
 
-            if (remainingAmountFromCurrentPayment > 0) {
-                descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
-            }
-            
-            setDescription(descriptionParts.join('\n'));
-        };
+      for (const clause of project.contract.clauses) {
+        if (remainingAmountFromCurrentPayment <= 0) break;
+        
+        const clauseAmount = clause.amount;
+        const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalPaidPreviously - allocatedPaid));
+        const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
 
-        generateDescription();
-    }, [amount, receipt, clientProjects, firestore, id]);
+        if (remainingOnClause > 0) {
+          const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
+          
+          if (paymentForThisClause >= remainingOnClause) {
+            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
+          } else {
+            descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+            const newRemaining = remainingOnClause - paymentForThisClause;
+            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+          }
+          remainingAmountFromCurrentPayment -= paymentForThisClause;
+        }
+        allocatedPaid += clauseAmount;
+      }
+
+      if (remainingAmountFromCurrentPayment > 0) {
+        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
+      }
+      
+      setDescription(descriptionParts.join('\n'));
+    };
+
+    generateDescription();
+  }, [amount, originalReceipt, clientProjects, firestore, id]);
+
 
   useEffect(() => {
     if (!firestore) return;
