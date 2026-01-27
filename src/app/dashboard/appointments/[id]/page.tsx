@@ -117,6 +117,20 @@ export default function AppointmentDetailsPage() {
         fetchRelatedData();
     }, [appointment, firestore, toast]);
 
+    const workStageOptions = useMemo(() => {
+        if (!workStages) return [];
+        // If transaction data is not loaded yet, show all stages to avoid flickering
+        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
+
+        const completedStageIds = new Set(
+            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
+        );
+
+        return workStages
+            .filter(stage => !completedStageIds.has(stage.id!))
+            .map(stage => ({ value: stage.id!, label: stage.name }));
+    }, [workStages, transaction]);
+
     const handleUpdateStage = async () => {
         if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء اختيار مرحلة عمل. تأكد من أن هذه الزيارة مرتبطة بمعاملة.' });
@@ -265,20 +279,6 @@ export default function AppointmentDetailsPage() {
     }
     
     if (!appointment) return null;
-
-    const workStageOptions = useMemo(() => {
-        if (!workStages) return [];
-        // If transaction data is not loaded yet, show all stages to avoid flickering
-        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
-
-        const completedStageIds = new Set(
-            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
-        );
-
-        return workStages
-            .filter(stage => !completedStageIds.has(stage.id!))
-            .map(stage => ({ value: stage.id!, label: stage.name }));
-    }, [workStages, transaction]);
 
     return (
         <div className="max-w-2xl mx-auto space-y-6" dir="rtl">
