@@ -370,9 +370,19 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const updatePayload = { contract: contractData, stages: updatedStages };
             transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             
+            // Log in transaction timeline
+            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
+            transaction_firestore.set(doc(transactionTimelineRef), {
+                type: 'log',
+                content: `تم إنشاء/تحديث العقد بواسطة ${currentUser.fullName}.`,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl || '',
+                createdAt: serverTimestamp(),
+            });
+
+            // Log in main client history
             const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
-            
-            // Add a detailed comment about the new contract
             let contractDetailsComment = `**تم توقيع عقد جديد**\n\n`;
             contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
             contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
@@ -393,7 +403,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 userAvatar: currentUser.avatarUrl || '', 
                 createdAt: serverTimestamp(),
             });
-
 
             // This logic only runs when creating a contract for the first time for a client
             if (clientData.status === 'new') {
