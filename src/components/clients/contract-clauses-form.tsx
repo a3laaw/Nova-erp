@@ -242,7 +242,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   };
 
   const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
-  const handleTermChange = (id: string, value: string) => {
+  const updateTerm = (id: string, value: string) => {
     setTerms(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
   const removeTerm = (id: string) => setTerms(prev => prev.filter(term => term.id !== id));
@@ -457,18 +457,35 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         
         // --- Notification Logic ---
         const engineerId = newTransactionData?.assignedEngineerId;
-        if (engineerId && currentUser && engineerId !== currentUser.employeeId) {
+        const recipients = new Set<string>();
+
+        if (currentUser) {
+            recipients.add(currentUser.id);
+        }
+
+        if (engineerId) {
             const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
             if (targetUserId) {
-                await createNotification(firestore, {
-                    userId: targetUserId,
-                    title: `تم توقيع عقد`,
-                    body: `قام ${currentUser.fullName} بتوقيع عقد لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`,
-                    link: `/dashboard/clients/${clientId}/transactions/${transaction.id!}`
-                });
+                recipients.add(targetUserId);
             }
         }
 
+        for (const recipientId of recipients) {
+            const isCreator = recipientId === currentUser?.id;
+            const actionText = transaction.contract ? 'تحديث عقد' : 'توقيع عقد';
+            const title = isCreator ? `تم ${actionText} بنجاح` : `${actionText} جديد`;
+            const body = isCreator
+                ? `لقد قمت بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`
+                : `قام ${currentUser?.fullName} بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`;
+            
+            await createNotification(firestore, {
+                userId: recipientId,
+                title,
+                body,
+                link: `/dashboard/clients/${clientId}/transactions/${transaction.id!}`
+            });
+        }
+        
         onClose();
 
     } catch (error) {
