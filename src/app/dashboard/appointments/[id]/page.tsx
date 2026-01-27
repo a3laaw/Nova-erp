@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,7 @@ export default function AppointmentDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [selectedStageId, setSelectedStageId] = useState('');
+    const [isEditingStage, setIsEditingStage] = useState(false);
 
     // Fetch main appointment data
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
@@ -169,113 +170,126 @@ export default function AppointmentDetailsPage() {
             return;
         }
         
+        const isEditing = !!appointment.workStageUpdated;
+
         try {
             const batch = writeBatch(firestore);
             const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
     
-            // --- Get the transaction document to update its stages array ---
             const transactionSnap = await getDoc(transactionRef);
             if (!transactionSnap.exists()) {
                 throw new Error("لم يتم العثور على المعاملة المرتبطة بهذا الموعد.");
             }
             const transactionData = transactionSnap.data() as ClientTransaction;
-            const currentStages = [...(transactionData.stages || [])]; // Make a mutable copy
+            const currentStages = [...(transactionData.stages || [])];
             const now = new Date();
+            let logContent = '';
 
-            // --- 1. Update the COMPLETED stage ---
+            // --- ROLLBACK LOGIC (if editing as Admin) ---
+            if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
+                const progressDocRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
+                const progressSnap = await getDoc(progressDocRef);
+                if (progressSnap.exists()) {
+                    const previousStageId = progressSnap.data().stageId;
+                    const previousStageIndexInTemplate = workStages.findIndex(s => s.id === previousStageId);
+
+                    if (previousStageIndexInTemplate !== -1) {
+                        // Revert previously completed stage
+                        const previousStageIndexInProg = currentStages.findIndex(s => s.stageId === previousStageId);
+                        if (previousStageIndexInProg !== -1 && currentStages[previousStageIndexInProg].status === 'completed') {
+                            currentStages[previousStageIndexInProg].status = 'pending';
+                            currentStages[previousStageIndexInProg].endDate = null;
+                            currentStages[previousStageIndexInProg].startDate = null; 
+                        }
+
+                        // Revert auto-started stage after it
+                        const autoStartedStageTemplate = workStages[previousStageIndexInTemplate + 1];
+                        if (autoStartedStageTemplate) {
+                            const autoStartedStageIndexInProg = currentStages.findIndex(s => s.stageId === autoStartedStageTemplate.id);
+                            if (autoStartedStageIndexInProg !== -1 && currentStages[autoStartedStageIndexInProg].status === 'in-progress') {
+                                currentStages[autoStartedStageIndexInProg].status = 'pending';
+                                currentStages[autoStartedStageIndexInProg].startDate = null;
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            // --- FORWARD LOGIC (for new selection) ---
             const completedStageIndex = currentStages.findIndex(s => s.stageId === selectedStage.id);
             if (completedStageIndex !== -1) {
-                // Stage exists, update it
                 const stageToUpdate = { ...currentStages[completedStageIndex] };
                 if (stageToUpdate.status !== 'completed') {
                     stageToUpdate.status = 'completed';
                     stageToUpdate.endDate = now;
-                    if (!stageToUpdate.startDate) {
-                        stageToUpdate.startDate = now;
-                    }
+                    if (!stageToUpdate.startDate) stageToUpdate.startDate = now;
                     currentStages[completedStageIndex] = stageToUpdate;
                 }
             } else {
-                // Stage doesn't exist in progress, add it as completed
                 currentStages.push({
-                    stageId: selectedStage.id,
-                    name: selectedStage.name,
-                    status: 'completed',
-                    startDate: now,
-                    endDate: now,
+                    stageId: selectedStage.id, name: selectedStage.name, status: 'completed', startDate: now, endDate: now, allowedRoles: selectedStage.allowedRoles,
                 });
             }
             
-            let logContent = `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
+            logContent = isEditing
+                ? `قام ${currentUser.fullName} (مدير) بتعديل مرحلة الزيارة رقم ${appointment.visitCount || ''} إلى: "${selectedStage.name}".`
+                : `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
 
-            // --- 2. Start the NEXT stage automatically ---
+
             const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
             const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
 
             if (nextStageInTemplate) {
                 const nextStageId = nextStageInTemplate.id!;
-                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
                 const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
 
-                if (!isDiscussionStage && nextStageIndexInProg !== -1) {
-                    const stageToStart = { ...currentStages[nextStageIndexInProg] };
-                    if (stageToStart.status === 'pending') {
-                        stageToStart.status = 'in-progress';
-                        stageToStart.startDate = now;
-                        currentStages[nextStageIndexInProg] = stageToStart;
+                if (!isDiscussionStage) {
+                    const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+                    if (nextStageIndexInProg !== -1) {
+                        const stageToStart = { ...currentStages[nextStageIndexInProg] };
+                        if (stageToStart.status === 'pending') {
+                            stageToStart.status = 'in-progress';
+                            stageToStart.startDate = now;
+                            currentStages[nextStageIndexInProg] = stageToStart;
+                            logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+                        }
+                    } else {
+                        currentStages.push({
+                            stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
+                        });
                         logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
                     }
-                } else if (!isDiscussionStage) {
-                    currentStages.push({
-                        stageId: nextStageId,
-                        name: nextStageInTemplate.name,
-                        status: 'in-progress',
-                        startDate: now,
-                        endDate: null,
-                    });
-                    logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
                 }
             }
     
-            // 1. Update the transaction with the new stages progress
             batch.update(transactionRef, { stages: currentStages });
     
-            // 2. Create WorkStageProgress document for auditing
-            const progressRef = doc(collection(firestore, 'work_stages_progress'));
-            batch.set(progressRef, {
-                visitId: appointment.id,
-                transactionId: appointment.transactionId,
-                stageId: selectedStage.id,
-                stageName: selectedStage.name,
-                selectedBy: currentUser.employeeId,
-                selectedAt: serverTimestamp(),
-            });
-    
-            // 3. Update the appointment itself
-            const apptRef = doc(firestore, 'appointments', appointment.id);
-            batch.update(apptRef, {
-                workStageUpdated: true,
-                workStageProgressId: progressRef.id
-            });
+            if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
+                const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
+                batch.update(progressRef, {
+                    stageId: selectedStage.id, stageName: selectedStage.name, selectedBy: currentUser.employeeId, selectedAt: serverTimestamp(),
+                });
+            } else {
+                const progressRef = doc(collection(firestore, 'work_stages_progress'));
+                batch.set(progressRef, {
+                    visitId: appointment.id, transactionId: appointment.transactionId, stageId: selectedStage.id, stageName: selectedStage.name, selectedBy: currentUser.employeeId, selectedAt: serverTimestamp(),
+                });
+                const apptRef = doc(firestore, 'appointments', appointment.id);
+                batch.update(apptRef, { workStageUpdated: true, workStageProgressId: progressRef.id });
+            }
             
-            // 4. Add a log entry to the transaction's timeline
             const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
-                type: 'log',
-                content: logContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
+                type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
             });
-    
     
             await batch.commit();
     
-            toast({ title: 'نجاح', description: `تم تحديث مرحلة العمل إلى: ${selectedStage.name}` });
+            toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
             
-            // Manually update local state to reflect change immediately
-            setAppointment(prev => prev ? { ...prev, workStageUpdated: true, workStageProgressId: progressRef.id } : null);
+            setAppointment(prev => prev ? { ...prev, workStageUpdated: true } : null);
+            setIsEditingStage(false);
     
         } catch (error) {
             console.error("Error updating work stage:", error);
@@ -336,10 +350,18 @@ export default function AppointmentDetailsPage() {
                                 لا يمكن تحديث مرحلة العمل لأن هذه الزيارة غير مرتبطة بأي معاملة. الرجاء تعديل الموعد وربطه بمعاملة أولاً.
                             </AlertDescription>
                         </Alert>
-                    ) : !appointment.workStageUpdated ? (
+                    ) : !appointment.workStageUpdated || (isEditingStage && currentUser?.role === 'Admin') ? (
                         <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                             <h3 className="font-semibold text-lg flex items-center gap-2"><Workflow className="text-blue-500" /> تحديث مرحلة العمل</h3>
-                             <p className="text-sm text-muted-foreground">الرجاء تحديد مرحلة العمل التي وصل إليها العميل في هذه الزيارة.</p>
+                             <h3 className="font-semibold text-lg flex items-center gap-2">
+                                <Workflow className="text-blue-500" /> 
+                                {isEditingStage ? 'تعديل مرحلة العمل' : 'تحديث مرحلة العمل'}
+                             </h3>
+                             <p className="text-sm text-muted-foreground">
+                                {isEditingStage 
+                                    ? 'اختر المرحلة الصحيحة. سيتم التراجع عن الإجراءات التلقائية السابقة.' 
+                                    : 'الرجاء تحديد مرحلة العمل التي وصل إليها العميل في هذه الزيارة.'
+                                }
+                             </p>
                             <div className="grid gap-2">
                                 <Label htmlFor="work-stage">مرحلة العمل</Label>
                                 <InlineSearchList 
@@ -355,15 +377,22 @@ export default function AppointmentDetailsPage() {
                             </div>
                             <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId}>
                                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Check className="ml-2 h-4 w-4"/>}
-                                تأكيد تحديث المرحلة
+                                {isEditingStage ? 'حفظ التعديل' : 'تأكيد تحديث المرحلة'}
                             </Button>
                         </div>
                     ) : (
                          <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800/50">
                             <Check className="h-4 w-4 !text-green-600 dark:!text-green-300" />
                             <AlertTitle>تم تحديث مرحلة العمل</AlertTitle>
-                            <AlertDescription>
-                                تم تسجيل مرحلة العمل لهذه الزيارة بنجاح.
+                            <AlertDescription asChild>
+                                <div className="flex justify-between items-center w-full">
+                                    <span>تم تسجيل مرحلة العمل لهذه الزيارة بنجاح.</span>
+                                    {currentUser?.role === 'Admin' && (
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-800 hover:text-green-900 dark:text-green-300 dark:hover:text-green-200 -mr-2" onClick={() => setIsEditingStage(true)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
                             </AlertDescription>
                         </Alert>
                     )}
