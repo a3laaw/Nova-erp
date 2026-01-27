@@ -320,7 +320,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(transactionRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterDoc)
+                transaction_firestore.get(journalEntryCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
