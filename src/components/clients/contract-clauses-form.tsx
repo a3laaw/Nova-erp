@@ -171,40 +171,26 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setStep('loading');
       try {
         const allTemplatesQuery = query(collection(firestore, 'contractTemplates'));
-        const stagesQuery = query(collectionGroup(firestore, 'workStages'));
         
-        let departmentStagesQuery = null;
+        let stages: MultiSelectOption[] = [];
+        let fetchedDeptStages: WorkStage[] = [];
+
         if(transaction.departmentId) {
-            departmentStagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`), orderBy('order', 'asc'));
+            const departmentStagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`), orderBy('order', 'asc'));
+            const departmentStagesSnapshot = await getDocs(departmentStagesQuery);
+            fetchedDeptStages = departmentStagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage));
+            stages = fetchedDeptStages.map(stage => ({ value: stage.name, label: stage.name }));
         }
 
         const [
             allTemplatesSnapshot,
-            stagesSnapshot,
-            departmentStagesSnapshot
         ] = await Promise.all([
             getDocs(allTemplatesQuery),
-            getDocs(stagesQuery),
-            departmentStagesQuery ? getDocs(departmentStagesQuery) : Promise.resolve(null),
         ]);
         
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
-
-        const uniqueStages = new Map<string, MultiSelectOption>();
-        stagesSnapshot.forEach(stageDoc => {
-            const stageName = stageDoc.data().name as string;
-            if (stageName && !uniqueStages.has(stageName)) {
-                uniqueStages.set(stageName, { value: stageName, label: stageName });
-            }
-        });
-        const stages = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
-
-        if (departmentStagesSnapshot) {
-            setDepartmentWorkStages(departmentStagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage)));
-        } else {
-            setDepartmentWorkStages([]);
-        }
         
+        setDepartmentWorkStages(fetchedDeptStages);
         setReferenceData({ templates, stages });
 
       } catch (error) {
@@ -313,37 +299,41 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     let newTransactionData: ClientTransaction | null = null;
 
     try {
-        const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
-        const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
-        const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
-
-        const [parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
-            getDocs(parentAccountQuery),
-            getDocs(revenueAccountQuery),
-            getDocs(clientAccountQuery)
-        ]);
-
-        if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
-        if (revenueAccountSnap.empty) throw new Error('حساب "إيرادات استشارات هندسية" غير موجود في شجرة الحسابات.');
-
-        const customersAccountDoc = parentAccountSnap.docs[0];
-        const revenueAccountDoc = revenueAccountSnap.docs[0];
-        
         await runTransaction(firestore, async (transaction_firestore) => {
             const clientRef = doc(firestore, 'clients', clientId);
             const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
+            const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
+            const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
+            const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
 
-            const [clientSnap, currentTransactionSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
+            const [
+                clientSnap, 
+                currentTransactionSnap, 
+                coaClientCounterDoc, 
+                journalEntryCounterDoc, 
+                parentAccountSnap, 
+                revenueAccountSnap,
+                clientAccountSnap
+            ] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(transactionRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef)
+                transaction_firestore.get(journalEntryCounterRef),
+                getDocs(parentAccountQuery), // Fetch inside transaction for consistency
+                getDocs(revenueAccountQuery),
+                getDocs(clientAccountQuery)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
             if (!currentTransactionSnap.exists()) throw new Error("Transaction not found.");
+
+            if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
+            if (revenueAccountSnap.empty) throw new Error('حساب "إيرادات استشارات هندسية" غير موجود في شجرة الحسابات.');
+            
+            const customersAccountDoc = parentAccountSnap.docs[0];
+            const revenueAccountDoc = revenueAccountSnap.docs[0];
 
             const clientData = clientSnap.data();
             const currentTransactionData = currentTransactionSnap.data() as ClientTransaction;
@@ -469,7 +459,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const isCreator = recipientId === currentUser?.id;
             const actionText = transaction.contract ? 'تحديث عقد' : 'توقيع عقد';
             const title = isCreator ? `تم ${actionText} بنجاح` : `${actionText} جديد`;
-            const body = isCreator
+            const body = isCreator 
                 ? `لقد قمت بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`
                 : `قام ${currentUser?.fullName} بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`;
             
@@ -603,10 +593,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                                 <Input value={clause.name} onChange={(e) => handleClauseChange(index, 'name', e.target.value)} />
                                             </TableCell>
                                             <TableCell>
-                                                <Select value={clause.condition || ''} onValueChange={(v) => handleClauseChange(index, 'condition', v)}>
+                                                <Select value={clause.condition || '_NONE_'} onValueChange={(v) => handleClauseChange(index, 'condition', v === '_NONE_' ? '' : v)}>
                                                     <SelectTrigger><SelectValue placeholder="اختر شرط..."/></SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="">- بدون شرط -</SelectItem>
+                                                        <SelectItem value="_NONE_">- بدون شرط -</SelectItem>
                                                         {referenceData.stages.map(stage => <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>)}
                                                     </SelectContent>
                                                 </Select>
