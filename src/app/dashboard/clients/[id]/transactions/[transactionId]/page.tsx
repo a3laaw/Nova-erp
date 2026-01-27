@@ -387,6 +387,20 @@ export default function TransactionDetailPage() {
             createdAt: serverTimestamp(),
         });
         
+        // Add Engineering Comment when completed
+        if (newStatus === 'completed') {
+            const engineeringCommentContent = `تم إكمال مرحلة: ${updatedProgress.name}.`;
+            const engineeringCommentRef = doc(timelineCollectionRef);
+            batch.set(engineeringCommentRef, {
+                type: 'comment',
+                content: engineeringCommentContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            });
+        }
+        
         if (newStatus === 'completed' && oldStatus !== 'completed') {
             newlyCompletedStage = updatedProgress;
             if (transaction.contract?.clauses) {

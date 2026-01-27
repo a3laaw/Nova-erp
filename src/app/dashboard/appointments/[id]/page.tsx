@@ -303,8 +303,20 @@ export default function AppointmentDetailsPage() {
             batch.set(timelineRef, {
                 type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
             });
+
+            // Add Engineering Comment
+            const engineeringCommentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
+            const engineeringCommentRef = doc(collection(transactionRef, 'timelineEvents'));
+            batch.set(engineeringCommentRef, {
+                type: 'comment',
+                content: engineeringCommentContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            });
             
-            // --- NEW: Check for payment due ---
+            // Check for payment due
             const completedStageName = selectedStage.name;
             paymentClauses = transactionData.contract?.clauses?.filter(
                 (c: any) => c.condition === completedStageName && c.status !== 'مدفوعة'
@@ -329,7 +341,7 @@ export default function AppointmentDetailsPage() {
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
             
-            // --- NEW: Send notifications to accountants AFTER successful commit ---
+            // Send notifications to accountants AFTER successful commit
             if (paymentClauses.length > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
