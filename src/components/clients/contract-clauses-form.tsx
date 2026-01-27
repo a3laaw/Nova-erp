@@ -566,137 +566,127 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             </DialogHeader>
             <ScrollArea className="h-[calc(90vh-150px)]">
                 <div className="p-4 space-y-8">
-                    <div>
-                        <Label className="text-base font-semibold">البنود المالية</Label>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>البند</TableHead>
-                              <TableHead>شرط الاستحقاق</TableHead>
-                              <TableHead className="w-[150px] text-left">المبلغ (د.ك)</TableHead>
-                              <TableHead><span className="sr-only">إجراءات</span></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {clauses.map((clause, index) => (
-                              <TableRow key={clause.id}>
-                                <TableCell className="font-medium">
-                                   <Input 
-                                    value={clause.name}
-                                    onChange={(e) => handleClauseChange(index, 'name', e.target.value)}
-                                    placeholder={`دفعة ${index + 1}`}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                   <Select value={clause.condition || '_NONE_'} onValueChange={(v) => handleClauseChange(index, 'condition', v === '_NONE_' ? '' : v)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="اختر مرحلة العمل" />
+                    <section className="space-y-4 p-4 border rounded-lg">
+                        <h3 className="font-semibold">البيانات الأساسية</h3>
+                        <div className="grid gap-2">
+                            <Label htmlFor="template-title">عنوان النموذج <span className="text-destructive">*</span></Label>
+                            <Input id="template-title" value={title} onChange={e => setTitle(e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="template-description">الوصف</Label>
+                            <Textarea id="template-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>ربط بأنواع المعاملات</Label>
+                            <MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع المعاملات..." disabled={loadingRefData} />
+                        </div>
+                    </section>
+
+                    <section className="space-y-4 p-4 border rounded-lg">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold">نطاق العمل (Scope of Work)</h3>
+                            <Button size="sm" variant="outline" type="button" onClick={addScopeItem}><PlusCircle className="ml-2"/> إضافة بند</Button>
+                        </div>
+                        {scopeOfWork.map((item, index) => (
+                            <div key={item.id} className="flex items-start gap-2 p-2 border rounded-md">
+                               <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                               <div className="flex-grow space-y-2">
+                                 <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} />
+                                 <Textarea placeholder="وصف تفصيلي للبند..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} />
+                               </div>
+                                <div className="flex flex-col">
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'up')} disabled={index === 0}>
+                                        <ArrowUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'down')} disabled={index === scopeOfWork.length - 1}>
+                                        <ArrowDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <Button variant="ghost" size="icon" type="button" onClick={() => removeScopeItem(item.id)} className="shrink-0"><Trash2 className="text-destructive h-4 w-4"/></Button>
+                            </div>
+                        ))}
+                    </section>
+
+                    <section className="space-y-4 p-4 border rounded-lg">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold">الشروط والأحكام</h3>
+                            <Button size="sm" variant="outline" type="button" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
+                        </div>
+                         {termsAndConditions.map((term, index) => (
+                            <div key={term.id} className="flex items-center gap-2">
+                               <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                               <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow"/>
+                               <div className="flex flex-col">
+                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
+                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === termsAndConditions.length - 1}><ArrowDown className="h-4 w-4"/></Button>
+                               </div>
+                               <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
+                            </div>
+                         ))}
+                    </section>
+
+                    <section className="space-y-4 p-4 border rounded-lg">
+                        <h3 className="font-semibold">البنود المالية</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label>نوع العقد المالي</Label>
+                                <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="fixed">قيمة ثابتة</SelectItem>
+                                        <SelectItem value="percentage">نسبة مئوية</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>إجمالي قيمة العقد (د.ك)</Label>
+                                <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="dir-ltr text-left" />
+                            </div>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between items-center">
+                             <h4 className="font-semibold">الدفعات المالية</h4>
+                             <Button variant="outline" size="sm" type="button" onClick={addMilestone}><PlusCircle className="ml-2"/> إضافة دفعة</Button>
+                        </div>
+                        <div className="space-y-2">
+                            {financials.milestones.map((m, i) => (
+                                 <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
+                                    <Label className="col-span-3 font-semibold">{m.name}</Label>
+                                    <Select value={m.condition || '_NONE_'} onValueChange={v => updateMilestone(m.id, 'condition', v === '_NONE_' ? '' : v)}>
+                                        <SelectTrigger className="col-span-5">
+                                            <SelectValue placeholder="اختر مرحلة العمل كشرط..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="_NONE_">بدون شرط</SelectItem>
-                                            {referenceData.stages.map(opt => (
-                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                            {allWorkStages.map(stage => (
+                                                <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Input 
-                                    type="number"
-                                    value={clause.amount}
-                                    onChange={(e) => handleClauseChange(index, 'amount', Number(e.target.value))}
-                                    className="text-left dir-ltr"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeClause(clause.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                </TableCell>
-                              </TableRow>
+                                    <div className="col-span-3 flex items-center gap-1">
+                                        <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
+                                        <span className="text-sm">{financials.type === 'fixed' ? 'د.ك' : '%'}</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" type="button" onClick={() => removeMilestone(m.id)} className="col-span-1"><Trash2 className="text-destructive h-4 w-4"/></Button>
+                                 </div>
                             ))}
-                          </TableBody>
-                          <TableFooter>
-                            <TableRow>
-                              <TableCell colSpan={2} className="font-bold">الإجمالي</TableCell>
-                              <TableCell className="text-left font-bold font-mono">
-                                {formatCurrency(totalAmount)}
-                              </TableCell>
-                              <TableCell></TableCell>
-                            </TableRow>
-                          </TableFooter>
-                        </Table>
-                        <div className="flex justify-end mt-2">
-                            <Button type="button" size="sm" variant="outline" onClick={addClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة دفعة</Button>
                         </div>
-                    </div>
-                    
-                    <div className="grid gap-2 pt-4">
-                        <div className='flex justify-between items-center'>
-                          <Label className="text-base font-semibold">نطاق العمل</Label>
-                          <Button type="button" size="sm" variant="outline" onClick={addScopeItem}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
-                        </div>
-                        <div className='space-y-2'>
-                            {scopeOfWork.map((item, index) => (
-                                <div key={item.id} className="flex items-start gap-2 p-2 border rounded-md">
-                                    <span className="text-sm font-semibold pt-2">{arabicOrdinals[index] || `${index + 1}-`}</span>
-                                    <div className="flex-grow space-y-2">
-                                        <Input
-                                            placeholder={`عنوان البند ${index + 1}`}
-                                            value={item.title}
-                                            onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)}
-                                        />
-                                        <Textarea
-                                            placeholder={`وصف تفصيلي للبند...`}
-                                            value={item.description}
-                                            onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)}
-                                            rows={2}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'up')} disabled={index === 0}>
-                                            <ArrowUp className="h-4 w-4" />
-                                        </Button>
-                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderScopeItem(index, 'down')} disabled={index === scopeOfWork.length - 1}>
-                                            <ArrowDown className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeScopeItem(item.id)}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
+                         {financials.milestones.length > 0 && (
+                            <div className="border-t pt-2 mt-2 space-y-1">
+                                <div className="flex justify-between font-semibold">
+                                    <span>مجموع الدفعات:</span>
+                                    <span className="font-mono">{financials.type === 'fixed' ? formatCurrency(totalMilestoneValue) : `${totalMilestoneValue}%`}</span>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                    
-                    <div className="grid gap-2 pt-4">
-                        <div className='flex justify-between items-center'>
-                          <Label className="text-base font-semibold">الشروط والأحكام</Label>
-                          <Button type="button" size="sm" variant="outline" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
-                        </div>
-                        <div className='space-y-2'>
-                            {termsAndConditions.map((term, index) => (
-                                <div key={term.id} className="flex items-center gap-2">
-                                    <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
-                                    <Textarea
-                                        placeholder={`نص الشرط ${index + 1}`}
-                                        value={term.text}
-                                        onChange={(e) => updateTerm(term.id, e.target.value)}
-                                        rows={2}
-                                        className="flex-grow"
-                                    />
-                                    <div className="flex flex-col">
-                                        <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
-                                        <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === termsAndConditions.length - 1}><ArrowDown className="h-4 w-4"/></Button>
-                                    </div>
-                                    <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                                {financials.type === 'percentage' && totalMilestoneValue !== 100 && <p className="text-destructive text-xs text-center">تحذير: مجموع النسب لا يساوي 100%</p>}
+                                 {financials.type === 'fixed' && totalMilestoneValue !== financials.totalAmount && <p className="text-destructive text-xs text-center">تحذير: مجموع الدفعات لا يساوي إجمالي قيمة العقد</p>}
+                            </div>
+                         )}
+                    </section>
 
-                    <div className="grid gap-2 pt-4">
-                        <div className='flex justify-between items-center'>
-                          <Label className="text-base font-semibold">بنود إضافية (اختياري)</Label>
-                          <Button type="button" size="sm" variant="outline" onClick={addOpenClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
+                    <section className="space-y-4 p-4 border rounded-lg">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
+                            <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
                         </div>
                         <div className='space-y-2'>
                             {openClauses.map((clause, index) => (
@@ -723,7 +713,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                             ))}
                         </div>
                     </section>
-
                 </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t">
