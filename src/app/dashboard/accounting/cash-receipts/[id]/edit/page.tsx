@@ -100,6 +100,46 @@ export default function EditCashReceiptPage() {
   }, [amount]);
   
   useEffect(() => {
+    if (!selectedProjectId || !amount || parseFloat(amount) <= 0) {
+        setDescription(''); // Reset description if no project or amount
+        return;
+    }
+    
+    const project = clientProjects.find(p => p.id === selectedProjectId);
+    if (!project || !project.contract?.clauses) {
+        setDescription('');
+        return;
+    }
+    
+    let remainingAmount = parseFloat(amount);
+    const descriptionParts: string[] = [];
+    const unpaidClauses = project.contract.clauses.filter(c => c.status !== 'مدفوعة');
+    
+    for (const clause of unpaidClauses) {
+        if (remainingAmount <= 0) break;
+        
+        const clauseAmount = clause.amount;
+        
+        if (remainingAmount >= clauseAmount) {
+            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(clauseAmount)}`);
+            remainingAmount -= clauseAmount;
+        } else {
+            descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(remainingAmount)}`);
+            const remainingInClause = clauseAmount - remainingAmount;
+            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(remainingInClause)})`);
+            remainingAmount = 0;
+        }
+    }
+    
+    if (remainingAmount > 0) {
+        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmount)} كدفعة مقدمة على الحساب.`);
+    }
+    
+    setDescription(descriptionParts.join('\n'));
+
+}, [amount, selectedProjectId, clientProjects]);
+
+  useEffect(() => {
     if (!firestore) return;
     const fetchClients = async () => {
         try {
@@ -355,4 +395,3 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
-
