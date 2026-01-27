@@ -56,7 +56,6 @@ export default function EditCashReceiptPage() {
   const [amountInWords, setAmountInWords] = useState('');
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [type, setType] = useState('');
   const [reference, setReference] = useState('');
   
   const receiptRef = useMemo(() => {
@@ -86,7 +85,6 @@ export default function EditCashReceiptPage() {
     setAmountInWords(data.amountInWords);
     setDescription(data.description);
     setPaymentMethod(data.paymentMethod);
-    setType(data.type || '');
     setReference(data.reference || '');
     
   }, [receiptSnap, receiptLoading, toast, router]);
@@ -239,10 +237,6 @@ export default function EditCashReceiptPage() {
             updatePayload.reference = reference;
             changes.push(`تحديث المرجع.`);
         }
-        if (type !== (originalReceipt.type || '')) {
-            updatePayload.type = type;
-            changes.push(`تغيير نوع الدفعة.`);
-        }
         
         if (Object.keys(updatePayload).length > 0) {
             batch.update(receiptRefDoc, cleanFirestoreData(updatePayload));
@@ -347,7 +341,7 @@ export default function EditCashReceiptPage() {
                 <Label htmlFor="description">وذلك عن</Label>
                 <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
@@ -359,20 +353,6 @@ export default function EditCashReceiptPage() {
                             <SelectItem value="Cheque">شيك</SelectItem>
                             <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
                             <SelectItem value="K-Net">كي-نت</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="type">نوع الدفعة (يدوي)</Label>
-                    <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving || !!selectedProjectId}>
-                        <SelectTrigger id="type">
-                            <SelectValue placeholder="اختر نوع الدفعة" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="advance">دفعة مقدمة</SelectItem>
-                            <SelectItem value="milestone">دفعة مرحلية</SelectItem>
-                            <SelectItem value="final">دفعة أخيرة</SelectItem>
-                            <SelectItem value="other">أخرى</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

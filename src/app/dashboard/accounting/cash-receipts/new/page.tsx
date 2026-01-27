@@ -58,7 +58,6 @@ export default function NewCashReceiptPage() {
   const [amountInWords, setAmountInWords] = useState('');
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [type, setType] = useState(''); // advance, milestone, final
   const [reference, setReference] = useState('');
 
   const [voucherNumber, setVoucherNumber] = useState('جاري التوليد...');
@@ -143,7 +142,7 @@ export default function NewCashReceiptPage() {
     fetchClients();
   }, [firestore, toast]);
   
-  // Effect to fetch client's projects (transactions with contracts) when a client is selected
+  // Effect to fetch client's projects (transactions) when a client is selected
   useEffect(() => {
     if (!firestore || !selectedClientId) {
         setClientProjects([]);
@@ -160,7 +159,7 @@ export default function NewCashReceiptPage() {
             setClientProjects(fetchedProjects);
         } catch (error) {
             console.error("Error fetching client projects:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب عقود العميل.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب معاملات العميل.' });
         } finally {
             setProjectsLoading(false);
         }
@@ -189,8 +188,6 @@ export default function NewCashReceiptPage() {
       for (const clause of unpaidClauses) {
           if (remainingAmount <= 0) break;
           
-          // NOTE: This is a simplified logic. A real system would need to track partial payments on each clause.
-          // For now, we assume the clause.amount is the full remaining amount for that clause.
           const clauseAmount = clause.amount;
           
           if (remainingAmount >= clauseAmount) {
@@ -286,10 +283,6 @@ export default function NewCashReceiptPage() {
             if (selectedProjectId && selectedProject) {
                 newReceiptData.projectId = selectedProjectId;
                 newReceiptData.projectNameAr = selectedProject.transactionType;
-            }
-
-            if(type) {
-                newReceiptData.type = type;
             }
 
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
@@ -436,7 +429,7 @@ export default function NewCashReceiptPage() {
                     <Label htmlFor="description">وذلك عن</Label>
                     <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
                         <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
                         <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
@@ -448,20 +441,6 @@ export default function NewCashReceiptPage() {
                                 <SelectItem value="Cheque">شيك</SelectItem>
                                 <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
                                 <SelectItem value="K-Net">كي-نت</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="type">نوع الدفعة (يدوي)</Label>
-                        <Select dir="rtl" value={type} onValueChange={setType} disabled={isSaving || !!selectedProjectId}>
-                            <SelectTrigger id="type">
-                                <SelectValue placeholder="اختر نوع الدفعة" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="advance">دفعة مقدمة</SelectItem>
-                                <SelectItem value="milestone">دفعة مرحلية</SelectItem>
-                                <SelectItem value="final">دفعة أخيرة</SelectItem>
-                                <SelectItem value="other">أخرى</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
