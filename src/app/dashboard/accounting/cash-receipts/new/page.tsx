@@ -24,7 +24,7 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, limit, doc, runTransaction, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc } from 'firebase/firestore';
 import type { Client, Company, ClientTransaction } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,18 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+
+const getTotalPaidForProject = async (projectId: string, db: any) => {
+    let total = 0;
+    if (!projectId || !db) return total;
+    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        total += doc.data().amount || 0;
+    });
+    return total;
+};
+
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -156,7 +168,7 @@ export default function NewCashReceiptPage() {
             const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
             const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-            setClientProjects(fetchedProjects.filter(p => !!p.contract));
+            setClientProjects(fetchedProjects); // No filter here
         } catch (error) {
             console.error("Error fetching client projects:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب معاملات العميل.' });
@@ -170,44 +182,63 @@ export default function NewCashReceiptPage() {
   
   // Effect for automatic description generation
   useEffect(() => {
-      if (!selectedProjectId || !amount || parseFloat(amount) <= 0) {
-          setDescription(''); // Reset description if no project or amount
-          return;
-      }
-      
-      const project = clientProjects.find(p => p.id === selectedProjectId);
-      if (!project || !project.contract?.clauses) {
-          setDescription('');
-          return;
-      }
-      
-      let remainingAmount = parseFloat(amount);
-      const descriptionParts: string[] = [];
-      const unpaidClauses = project.contract.clauses.filter(c => c.status !== 'مدفوعة');
-      
-      for (const clause of unpaidClauses) {
-          if (remainingAmount <= 0) break;
-          
-          const clauseAmount = clause.amount;
-          
-          if (remainingAmount >= clauseAmount) {
-              descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(clauseAmount)}`);
-              remainingAmount -= clauseAmount;
-          } else {
-              descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(remainingAmount)}`);
-              const remainingInClause = clauseAmount - remainingAmount;
-              descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(remainingInClause)})`);
-              remainingAmount = 0;
-          }
-      }
-      
-      if (remainingAmount > 0) {
-          descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmount)} كدفعة مقدمة على الحساب.`);
-      }
-      
-      setDescription(descriptionParts.join('\n'));
+    const generateDescription = async () => {
+        if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore) {
+            setDescription('');
+            return;
+        }
 
-  }, [amount, selectedProjectId, clientProjects]);
+        const project = clientProjects.find(p => p.id === selectedProjectId);
+        if (!project || !project.contract?.clauses) {
+            setDescription(''); // Reset description if no contract or clauses
+            return;
+        }
+
+        // 1. Fetch all existing payments for this project
+        let totalAlreadyPaid = 0;
+        try {
+            totalAlreadyPaid = await getTotalPaidForProject(selectedProjectId, firestore);
+        } catch (e) {
+            console.error("Could not fetch previous payments for description generation:", e);
+        }
+
+        let remainingAmountFromCurrentPayment = parseFloat(amount);
+        const descriptionParts: string[] = [];
+        let allocatedPaid = 0;
+
+        // Iterate over a copy of clauses to avoid state issues
+        for (const clause of [...project.contract.clauses]) {
+            if (remainingAmountFromCurrentPayment <= 0) break;
+            
+            const clauseAmount = clause.amount;
+            const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalAlreadyPaid - allocatedPaid));
+            const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
+
+            if (remainingOnClause > 0) {
+                const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
+                
+                if (paymentForThisClause >= remainingOnClause) {
+                    descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
+                } else {
+                    descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+                    const newRemaining = remainingOnClause - paymentForThisClause;
+                    descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+                }
+                remainingAmountFromCurrentPayment -= paymentForThisClause;
+            }
+            allocatedPaid += clauseAmount;
+        }
+
+        if (remainingAmountFromCurrentPayment > 0) {
+            descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
+        }
+        
+        setDescription(descriptionParts.join('\n'));
+    };
+
+    generateDescription();
+  }, [amount, selectedProjectId, clientProjects, firestore]);
+
 
   const clientOptions = useMemo(() => clients.map(c => ({
       value: c.id,
@@ -228,12 +259,12 @@ export default function NewCashReceiptPage() {
         toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح أو المستخدم غير مسجل.' });
         return;
     }
-    // Validation
-    if (!selectedClientId || !amount || !date || !paymentMethod) {
+    
+    if (!selectedClientId || !amount || !date || !paymentMethod || !selectedProjectId) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
-            description: 'الرجاء تعبئة حقول العميل، المبلغ، التاريخ، وطريقة الدفع.',
+            description: 'الرجاء تعبئة حقول العميل، المشروع، المبلغ، التاريخ، وطريقة الدفع.',
         });
         return;
     }
@@ -289,7 +320,6 @@ export default function NewCashReceiptPage() {
 
             transaction_fs.set(newReceiptRef, newReceiptData);
             
-            // If a project is linked, add the description as a comment to its timeline
             if (selectedProjectId && description) {
                 const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
                 transaction_fs.set(timelineCommentRef, {
@@ -302,6 +332,27 @@ export default function NewCashReceiptPage() {
                 });
             }
         });
+        
+        // Post-transaction logic to update contract clauses
+        if (selectedProjectId) {
+            const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
+            const transactionRef = doc(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}`);
+            const transactionDoc = await getDoc(transactionRef);
+            if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
+                let runningPaidTotal = totalPaid;
+                const updatedClauses = transactionDoc.data().contract.clauses.map((clause: any) => {
+                    const newClause = { ...clause };
+                    if (runningPaidTotal >= newClause.amount) {
+                        newClause.status = 'مدفوعة';
+                        runningPaidTotal -= newClause.amount;
+                    } else {
+                        newClause.status = 'غير مستحقة'; // Or whatever the base status is
+                    }
+                    return newClause;
+                });
+                await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
+            }
+        }
         
         toast({
             title: 'نجاح',
@@ -413,7 +464,7 @@ export default function NewCashReceiptPage() {
                 </div>
                 
                 <div className="grid gap-2">
-                    <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
+                    <Label htmlFor="project">ربط بعقد/مشروع <span className="text-destructive">*</span></Label>
                     <InlineSearchList 
                         value={selectedProjectId}
                         onSelect={setSelectedProjectId}
@@ -437,7 +488,7 @@ export default function NewCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="description">وذلك عن</Label>
-                    <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
+                    <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
@@ -485,7 +536,7 @@ export default function NewCashReceiptPage() {
             <Printer className="ml-2 h-4 w-4" />
             طباعة
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher}>
+        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher || !selectedProjectId}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ'}
         </Button>

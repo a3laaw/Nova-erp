@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
-import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where } from 'firebase/firestore';
 import type { CashReceipt, Client, ClientTransaction } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,20 @@ import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/u
 import { useAuth } from '@/context/auth-context';
 import { format } from 'date-fns';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+
+const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
+    let total = 0;
+    if (!projectId || !db) return total;
+    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        if (doc.id !== excludeReceiptId) {
+            total += doc.data().amount || 0;
+        }
+    });
+    return total;
+};
+
 
 export default function EditCashReceiptPage() {
   const router = useRouter();
@@ -98,45 +112,61 @@ export default function EditCashReceiptPage() {
     }
   }, [amount]);
   
-  useEffect(() => {
-    if (!selectedProjectId || !amount || parseFloat(amount) <= 0) {
-        setDescription(''); // Reset description if no project or amount
-        return;
-    }
-    
-    const project = clientProjects.find(p => p.id === selectedProjectId);
-    if (!project || !project.contract?.clauses) {
-        setDescription('');
-        return;
-    }
-    
-    let remainingAmount = parseFloat(amount);
-    const descriptionParts: string[] = [];
-    const unpaidClauses = project.contract.clauses.filter(c => c.status !== 'مدفوعة');
-    
-    for (const clause of unpaidClauses) {
-        if (remainingAmount <= 0) break;
-        
-        const clauseAmount = clause.amount;
-        
-        if (remainingAmount >= clauseAmount) {
-            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(clauseAmount)}`);
-            remainingAmount -= clauseAmount;
-        } else {
-            descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(remainingAmount)}`);
-            const remainingInClause = clauseAmount - remainingAmount;
-            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(remainingInClause)})`);
-            remainingAmount = 0;
-        }
-    }
-    
-    if (remainingAmount > 0) {
-        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmount)} كدفعة مقدمة على الحساب.`);
-    }
-    
-    setDescription(descriptionParts.join('\n'));
+    useEffect(() => {
+        const generateDescription = async () => {
+            if (!receipt?.projectId || !amount || parseFloat(amount) <= 0 || !firestore || !id) {
+                setDescription(receipt?.description || '');
+                return;
+            }
 
-}, [amount, selectedProjectId, clientProjects]);
+            let totalAlreadyPaid = 0;
+            try {
+                totalAlreadyPaid = await getTotalPaidForProject(receipt.projectId, firestore, id);
+            } catch (e) {
+                console.error("Could not fetch previous payments for description generation:", e);
+            }
+
+            const project = clientProjects.find(p => p.id === receipt.projectId);
+            if (!project || !project.contract?.clauses) {
+                setDescription('');
+                return;
+            }
+
+            let remainingAmountFromCurrentPayment = parseFloat(amount);
+            const descriptionParts: string[] = [];
+            let allocatedPaid = 0;
+
+            for (const clause of project.contract.clauses) {
+                if (remainingAmountFromCurrentPayment <= 0) break;
+                
+                const clauseAmount = clause.amount;
+                const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalAlreadyPaid - allocatedPaid));
+                const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
+
+                if (remainingOnClause > 0) {
+                    const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
+                    
+                    if (paymentForThisClause >= remainingOnClause) {
+                        descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
+                    } else {
+                        descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+                        const newRemaining = remainingOnClause - paymentForThisClause;
+                        descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+                    }
+                    remainingAmountFromCurrentPayment -= paymentForThisClause;
+                }
+                allocatedPaid += clauseAmount;
+            }
+
+            if (remainingAmountFromCurrentPayment > 0) {
+                descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
+            }
+            
+            setDescription(descriptionParts.join('\n'));
+        };
+
+        generateDescription();
+    }, [amount, receipt, clientProjects, firestore, id]);
 
   useEffect(() => {
     if (!firestore) return;
@@ -165,7 +195,7 @@ export default function EditCashReceiptPage() {
             const projectsQuery = query(collection(firestore, `clients/${receipt.clientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
             const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-            setClientProjects(fetchedProjects.filter(p => !!p.contract));
+            setClientProjects(fetchedProjects);
         } catch (error) {
             console.error("Error fetching client projects:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب عقود العميل.' });
@@ -191,8 +221,7 @@ export default function EditCashReceiptPage() {
   const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
     
-    // Validation
-    if (!amount || !date || !paymentMethod) {
+    if (!amount || !date || !paymentMethod || !selectedProjectId) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -210,7 +239,6 @@ export default function EditCashReceiptPage() {
         const updatePayload: Record<string, any> = {};
         const changes: string[] = [];
 
-        // Compare fields and build payload and log
         if (date !== format(originalReceipt.receiptDate.toDate(), 'yyyy-MM-dd')) {
             updatePayload.receiptDate = new Date(date);
             changes.push(`تغيير تاريخ السند من ${format(originalReceipt.receiptDate.toDate(), 'dd/MM/yyyy')} إلى ${format(new Date(date), 'dd/MM/yyyy')}`);
@@ -242,20 +270,47 @@ export default function EditCashReceiptPage() {
         if (Object.keys(updatePayload).length > 0) {
             batch.update(receiptRefDoc, cleanFirestoreData(updatePayload));
             
-            // Log changes in client's history
-            const logContent = `قام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}:\n- ${changes.join('\n- ')}`;
-            const historyRef = doc(collection(firestore, 'clients', originalReceipt.clientId, 'history'));
-            batch.set(historyRef, {
-                type: 'log',
-                content: logContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            });
+            if (changes.length > 0) {
+                const logContent = `قام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}:\n- ${changes.join('\n- ')}`;
+                const historyRef = doc(collection(firestore, 'clients', originalReceipt.clientId, 'history'));
+                batch.set(historyRef, {
+                    type: 'log',
+                    content: logContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                });
+            }
             
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تحديث سند القبض بنجاح.' });
+
+             // --- Post-transaction update of contract clause statuses ---
+            if (originalReceipt.projectId && (updatePayload.amount || updatePayload.projectId)) {
+                // Get total paid amount for the project, including the new amount for the receipt being edited
+                const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore, id) + parseFloat(amount);
+                
+                const transactionRef = doc(firestore, `clients/${originalReceipt.clientId}/transactions/${originalReceipt.projectId}`);
+                const transactionDoc = await getDoc(transactionRef);
+                
+                if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
+                    const transactionData = transactionDoc.data();
+                    let allocatedPaid = 0;
+                    const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                        const newClause = {...clause};
+                        if (totalPaid >= allocatedPaid + newClause.amount) {
+                            newClause.status = 'مدفوعة';
+                        } else {
+                            newClause.status = 'غير مستحقة'; 
+                        }
+                        allocatedPaid += newClause.amount;
+                        return newClause;
+                    });
+                    await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
+                }
+            }
+
 
             // --- Notification Logic ---
             if (changes.length > 0 && originalReceipt.projectId) {
@@ -346,7 +401,7 @@ export default function EditCashReceiptPage() {
             </div>
             
             <div className="grid gap-2">
-                <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
+                <Label htmlFor="project">ربط بعقد/مشروع <span className="text-destructive">*</span></Label>
                 <InlineSearchList 
                     value={selectedProjectId}
                     onSelect={setSelectedProjectId}
@@ -370,7 +425,7 @@ export default function EditCashReceiptPage() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="description">وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
+                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="grid gap-2">
@@ -398,7 +453,7 @@ export default function EditCashReceiptPage() {
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || loading}>
+        <Button onClick={handleSave} disabled={isSaving || loading || !selectedProjectId}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
