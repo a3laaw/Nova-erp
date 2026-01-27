@@ -373,8 +373,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             // Log in transaction timeline
             const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
             transaction_firestore.set(doc(transactionTimelineRef), {
-                type: 'log',
-                content: `تم إنشاء/تحديث العقد بواسطة ${currentUser.fullName}.`,
+                type: 'comment',
+                content: `**تم إنشاء/تحديث العقد**\nقام ${currentUser.fullName} بإنشاء أو تحديث العقد لهذه المعاملة.`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl || '',
