@@ -49,6 +49,7 @@ export default function AppointmentDetailsPage() {
     const [client, setClient] = useState<Client | null>(null);
     const [engineer, setEngineer] = useState<Employee | null>(null);
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
+    const [transaction, setTransaction] = useState<ClientTransaction | null>(null);
     
     // UI states
     const [loading, setLoading] = useState(true);
@@ -85,6 +86,15 @@ export default function AppointmentDetailsPage() {
                 const [clientSnap, engineerSnap] = await Promise.all([getDoc(clientRef), getDoc(engineerRef)]);
                 if (clientSnap.exists()) setClient(clientSnap.data() as Client);
                 if (engineerSnap.exists()) setEngineer(engineerSnap.data() as Employee);
+
+                // Fetch the transaction to get stage progress
+                if (appointment.transactionId) {
+                    const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
+                    const transactionSnap = await getDoc(transactionRef);
+                    if (transactionSnap.exists()) {
+                        setTransaction(transactionSnap.data() as ClientTransaction);
+                    }
+                }
 
                 // Fetch architectural department work stages
                 const deptQuery = query(collection(firestore, 'departments'), where('name', '==', 'القسم المعماري'), limit(1));
@@ -256,7 +266,19 @@ export default function AppointmentDetailsPage() {
     
     if (!appointment) return null;
 
-    const workStageOptions = workStages.map(stage => ({ value: stage.id, label: stage.name }));
+    const workStageOptions = useMemo(() => {
+        if (!workStages) return [];
+        // If transaction data is not loaded yet, show all stages to avoid flickering
+        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
+
+        const completedStageIds = new Set(
+            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
+        );
+
+        return workStages
+            .filter(stage => !completedStageIds.has(stage.id!))
+            .map(stage => ({ value: stage.id!, label: stage.name }));
+    }, [workStages, transaction]);
 
     return (
         <div className="max-w-2xl mx-auto space-y-6" dir="rtl">
@@ -283,7 +305,15 @@ export default function AppointmentDetailsPage() {
                     <CardTitle>إجراءات الزيارة</CardTitle>
                 </CardHeader>
                  <CardContent>
-                    {!appointment.workStageUpdated ? (
+                    {!appointment.transactionId ? (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>زيارة غير مرتبطة بمعاملة</AlertTitle>
+                            <AlertDescription>
+                                لا يمكن تحديث مرحلة العمل لأن هذه الزيارة غير مرتبطة بأي معاملة. الرجاء تعديل الموعد وربطه بمعاملة أولاً.
+                            </AlertDescription>
+                        </Alert>
+                    ) : !appointment.workStageUpdated ? (
                         <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                              <h3 className="font-semibold text-lg flex items-center gap-2"><Workflow className="text-blue-500" /> تحديث مرحلة العمل</h3>
                              <p className="text-sm text-muted-foreground">الرجاء تحديد مرحلة العمل التي وصل إليها العميل في هذه الزيارة.</p>
@@ -295,6 +325,9 @@ export default function AppointmentDetailsPage() {
                                     options={workStageOptions}
                                     placeholder="اختر مرحلة..."
                                 />
+                                {workStageOptions.length === 0 && !loading && (
+                                    <p className='text-xs text-muted-foreground'>جميع المراحل لهذه المعاملة قد اكتملت.</p>
+                                )}
                             </div>
                             <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId}>
                                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Check className="ml-2 h-4 w-4"/>}
@@ -319,7 +352,7 @@ export default function AppointmentDetailsPage() {
                         <ArrowRight className="ml-2 h-4 w-4" />
                         إغلاق الزيارة
                     </Button>
-                    {!appointment.workStageUpdated && (
+                    {!appointment.workStageUpdated && appointment.transactionId && (
                          <Alert variant="destructive" className="w-full">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>إجراء مطلوب</AlertTitle>
