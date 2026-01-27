@@ -60,6 +60,20 @@ export default function AppointmentDetailsPage() {
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
 
+    const workStageOptions = useMemo(() => {
+        if (!workStages) return [];
+        // If transaction data is not loaded yet, show all stages to avoid flickering
+        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
+
+        const completedStageIds = new Set(
+            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
+        );
+
+        return workStages
+            .filter(stage => !completedStageIds.has(stage.id!))
+            .map(stage => ({ value: stage.id!, label: stage.name }));
+    }, [workStages, transaction]);
+
     useEffect(() => {
         if (!id && !appointmentLoading) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'معرف الموعد غير موجود.' });
@@ -117,20 +131,6 @@ export default function AppointmentDetailsPage() {
         fetchRelatedData();
     }, [appointment, firestore, toast]);
 
-    const workStageOptions = useMemo(() => {
-        if (!workStages) return [];
-        // If transaction data is not loaded yet, show all stages to avoid flickering
-        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
-
-        const completedStageIds = new Set(
-            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
-        );
-
-        return workStages
-            .filter(stage => !completedStageIds.has(stage.id!))
-            .map(stage => ({ value: stage.id!, label: stage.name }));
-    }, [workStages, transaction]);
-
     const handleUpdateStage = async () => {
         if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء اختيار مرحلة عمل. تأكد من أن هذه الزيارة مرتبطة بمعاملة.' });
@@ -184,33 +184,31 @@ export default function AppointmentDetailsPage() {
             
             let logContent = `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
 
-            // --- 2. Conditionally start the NEXT stage if contract was signed ---
-            if (selectedStage.name === 'توقيع العقد') {
-                const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
-                const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
-    
-                if (nextStageInTemplate) {
-                    const nextStageId = nextStageInTemplate.id!;
-                    const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
-    
-                    if (nextStageIndexInProg !== -1) {
-                        const stageToStart = { ...currentStages[nextStageIndexInProg] };
-                        if (stageToStart.status === 'pending') {
-                            stageToStart.status = 'in-progress';
-                            stageToStart.startDate = now;
-                            currentStages[nextStageIndexInProg] = stageToStart;
-                            logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
-                        }
-                    } else {
-                        currentStages.push({
-                            stageId: nextStageId,
-                            name: nextStageInTemplate.name,
-                            status: 'in-progress',
-                            startDate: now,
-                            endDate: null,
-                        });
+            // --- 2. Start the NEXT stage automatically ---
+            const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
+            const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
+
+            if (nextStageInTemplate) {
+                const nextStageId = nextStageInTemplate.id!;
+                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+
+                if (nextStageIndexInProg !== -1) {
+                    const stageToStart = { ...currentStages[nextStageIndexInProg] };
+                    if (stageToStart.status === 'pending') {
+                        stageToStart.status = 'in-progress';
+                        stageToStart.startDate = now;
+                        currentStages[nextStageIndexInProg] = stageToStart;
                         logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
                     }
+                } else {
+                    currentStages.push({
+                        stageId: nextStageId,
+                        name: nextStageInTemplate.name,
+                        status: 'in-progress',
+                        startDate: now,
+                        endDate: null,
+                    });
+                    logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
                 }
             }
     

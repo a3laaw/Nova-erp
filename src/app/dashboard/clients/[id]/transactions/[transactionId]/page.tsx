@@ -333,8 +333,8 @@ export default function TransactionDetailPage() {
         newProgressForFirestore = [...originalProgress, updatedProgress as TransactionStage];
     }
     
-    const wasContractSigned = updatedProgress.name === 'توقيع العقد' && newStatus === 'completed' && oldStatus !== 'completed';
-    if (wasContractSigned) {
+    const shouldStartNextStage = newStatus === 'completed' && oldStatus !== 'completed';
+    if (shouldStartNextStage) {
         const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
         const nextStageInUI = stages[completedStageOrderIndex + 1];
 
@@ -371,7 +371,7 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRefDoc, safeDataToUpdate);
         
-        const logContent = `قام بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        const logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         batch.set(doc(timelineCollectionRef), {
             type: 'log',
             content: logContent,
