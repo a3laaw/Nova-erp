@@ -370,12 +370,36 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const updatePayload = { contract: contractData, stages: updatedStages };
             transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            
+            // Add a detailed comment about the new contract
+            let contractDetailsComment = `**تم توقيع عقد جديد**\n\n`;
+            contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
+            contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
+            contractDetailsComment += `**الدفعات:**\n`;
+            if (clauses.length > 0) {
+              clauses.forEach(c => {
+                contractDetailsComment += `  - ${c.name}: ${formatCurrency(c.amount)}\n`;
+              });
+            } else {
+              contractDetailsComment += `  - لا توجد دفعات محددة.\n`;
+            }
+
+            transaction_firestore.set(doc(historyCollectionRef), {
+                type: 'comment',
+                content: contractDetailsComment,
+                userId: currentUser.id, 
+                userName: currentUser.fullName || 'النظام', 
+                userAvatar: currentUser.avatarUrl || '', 
+                createdAt: serverTimestamp(),
+            });
+
+
             // This logic only runs when creating a contract for the first time for a client
             if (clientData.status === 'new') {
                 let clientAccountId: string;
                 transaction_firestore.update(clientRef, { status: 'contracted' });
 
-                const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
                 transaction_firestore.set(doc(historyCollectionRef), {
                     type: 'log',
                     content: `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`,
@@ -587,7 +611,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                         <div className='space-y-2'>
                             {terms.map((term, index) => (
                                 <div key={term.id} className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold pt-2">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                                    <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                     <Textarea
                                         placeholder={`نص الشرط ${index + 1}`}
                                         value={term.text}
@@ -612,7 +636,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                         <div className='space-y-2'>
                             {openClauses.map((clause, index) => (
                                 <div key={clause.id} className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold pt-2">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                                    <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                     <Textarea
                                         placeholder={`نص البند الإضافي ${index + 1}`}
                                         value={clause.text}
