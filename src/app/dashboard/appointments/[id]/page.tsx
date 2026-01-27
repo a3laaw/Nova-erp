@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot } from 'firebase/firestore';
 import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction } from '@/lib/types';
 import {
   Card,
@@ -51,6 +51,7 @@ export default function AppointmentDetailsPage() {
     const [engineer, setEngineer] = useState<Employee | null>(null);
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
     const [transaction, setTransaction] = useState<ClientTransaction | null>(null);
+    const [progressDoc, setProgressDoc] = useState<DocumentSnapshot | null>(null);
     
     // UI states
     const [loading, setLoading] = useState(true);
@@ -64,38 +65,60 @@ export default function AppointmentDetailsPage() {
     // Hooks are now called unconditionally at the top level
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
 
+    // Fetch the specific progress document for this visit
+    useEffect(() => {
+        if (!firestore || !appointment?.workStageProgressId) {
+            setProgressDoc(null);
+            return;
+        }
+        const fetchProgressDoc = async () => {
+            const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
+            try {
+                const progressSnap = await getDoc(progressRef);
+                if (progressSnap.exists()) {
+                    setProgressDoc(progressSnap);
+                }
+            } catch (error) {
+                console.error("Failed to fetch progress doc:", error);
+            }
+        };
+        fetchProgressDoc();
+    }, [firestore, appointment?.workStageProgressId]);
+
+
     const workStageOptions = useMemo(() => {
         if (!workStages || !currentUser) return [];
 
         // Filter stages based on the current user's role and job title
         const roleFilteredStages = workStages.filter(stage => {
-            // Admin can see all stages
             if (currentUser.role === 'Admin') {
                 return true;
             }
-            // If allowedRoles is not defined or empty, assume it's a general stage visible to all
             if (!stage.allowedRoles || stage.allowedRoles.length === 0) {
                 return true;
             }
-            // If allowedRoles is defined, the user's jobTitle must be included
             return currentUser.jobTitle ? stage.allowedRoles.includes(currentUser.jobTitle) : false;
         });
 
-        // If transaction data isn't loaded yet, show the role-filtered list to avoid flickering
         if (!transaction) {
             return roleFilteredStages.map(stage => ({ value: stage.id!, label: stage.name }));
         }
 
-        // Exclude stages that are already completed
         const completedStageIds = new Set(
             transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
         );
+
+        // If we are editing, the stage completed for THIS visit should be available in the list.
+        const stageIdForThisVisit = progressDoc?.data()?.stageId;
+        if (isEditingStage && stageIdForThisVisit) {
+            completedStageIds.delete(stageIdForThisVisit);
+        }
 
         return roleFilteredStages
             .filter(stage => !completedStageIds.has(stage.id!))
             .map(stage => ({ value: stage.id!, label: stage.name }));
             
-    }, [workStages, transaction, currentUser]);
+    }, [workStages, transaction, currentUser, isEditingStage, progressDoc]);
 
 
     useEffect(() => {
