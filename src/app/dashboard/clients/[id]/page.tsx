@@ -164,12 +164,31 @@ export default function ClientProfilePage() {
     setIsProcessing(true);
     try {
         const batch = writeBatch(firestore);
-
-        // 1. Remove contract from the transaction using deleteField
         const transactionRef = doc(firestore, 'clients', client.id, 'transactions', transactionToCancel.id!);
-        batch.update(transactionRef, { contract: deleteField() });
 
-        // 2. Log the event
+        // Revert contract signing stage
+        const currentStages = [...(transactionToCancel.stages || [])];
+        const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+        let stagesUpdated = false;
+
+        if (contractStageIndex > -1 && currentStages[contractStageIndex].status === 'completed') {
+            const stageToRevert = { ...currentStages[contractStageIndex] };
+            stageToRevert.status = 'pending';
+            stageToRevert.endDate = null;
+            currentStages[contractStageIndex] = stageToRevert;
+            stagesUpdated = true;
+        }
+
+        const updateData: { contract: any; stages?: any[] } = {
+            contract: deleteField()
+        };
+        if (stagesUpdated) {
+            updateData.stages = currentStages;
+        }
+        
+        batch.update(transactionRef, updateData);
+
+        // Log the event
         const historyCollectionRef = collection(firestore, `clients/${client.id}/history`);
         const logContent = `قام بإلغاء عقد المعاملة: "${transactionToCancel.transactionType}".`;
         batch.set(doc(historyCollectionRef), {
@@ -180,8 +199,19 @@ export default function ClientProfilePage() {
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
         });
+        
+        const transactionTimelineRef = collection(firestore, `clients/${client.id}/transactions/${transactionToCancel.id}/timelineEvents`);
+        batch.set(doc(transactionTimelineRef), {
+            type: 'comment',
+            content: `**تم إلغاء العقد**\nقام ${currentUser.fullName} بإلغاء العقد المرتبط بهذه المعاملة.`,
+            userId: currentUser.id, 
+            userName: currentUser.fullName, 
+            userAvatar: currentUser.avatarUrl, 
+            createdAt: serverTimestamp(),
+        });
 
-        // 3. Check if this is the last contract to potentially revert client status
+
+        // Check if this is the last contract to potentially revert client status
         const otherTransactions = transactions.filter(tx => tx.id !== transactionToCancel.id!);
         const hasOtherContracts = otherTransactions.some(tx => !!tx.contract);
 
@@ -201,7 +231,7 @@ export default function ClientProfilePage() {
         }
 
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تم إلغاء العقد بنجاح.' });
+        toast({ title: 'نجاح', description: 'تم إلغاء العقد وتحديث المراحل بنجاح.' });
 
     } catch (error) {
         console.error("Error cancelling contract:", error);
@@ -469,7 +499,7 @@ export default function ClientProfilePage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>تأكيد إلغاء العقد</AlertDialogTitle>
                 <AlertDialogDescription>
-                    هل أنت متأكد من رغبتك في إلغاء عقد المعاملة "{transactionToCancel?.transactionType}"؟ سيتم حذف بيانات العقد نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                    هل أنت متأكد من رغبتك في إلغاء عقد المعاملة "{transactionToCancel?.transactionType}"؟ سيتم حذف بيانات العقد نهائياً والتراجع عن مرحلة توقيع العقد. لا يمكن التراجع عن هذا الإجراء.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
