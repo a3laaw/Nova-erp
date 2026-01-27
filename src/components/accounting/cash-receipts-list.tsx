@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -16,7 +15,7 @@ import { collection, query, orderBy, doc, deleteDoc, writeBatch, getDoc, updateD
 import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -24,6 +23,8 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -53,6 +54,11 @@ export function CashReceiptsList() {
   
   const [receiptToDelete, setReceiptToDelete] = useState<CashReceipt | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // State for filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
 
   const receiptsQuery = useMemo(() => {
@@ -66,6 +72,26 @@ export function CashReceiptsList() {
     if (!snapshot) return [];
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CashReceipt));
   }, [snapshot]);
+  
+  const filteredReceipts = useMemo(() => {
+    return receipts.filter(receipt => {
+        const searchLower = searchQuery.toLowerCase();
+        
+        const receiptDate = receipt.receiptDate?.toDate ? receipt.receiptDate.toDate() : null;
+        if (!receiptDate) return false;
+        
+        const matchesSearch = !searchQuery ||
+            (receipt.voucherNumber && receipt.voucherNumber.toLowerCase().includes(searchLower)) ||
+            (receipt.clientNameAr && receipt.clientNameAr.toLowerCase().includes(searchLower)) ||
+            String(receipt.amount).includes(searchQuery);
+
+        const matchesDateFrom = !dateFrom || (receiptDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
+        const matchesDateTo = !dateTo || (receiptDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+        
+        return matchesSearch && matchesDateFrom && matchesDateTo;
+    });
+  }, [receipts, searchQuery, dateFrom, dateTo]);
+
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
@@ -155,21 +181,46 @@ export function CashReceiptsList() {
   if (error) {
       return <div className="text-center py-10 text-destructive">فشل تحميل قائمة السندات.</div>;
   }
-
-  if (receipts.length === 0) {
-    return (
-        <div className="p-8 text-center border-2 border-dashed rounded-lg">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-medium">لا توجد سندات قبض</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-                ابدأ بإنشاء سند قبض جديد ليظهر هنا.
-            </p>
-        </div>
-    );
-  }
+  
 
   return (
     <>
+        <div className="bg-muted/50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid gap-2 md:col-span-1">
+                    <Label htmlFor="search">بحث ذكي</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            id="search"
+                            placeholder="رقم السند, اسم العميل, المبلغ..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                    <Input 
+                        id="dateFrom"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                    <Input 
+                        id="dateTo"
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                    />
+                </div>
+            </div>
+        </div>
+
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -183,41 +234,61 @@ export function CashReceiptsList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {receipts.map((receipt) => (
-                <TableRow key={receipt.id}>
-                  <TableCell className="font-mono">{receipt.voucherNumber}</TableCell>
-                  <TableCell>
-                    <Link href={`/dashboard/clients/${receipt.clientId}`} className="hover:underline">
-                      {receipt.clientNameAr}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{formatDate(receipt.receiptDate)}</TableCell>
-                  <TableCell>
-                      <Badge variant="outline">{paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod}</Badge>
-                  </TableCell>
-                  <TableCell className="text-left font-mono">{formatCurrency(receipt.amount)}</TableCell>
-                   <TableCell>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" dir="rtl">
-                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}`)}>
-                                    <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}>
-                                    <Pencil className="ml-2 h-4 w-4" /> تعديل
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setReceiptToDelete(receipt)} className="text-destructive focus:text-destructive">
-                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                   </TableCell>
-                </TableRow>
-              ))}
+                {receipts.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={6}>
+                            <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h3 className="mt-4 text-lg font-medium">لا توجد سندات قبض</h3>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    ابدأ بإنشاء سند قبض جديد ليظهر هنا.
+                                </p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ) : filteredReceipts.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center">
+                            لا توجد نتائج تطابق بحثك.
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                    filteredReceipts.map((receipt) => (
+                        <TableRow key={receipt.id}>
+                        <TableCell className="font-mono">{receipt.voucherNumber}</TableCell>
+                        <TableCell>
+                            <Link href={`/dashboard/clients/${receipt.clientId}`} className="hover:underline">
+                            {receipt.clientNameAr}
+                            </Link>
+                        </TableCell>
+                        <TableCell>{formatDate(receipt.receiptDate)}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod}</Badge>
+                        </TableCell>
+                        <TableCell className="text-left font-mono">{formatCurrency(receipt.amount)}</TableCell>
+                        <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" dir="rtl">
+                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}`)}>
+                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}>
+                                            <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => setReceiptToDelete(receipt)} className="text-destructive focus:text-destructive">
+                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                        </TableCell>
+                        </TableRow>
+                    ))
+                )}
             </TableBody>
           </Table>
         </div>
