@@ -1,13 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { X, ChevronsUpDown } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
+import ReactSelect, { type StylesConfig } from 'react-select';
 import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export interface MultiSelectOption {
   value: string;
@@ -17,113 +13,130 @@ export interface MultiSelectOption {
 interface MultiSelectProps {
   options: MultiSelectOption[];
   selected: string[];
-  onChange: React.Dispatch<React.SetStateAction<string[]>>;
+  onChange: (selected: string[]) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
 }
 
-export function MultiSelect({ options, selected, onChange, placeholder = 'Select options...', className, disabled = false }: MultiSelectProps) {
-  const [open, setOpen] = React.useState(false);
+// Using HSL values directly from globals.css for theming
+const customStyles: StylesConfig<MultiSelectOption, true> = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '40px',
+    backgroundColor: 'hsl(var(--background))',
+    borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--border))',
+    boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
+    borderRadius: 'var(--radius)',
+    '&:hover': {
+      borderColor: 'hsl(var(--input))',
+    },
+    direction: 'rtl',
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    padding: '2px 8px',
+    gap: '4px'
+  }),
+  multiValue: (provided) => ({
+    ...provided,
+    backgroundColor: 'hsl(var(--secondary))',
+    borderRadius: 'calc(var(--radius) - 4px)',
+  }),
+  multiValueLabel: (provided) => ({
+    ...provided,
+    color: 'hsl(var(--secondary-foreground))',
+    fontSize: '0.875rem',
+  }),
+  multiValueRemove: (provided) => ({
+    ...provided,
+    color: 'hsl(var(--muted-foreground))',
+    borderRadius: '0 calc(var(--radius) - 4px) calc(var(--radius) - 4px) 0',
+    '&:hover': {
+      backgroundColor: 'hsl(var(--destructive) / 0.2)',
+      color: 'hsl(var(--destructive))',
+    },
+  }),
+  menu: (provided) => ({
+    ...provided,
+    backgroundColor: 'hsl(var(--popover))',
+    borderRadius: 'var(--radius)',
+    borderColor: 'hsl(var(--border))',
+    zIndex: 50,
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected
+      ? 'hsl(var(--primary))'
+      : state.isFocused
+      ? 'hsl(var(--accent))'
+      : 'transparent',
+    color: state.isSelected
+      ? 'hsl(var(--primary-foreground))'
+      : 'hsl(var(--popover-foreground))',
+    cursor: 'pointer',
+    textAlign: 'right',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: 'hsl(var(--muted-foreground))',
+  }),
+  input: (provided) => ({
+    ...provided,
+    color: 'hsl(var(--foreground))',
+    margin: '0',
+    padding: '0',
+  }),
+  indicatorSeparator: () => ({
+    display: 'none',
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    color: 'hsl(var(--muted-foreground))',
+    '&:hover': {
+      color: 'hsl(var(--foreground))',
+    }
+  }),
+};
 
-  const handleUnselect = (item: string) => {
-    onChange(selected.filter((i) => i !== item));
+export function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder = 'Select options...',
+  className,
+  disabled = false,
+}: MultiSelectProps) {
+
+  const handleChange = (selectedOptions: readonly MultiSelectOption[] | null) => {
+    const values = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+    console.log("تم اختيار:", values);
+    onChange(values);
   };
 
+  const selectedValue = options.filter(option => selected.includes(option.value));
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-full justify-between font-normal h-auto min-h-10", className)}
-          onClick={() => setOpen(!open)}
-          disabled={disabled}
-        >
-          <div className="flex gap-1 flex-wrap">
-            {selected.length > 0 ? (
-              selected.map((item) => {
-                const option = options.find((opt) => opt.value === item);
-                return (
-                  <Badge
-                    variant="secondary"
-                    key={item}
-                    className="mr-1 mb-1"
-                  >
-                    {option?.label || item}
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Remove ${option?.label || item}`}
-                      className="ml-1 cursor-pointer ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleUnselect(item);
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUnselect(item);
-                      }}
-                    >
-                      <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </span>
-                  </Badge>
-                );
-              })
-            ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
-            )}
+    <ReactSelect
+      isMulti
+      options={options}
+      value={selectedValue}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={cn('basic-multi-select', className)}
+      classNamePrefix="select"
+      isDisabled={disabled}
+      isSearchable={true}
+      noOptionsMessage={() => "لا توجد نتائج"}
+      styles={customStyles}
+      isRtl={true}
+      components={{
+        MultiValueRemove: ({ children, ...props }) => (
+          <div {...props.innerProps}>
+            <X className="h-3 w-3" />
           </div>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder="Search..." />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onSelect={() => {
-                    console.log("تم كليك على:", option.value);
-                    onChange(
-                      selected.includes(option.value)
-                        ? selected.filter((item) => item !== option.value)
-                        : [...selected, option.value]
-                    );
-                    setOpen(true);
-                  }}
-                  className={cn("cursor-pointer")}
-                >
-                  <div
-                    className={cn(
-                      'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
-                      selected.includes(option.value) ? 'bg-primary text-primary-foreground' : 'opacity-50 [&_svg]:invisible'
-                    )}
-                  >
-                    <Check className={cn('h-4 w-4')} />
-                  </div>
-                  {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        )
+      }}
+    />
   );
 }
