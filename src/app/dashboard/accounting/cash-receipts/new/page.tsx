@@ -218,9 +218,7 @@ export default function NewCashReceiptPage() {
       searchKey: c.mobile,
   })), [clients]);
 
-  const projectOptions = useMemo(() => clientProjects
-    .filter(p => p.contract && p.contract.clauses && p.contract.clauses.length > 0)
-    .map(p => {
+  const projectOptions = useMemo(() => clientProjects.map(p => {
     const dateString = p.createdAt?.toDate ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '';
     return {
         value: p.id!,
@@ -234,11 +232,11 @@ export default function NewCashReceiptPage() {
         return;
     }
     // Validation
-    if (!selectedClientId || !selectedProjectId || !amount || !date || !paymentMethod) {
+    if (!selectedClientId || !amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
-            description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).',
+            description: 'الرجاء تعبئة حقول العميل، المبلغ، التاريخ، وطريقة الدفع.',
         });
         return;
     }
@@ -412,7 +410,7 @@ export default function NewCashReceiptPage() {
                 </div>
                 
                 <div className="grid gap-2">
-                    <Label htmlFor="project">ربط بعقد/مشروع <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="project">ربط بعقد/مشروع (اختياري)</Label>
                     <InlineSearchList 
                         value={selectedProjectId}
                         onSelect={setSelectedProjectId}

@@ -181,9 +181,7 @@ export default function EditCashReceiptPage() {
       searchKey: c.mobile,
   })), [clients]);
 
-  const projectOptions = useMemo(() => clientProjects
-    .filter(p => p.contract && p.contract.clauses && p.contract.clauses.length > 0)
-    .map(p => {
+  const projectOptions = useMemo(() => clientProjects.map(p => {
     const dateString = p.createdAt?.toDate ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '';
     return {
         value: p.id!,
