@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch, getDoc, updateDoc, where, getDocs } from 'firebase/firestore';
 import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -30,6 +31,20 @@ const paymentMethodTranslations: Record<string, string> = {
     'Bank Transfer': 'تحويل بنكي',
     'K-Net': 'كي-نت'
 };
+
+const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
+    let total = 0;
+    if (!projectId || !db) return total;
+    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        if (doc.id !== excludeReceiptId) {
+            total += doc.data().amount || 0;
+        }
+    });
+    return total;
+};
+
 
 export function CashReceiptsList() {
   const { firestore } = useFirebase();
@@ -65,8 +80,43 @@ export function CashReceiptsList() {
     if (!receiptToDelete || !firestore) return;
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(firestore, 'cashReceipts', receiptToDelete.id!));
-        toast({ title: 'نجاح', description: 'تم حذف سند القبض بنجاح.' });
+        const batch = writeBatch(firestore);
+        const receiptRef = doc(firestore, 'cashReceipts', receiptToDelete.id!);
+        batch.delete(receiptRef); // Stage the deletion
+
+        // Recalculate contract statuses if linked to a project
+        if (receiptToDelete.projectId) {
+            const projectRef = doc(firestore, 'clients', receiptToDelete.clientId, 'transactions', receiptToDelete.projectId);
+            const projectSnap = await getDoc(projectRef); // Need to get it before batching update
+
+            if (projectSnap.exists() && projectSnap.data()?.contract?.clauses) {
+                // Calculate the total paid amount *after* deletion
+                const totalPaidAfterDeletion = await getTotalPaidForProject(receiptToDelete.projectId, firestore, receiptToDelete.id);
+
+                const transactionData = projectSnap.data();
+                let accumulatedAmount = 0;
+                let dueClauseFound = false;
+                const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                    const newClause = { ...clause };
+                    if (totalPaidAfterDeletion >= accumulatedAmount + clause.amount) {
+                        newClause.status = 'مدفوعة';
+                    } else if (totalPaidAfterDeletion > accumulatedAmount && !dueClauseFound) {
+                        newClause.status = 'مستحقة';
+                        dueClauseFound = true;
+                    } else {
+                        newClause.status = 'غير مستحقة';
+                    }
+                    accumulatedAmount += clause.amount;
+                    return newClause;
+                });
+
+                batch.update(projectRef, { 'contract.clauses': updatedClauses });
+            }
+        }
+        
+        await batch.commit(); // Commit both deletion and update together
+
+        toast({ title: 'نجاح', description: 'تم حذف سند القبض وتحديث حالة العقد.' });
     } catch (error) {
         console.error('Error deleting cash receipt:', error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف سند القبض.' });

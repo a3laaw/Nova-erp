@@ -194,7 +194,9 @@ export default function EditCashReceiptPage() {
         try {
             const projectsQuery = query(collection(firestore, `clients/${receipt.clientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
-            const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+            const fetchedProjects = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction))
+                .filter(tx => !!tx.contract);
             setClientProjects(fetchedProjects);
         } catch (error) {
             console.error("Error fetching client projects:", error);
@@ -221,7 +223,7 @@ export default function EditCashReceiptPage() {
   const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
     
-    if (!amount || !date || !paymentMethod || !selectedProjectId) {
+    if (!amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -286,28 +288,34 @@ export default function EditCashReceiptPage() {
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تحديث سند القبض بنجاح.' });
 
-             // --- Post-transaction update of contract clause statuses ---
-            if (originalReceipt.projectId && (updatePayload.amount || updatePayload.projectId)) {
-                // Get total paid amount for the project, including the new amount for the receipt being edited
-                const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore, id) + parseFloat(amount);
+            // --- Post-transaction update of contract clause statuses ---
+            if (originalReceipt.projectId) { // Always recalculate if the project exists
+                const projectRef = doc(firestore, `clients/${originalReceipt.clientId}/transactions/${originalReceipt.projectId}`);
                 
-                const transactionRef = doc(firestore, `clients/${originalReceipt.clientId}/transactions/${originalReceipt.projectId}`);
-                const transactionDoc = await getDoc(transactionRef);
+                // Recalculate total paid amount for the project, considering the new amount
+                const newTotalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore, id) + parseFloat(amount);
+                
+                const transactionDoc = await getDoc(projectRef);
                 
                 if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
                     const transactionData = transactionDoc.data();
-                    let allocatedPaid = 0;
+                    let accumulatedAmount = 0;
+                    let dueClauseFound = false;
                     const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
                         const newClause = {...clause};
-                        if (totalPaid >= allocatedPaid + newClause.amount) {
+                        if (newTotalPaid >= accumulatedAmount + clause.amount) {
                             newClause.status = 'مدفوعة';
+                        } else if (newTotalPaid > accumulatedAmount && !dueClauseFound) {
+                            newClause.status = 'مستحقة';
+                            dueClauseFound = true;
                         } else {
                             newClause.status = 'غير مستحقة'; 
                         }
-                        allocatedPaid += newClause.amount;
+                        accumulatedAmount += clause.amount;
                         return newClause;
                     });
-                    await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
+                    // This update must happen outside the main transaction batch
+                    await updateDoc(projectRef, { 'contract.clauses': updatedClauses });
                 }
             }
 
@@ -401,7 +409,7 @@ export default function EditCashReceiptPage() {
             </div>
             
             <div className="grid gap-2">
-                <Label htmlFor="project">ربط بعقد/مشروع <span className="text-destructive">*</span></Label>
+                <Label htmlFor="project">ربط بعقد/مشروع</Label>
                 <InlineSearchList 
                     value={selectedProjectId}
                     onSelect={setSelectedProjectId}
@@ -453,7 +461,7 @@ export default function EditCashReceiptPage() {
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || loading || !selectedProjectId}>
+        <Button onClick={handleSave} disabled={isSaving || loading}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
