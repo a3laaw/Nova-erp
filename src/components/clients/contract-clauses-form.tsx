@@ -470,7 +470,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         }
 
         onClose();
-        onSaveSuccess();
 
     } catch (error) {
         console.error(error);
@@ -633,7 +632,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                     <div className="grid gap-2 pt-4">
                         <div className='flex justify-between items-center'>
                           <Label className="text-base font-semibold">الشروط والأحكام</Label>
-                          <Button type="button" size="sm" variant="outline" onClick={addTerm}><PlusCircle className="ml-2 h-4 w-4"/> إضافة شرط</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
                         </div>
                         <div className='space-y-2'>
                             {terms.map((term, index) => (
