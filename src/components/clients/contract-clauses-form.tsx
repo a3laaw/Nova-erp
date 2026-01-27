@@ -339,7 +339,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(transactionRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterDoc)
+                transaction_firestore.get(journalEntryCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -673,7 +673,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                           <Button type="button" size="sm" variant="outline" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
                         </div>
                         <div className='space-y-2'>
-                            {terms.map((term, index) => (
+                            {termsAndConditions.map((term, index) => (
                                 <div key={term.id} className="flex items-center gap-2">
                                     <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                     <Textarea
@@ -681,10 +681,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                         value={term.text}
                                         onChange={(e) => updateTerm(term.id, e.target.value)}
                                         rows={2}
+                                        className="flex-grow"
                                     />
                                     <div className="flex flex-col">
                                         <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
-                                        <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === terms.length - 1}><ArrowDown className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === termsAndConditions.length - 1}><ArrowDown className="h-4 w-4"/></Button>
                                     </div>
                                     <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
                                 </div>
@@ -694,7 +695,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
                     <div className="grid gap-2 pt-4">
                         <div className='flex justify-between items-center'>
-                          <Label className="text-base font-semibold">بنود إضافية</Label>
+                          <Label className="text-base font-semibold">بنود إضافية (اختياري)</Label>
                           <Button type="button" size="sm" variant="outline" onClick={addOpenClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
                         </div>
                         <div className='space-y-2'>
@@ -721,7 +722,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </section>
+
                 </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t">
