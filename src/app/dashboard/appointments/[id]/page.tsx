@@ -59,7 +59,43 @@ export default function AppointmentDetailsPage() {
 
     // Fetch main appointment data
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
+    
+    // Hooks are now called unconditionally at the top level
     const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
+
+    const workStageOptions = useMemo(() => {
+        if (!workStages || !currentUser) return [];
+
+        // Filter stages based on the current user's role and job title
+        const roleFilteredStages = workStages.filter(stage => {
+            // Admin can see all stages
+            if (currentUser.role === 'Admin') {
+                return true;
+            }
+            // If allowedRoles is not defined or empty, assume it's a general stage visible to all
+            if (!stage.allowedRoles || stage.allowedRoles.length === 0) {
+                return true;
+            }
+            // If allowedRoles is defined, the user's jobTitle must be included
+            return currentUser.jobTitle ? stage.allowedRoles.includes(currentUser.jobTitle) : false;
+        });
+
+        // If transaction data isn't loaded yet, show the role-filtered list to avoid flickering
+        if (!transaction) {
+            return roleFilteredStages.map(stage => ({ value: stage.id!, label: stage.name }));
+        }
+
+        // Exclude stages that are already completed
+        const completedStageIds = new Set(
+            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
+        );
+
+        return roleFilteredStages
+            .filter(stage => !completedStageIds.has(stage.id!))
+            .map(stage => ({ value: stage.id!, label: stage.name }));
+            
+    }, [workStages, transaction, currentUser]);
+
 
     useEffect(() => {
         if (!id && !appointmentLoading) {
@@ -118,19 +154,6 @@ export default function AppointmentDetailsPage() {
         fetchRelatedData();
     }, [appointment, firestore, toast]);
 
-    const workStageOptions = useMemo(() => {
-        if (!workStages) return [];
-        // If transaction data is not loaded yet, show all stages to avoid flickering
-        if (!transaction) return workStages.map(stage => ({ value: stage.id!, label: stage.name }));
-
-        const completedStageIds = new Set(
-            transaction.stages?.filter(s => s.status === 'completed').map(s => s.stageId)
-        );
-
-        return workStages
-            .filter(stage => !completedStageIds.has(stage.id!))
-            .map(stage => ({ value: stage.id!, label: stage.name }));
-    }, [workStages, transaction]);
 
     const handleUpdateStage = async () => {
         if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId) {
@@ -323,10 +346,11 @@ export default function AppointmentDetailsPage() {
                                     value={selectedStageId}
                                     onSelect={setSelectedStageId}
                                     options={workStageOptions}
-                                    placeholder="اختر مرحلة..."
+                                    placeholder={workStageOptions.length === 0 ? "لا توجد مراحل متاحة لك" : "اختر مرحلة..."}
+                                    disabled={workStageOptions.length === 0}
                                 />
-                                {workStageOptions.length === 0 && !loading && (
-                                    <p className='text-xs text-muted-foreground'>جميع المراحل لهذه المعاملة قد اكتملت.</p>
+                                {workStageOptions.length === 0 && !loading && currentUser?.role !== 'Admin' && (
+                                    <p className='text-xs text-muted-foreground'>لا توجد مراحل عمل متاحة لدورك الوظيفي حالياً أو تم إكمال جميع المراحل.</p>
                                 )}
                             </div>
                             <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId}>
