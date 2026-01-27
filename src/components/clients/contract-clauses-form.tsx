@@ -105,6 +105,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
 
   const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[] }>({ stages: [], templates: [] });
+  const [departmentWorkStages, setDepartmentWorkStages] = useState<WorkStage[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
 
   // This effect resets the entire component's state when the dialog is closed.
@@ -119,6 +120,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setAvailableTemplates([]);
       setChosenTemplate(null);
       setReferenceData({ stages: [], templates: [] });
+      setDepartmentWorkStages([]);
       setLoadingRefData(true);
     }
   }, [isOpen]);
@@ -168,14 +170,26 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setLoadingRefData(true);
       setStep('loading');
       try {
-        // Fetch all available contract templates
         const allTemplatesQuery = query(collection(firestore, 'contractTemplates'));
-        const allTemplatesSnapshot = await getDocs(allTemplatesQuery);
+        const stagesQuery = query(collectionGroup(firestore, 'workStages'));
+        
+        let departmentStagesQuery = null;
+        if(transaction.departmentId) {
+            departmentStagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`), orderBy('order', 'asc'));
+        }
+
+        const [
+            allTemplatesSnapshot,
+            stagesSnapshot,
+            departmentStagesSnapshot
+        ] = await Promise.all([
+            getDocs(allTemplatesQuery),
+            getDocs(stagesQuery),
+            departmentStagesQuery ? getDocs(departmentStagesQuery) : Promise.resolve(null),
+        ]);
+        
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
 
-        // Fetch all possible work stages robustly
-        const stagesQuery = query(collectionGroup(firestore, 'workStages'));
-        const stagesSnapshot = await getDocs(stagesQuery);
         const uniqueStages = new Map<string, MultiSelectOption>();
         stagesSnapshot.forEach(stageDoc => {
             const stageName = stageDoc.data().name as string;
@@ -185,8 +199,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         });
         const stages = Array.from(uniqueStages.values()).sort((a, b) => a.label.localeCompare(b.label));
 
-        if (stages.length === 0) {
-            console.warn("Firebase Studio: No work stages found in any 'workStages' subcollection. The condition dropdown will be empty.");
+        if (departmentStagesSnapshot) {
+            setDepartmentWorkStages(departmentStagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage)));
+        } else {
+            setDepartmentWorkStages([]);
         }
         
         setReferenceData({ templates, stages });
@@ -255,7 +271,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
-  const handleOpenClauseChange = (id: string, value: string) => {
+  const updateOpenClause = (id: string, value: string) => {
     setOpenClauses(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
   const removeOpenClause = (id: string) => setOpenClauses(prev => prev.filter(term => term.id !== id));
@@ -323,7 +339,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(transactionRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef)
+                transaction_firestore.get(journalEntryCounterDoc)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -345,32 +361,37 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 wasContractSigned = true;
             }
 
-            if (wasContractSigned && currentTransactionData.departmentId) {
-                const workStagesQuery = query(collection(firestore, `departments/${currentTransactionData.departmentId}/workStages`), orderBy('order', 'asc'));
-                const workStagesSnap = await getDocs(workStagesQuery); // Use regular getDocs inside transaction
-                const departmentWorkStages = workStagesSnap.docs.map(d => ({ id: d.id, ...d.data() as WorkStage }));
-                
-                const signedStageTemplate = departmentWorkStages.find(ws => ws.id === updatedStages[contractStageIndex].stageId);
-                const signedStageOrder = signedStageTemplate?.order;
-
-                if (signedStageOrder !== undefined) {
-                    const nextStageTemplate = departmentWorkStages.find(ws => ws.order === signedStageOrder + 1);
-
-                    if (nextStageTemplate) {
-                        const nextStageIndexInProg = updatedStages.findIndex(s => s.stageId === nextStageTemplate.id);
-                        if (nextStageIndexInProg > -1) {
-                            if (updatedStages[nextStageIndexInProg].status === 'pending') {
-                                updatedStages[nextStageIndexInProg] = { ...updatedStages[nextStageIndexInProg], status: 'in-progress', startDate: new Date() };
+            if (wasContractSigned) {
+                const signedStageInProg = updatedStages[contractStageIndex];
+                if (signedStageInProg) { // a bit of safety
+                    const signedStageTemplate = departmentWorkStages.find(ws => ws.id === signedStageInProg.stageId);
+                    const signedStageOrder = signedStageTemplate?.order;
+            
+                    if (signedStageOrder !== undefined) {
+                        const nextStageTemplate = departmentWorkStages.find(ws => ws.order === signedStageOrder + 1);
+            
+                        if (nextStageTemplate) {
+                            const nextStageIndexInProg = updatedStages.findIndex(s => s.stageId === nextStageTemplate.id);
+                            if (nextStageIndexInProg > -1) {
+                                if (updatedStages[nextStageIndexInProg].status === 'pending') {
+                                    updatedStages[nextStageIndexInProg] = { ...updatedStages[nextStageIndexInProg], status: 'in-progress', startDate: new Date() };
+                                }
+                            } else {
+                                updatedStages.push({
+                                    stageId: nextStageTemplate.id,
+                                    name: nextStageTemplate.name,
+                                    allowedRoles: nextStageTemplate.allowedRoles,
+                                    status: 'in-progress' as const,
+                                    startDate: new Date(),
+                                    endDate: null,
+                                    notes: '',
+                                });
                             }
-                        } else {
-                            updatedStages.push({
-                                stageId: nextStageTemplate.id, name: nextStageTemplate.name, status: 'in-progress', startDate: new Date(), endDate: null
-                            });
                         }
                     }
                 }
             }
-
+            
             const updatePayload = { contract: contractData, stages: updatedStages };
             transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             
@@ -469,7 +490,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 recipients.add(targetUserId);
             }
         }
-
+        
         for (const recipientId of recipients) {
             const isCreator = recipientId === currentUser?.id;
             const actionText = transaction.contract ? 'تحديث عقد' : 'توقيع عقد';
