@@ -370,20 +370,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const updatePayload = { contract: contractData, stages: updatedStages };
             transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             
-            // Log in transaction timeline
-            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
-            transaction_firestore.set(doc(transactionTimelineRef), {
-                type: 'comment',
-                content: `**تم إنشاء/تحديث العقد**\nقام ${currentUser.fullName} بإنشاء أو تحديث العقد لهذه المعاملة.`,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl || '',
-                createdAt: serverTimestamp(),
-            });
+             // --- Log contract creation/update in both timelines ---
 
-            // Log in main client history
-            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
-            let contractDetailsComment = `**تم توقيع عقد جديد**\n\n`;
+            // 1. Construct the detailed comment
+            let contractDetailsComment = `**تم توقيع/تحديث العقد**\n\n`;
             contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
             contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
             contractDetailsComment += `**الدفعات:**\n`;
@@ -395,14 +385,23 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
               contractDetailsComment += `  - لا توجد دفعات محددة.\n`;
             }
 
-            transaction_firestore.set(doc(historyCollectionRef), {
+            const commentData = {
                 type: 'comment',
                 content: contractDetailsComment,
                 userId: currentUser.id, 
                 userName: currentUser.fullName || 'النظام', 
                 userAvatar: currentUser.avatarUrl || '', 
                 createdAt: serverTimestamp(),
-            });
+            };
+
+            // 2. Log in transaction timeline
+            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
+            transaction_firestore.set(doc(transactionTimelineRef), commentData);
+
+            // 3. Log in main client history
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            transaction_firestore.set(doc(historyCollectionRef), commentData);
+
 
             // This logic only runs when creating a contract for the first time for a client
             if (clientData.status === 'new') {
@@ -624,7 +623,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                     <Textarea
                                         placeholder={`نص الشرط ${index + 1}`}
                                         value={term.text}
-                                        onChange={(e) => handleTermChange(term.id, e.target.value)}
+                                        onChange={(e) => updateTerm(term.id, e.target.value)}
                                         rows={2}
                                     />
                                     <div className="flex flex-col">
@@ -649,7 +648,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                     <Textarea
                                         placeholder={`نص البند الإضافي ${index + 1}`}
                                         value={clause.text}
-                                        onChange={(e) => handleOpenClauseChange(clause.id, e.target.value)}
+                                        onChange={(e) => updateOpenClause(clause.id, e.target.value)}
                                         rows={2}
                                     />
                                     <div className="flex flex-col">
