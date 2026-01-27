@@ -330,7 +330,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const currentTransactionData = currentTransactionSnap.data() as ClientTransaction;
 
             // Prepare contract and stage data
-            const contractData = { clauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
+            const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
             
             const updatedStages = [...(currentTransactionData.stages || [])];
             const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
