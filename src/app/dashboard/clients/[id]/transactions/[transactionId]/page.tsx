@@ -1,4 +1,5 @@
-'use client';
+
+      'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -300,7 +301,9 @@ export default function TransactionDetailPage() {
     if(oldStatus === newStatus) return;
 
     const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
-    if (newStatus === 'in-progress' && stages[currentIndexInUI].name !== 'تعديلات ومناقشات' && currentIndexInUI > 0) {
+    const isDiscussionStage = stages[currentIndexInUI]?.name === 'تعديلات ومناقشات';
+
+    if (newStatus === 'in-progress' && !isDiscussionStage && currentIndexInUI > 0) {
         const previousStageInUI = stages[currentIndexInUI - 1];
         if (previousStageInUI.status !== 'completed') {
             toast({
@@ -635,3 +638,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
