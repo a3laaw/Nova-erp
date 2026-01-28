@@ -16,7 +16,7 @@
         },
         "address": {
           "type": "string",
-          "description": "The full address of the company."
+          "description": "The company's contact phone number."
         },
         "phone": {
           "type": "string",
@@ -191,6 +191,7 @@
             "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
+            "departmentId": { "type": "string", "description": "The ID of the department this transaction belongs to." },
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
@@ -282,20 +283,26 @@
     },
     "TransactionStage": {
       "title": "Transaction Stage",
-      "description": "A single stage within a client transaction's lifecycle.",
+      "description": "Tracks the progress of a single stage within a client transaction's lifecycle. It is linked to a reference WorkStage via stageId.",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Name of the stage (e.g., 'Basement Design')." },
+        "stageId": { "type": "string", "description": "The ID of the reference WorkStage document from the department's workStages subcollection." },
+        "name": { "type": "string", "description": "Name of the stage, stored for convenience. The name in the reference data is the source of truth." },
         "status": {
           "type": "string",
           "enum": ["pending", "in-progress", "completed", "skipped"],
           "description": "The current status of the stage."
         },
+        "allowedRoles": {
+            "type": "array",
+            "description": "The job titles responsible for this stage, copied from the WorkStage template.",
+            "items": { "type": "string" }
+        },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
         "notes": { "type": "string", "description": "Notes specific to this stage." }
       },
-      "required": ["name", "status"]
+      "required": ["stageId", "name", "status"]
     },
     "Counter": {
       "title": "Counter",
@@ -558,6 +565,27 @@
       },
       "required": ["name"]
     },
+    "WorkStage": {
+      "title": "Work Stage",
+      "description": "Represents a standard work stage that can be associated with a department.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the work stage."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display and logical order of the stage."
+        },
+        "allowedRoles": {
+            "type": "array",
+            "description": "A list of job titles responsible for this stage.",
+            "items": { "type": "string" }
+        }
+      },
+      "required": ["name"]
+    },
     "Appointment": {
       "title": "Appointment",
       "description": "Represents a scheduled meeting or visit.",
@@ -606,9 +634,43 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "The ID of the client transaction this appointment is related to."
+        },
+        "workStageUpdated": {
+            "type": "boolean",
+            "description": "Indicates if the work stage has been updated for this visit."
+        },
+        "workStageProgressId": {
+            "type": "string",
+            "description": "Reference to the document in work_stages_progress."
+        },
+        "visitCount": {
+            "type": "number",
+            "description": "The sequential visit number for this client's architectural appointments."
+        },
+        "color": {
+            "type": "string",
+            "description": "Hex color code for calendar display based on visit status."
         }
       },
       "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+    },
+    "WorkStageProgress": {
+        "title": "Work Stage Progress",
+        "description": "Logs the selection of a work stage for a specific architectural visit.",
+        "type": "object",
+        "properties": {
+            "transactionId": { "type": "string", "description": "The ID of the client transaction this visit is related to." },
+            "visitId": { "type": "string", "description": "The ID of the architectural visit document." },
+            "stageId": { "type": "string", "description": "The ID of the selected work stage." },
+            "stageName": { "type": "string", "description": "The name of the selected work stage." },
+            "selectedBy": { "type": "string", "description": "The ID of the employee who updated the stage." },
+            "selectedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["visitId", "stageId", "stageName", "selectedBy", "selectedAt"]
     },
     "Contract": {
       "title": "Contract",
@@ -833,6 +895,55 @@
         }
       },
       "required": ["entryNumber", "date", "narration", "totalDebit", "totalCredit", "status", "lines", "createdAt"]
+    },
+    "PaymentVoucher": {
+      "title": "Payment Voucher",
+      "description": "Represents a payment voucher for disbursing funds.",
+      "type": "object",
+      "properties": {
+        "voucherNumber": { "type": "string" },
+        "voucherSequence": { "type": "number" },
+        "voucherYear": { "type": "number" },
+        "payeeName": { "type": "string" },
+        "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
+        "amount": { "type": "number" },
+        "amountInWords": { "type": "string" },
+        "paymentDate": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer"] },
+        "description": { "type": "string" },
+        "reference": { "type": "string", "description": "e.g., Cheque number or transfer reference" },
+        "debitAccountId": { "type": "string" },
+        "debitAccountName": { "type": "string" },
+        "creditAccountId": { "type": "string" },
+        "creditAccountName": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "paid", "cancelled"] },
+        "journalEntryId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["voucherNumber", "payeeName", "amount", "paymentDate", "paymentMethod", "debitAccountId", "creditAccountId", "status"]
+    },
+    "CashReceipt": {
+      "title": "Cash Receipt",
+      "description": "Represents a cash receipt voucher.",
+      "type": "object",
+      "properties": {
+        "voucherNumber": { "type": "string" },
+        "voucherSequence": { "type": "number" },
+        "voucherYear": { "type": "number" },
+        "clientId": { "type": "string" },
+        "clientNameAr": { "type": "string" },
+        "clientNameEn": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectNameAr": { "type": "string" },
+        "amount": { "type": "number" },
+        "amountInWords": { "type": "string" },
+        "receiptDate": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "K-Net"] },
+        "description": { "type": "string" },
+        "reference": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["voucherNumber", "clientId", "amount", "receiptDate", "paymentMethod"]
     }
   },
   "auth": {
@@ -925,6 +1036,10 @@
         "schema": { "$ref": "#/entities/TransactionType" },
         "description": "Stores transaction types for a specific department."
     },
+    "/departments/{departmentId}/workStages/{workStageId}": {
+        "schema": { "$ref": "#/entities/WorkStage" },
+        "description": "Stores standard work stages for a specific department."
+    },
     "/governorates/{governorateId}": {
       "schema": { "$ref": "#/entities/Governorate" },
       "description": "Stores country governorates."
@@ -938,6 +1053,12 @@
         "$ref": "#/entities/Appointment"
       },
       "description": "Stores all scheduled appointments."
+    },
+    "/work_stages_progress/{progressId}": {
+        "schema": {
+            "$ref": "#/entities/WorkStageProgress"
+        },
+        "description": "Stores logs of work stage updates from architectural visits."
     },
     "/contracts/{contractId}": {
       "schema": {
@@ -962,6 +1083,14 @@
         "$ref": "#/entities/JournalEntry"
       },
       "description": "Stores general journal entries created manually or by other processes."
+    },
+    "/paymentVouchers/{voucherId}": {
+      "schema": { "$ref": "#/entities/PaymentVoucher" },
+      "description": "Stores all payment vouchers issued by the company."
+    },
+    "/cashReceipts/{receiptId}": {
+      "schema": { "$ref": "#/entities/CashReceipt" },
+      "description": "Stores all cash receipt vouchers received by the company."
     }
   }
 }

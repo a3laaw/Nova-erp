@@ -33,7 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 import { cn, cleanFirestoreData, formatCurrency } from '@/lib/utils';
-import { format, isPast, formatDistanceToNowStrict } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
@@ -184,7 +184,6 @@ export default function TransactionDetailPage() {
                     startDate: progress?.startDate || null,
                     endDate: progress?.endDate || null,
                     notes: progress?.notes || '',
-                    expectedEndDate: progress?.expectedEndDate || null,
                 };
             });
 
@@ -457,25 +456,6 @@ export default function TransactionDetailPage() {
   };
 
 
-  const renderStageTiming = (stage: TransactionStage) => {
-    if (!stage.expectedEndDate || stage.status === 'completed') {
-        return null;
-    }
-    
-    const expectedEndDate = stage.expectedEndDate.toDate ? stage.expectedEndDate.toDate() : new Date(stage.expectedEndDate);
-    const now = new Date();
-    const isOverdue = isPast(expectedEndDate);
-    
-    const distance = formatDistanceToNowStrict(expectedEndDate, { addSuffix: true, locale: ar });
-
-    return (
-        <Badge variant={isOverdue ? "destructive" : "secondary"}>
-            {isOverdue ? `متأخر ${distance}` : `متبقي ${distance}`}
-        </Badge>
-    );
-  };
-
-
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading;
 
@@ -636,7 +616,6 @@ export default function TransactionDetailPage() {
                                                 {stage.allowedRoles?.map(role => (
                                                     <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                                                 ))}
-                                                {renderStageTiming(stage)}
                                             </div>
                                             <div className="flex gap-2">
                                                 {stage.status === 'pending' && (
