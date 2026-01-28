@@ -1,8 +1,7 @@
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirestore, useDoc, useCollection } from '@/firebase';
+import { useFirebase, useDoc, useCollection } from '@/firebase';
 import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
   Card,
@@ -104,19 +103,25 @@ const transactionStatusColors: Record<string, string> = {
 
 // --- Quotations List Component ---
 function ClientQuotationsList({ clientId, clientName }: { clientId: string, clientName: string }) {
-  const firestore = useFirestore();
+  const { firestore } = useFirebase();
   const router = useRouter();
 
   const quotationsQuery = useMemo(() => {
     if (!firestore || !clientId) return null;
-    return query(collection(firestore, 'quotations'), where('clientId', '==', clientId), orderBy('date', 'desc'));
+    return query(collection(firestore, 'quotations'), where('clientId', '==', clientId));
   }, [firestore, clientId]);
 
   const [snapshot, loading, error] = useCollection(quotationsQuery);
 
   const quotations = useMemo(() => {
     if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
+    docs.sort((a, b) => {
+        const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
+        const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
+        return dateB - dateA;
+    });
+    return docs;
   }, [snapshot]);
   
   const formatDate = (dateValue: any) => {
@@ -212,7 +217,7 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const firestore = useFirestore();
+  const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -658,3 +663,4 @@ export default function ClientProfilePage() {
     </>
   );
 }
+    
