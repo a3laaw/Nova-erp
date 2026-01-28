@@ -31,6 +31,7 @@ import { Loader2, Printer, ArrowRight, Search } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface StatementLine {
     date: Date;
@@ -56,6 +57,8 @@ export default function ClientStatementPage() {
     
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [movementType, setMovementType] = useState('all'); // 'all', 'debit', 'credit'
 
     useEffect(() => {
         // Set default date range on client-side to avoid hydration mismatch
@@ -91,10 +94,11 @@ export default function ClientStatementPage() {
 
                 const transactions: any[] = [];
                 
-                journalEntriesSnap.forEach(doc => {
-                    const entry = doc.data() as JournalEntry;
+                journalEntriesSnap.forEach(entryDoc => {
+                    const entry = entryDoc.data() as JournalEntry;
                     if (entry.status === 'posted') { // Only include posted entries
                         transactions.push({
+                            id: entryDoc.id,
                             date: entry.date.toDate(),
                             description: entry.narration,
                             debit: entry.totalDebit,
@@ -106,9 +110,10 @@ export default function ClientStatementPage() {
                     }
                 });
 
-                cashReceiptsSnap.forEach(doc => {
-                    const receipt = doc.data() as CashReceipt;
+                cashReceiptsSnap.forEach(receiptDoc => {
+                    const receipt = receiptDoc.data() as CashReceipt;
                     transactions.push({
+                        id: receiptDoc.id,
                         date: receipt.receiptDate.toDate(),
                         description: `دفعة: ${receipt.description}`,
                         debit: 0,
@@ -136,7 +141,7 @@ export default function ClientStatementPage() {
 
     const statementData = useMemo(() => {
         if (!dateFrom || !dateTo) {
-            return { openingBalance: 0, lines: [], totalDebit: 0, totalCredit: 0 };
+            return { openingBalance: 0, lines: [], totalDebit: 0, totalCredit: 0, finalBalance: 0 };
         }
 
         const startDate = parseISO(dateFrom);
@@ -147,29 +152,48 @@ export default function ClientStatementPage() {
             .filter(tx => tx.date < startDate)
             .reduce((balance, tx) => balance + (tx.debit || 0) - (tx.credit || 0), 0);
         
-        const periodTransactions = allTransactions.filter(tx => tx.date >= startDate && tx.date <= endDate);
+        const allPeriodTransactions = allTransactions.filter(tx => tx.date >= startDate && tx.date <= endDate);
+        
+        const filteredTransactionIds = new Set(allPeriodTransactions.filter(tx => {
+            const searchLower = searchQuery.toLowerCase();
+            const matchesSearch = !searchQuery ||
+                tx.description?.toLowerCase().includes(searchLower) ||
+                tx.refNumber?.toLowerCase().includes(searchLower) ||
+                tx.voucherType?.toLowerCase().includes(searchLower);
 
+            const matchesMovement = movementType === 'all' ||
+                (movementType === 'debit' && tx.debit > 0) ||
+                (movementType === 'credit' && tx.credit > 0);
+            
+            return matchesSearch && matchesMovement;
+        }).map(tx => tx.id));
+
+        const unfilteredFinalBalance = allPeriodTransactions.reduce((bal, tx) => bal + (tx.debit || 0) - (tx.credit || 0), openingBalance);
+        
         let runningBalance = openingBalance;
-        const lines: StatementLine[] = periodTransactions.map(tx => {
+        const lines: StatementLine[] = [];
+        allPeriodTransactions.forEach(tx => {
             runningBalance += (tx.debit || 0) - (tx.credit || 0);
-            return {
-                date: tx.date,
-                voucherType: tx.voucherType,
-                refNumber: tx.refNumber,
-                chequeNumber: tx.chequeNumber,
-                description: tx.description,
-                debit: tx.debit || 0,
-                credit: tx.credit || 0,
-                balance: runningBalance
-            };
+            if (filteredTransactionIds.has(tx.id)) {
+                 lines.push({
+                    date: tx.date,
+                    voucherType: tx.voucherType,
+                    refNumber: tx.refNumber,
+                    chequeNumber: tx.chequeNumber,
+                    description: tx.description,
+                    debit: tx.debit || 0,
+                    credit: tx.credit || 0,
+                    balance: runningBalance,
+                });
+            }
         });
+        
+        const totalDebit = lines.reduce((sum, tx) => sum + (tx.debit || 0), 0);
+        const totalCredit = lines.reduce((sum, tx) => sum + (tx.credit || 0), 0);
 
-        const totalDebit = periodTransactions.reduce((sum, tx) => sum + (tx.debit || 0), 0);
-        const totalCredit = periodTransactions.reduce((sum, tx) => sum + (tx.credit || 0), 0);
+        return { openingBalance, lines, totalDebit, totalCredit, finalBalance: unfilteredFinalBalance };
 
-        return { openingBalance, lines, totalDebit, totalCredit };
-
-    }, [allTransactions, dateFrom, dateTo]);
+    }, [allTransactions, dateFrom, dateTo, searchQuery, movementType]);
 
 
     const handlePrint = () => {
@@ -189,13 +213,11 @@ export default function ClientStatementPage() {
         return <div className="text-center p-10">لم يتم العثور على بيانات العميل.</div>
     }
     
-    const finalBalance = statementData.openingBalance + statementData.totalDebit - statementData.totalCredit;
-
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
             <Card className="mb-4 no-print">
                 <CardHeader>
-                    <CardTitle>خيارات العرض</CardTitle>
+                    <CardTitle>خيارات العرض والبحث</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                      <div className="grid gap-2">
@@ -205,6 +227,30 @@ export default function ClientStatementPage() {
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">التاريخ إلى</Label>
                         <Input id="dateTo" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                     </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="search">بحث</Label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                id="search"
+                                placeholder="ابحث في البيان، رقم السند..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                     </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="movementType">نوع الحركة</Label>
+                        <Select value={movementType} onValueChange={setMovementType}>
+                            <SelectTrigger id="movementType"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">الكل</SelectItem>
+                                <SelectItem value="debit">مدين فقط (فواتير)</SelectItem>
+                                <SelectItem value="credit">دائن فقط (دفعات)</SelectItem>
+                            </SelectContent>
+                        </Select>
                      </div>
                 </CardContent>
             </Card>
@@ -260,13 +306,20 @@ export default function ClientStatementPage() {
                                     <TableCell className="text-left font-mono">{formatCurrency(line.balance)}</TableCell>
                                 </TableRow>
                             ))}
+                             {statementData.lines.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="h-24 text-center">
+                                        لا توجد حركات تطابق الفلاتر المحددة.
+                                    </TableCell>
+                                </TableRow>
+                             )}
                         </TableBody>
                         <TableFooter>
                             <TableRow className="font-bold bg-muted/50">
-                                <TableCell colSpan={4}>الإجمالي</TableCell>
+                                <TableCell colSpan={4}>إجمالي الحركات المعروضة</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                <TableCell className="text-left font-mono">{formatCurrency(finalBalance)}</TableCell>
+                                <TableCell className="text-left font-mono font-bold text-lg">{formatCurrency(statementData.finalBalance)}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
