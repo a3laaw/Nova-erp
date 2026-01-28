@@ -35,7 +35,7 @@ import { ContractClausesForm } from '@/components/clients/contract-clauses-form'
 import { cn, cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { format, isPast, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { createNotification } from '@/services/notification-service';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 
 // Using the same translation objects from client profile page
@@ -367,7 +367,7 @@ export default function TransactionDetailPage() {
     const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
     let newlyCompletedStage: Partial<TransactionStage> | null = null;
-    let paymentClauses: any[] = [];
+    let newlyTriggeredClause: any = null;
     
     try {
         const batch = writeBatch(firestore);
@@ -403,47 +403,42 @@ export default function TransactionDetailPage() {
         
         if (newStatus === 'completed' && oldStatus !== 'completed') {
             newlyCompletedStage = updatedProgress;
-            if (transaction.contract?.clauses) {
-                paymentClauses = transaction.contract.clauses.filter(
-                    c => c.condition === newlyCompletedStage?.name && c.status !== 'مدفوعة'
-                );
+            
+            const allClauses = transaction.contract?.clauses || [];
+            const nextDueClause = allClauses.find((c: any) => c.status !== 'مدفوعة');
 
-                if (paymentClauses.length > 0) {
-                    for (const clause of paymentClauses) {
-                        const paymentCommentRef = doc(timelineCollectionRef);
-                        const commentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${newlyCompletedStage.name}"، أصبحت الدفعة "${clause.name}" مستحقة للدفع.`;
-                        batch.set(paymentCommentRef, {
-                            type: 'comment',
-                            content: commentContent,
-                            userId: currentUser.id,
-                            userName: "النظام الآلي",
-                            userAvatar: '',
-                            createdAt: serverTimestamp(),
-                        });
-                    }
-                }
+            if (nextDueClause && nextDueClause.condition === newlyCompletedStage?.name) {
+                newlyTriggeredClause = nextDueClause;
+                const paymentCommentRef = doc(timelineCollectionRef);
+                const commentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${newlyCompletedStage.name}"، أصبحت الدفعة "${nextDueClause.name}" مستحقة للدفع.`;
+                batch.set(paymentCommentRef, {
+                    type: 'comment',
+                    content: commentContent,
+                    userId: currentUser.id,
+                    userName: "النظام الآلي",
+                    userAvatar: '',
+                    createdAt: serverTimestamp(),
+                });
             }
         }
 
         await batch.commit();
         toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
         
-        if (paymentClauses.length > 0 && newlyCompletedStage) {
+        if (newlyTriggeredClause && newlyCompletedStage) {
             const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
             const accountantsSnap = await getDocs(accountantsQuery);
 
-            for (const clause of paymentClauses) {
-                const notificationBody = `استحقاق دفعة "${clause.name}" بقيمة ${formatCurrency(clause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${newlyCompletedStage.name}".`;
+            const notificationBody = `استحقاق دفعة "${newlyTriggeredClause.name}" بقيمة ${formatCurrency(newlyTriggeredClause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${newlyCompletedStage.name}".`;
 
-                for (const accountantDoc of accountantsSnap.docs) {
-                    const accountantId = accountantDoc.id;
-                    await createNotification(firestore, {
-                        userId: accountantId,
-                        title: 'إشعار استحقاق دفعة مالية',
-                        body: notificationBody,
-                        link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
-                    });
-                }
+            for (const accountantDoc of accountantsSnap.docs) {
+                const accountantId = accountantDoc.id;
+                await createNotification(firestore, {
+                    userId: accountantId,
+                    title: 'إشعار استحقاق دفعة مالية',
+                    body: notificationBody,
+                    link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
+                });
             }
         }
 

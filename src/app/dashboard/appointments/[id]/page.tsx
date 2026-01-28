@@ -320,26 +320,32 @@ export default function AppointmentDetailsPage() {
             batch.set(doc(timelineRef), engineeringCommentData);
             batch.set(doc(historyRef), engineeringCommentData); // Dual write comment
             
-            // Check for payment due
+            // Check for payment due - NEW LOGIC
             const completedStageName = selectedStage.name;
-            paymentClauses = transactionData.contract?.clauses?.filter(
-                (c: any) => c.condition === completedStageName && c.status !== 'مدفوعة'
-            ) || [];
+            const allClauses = transactionData.contract?.clauses || [];
+            
+            // Find the very next clause that isn't fully paid.
+            const nextDueClause = allClauses.find((c: any) => c.status !== 'مدفوعة');
 
-            if (paymentClauses.length > 0) {
-                for (const clause of paymentClauses) {
-                    const paymentCommentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${completedStageName}"، أصبحت الدفعة "${clause.name}" مستحقة للدفع.`;
-                    const paymentCommentData = {
-                        type: 'comment' as const,
-                        content: paymentCommentContent,
-                        userId: currentUser.id,
-                        userName: "النظام الآلي",
-                        userAvatar: '',
-                        createdAt: serverTimestamp(),
-                    };
-                    batch.set(doc(timelineRef), paymentCommentData);
-                    batch.set(doc(historyRef), paymentCommentData); // Dual write payment comment
-                }
+            // Reset paymentClauses to be used for notifications
+            paymentClauses = []; 
+
+            // Check if this next due clause is triggered by the stage we just completed.
+            if (nextDueClause && nextDueClause.condition === completedStageName) {
+                // This is the one!
+                paymentClauses.push(nextDueClause); // Add it to the list for notifications
+
+                const paymentCommentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${completedStageName}"، أصبحت الدفعة "${nextDueClause.name}" مستحقة للدفع.`;
+                const paymentCommentData = {
+                    type: 'comment' as const,
+                    content: paymentCommentContent,
+                    userId: currentUser.id,
+                    userName: "النظام الآلي",
+                    userAvatar: '',
+                    createdAt: serverTimestamp(),
+                };
+                batch.set(doc(timelineRef), paymentCommentData);
+                batch.set(doc(historyRef), paymentCommentData); // Dual write payment comment
             }
     
             await batch.commit();
