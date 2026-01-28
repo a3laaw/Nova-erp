@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -62,6 +63,8 @@ export default function ViewQuotationPage() {
     return {
       clientId: quotation.clientId,
       transactionType: quotation.subject,
+      departmentId: quotation.departmentId,
+      transactionTypeId: quotation.transactionTypeId,
       description: quotation.templateDescription || '',
       contract: {
         totalAmount: quotation.totalAmount,
@@ -204,12 +207,14 @@ export default function ViewQuotationPage() {
                                 <TableRow key={item.id || index}>
                                     <TableCell>{index + 1}</TableCell>
                                     <TableCell className="font-medium">
-                                        {item.description}
-                                        {item.condition && (
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                (شرط الاستحقاق: {item.condition})
-                                            </p>
-                                        )}
+                                        <div className="flex flex-col gap-1">
+                                            <span>{item.description}</span>
+                                            {item.condition && (
+                                                <div className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                                                    - شرط الاستحقاق: {item.condition}
+                                                </div>
+                                            )}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center font-mono">{item.quantity}</TableCell>
                                     <TableCell className="text-center font-mono">{formatCurrency(item.unitPrice)}</TableCell>
