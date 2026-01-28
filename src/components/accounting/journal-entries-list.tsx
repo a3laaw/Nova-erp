@@ -15,7 +15,7 @@ import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getD
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2 } from 'lucide-react';
+import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -23,6 +23,8 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -46,6 +48,10 @@ export function JournalEntriesList() {
   const [isPosting, setIsPosting] = useState(false);
   const [isUnposting, setIsUnposting] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
 
   const entriesQuery = useMemo(() => {
     if (!firestore) return null;
@@ -58,6 +64,24 @@ export function JournalEntriesList() {
     if (!snapshot) return [];
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry));
   }, [snapshot]);
+
+  const filteredEntries = useMemo(() => {
+    return entries.filter(entry => {
+        const searchLower = searchQuery.toLowerCase();
+        
+        const entryDate = entry.date?.toDate ? entry.date.toDate() : null;
+        if (!entryDate) return false;
+
+        const matchesSearch = !searchQuery ||
+            (entry.entryNumber && entry.entryNumber.toLowerCase().includes(searchLower)) ||
+            (entry.narration && entry.narration.toLowerCase().includes(searchLower));
+        
+        const matchesDateFrom = !dateFrom || (entryDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
+        const matchesDateTo = !dateTo || (entryDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+        
+        return matchesSearch && matchesDateFrom && matchesDateTo;
+    });
+  }, [entries, searchQuery, dateFrom, dateTo]);
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
@@ -199,20 +223,44 @@ export function JournalEntriesList() {
       return <div className="text-center py-10 text-destructive">فشل تحميل قائمة القيود.</div>;
   }
 
-  if (entries.length === 0) {
-    return (
-        <div className="p-8 text-center border-2 border-dashed rounded-lg">
-            <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-medium">لا توجد قيود يومية</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-                ابدأ بإنشاء قيد يومية جديد ليظهر هنا.
-            </p>
-        </div>
-    );
-  }
-
   return (
     <>
+         <div className="bg-muted/50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid gap-2 md:col-span-1">
+                    <Label htmlFor="search">بحث ذكي</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            id="search"
+                            placeholder="ابحث بالرقم أو البيان..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                    <Input 
+                        id="dateFrom"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                    <Input 
+                        id="dateTo"
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                    />
+                </div>
+            </div>
+        </div>
+
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -226,56 +274,76 @@ export function JournalEntriesList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-mono">{entry.entryNumber}</TableCell>
-                  <TableCell>{formatDate(entry.date)}</TableCell>
-                  <TableCell className="max-w-xs truncate">{entry.narration}</TableCell>
-                  <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>
-                  <TableCell>
-                      <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
-                  </TableCell>
-                   <TableCell>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" dir="rtl">
-                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)}>
-                                    <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                </DropdownMenuItem>
-                                
-                                {entry.status === 'draft' && (
-                                    <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} disabled={isPosting || isUnposting} className="text-green-600 focus:text-green-700 focus:bg-green-50">
-                                            <CheckCircle className="ml-2 h-4 w-4" />
-                                            ترحيل القيد
+                {entries.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={6}>
+                            <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                                <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h3 className="mt-4 text-lg font-medium">لا توجد قيود يومية</h3>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    ابدأ بإنشاء قيد يومية جديد ليظهر هنا.
+                                </p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ) : filteredEntries.length === 0 ? (
+                     <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center">
+                            لا توجد نتائج تطابق بحثك.
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                    filteredEntries.map((entry) => (
+                        <TableRow key={entry.id}>
+                        <TableCell className="font-mono">{entry.entryNumber}</TableCell>
+                        <TableCell>{formatDate(entry.date)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{entry.narration}</TableCell>
+                        <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" dir="rtl">
+                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)}>
+                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)}>
-                                            <Pencil className="ml-2 h-4 w-4" /> تعديل
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                        </DropdownMenuItem>
-                                    </>
-                                )}
-                                {entry.status === 'posted' && (
-                                     <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} disabled={isUnposting || isPosting} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
-                                            <Undo2 className="ml-2 h-4 w-4" />
-                                            التراجع عن الترحيل
-                                        </DropdownMenuItem>
-                                    </>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                   </TableCell>
-                </TableRow>
-              ))}
+                                        
+                                        {entry.status === 'draft' && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} disabled={isPosting || isUnposting} className="text-green-600 focus:text-green-700 focus:bg-green-50">
+                                                    <CheckCircle className="ml-2 h-4 w-4" />
+                                                    ترحيل القيد
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)}>
+                                                    <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-destructive focus:text-destructive">
+                                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                        {entry.status === 'posted' && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} disabled={isUnposting || isPosting} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
+                                                    <Undo2 className="ml-2 h-4 w-4" />
+                                                    التراجع عن الترحيل
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                        </TableCell>
+                        </TableRow>
+                    ))
+                )}
             </TableBody>
           </Table>
         </div>

@@ -17,16 +17,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText } from 'lucide-react';
+import { FileText, Search } from 'lucide-react';
 import { collection, query, orderBy, type DocumentData } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirestore, useCollection } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Client } from '@/lib/types';
+import { Input } from '@/components/ui/input';
+
 
 export default function ClientStatementsPage() {
   const { language } = useLanguage();
   const firestore = useFirestore();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const clientsQuery = useMemo(() => {
     if (!firestore) return null;
@@ -39,6 +42,16 @@ export default function ClientStatementsPage() {
     if (!snapshot) return [];
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
   }, [snapshot]);
+
+  const filteredClients = useMemo(() => {
+    if (!searchQuery) return clients;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return clients.filter(client => 
+        (client.nameAr && client.nameAr.toLowerCase().includes(lowercasedQuery)) ||
+        (client.fileId && client.fileId.includes(lowercasedQuery)) ||
+        (client.mobile && client.mobile.includes(lowercasedQuery))
+    );
+  }, [clients, searchQuery]);
   
   const t = {
     ar: {
@@ -51,6 +64,8 @@ export default function ClientStatementsPage() {
       loading: 'جاري تحميل العملاء...',
       error: 'حدث خطأ أثناء جلب البيانات.',
       noClients: 'لا يوجد عملاء لعرضهم حالياً.',
+      noResults: 'لا توجد نتائج مطابقة للبحث.',
+      searchPlaceholder: 'ابحث بالاسم، رقم الملف، أو الجوال...'
     },
     en: {
       title: 'Client Statements',
@@ -62,6 +77,8 @@ export default function ClientStatementsPage() {
       loading: 'Loading clients...',
       error: 'An error occurred while fetching data.',
       noClients: 'No clients to display at the moment.',
+      noResults: 'No results match your search.',
+      searchPlaceholder: 'Search by name, file no., or mobile...'
     }
   }
   const currentText = t[language];
@@ -75,6 +92,17 @@ export default function ClientStatementsPage() {
           </div>
       </CardHeader>
       <CardContent>
+         <div className="mb-4">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground rtl:right-3 rtl:left-auto" />
+                <Input
+                    placeholder={currentText.searchPlaceholder}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 rtl:pr-10"
+                />
+            </div>
+        </div>
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -95,8 +123,13 @@ export default function ClientStatementsPage() {
                   </TableRow>
               ))}
               {error && <TableRow><TableCell colSpan={4} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
-              {!loading && clients.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">{currentText.noClients}</TableCell></TableRow>}
-              {clients.map((client) => {
+              {!loading && clients.length > 0 && filteredClients.length === 0 && (
+                <TableRow><TableCell colSpan={4} className="text-center h-24">{currentText.noResults}</TableCell></TableRow>
+              )}
+              {!loading && clients.length === 0 && (
+                 <TableRow><TableCell colSpan={4} className="text-center h-24">{currentText.noClients}</TableCell></TableRow>
+              )}
+              {filteredClients.map((client) => {
                 return (
                     <TableRow key={client.id}>
                         <TableCell className="font-medium">{client.nameAr}</TableCell>
