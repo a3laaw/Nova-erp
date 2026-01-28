@@ -349,31 +349,6 @@ export default function TransactionDetailPage() {
     }
     
     const shouldStartNextStage = newStatus === 'completed' && oldStatus !== 'completed';
-    if (shouldStartNextStage) {
-        const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
-        const nextStageInUI = stages[completedStageOrderIndex + 1];
-
-        if (nextStageInUI) {
-            const nextStageId = nextStageInUI.stageId!;
-            const nextStageIndexInProg = newProgressForFirestore.findIndex(s => s.stageId === nextStageId);
-            if (nextStageIndexInProg > -1) {
-                const stageToStart = { ...newProgressForFirestore[nextStageIndexInProg] };
-                if (stageToStart.status === 'pending') {
-                    stageToStart.status = 'in-progress';
-                    stageToStart.startDate = new Date();
-                    newProgressForFirestore[nextStageIndexInProg] = stageToStart as TransactionStage;
-                }
-            } else {
-                newProgressForFirestore.push({
-                    stageId: nextStageId,
-                    name: nextStageInUI.name,
-                    status: 'in-progress',
-                    startDate: new Date(),
-                    endDate: null,
-                });
-            }
-        }
-    }
     
     const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
@@ -385,6 +360,7 @@ export default function TransactionDetailPage() {
         let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         let contractClauses = transaction.contract ? [...transaction.contract.clauses] : [];
         let clausesUpdated = false;
+        let outstandingBalance = 0;
 
         if (shouldStartNextStage) {
             const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
@@ -393,28 +369,27 @@ export default function TransactionDetailPage() {
                  logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
             }
         }
-
+        
         if (newStatus === 'completed' && oldStatus !== 'completed' && contractClauses.length > 0) {
-            const newlyCompletedStage = updatedProgress;
-            const nextDueClause = contractClauses.find((c: any) => c.status !== 'مدفوعة');
-
-            if (nextDueClause && nextDueClause.condition === newlyCompletedStage?.name) {
-                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === nextDueClause.id);
-                if (clauseToUpdateIndex > -1 && contractClauses[clauseToUpdateIndex].status === 'غير مستحقة') {
+            const triggeredClause = contractClauses.find(c => c.condition === updatedProgress.name);
+            
+            if (triggeredClause && triggeredClause.status === 'غير مستحقة') {
+                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === triggeredClause.id);
+                if (clauseToUpdateIndex > -1) {
                     contractClauses[clauseToUpdateIndex].status = 'مستحقة';
                     clausesUpdated = true;
-                }
 
-                const totalAmountNowDue = contractClauses
-                    .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
-                    .reduce((sum, c) => sum + c.amount, 0);
-                
-                const totalPaid = await getTotalPaidForProject(transactionId, firestore);
-                const outstandingBalance = totalAmountNowDue - totalPaid;
+                    const totalAmountNowDue = contractClauses
+                        .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
+                        .reduce((sum, c) => sum + c.amount, 0);
+                    
+                    const totalPaid = await getTotalPaidForProject(transactionId, firestore);
+                    outstandingBalance = totalAmountNowDue - totalPaid;
 
-                if (outstandingBalance > 0) {
-                    const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
-                    commentContent += paymentNotificationText; // Append to main comment
+                    if (outstandingBalance > 0) {
+                        const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+                        commentContent += paymentNotificationText;
+                    }
                 }
             }
         }
@@ -691,5 +666,7 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
 
     
