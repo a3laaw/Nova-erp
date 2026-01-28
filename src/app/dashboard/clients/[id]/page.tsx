@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -103,7 +104,7 @@ const transactionStatusColors: Record<string, string> = {
 
 // --- Quotations List Component ---
 function ClientQuotationsList({ clientId, clientName }: { clientId: string, clientName: string }) {
-  const { firestore } = useFirebase();
+  const firestore = useFirestore();
   const router = useRouter();
 
   const quotationsQuery = useMemo(() => {
