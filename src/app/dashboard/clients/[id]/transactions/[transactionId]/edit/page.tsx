@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, X } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
-import { doc, getDocs, collection, query, orderBy, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, collection, query, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
 import type { Employee, ClientTransaction, Department, TransactionType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,7 +34,6 @@ export default function EditTransactionPage() {
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   
   const [formData, setFormData] = useState({
-      selectedDepartment: '',
       transactionType: '',
       description: '',
       assignedEngineerId: ''
@@ -43,11 +42,9 @@ export default function EditTransactionPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   // --- Reference Data Loading ---
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
   const [engineers, setEngineers] = useState<Employee[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(true);
-  const [loadingTypes, setLoadingTypes] = useState(false);
 
   // --- Transaction Data Loading ---
   const transactionRef = useMemo(() => {
@@ -56,17 +53,17 @@ export default function EditTransactionPage() {
   }, [firestore, clientId, transactionId]);
   const [transactionSnap, transactionLoading, transactionError] = useDoc(transactionRef);
   
-  // --- Fetch Departments & Engineers ---
+  // --- Fetch Reference Data ---
   useEffect(() => {
     if (!firestore) return;
     setLoadingRefs(true);
     const fetchRefData = async () => {
         try {
-            const [deptSnap, engSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
+            const [typesSnap, engSnap] = await Promise.all([
+                getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name'))),
                 getDocs(query(collection(firestore, 'employees'), orderBy('fullName')))
             ]);
-            setDepartments(deptSnap.docs.map(d => ({id: d.id, ...d.data()} as Department)));
+            setTransactionTypes(typesSnap.docs.map(d => ({id: d.id, ...d.data()} as TransactionType)));
             setEngineers(engSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
@@ -77,45 +74,18 @@ export default function EditTransactionPage() {
     fetchRefData();
   }, [firestore, toast]);
   
-  // --- Fetch Transaction Types when Department changes ---
-  useEffect(() => {
-    if (!firestore || !formData.selectedDepartment) {
-        setTransactionTypes([]);
-        return;
-    };
-    setLoadingTypes(true);
-    const fetchTypes = async () => {
-        try {
-            const typesQuery = query(collection(firestore, `departments/${formData.selectedDepartment}/transactionTypes`), orderBy('name'));
-            const typesSnapshot = await getDocs(typesQuery);
-            setTransactionTypes(typesSnapshot.docs.map(d => ({id: d.id, ...d.data()} as TransactionType)));
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب أنواع المعاملات.' });
-        } finally {
-            setLoadingTypes(false);
-        }
-    };
-    fetchTypes();
-  }, [firestore, formData.selectedDepartment, toast]);
-
   // --- Populate Form with existing data ---
   useEffect(() => {
-      // This effect should only run ONCE when the transaction data is loaded
-      // to populate the form for the first time.
-      if (transactionSnap?.exists() && departments.length > 0 && !originalData) {
+      if (transactionSnap?.exists()) {
           const data = transactionSnap.data() as ClientTransaction;
           setOriginalData(data);
-          
-          const departmentId = data.departmentId || '';
-
           setFormData({
-              selectedDepartment: departmentId,
               transactionType: data.transactionType || '',
               description: data.description || '',
               assignedEngineerId: data.assignedEngineerId || ''
           });
       }
-  }, [transactionSnap, departments, originalData]);
+  }, [transactionSnap]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,14 +97,6 @@ export default function EditTransactionPage() {
     const changes: string[] = [];
     const updatePayload: any = {};
     
-    const originalDepartmentId = originalData.departmentId || '';
-    if (formData.selectedDepartment !== originalDepartmentId) {
-        const oldDeptName = departments.find(d => d.id === originalDepartmentId)?.name || 'غير محدد';
-        const newDeptName = departments.find(d => d.id === formData.selectedDepartment)?.name || 'غير محدد';
-        changes.push(`تغير القسم من "${oldDeptName}" إلى "${newDeptName}".`);
-        updatePayload.departmentId = formData.selectedDepartment;
-    }
-
     if (formData.transactionType !== originalData.transactionType) {
         changes.push(`تغير نوع المعاملة من "${originalData.transactionType || 'غير محدد'}" إلى "${formData.transactionType}".`);
         updatePayload.transactionType = formData.transactionType;
@@ -162,9 +124,6 @@ export default function EditTransactionPage() {
         const batch = writeBatch(firestore);
         
         const safeUpdatePayload = cleanFirestoreData(updatePayload);
-        console.log("البيانات قبل التنظيف (Transaction Edit):", JSON.stringify(updatePayload, null, 2));
-        console.log("البيانات بعد التنظيف (Transaction Edit):", JSON.stringify(safeUpdatePayload, null, 2));
-        
         batch.update(transactionRef, safeUpdatePayload);
         
         const logRef = doc(collection(transactionRef, 'timelineEvents'));
@@ -188,13 +147,8 @@ export default function EditTransactionPage() {
     }
   };
   
-    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
     const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.name, label: t.name })), [transactionTypes]);
-    const engineerOptions = useMemo(() => {
-        const selectedDeptName = departments.find(d => d.id === formData.selectedDepartment)?.name;
-        if (!selectedDeptName) return [];
-        return engineers.filter(e => e.department === selectedDeptName).map(e => ({ value: e.id!, label: e.fullName }));
-    }, [engineers, formData.selectedDepartment, departments]);
+    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
 
 
   if (transactionLoading || loadingRefs) {
@@ -213,26 +167,15 @@ export default function EditTransactionPage() {
                 <CardDescription>تعديل تفاصيل المعاملة الداخلية للعميل.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                        <Label>القسم <span className="text-destructive">*</span></Label>
-                        <InlineSearchList 
-                            value={formData.selectedDepartment} 
-                            onSelect={(v) => setFormData(p => ({...p, selectedDepartment: v, transactionType: ''}))} 
-                            options={departmentOptions} 
-                            placeholder="اختر القسم..." 
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
-                        <InlineSearchList 
-                            value={formData.transactionType} 
-                            onSelect={(v) => setFormData(p => ({...p, transactionType: v}))} 
-                            options={transactionTypeOptions} 
-                            placeholder={!formData.selectedDepartment ? "اختر قسمًا أولاً" : loadingTypes ? "تحميل..." : "اختر نوع المعاملة..."} 
-                            disabled={!formData.selectedDepartment || loadingTypes}
-                        />
-                    </div>
+                <div className="grid gap-2">
+                    <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
+                    <InlineSearchList 
+                        value={formData.transactionType} 
+                        onSelect={(v) => setFormData(p => ({...p, transactionType: v}))} 
+                        options={transactionTypeOptions} 
+                        placeholder={loadingRefs ? "تحميل..." : "اختر نوع المعاملة..."} 
+                        disabled={loadingRefs}
+                    />
                 </div>
                 <div className="grid gap-2">
                     <Label>المهندس المسؤول (اختياري)</Label>
@@ -240,8 +183,8 @@ export default function EditTransactionPage() {
                         value={formData.assignedEngineerId} 
                         onSelect={(v) => setFormData(p => ({...p, assignedEngineerId: v}))} 
                         options={engineerOptions} 
-                        placeholder={!formData.selectedDepartment ? "اختر قسمًا أولاً" : "اختر مهندسًا..."} 
-                        disabled={!formData.selectedDepartment}
+                        placeholder={loadingRefs ? "تحميل..." : "اختر مهندسًا..."} 
+                        disabled={loadingRefs}
                     />
                 </div>
                 <div className="grid gap-2">

@@ -1,4 +1,5 @@
 
+
       'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -15,11 +16,11 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause, Briefcase } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole, Department } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -130,7 +131,6 @@ export default function TransactionDetailPage() {
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
-  const [departmentsMap, setDepartmentsMap] = useState<Map<string, string>>(new Map());
   const [newStatus, setNewStatus] = useState('');
   const [newEngineerId, setNewEngineerId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -155,25 +155,17 @@ export default function TransactionDetailPage() {
   
   useEffect(() => {
     if (!firestore) return;
-    const fetchRefData = async () => {
-        try {
-            const [empSnap, deptSnap] = await Promise.all([
-                getDocs(collection(firestore, 'employees')),
-                getDocs(collection(firestore, 'departments')),
-            ]);
-
-            const newEmpMap = new Map<string, string>();
-            empSnap.forEach(doc => newEmpMap.set(doc.id, (doc.data() as Employee).fullName));
-            setEmployeesMap(newEmpMap);
-
-            const newDeptMap = new Map<string, string>();
-            deptSnap.forEach(doc => newDeptMap.set(doc.id, (doc.data() as Department).name));
-            setDepartmentsMap(newDeptMap);
-        } catch (e) {
-            console.error("Failed to fetch ref data", e);
-        }
+    const fetchEmployees = async () => {
+        const q = query(collection(firestore, 'employees'));
+        const querySnapshot = await getDocs(q);
+        const newMap = new Map<string, string>();
+        querySnapshot.forEach(doc => {
+            const emp = doc.data() as Employee;
+            newMap.set(doc.id, emp.fullName);
+        });
+        setEmployeesMap(newMap);
     };
-    fetchRefData();
+    fetchEmployees();
   }, [firestore]);
 
 
@@ -527,8 +519,6 @@ export default function TransactionDetailPage() {
       </div>
     );
   }
-  
-  const departmentName = transaction.departmentId ? departmentsMap.get(transaction.departmentId) : null;
 
   return (
     <>
@@ -576,7 +566,6 @@ export default function TransactionDetailPage() {
             </CardHeader>
             <CardContent>
                 <div className='grid md:grid-cols-2 gap-6'>
-                    <InfoRow icon={<Briefcase />} label="القسم" value={departmentName || <span className='text-muted-foreground'>غير محدد</span>} />
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? (employeesMap.get(transaction.assignedEngineerId) || '...') : <span className='text-muted-foreground'>لم يحدد</span>} />
                     <InfoRow icon={<Calendar />} label="تاريخ الإنشاء" value={formatDate(transaction.createdAt)} />
                 </div>
@@ -733,6 +722,7 @@ export default function TransactionDetailPage() {
     
 
     
+
 
 
 

@@ -15,15 +15,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, Department, WorkStage, TransactionStage } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { InlineSearchList } from '../ui/inline-search-list';
-
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
@@ -39,16 +37,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
-    
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [departmentsLoading, setDepartmentsLoading] = useState(true);
-    const [selectedDepartment, setSelectedDepartment] = useState('');
-
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
-    const [typesLoading, setTypesLoading] = useState(false);
-
-    const [workStages, setWorkStages] = useState<WorkStage[]>([]);
-    const [stagesLoading, setStagesLoading] = useState(false);
+    const [typesLoading, setTypesLoading] = useState(true);
 
     const [transactionType, setTransactionType] = useState('');
     const [description, setDescription] = useState('');
@@ -58,97 +48,54 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
     useEffect(() => {
         if (!firestore || !isOpen) return;
 
-        const fetchInitialData = async () => {
+        const fetchEngineers = async () => {
             setEngineersLoading(true);
-            setDepartmentsLoading(true);
             try {
-                const engQuery = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
-                const deptQuery = query(collection(firestore, 'departments'), orderBy('name'));
-
-                const [engSnapshot, deptSnapshot] = await Promise.all([
-                    getDocs(engQuery),
-                    getDocs(deptQuery),
-                ]);
-
+                const q = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
+                const querySnapshot = await getDocs(q);
                 const fetchedEngineers: Employee[] = [];
-                engSnapshot.forEach((doc) => {
+                querySnapshot.forEach((doc) => {
                     const data = doc.data() as Employee;
                     if (data.jobTitle?.includes('مهندس') || data.jobTitle?.toLowerCase().includes('engineer')) {
                         fetchedEngineers.push({ id: doc.id, ...data });
                     }
                 });
                 setEngineers(fetchedEngineers);
-
-                const fetchedDepts = deptSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
-                setDepartments(fetchedDepts);
-
             } catch (error) {
-                console.error("Failed to fetch initial data:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات اللازمة.' });
+                console.error("Failed to fetch engineers:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المهندسين.' });
             } finally {
                 setEngineersLoading(false);
-                setDepartmentsLoading(false);
             }
         };
 
-        fetchInitialData();
-    }, [firestore, isOpen, toast]);
-
-    useEffect(() => {
-        if (!firestore || !selectedDepartment) {
-            setTransactionTypes([]);
-            setWorkStages([]);
-            return;
-        }
-
-        const fetchDepartmentData = async () => {
-            setTypesLoading(true);
-            setStagesLoading(true);
-            try {
-                const typesQuery = query(collection(firestore, `departments/${selectedDepartment}/transactionTypes`));
-                const stagesQuery = query(collection(firestore, `departments/${selectedDepartment}/workStages`));
-
-                const [typesSnapshot, stagesSnapshot] = await Promise.all([
-                    getDocs(typesQuery),
-                    getDocs(stagesQuery)
-                ]);
-                
-                const fetchedTypes = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
-                setTransactionTypes(fetchedTypes);
-
-                let fetchedStages = stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage));
-                fetchedStages.sort((a, b) => {
-                    const orderA = (a as any).order;
-                    const orderB = (b as any).order;
-                    return (orderA ?? 99) - (orderB ?? 99);
+        const fetchTransactionTypes = async () => {
+             setTypesLoading(true);
+             try {
+                const q = query(collection(firestore, 'transactionTypes'));
+                const querySnapshot = await getDocs(q);
+                const fetchedTypes: TransactionType[] = [];
+                querySnapshot.forEach((doc) => {
+                    fetchedTypes.push({ id: doc.id, ...doc.data() } as TransactionType);
                 });
-                setWorkStages(fetchedStages);
-
+                setTransactionTypes(fetchedTypes);
             } catch (error) {
-                console.error("Failed to fetch department data:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات القسم.' });
+                console.error("Failed to fetch transaction types:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة أنواع المعاملات.' });
             } finally {
                 setTypesLoading(false);
-                setStagesLoading(false);
             }
         };
 
-        fetchDepartmentData();
-    }, [firestore, selectedDepartment, toast]);
+        fetchEngineers();
+        fetchTransactionTypes();
+    }, [firestore, isOpen, toast]);
 
     const resetForm = () => {
         setTransactionType('');
         setDescription('');
         setAssignedEngineerId('');
-        setSelectedDepartment('');
-        setWorkStages([]);
     };
-
-    const handleDepartmentChange = (deptId: string) => {
-        setSelectedDepartment(deptId);
-        setTransactionType(''); // Reset transaction type when department changes
-    };
-
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -157,8 +104,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             return;
         }
 
-        if (!selectedDepartment || !transactionType) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار القسم ونوع المعاملة.' });
+        if (!transactionType) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار نوع المعاملة.' });
             return;
         }
 
@@ -168,8 +115,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const batch = writeBatch(firestore);
             const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
             const newTransactionRefId = newTransactionRef.id;
-
-            const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name || '';
 
             let engineerForTransactionId: string | null = assignedEngineerId || null;
 
@@ -190,20 +135,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             }
 
             const engineer = engineers.find(e => e.id === engineerForTransactionId);
-            
-            // Create stages based on the sorted reference data
-            const initialStages: Partial<TransactionStage>[] = workStages.length > 0
-                ? workStages.map((stage) => ({
-                    stageId: stage.id,
-                    name: stage.name,
-                    allowedRoles: stage.allowedRoles,
-                    status: 'pending' as const,
-                    startDate: null,
-                    endDate: null,
-                    notes: '',
-                }))
-                : [];
-
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
@@ -211,8 +142,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 description,
                 assignedEngineerId: engineerForTransactionId,
                 status: 'new',
-                stages: initialStages,
-                departmentId: selectedDepartment,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };
@@ -272,28 +201,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             setIsSaving(false);
         }
     };
-    
-    const engineerOptions = useMemo(() => {
-        if (!selectedDepartment) return [];
-        const selectedDeptName = departments.find(d => d.id === selectedDepartment)?.name;
-        return engineers.filter(e => e.department === selectedDeptName).map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber || e.civilId }))
-    }, [engineers, selectedDepartment, departments]);
-
-    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
-    const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.name, label: t.name })), [transactionTypes]);
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetForm(); onClose(); } }}>
-            <DialogContent
-                dir="rtl"
-                className="sm:max-w-lg"
-                onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                        e.preventDefault();
-                    }
-                }}
-            >
+            <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>إضافة معاملة داخلية جديدة</DialogTitle>
@@ -302,29 +213,22 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-6">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div className="grid gap-2">
-                                <Label>القسم <span className="text-destructive">*</span></Label>
-                                <InlineSearchList 
-                                    value={selectedDepartment} 
-                                    onSelect={handleDepartmentChange} 
-                                    options={departmentOptions} 
-                                    placeholder={departmentsLoading ? "تحميل..." : "اختر القسم..."} 
-                                    disabled={departmentsLoading}
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
-                                <InlineSearchList 
-                                    value={transactionType} 
-                                    onSelect={setTransactionType} 
-                                    options={transactionTypeOptions} 
-                                    placeholder={!selectedDepartment ? "اختر قسمًا أولاً" : typesLoading ? "تحميل..." : "اختر نوع المعاملة..."} 
-                                    disabled={!selectedDepartment || typesLoading || stagesLoading}
-                                />
-                            </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="transactionType">نوع المعاملة <span className="text-destructive">*</span></Label>
+                            <select
+                                id="transactionType"
+                                value={transactionType}
+                                onChange={(e) => setTransactionType(e.target.value)}
+                                className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50")}
+                                required
+                                disabled={typesLoading}
+                            >
+                                <option value="" disabled>{typesLoading ? 'جاري التحميل...' : 'اختر نوع المعاملة...'}</option>
+                                {transactionTypes.map(type => (
+                                    <option key={type.id} value={type.name}>{type.name}</option>
+                                ))}
+                            </select>
                         </div>
-
                         {transactionType.includes('بلدية') && transactionType.includes('سكن خاص') ? (
                             <Alert>
                                 <Info className="h-4 w-4" />
@@ -335,14 +239,19 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                             </Alert>
                         ) : (
                             <div className="grid gap-2">
-                                <Label>إسناد إلى مهندس (اختياري)</Label>
-                                <InlineSearchList 
-                                    value={assignedEngineerId} 
-                                    onSelect={setAssignedEngineerId} 
-                                    options={engineerOptions} 
-                                    placeholder={!selectedDepartment ? "اختر قسمًا أولاً" : engineersLoading ? "تحميل..." : "ابحث بالاسم أو الرقم الوظيفي..."} 
-                                    disabled={!selectedDepartment || engineersLoading}
-                                />
+                                <Label htmlFor="assignedEngineerId">إسناد إلى مهندس (اختياري)</Label>
+                                <select
+                                    id="assignedEngineerId"
+                                    value={assignedEngineerId}
+                                    onChange={(e) => setAssignedEngineerId(e.target.value)}
+                                    className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50")}
+                                    disabled={engineersLoading}
+                                >
+                                    <option value="">{engineersLoading ? 'جاري التحميل...' : 'اختر مهندسًا...'}</option>
+                                    {engineers.map(e => (
+                                        <option key={e.id} value={e.id!}>{e.fullName}</option>
+                                    ))}
+                                </select>
                             </div>
                         )}
                         
