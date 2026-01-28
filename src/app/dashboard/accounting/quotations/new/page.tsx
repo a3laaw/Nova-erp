@@ -28,7 +28,7 @@ import {
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import type { Client, QuotationItem } from '@/lib/types';
+import type { Client, QuotationItem, ContractTemplate } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -59,13 +59,20 @@ export default function NewQuotationPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
+  // Reference data states
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+
+  // Form-related states
   const [quotationNumber, setQuotationNumber] = useState('جاري التوليد...');
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
-  const { register, handleSubmit, control, formState: { errors }, watch } = useForm<QuotationFormValues>({
+
+  const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     mode: 'onChange',
     defaultValues: {
@@ -76,7 +83,7 @@ export default function NewQuotationPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -88,23 +95,35 @@ export default function NewQuotationPage() {
   [watchedItems]);
 
 
-  // Fetch clients
+  // Fetch clients and templates
   useEffect(() => {
     if (!firestore) return;
-    setClientsLoading(true);
-    const fetchClients = async () => {
+    const fetchRefData = async () => {
+      setClientsLoading(true);
+      setTemplatesLoading(true);
       try {
-        const q = query(collection(firestore, 'clients'), orderBy('nameAr'));
-        const snapshot = await getDocs(q);
-        const fetchedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+        const clientsQuery = query(collection(firestore, 'clients'), orderBy('nameAr'));
+        const templatesQuery = query(collection(firestore, 'contractTemplates'), orderBy('title'));
+
+        const [clientsSnapshot, templatesSnapshot] = await Promise.all([
+            getDocs(clientsQuery),
+            getDocs(templatesQuery)
+        ]);
+
+        const fetchedClients = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
         setClients(fetchedClients);
+        
+        const fetchedTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
+        setTemplates(fetchedTemplates);
+
       } catch (error) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة العملاء.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
         setClientsLoading(false);
+        setTemplatesLoading(false);
       }
     };
-    fetchClients();
+    fetchRefData();
   }, [firestore, toast]);
   
   // Generate Quotation Number
@@ -130,10 +149,38 @@ export default function NewQuotationPage() {
     };
     generateNumber();
   }, [firestore]);
+
+  // Handle template selection
+  useEffect(() => {
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (template) {
+      setValue('subject', template.title, { shouldValidate: true });
+      setValue('notes', template.description || '', { shouldValidate: true });
+
+      const newItems = template.financials?.milestones?.map(milestone => ({
+        description: milestone.name,
+        quantity: 1,
+        unitPrice: milestone.value,
+      })) || [];
+
+      if (newItems.length > 0) {
+        replace(newItems);
+      } else {
+        replace([{ description: '', quantity: 1, unitPrice: 0 }]);
+      }
+    } else {
+        // Optionally reset if no template is selected
+        // reset({ ...getValues(), subject: '', notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }]});
+    }
+  }, [selectedTemplateId, templates, replace, setValue]);
   
   const clientOptions = useMemo(() =>
     clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile }))
   , [clients]);
+  
+  const templateOptions = useMemo(() =>
+    templates.map(t => ({ value: t.id!, label: t.title }))
+  , [templates]);
 
   const onSubmit = async (data: QuotationFormValues) => {
     if (!firestore || isGeneratingNumber) return;
@@ -227,13 +274,23 @@ export default function NewQuotationPage() {
                         {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
                     </div>
                     <div className="grid gap-2">
+                        <Label>استيراد من نموذج عقد (اختياري)</Label>
+                        <InlineSearchList
+                            value={selectedTemplateId}
+                            onSelect={setSelectedTemplateId}
+                            options={[{value: '', label: '-- بدون نموذج --'}, ...templateOptions]}
+                            placeholder={templatesLoading ? 'تحميل النماذج...' : 'ابحث عن نموذج عقد...'}
+                            disabled={templatesLoading}
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     <div className="grid gap-2 md:col-span-1">
                         <Label htmlFor="subject">الموضوع <span className="text-destructive">*</span></Label>
                         <Input id="subject" {...register('subject')} />
                         {errors.subject && <p className="text-xs text-destructive">{errors.subject.message}</p>}
                     </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
                         <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
                         <Input id="date" type="date" {...register('date')} />
