@@ -53,6 +53,7 @@ const navItems = {
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف' },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
+        { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
         { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
       ]
@@ -77,6 +78,7 @@ const navItems = {
             { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
             { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
             { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
+            { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
             { href: '/dashboard/accounting/invoices', label: 'Invoices' },
             { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
           ]
