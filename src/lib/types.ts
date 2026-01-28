@@ -424,6 +424,7 @@ export interface WorkStage {
   name: string;
   order?: number;
   allowedRoles?: string[];
+  expectedDurationDays?: number;
 }
 
 export type ContractClause = {

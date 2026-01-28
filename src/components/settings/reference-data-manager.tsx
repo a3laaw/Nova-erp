@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -38,7 +39,7 @@ import { MultiSelect } from '../ui/multi-select';
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, allowedRoles?: string[]}, S extends {id: string, name: string, allowedRoles?: string[]}>({
+function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -73,10 +74,11 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const [editingItem, setEditingItem] = useState<{ id: string, name: string, allowedRoles?: string[] } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number } | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   const [itemName, setItemName] = useState('');
   const [itemRoles, setItemRoles] = useState<string[]>([]);
+  const [itemDuration, setItemDuration] = useState<number | ''>('');
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
 
@@ -164,11 +166,12 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   }, [primaryItems, selectedPrimary, handleSelectPrimary]);
 
 
-  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, allowedRoles?: string[]} | null = null) => {
+  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number} | null = null) => {
     setEditingItem(item);
     setItemName(item?.name || '');
     if (isWorkStageView && type === 'secondary') {
         setItemRoles(item?.allowedRoles || []);
+        setItemDuration(item?.expectedDurationDays || '');
     }
     if (type === 'primary') setIsPrimaryDialogOpen(true);
     else setIsSecondaryDialogOpen(true);
@@ -180,6 +183,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setEditingItem(null);
     setItemName('');
     setItemRoles([]);
+    setItemDuration('');
   }
   
   const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
@@ -221,9 +225,10 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
     try {
-      const dataToSave: { name: string, order?: number, allowedRoles?: string[] } = { name: itemName };
+      const dataToSave: { name: string, order?: number, allowedRoles?: string[], expectedDurationDays?: number } = { name: itemName };
        if (isWorkStageView && type === 'secondary') {
           dataToSave.allowedRoles = itemRoles;
+          dataToSave.expectedDurationDays = Number(itemDuration) || 0;
       }
 
       if (editingItem) { // Update
@@ -328,6 +333,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span>{item.name}</span>
+                        {isWorkStageView && item.expectedDurationDays && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
                         {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
                             <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                         ))}
@@ -374,15 +380,21 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
             </div>
 
             {isWorkStageView && !isPrimaryDialogOpen && (
-                <div className="grid gap-2">
-                    <Label htmlFor="item-role">الأدوار المسؤولة (المسميات الوظيفية)</Label>
-                    <MultiSelect
-                        options={jobs}
-                        selected={itemRoles}
-                        onChange={setItemRoles}
-                        placeholder="اختر دورًا أو أكثر..."
-                    />
-                </div>
+                <>
+                    <div className="grid gap-2">
+                        <Label htmlFor="item-role">الأدوار المسؤولة (المسميات الوظيفية)</Label>
+                        <MultiSelect
+                            options={jobs}
+                            selected={itemRoles}
+                            onChange={setItemRoles}
+                            placeholder="اختر دورًا أو أكثر..."
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
+                        <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(Number(e.target.value))} />
+                    </div>
+                </>
             )}
           </div>
           <DialogFooter>

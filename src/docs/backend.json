@@ -300,6 +300,7 @@
         },
         "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
+        "expectedEndDate": { "type": "string", "format": "date-time", "description": "The expected completion date for countdowns." },
         "notes": { "type": "string", "description": "Notes specific to this stage." }
       },
       "required": ["stageId", "name", "status"]
@@ -582,6 +583,10 @@
             "type": "array",
             "description": "A list of job titles responsible for this stage.",
             "items": { "type": "string" }
+        },
+        "expectedDurationDays": {
+            "type": "number",
+            "description": "The expected duration in days for this stage."
         }
       },
       "required": ["name"]

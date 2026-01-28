@@ -33,9 +33,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 import { cn, cleanFirestoreData, formatCurrency } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
     let total = 0;
@@ -80,6 +81,32 @@ const stageStatusTranslations: Record<string, string> = {
   skipped: 'تم تخطيها',
 };
 
+
+function StageCountdown({ stage }: { stage: TransactionStage }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
+  if (stage.status !== 'in-progress' || !stage.expectedEndDate) {
+    return null;
+  }
+
+  const endDate = toFirestoreDate(stage.expectedEndDate);
+  if (!endDate) return null;
+
+  const daysRemaining = differenceInDays(endDate, now);
+
+  if (daysRemaining < 0) {
+    return <Badge variant="destructive">متأخرة {Math.abs(daysRemaining)} أيام</Badge>
+  } else if (daysRemaining === 0) {
+    return <Badge variant="destructive" className="bg-orange-500 border-orange-600 text-white">اليوم الأخير</Badge>
+  } else {
+    return <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">{`متبقٍ ${daysRemaining + 1} أيام`}</Badge>
+  }
+}
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     if (!value) return null;
@@ -180,9 +207,11 @@ export default function TransactionDetailPage() {
                     name: template.name,
                     order: (template as any).order,
                     allowedRoles: template.allowedRoles,
+                    expectedDurationDays: template.expectedDurationDays,
                     status: progress?.status || 'pending',
                     startDate: progress?.startDate || null,
                     endDate: progress?.endDate || null,
+                    expectedEndDate: progress?.expectedEndDate || null,
                     notes: progress?.notes || '',
                 };
             });
@@ -290,21 +319,23 @@ export default function TransactionDetailPage() {
 
     const originalProgress = [...(transaction.stages || [])];
     const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
+    
+    const templateStageInfo = stages.find(s => s.stageId === stageId);
+    if (!templateStageInfo) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
+        return;
+    }
 
     let updatedProgress: Partial<TransactionStage>;
 
     if (stageProgressIndex > -1) {
         updatedProgress = { ...originalProgress[stageProgressIndex] };
     } else {
-        const templateStageInfo = stages.find(s => s.stageId === stageId);
-        if (!templateStageInfo) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
-            return;
-        }
         updatedProgress = {
             stageId: stageId,
             name: templateStageInfo.name,
             allowedRoles: templateStageInfo.allowedRoles,
+            expectedDurationDays: templateStageInfo.expectedDurationDays,
         };
     }
     
@@ -327,16 +358,23 @@ export default function TransactionDetailPage() {
     }
 
     updatedProgress.status = newStatus;
+    const now = new Date();
 
     if (newStatus === 'in-progress' && oldStatus !== 'in-progress') {
-        updatedProgress.startDate = new Date();
+        updatedProgress.startDate = now;
+        if (templateStageInfo.expectedDurationDays && templateStageInfo.expectedDurationDays > 0) {
+            const endDate = new Date(now);
+            endDate.setDate(now.getDate() + templateStageInfo.expectedDurationDays);
+            updatedProgress.expectedEndDate = endDate;
+        }
     }
     if (newStatus === 'completed' && oldStatus !== 'completed') {
-        updatedProgress.endDate = new Date();
+        updatedProgress.endDate = now;
     }
      if (newStatus === 'pending') {
       updatedProgress.startDate = null;
       updatedProgress.endDate = null;
+      updatedProgress.expectedEndDate = null;
     }
 
     let newProgressForFirestore;
@@ -416,7 +454,7 @@ export default function TransactionDetailPage() {
 
         const stageName = updatedProgress.name;
         for (const recipientId of recipients) {
-            const isCreator = recipientId === currentUser.id;
+            const isCreator = recipientId === currentUser?.id;
             let body = isCreator 
                 ? `لقد قمت بتغيير حالة المرحلة "${stageName}" إلى "${stageStatusTranslations[newStatus]}" لمعاملة العميل ${client?.nameAr}.`
                 : `${currentUser.fullName} قام بتغيير حالة المرحلة "${stageName}" إلى "${stageStatusTranslations[newStatus]}" لمعاملة العميل ${client?.nameAr}.`;
@@ -613,6 +651,7 @@ export default function TransactionDetailPage() {
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
+                                                <StageCountdown stage={stage} />
                                                 {stage.allowedRoles?.map(role => (
                                                     <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                                                 ))}
@@ -685,4 +724,5 @@ export default function TransactionDetailPage() {
     
 
     
+
 
