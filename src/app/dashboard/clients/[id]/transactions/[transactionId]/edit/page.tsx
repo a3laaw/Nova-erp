@@ -106,12 +106,7 @@ export default function EditTransactionPage() {
           const data = transactionSnap.data() as ClientTransaction;
           setOriginalData(data);
           
-          let departmentId = '';
-          // Try to find the department based on the transaction type name
-          const foundDept = departments.find(d => data.transactionType?.includes(d.name.substring(0, 3)));
-          if (foundDept) {
-            departmentId = foundDept.id;
-          }
+          const departmentId = data.departmentId || '';
 
           setFormData({
               selectedDepartment: departmentId,
@@ -132,10 +127,19 @@ export default function EditTransactionPage() {
     const changes: string[] = [];
     const updatePayload: any = {};
     
+    const originalDepartmentId = originalData.departmentId || '';
+    if (formData.selectedDepartment !== originalDepartmentId) {
+        const oldDeptName = departments.find(d => d.id === originalDepartmentId)?.name || 'غير محدد';
+        const newDeptName = departments.find(d => d.id === formData.selectedDepartment)?.name || 'غير محدد';
+        changes.push(`تغير القسم من "${oldDeptName}" إلى "${newDeptName}".`);
+        updatePayload.departmentId = formData.selectedDepartment;
+    }
+
     if (formData.transactionType !== originalData.transactionType) {
-        changes.push(`تغير نوع المعاملة من "${originalData.transactionType}" إلى "${formData.transactionType}".`);
+        changes.push(`تغير نوع المعاملة من "${originalData.transactionType || 'غير محدد'}" إلى "${formData.transactionType}".`);
         updatePayload.transactionType = formData.transactionType;
     }
+
     if (formData.description !== (originalData.description || '')) {
         changes.push(`تم تحديث الوصف.`);
         updatePayload.description = formData.description;
