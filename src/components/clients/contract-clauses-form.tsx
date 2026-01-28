@@ -33,13 +33,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { useRouter } from 'next/navigation';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
   onClose: () => void;
-  transaction: ClientTransaction | null;
+  transaction: ClientTransaction | null | Partial<ClientTransaction>;
   clientId: string;
   clientName: string;
+  quotationIdToUpdate?: string;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -87,10 +89,11 @@ function TemplateSelectionView({
 }
 
 
-export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName }: ContractClausesFormProps) {
+export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   // Form data state
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
@@ -214,7 +217,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       populateFormFromExistingContract(transaction.contract);
       setStep('edit');
     } else {
-      const matchingTemplates = referenceData.templates.filter(t => t.transactionTypes?.includes(transaction.transactionType));
+      const matchingTemplates = referenceData.templates.filter(t => t.transactionTypes?.includes(transaction.transactionType || ''));
       
       if (matchingTemplates.length > 1) {
         setAvailableTemplates(matchingTemplates);
@@ -294,184 +297,143 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
 
   const handleSubmit = async () => {
-    if (!firestore || !transaction?.id || !currentUser) return;
+    if (!firestore || !transaction || !currentUser) return;
+    
+    // Check if we are creating a new transaction or updating an existing one
+    const isCreatingNewTransaction = !transaction.id;
+
     setIsSaving(true);
-    let newTransactionData: ClientTransaction | null = null;
+    let finalTransactionId = transaction.id;
 
     try {
         await runTransaction(firestore, async (transaction_firestore) => {
             const clientRef = doc(firestore, 'clients', clientId);
-            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
-            const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
-            const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
-            const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
-            const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
-            const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
-
-            const [
-                clientSnap, 
-                currentTransactionSnap, 
-                coaClientCounterDoc, 
-                journalEntryCounterDoc, 
-                parentAccountSnap, 
-                revenueAccountSnap,
-                clientAccountSnap
-            ] = await Promise.all([
-                transaction_firestore.get(clientRef),
-                transaction_firestore.get(transactionRef),
-                transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef),
-                getDocs(parentAccountQuery), // Fetch inside transaction for consistency
-                getDocs(revenueAccountQuery),
-                getDocs(clientAccountQuery)
-            ]);
-
-            if (!clientSnap.exists()) throw new Error("Client not found.");
-            if (!currentTransactionSnap.exists()) throw new Error("Transaction not found.");
-
-            if (parentAccountSnap.empty) throw new Error('حساب "العملاء" الرئيسي غير موجود في شجرة الحسابات.');
-            if (revenueAccountSnap.empty) throw new Error('حساب "إيرادات استشارات هندسية" غير موجود في شجرة الحسابات.');
             
-            const customersAccountDoc = parentAccountSnap.docs[0];
-            const revenueAccountDoc = revenueAccountSnap.docs[0];
-
-            const clientData = clientSnap.data();
-            const currentTransactionData = currentTransactionSnap.data() as ClientTransaction;
-            newTransactionData = currentTransactionData; // To be used in notification
-
-            // Prepare contract and stage data
+            // --- Transaction and Contract Data ---
             const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
-            
-            const updatedStages = [...(currentTransactionData.stages || [])];
+            const updatedStages = [...(transaction.stages || [])];
             const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
-            
-            // Mark the "Sign Contract" stage as completed, if it exists and isn't already.
             if (contractStageIndex > -1 && updatedStages[contractStageIndex].status !== 'completed') {
                 const stageToUpdate = { ...updatedStages[contractStageIndex] };
                 stageToUpdate.status = 'completed';
                 stageToUpdate.endDate = new Date();
-                if (!stageToUpdate.startDate) {
-                    stageToUpdate.startDate = new Date();
-                }
+                if (!stageToUpdate.startDate) stageToUpdate.startDate = new Date();
                 updatedStages[contractStageIndex] = stageToUpdate as TransactionStage;
             }
-            
-            const updatePayload = { contract: contractData, stages: updatedStages };
-            transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
-            
-            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
-            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${transaction.id!}/timelineEvents`);
 
-            // --- Log contract creation/update in both timelines ---
-            let contractDetailsComment = `**تم توقيع/تحديث العقد**\n\n`;
-            contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
-            contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
-            contractDetailsComment += `**الدفعات:**\n`;
-            if (clauses.length > 0) {
-              clauses.forEach(c => {
-                contractDetailsComment += `  - ${c.name}: ${formatCurrency(c.amount)}\n`;
-              });
+            let transactionRef: any;
+
+            if (isCreatingNewTransaction) {
+                transactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
+                finalTransactionId = transactionRef.id;
+                transaction_firestore.set(transactionRef, {
+                    ...transaction,
+                    contract: contractData,
+                    stages: updatedStages,
+                    status: 'in-progress',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
             } else {
-              contractDetailsComment += `  - لا توجد دفعات محددة.\n`;
+                transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
+                const updatePayload = { contract: contractData, stages: updatedStages, status: 'in-progress' };
+                transaction_firestore.update(transactionRef, cleanFirestoreData(updatePayload));
             }
 
-            const commentData = {
-                type: 'comment' as const,
-                content: contractDetailsComment,
-                userId: currentUser.id, 
-                userName: currentUser.fullName || 'النظام', 
-                userAvatar: currentUser.avatarUrl || '', 
-                createdAt: serverTimestamp(),
-            };
+            // --- History & Timeline Logging ---
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${finalTransactionId}/timelineEvents`);
             
+            let contractDetailsComment = `**تم ${isCreatingNewTransaction ? 'توقيع' : 'تحديث'} العقد**\n\n`;
+            contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
+            contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
+            contractDetailsComment += `**الدفعات:**\n` + clauses.map(c => `  - ${c.name}: ${formatCurrency(c.amount)}`).join('\n');
+            
+            const commentData = { type: 'comment' as const, content: contractDetailsComment, userId: currentUser.id, userName: currentUser.fullName || 'النظام', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp() };
             transaction_firestore.set(doc(transactionTimelineRef), commentData);
             transaction_firestore.set(doc(historyCollectionRef), commentData);
 
-
-            // This logic only runs when creating a contract for the first time for a client
-            if (clientData.status === 'new') {
-                let clientAccountId: string;
+            // --- Accounting Logic (only on first contract creation for the client) ---
+            const clientSnap = await transaction_firestore.get(clientRef);
+            if (!clientSnap.exists()) throw new Error("Client not found.");
+            
+            if (clientSnap.data().status === 'new') {
                 transaction_firestore.update(clientRef, { status: 'contracted' });
 
-                const statusLogData = {
-                    type: 'log' as const,
-                    content: `تغيرت حالة الملف من "جديد" إلى "تم التعاقد" بعد إنشاء أول عقد.`,
-                    userId: currentUser.id, userName: currentUser.fullName || 'النظام', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
-                }
-                transaction_firestore.set(doc(historyCollectionRef), statusLogData);
-                transaction_firestore.set(doc(transactionTimelineRef), statusLogData);
-                
-                if (clientAccountSnap.empty) {
-                    const parentCode = customersAccountDoc.data().code as string;
-                    const lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()?.lastNumber || 0 : 0;
-                    const nextClientCodeNumber = lastClientCodeNumber + 1;
-                    const clientAccountCode = `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`;
+                const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
+                const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
+                const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
+                const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
+                const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
 
+                const [coaClientCounterDoc, journalEntryCounterDoc, parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
+                    transaction_firestore.get(coaClientCounterRef),
+                    transaction_firestore.get(journalEntryCounterRef),
+                    getDocs(parentAccountQuery), getDocs(revenueAccountQuery), getDocs(clientAccountQuery)
+                ]);
+
+                if (parentAccountSnap.empty || revenueAccountSnap.empty) throw new Error('حسابات رئيسية مفقودة.');
+
+                let clientAccountId: string;
+                if (clientAccountSnap.empty) {
+                    const parentCode = parentAccountSnap.docs[0].data().code as string;
+                    const nextClientCodeNumber = (coaClientCounterDoc.data()?.lastNumber || 0) + 1;
                     transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
                     const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
-                    transaction_firestore.set(newAccountRef, {
-                        name: clientData.nameAr, code: clientAccountCode, type: customersAccountDoc.data().type, level: (customersAccountDoc.data().level as number) + 1,
-                    });
+                    transaction_firestore.set(newAccountRef, { name: clientName, code: `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`, type: 'asset', level: 4 });
                     clientAccountId = newAccountRef.id;
                 } else {
                     clientAccountId = clientAccountSnap.docs[0].id;
                 }
-                
+
                 const currentYear = new Date().getFullYear();
-                const journalEntryCounterDocData = journalEntryCounterDoc.data();
-                const counts = journalEntryCounterDocData?.counts || {};
-                const nextJournalEntryNumber = (counts[currentYear] || 0) + 1;
-                
+                const nextJournalEntryNumber = ((journalEntryCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-                const journalLines = [
-                    { accountId: clientAccountId, accountName: clientData.nameAr, debit: totalAmount, credit: 0 },
-                    { accountId: revenueAccountDoc.id, accountName: revenueAccountDoc.data().name, debit: 0, credit: totalAmount }
-                ];
                 transaction_firestore.set(newJournalEntryRef, {
-                    entryNumber: `JV-${currentYear}-${String(nextJournalEntryNumber).padStart(4, '0')}`,
-                    date: serverTimestamp(),
-                    narration: `إثبات مديونية العميل ${clientData.nameAr} عن عقد معاملة "${transaction.transactionType}"`,
-                    totalDebit: totalAmount,
-                    totalCredit: totalAmount, status: 'draft', lines: journalLines, createdAt: serverTimestamp(), createdBy: currentUser.id, clientId: clientId, transactionId: transaction.id!,
+                    entryNumber: `JV-${currentYear}-${String(nextJournalEntryNumber).padStart(4, '0')}`, date: serverTimestamp(), narration: `إثبات مديونية ${clientName} عن عقد "${transaction.transactionType}"`,
+                    totalDebit: totalAmount, totalCredit: totalAmount, status: 'draft',
+                    lines: [
+                        { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0 },
+                        { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: totalAmount }
+                    ],
+                    createdAt: serverTimestamp(), createdBy: currentUser.id, clientId, transactionId: finalTransactionId,
                 });
                 transaction_firestore.set(journalEntryCounterRef, { counts: { [currentYear]: nextJournalEntryNumber } }, { merge: true });
             }
+
+            // Link quotation if it exists
+            if (quotationIdToUpdate) {
+                const quotationRef = doc(firestore, 'quotations', quotationIdToUpdate);
+                transaction_firestore.update(quotationRef, { transactionId: finalTransactionId });
+            }
         });
 
-        toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء قيد المديونية بنجاح.' });
+        toast({ title: 'نجاح', description: 'تم حفظ بنود العقد بنجاح.' });
         
-        // --- Notification Logic ---
-        const engineerId = newTransactionData?.assignedEngineerId;
+        const engineerId = transaction.assignedEngineerId;
         const recipients = new Set<string>();
-
-        if (currentUser) {
-            recipients.add(currentUser.id);
-        }
-
+        if (currentUser) recipients.add(currentUser.id);
         if (engineerId) {
             const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
-            if (targetUserId) {
-                recipients.add(targetUserId);
-            }
+            if (targetUserId) recipients.add(targetUserId);
         }
         
         for (const recipientId of recipients) {
             const isCreator = recipientId === currentUser?.id;
             const actionText = transaction.contract ? 'تحديث عقد' : 'توقيع عقد';
-            const title = isCreator ? `تم ${actionText} بنجاح` : `${actionText} جديد`;
-            const body = isCreator 
-                ? `لقد قمت بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`
-                : `قام ${currentUser?.fullName} بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`;
-            
             await createNotification(firestore, {
                 userId: recipientId,
-                title,
-                body,
-                link: `/dashboard/clients/${clientId}/transactions/${transaction.id!}`
+                title: isCreator ? `تم ${actionText} بنجاح` : `${actionText} جديد`,
+                body: `قام ${currentUser?.fullName} بـ ${actionText} لمعاملة "${transaction.transactionType}" للعميل ${clientName}.`,
+                link: `/dashboard/clients/${clientId}/transactions/${finalTransactionId}`
             });
         }
         
         onClose();
+        // Redirect to the new transaction page if it was just created from a quotation
+        if (isCreatingNewTransaction && quotationIdToUpdate && finalTransactionId) {
+            router.push(`/dashboard/clients/${clientId}/transactions/${finalTransactionId}`);
+        }
 
     } catch (error) {
         console.error(error);

@@ -28,7 +28,7 @@ import {
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import type { Client, QuotationItem, ContractTemplate } from '@/lib/types';
+import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -76,6 +76,11 @@ export default function NewQuotationPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  
+  // States to hold template data for saving
+  const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
+  const [terms, setTerms] = useState<ContractTerm[]>([]);
+  const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
 
 
   const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset } = useForm<QuotationFormValues>({
@@ -167,15 +172,18 @@ export default function NewQuotationPage() {
       if (template.description) {
         notesParts.push(`**ملخص:**\n${template.description}`);
       }
-
+      
+      setScopeOfWork(template.scopeOfWork || []);
       if (template.scopeOfWork && template.scopeOfWork.length > 0) {
           notesParts.push(`\n**نطاق العمل:**\n${template.scopeOfWork.map((item, index) => `${index + 1}. ${item.title}: ${item.description || ''}`).join('\n')}`);
       }
-      
+
+      setTerms(template.termsAndConditions || []);
       if (template.termsAndConditions && template.termsAndConditions.length > 0) {
           notesParts.push(`\n**الشروط والأحكام:**\n${template.termsAndConditions.map(term => `- ${term.text}`).join('\n')}`);
       }
       
+      setOpenClauses(template.openClauses || []);
       if (template.openClauses && template.openClauses.length > 0) {
           notesParts.push(`\n**بنود إضافية:**\n${template.openClauses.map(clause => `- ${clause.text}`).join('\n')}`);
       }
@@ -228,6 +236,7 @@ export default function NewQuotationPage() {
             const newQuotationRef = doc(collection(firestore, 'quotations'));
             newQuotationId = newQuotationRef.id;
             const client = clients.find(c => c.id === data.clientId);
+            const template = templates.find(t => t.id === selectedTemplateId);
             
             const processedItems = data.items.map(item => ({
                 ...item,
@@ -250,6 +259,11 @@ export default function NewQuotationPage() {
                 notes: data.notes,
                 status: 'draft',
                 createdAt: serverTimestamp(),
+                // Store structured data for later contract conversion
+                scopeOfWork: scopeOfWork,
+                termsAndConditions: terms,
+                openClauses: openClauses,
+                templateDescription: template?.description || '',
             });
         });
         
@@ -393,7 +407,7 @@ export default function NewQuotationPage() {
                 </div>
 
                 <div className="grid gap-2">
-                    <Label htmlFor="notes">ملاحظات إضافية</Label>
+                    <Label htmlFor="notes">ملاحظات إضافية (تحتوي على بنود العقد)</Label>
                     <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
                 </div>
             </CardContent>

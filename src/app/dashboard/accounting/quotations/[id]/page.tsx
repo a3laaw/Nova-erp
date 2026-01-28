@@ -5,15 +5,16 @@ import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
-import type { Quotation, Company } from '@/lib/types';
+import type { Quotation, Company, ClientTransaction } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Printer, Pencil, ArrowRight } from 'lucide-react';
+import { Printer, Pencil, ArrowRight, FileSignature } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 
 const statusTranslations: Record<Quotation['status'], string> = {
     draft: 'مسودة',
@@ -40,6 +41,7 @@ export default function ViewQuotationPage() {
 
   const [company, setCompany] = useState<Company | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
+  const [isContractFormOpen, setIsContractFormOpen] = useState(false);
 
   const quotationRef = useMemo(() => {
     if (!firestore || !id) return null;
@@ -54,6 +56,28 @@ export default function ViewQuotationPage() {
     }
     return null;
   }, [quotationSnap]);
+  
+  const prefilledTransaction = useMemo((): Partial<ClientTransaction> | null => {
+    if (!quotation) return null;
+    return {
+      clientId: quotation.clientId,
+      transactionType: quotation.subject,
+      description: quotation.templateDescription || '',
+      contract: {
+        totalAmount: quotation.totalAmount,
+        clauses: quotation.items.map(item => ({
+            id: item.id || '',
+            name: item.description,
+            amount: item.total,
+            status: 'غير مستحقة',
+            condition: item.condition || ''
+        })),
+        scopeOfWork: quotation.scopeOfWork || [],
+        termsAndConditions: quotation.termsAndConditions || [],
+        openClauses: quotation.openClauses || [],
+      }
+    };
+  }, [quotation]);
 
 
   useEffect(() => {
@@ -117,6 +141,17 @@ export default function ViewQuotationPage() {
   }
 
   return (
+    <>
+    {isContractFormOpen && prefilledTransaction && (
+        <ContractClausesForm
+            isOpen={isContractFormOpen}
+            onClose={() => setIsContractFormOpen(false)}
+            transaction={prefilledTransaction as ClientTransaction}
+            clientId={quotation.clientId}
+            clientName={quotation.clientName}
+            quotationIdToUpdate={quotation.id}
+        />
+    )}
     <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
         <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
             <div id="printable-area" className="p-8 md:p-12 printable-content">
@@ -192,7 +227,7 @@ export default function ViewQuotationPage() {
                     
                     {quotation.notes && (
                         <div className="pt-4">
-                            <h4 className="font-semibold mb-2">ملاحظات:</h4>
+                            <h4 className="font-semibold mb-2">ملاحظات وبنود إضافية:</h4>
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quotation.notes}</p>
                         </div>
                     )}
@@ -208,6 +243,14 @@ export default function ViewQuotationPage() {
                 </footer>
             </div>
              <div className="p-6 bg-muted/50 rounded-b-lg flex justify-end gap-2 no-print">
+                {quotation.transactionId ? (
+                    <Button variant="outline" disabled>تم تحويله إلى عقد</Button>
+                ) : (
+                    <Button onClick={() => setIsContractFormOpen(true)}>
+                        <FileSignature className="ml-2 h-4 w-4" />
+                        تحويل إلى عقد
+                    </Button>
+                )}
                 <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)}>
                     <Pencil className="ml-2 h-4 w-4" />
                     تعديل
@@ -219,5 +262,6 @@ export default function ViewQuotationPage() {
             </div>
         </div>
     </div>
+    </>
   );
 }

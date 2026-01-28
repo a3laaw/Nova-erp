@@ -573,4 +573,9 @@ export interface Quotation {
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   createdAt: any; // Timestamp
   createdBy?: string;
+  scopeOfWork?: ContractScopeItem[];
+  termsAndConditions?: ContractTerm[];
+  openClauses?: ContractTerm[];
+  templateDescription?: string;
+  transactionId?: string;
 }
