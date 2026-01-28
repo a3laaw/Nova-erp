@@ -210,6 +210,7 @@ export default function NewQuotationPage() {
   const onSubmit = async (data: QuotationFormValues) => {
     if (!firestore || isGeneratingNumber) return;
     setIsSaving(true);
+    let newQuotationId = '';
     try {
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
@@ -225,6 +226,7 @@ export default function NewQuotationPage() {
             const newQuotationNumber = `Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
             const newQuotationRef = doc(collection(firestore, 'quotations'));
+            newQuotationId = newQuotationRef.id;
             const client = clients.find(c => c.id === data.clientId);
             
             const processedItems = data.items.map(item => ({
@@ -252,7 +254,11 @@ export default function NewQuotationPage() {
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ عرض السعر كمسودة.' });
-        router.push('/dashboard/accounting/quotations');
+        if (newQuotationId) {
+            router.push(`/dashboard/accounting/quotations/${newQuotationId}`);
+        } else {
+            router.push('/dashboard/accounting/quotations');
+        }
 
     } catch (error) {
         console.error("Error saving quotation:", error);
