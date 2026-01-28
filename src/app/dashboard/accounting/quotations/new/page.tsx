@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,8 +28,8 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm } from '@/lib/types';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
+import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, Department, TransactionType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -53,6 +54,8 @@ const quotationSchema = z.object({
   validUntil: z.string().min(1, 'تاريخ انتهاء الصلاحية مطلوب.'),
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   notes: z.string().optional(),
+  departmentId: z.string().min(1, 'القسم مطلوب'),
+  transactionTypeId: z.string().min(1, 'نوع المعاملة مطلوب'),
 });
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
@@ -67,23 +70,22 @@ export default function NewQuotationPage() {
 
   // Reference data states
   const [clients, setClients] = useState<Client[]>([]);
-  const [clientsLoading, setClientsLoading] = useState(true);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [refDataLoading, setRefDataLoading] = useState(true);
+  const [transactionTypesLoading, setTransactionTypesLoading] = useState(false);
 
   // Form-related states
   const [quotationNumber, setQuotationNumber] = useState('جاري التوليد...');
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   
-  // States to hold template data for saving
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
 
-
-  const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset, getValues } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     mode: 'onChange',
     defaultValues: {
@@ -92,6 +94,9 @@ export default function NewQuotationPage() {
       validUntil: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
       items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }],
       notes: '',
+      departmentId: '',
+      transactionTypeId: '',
+      subject: '',
     },
   });
 
@@ -101,43 +106,115 @@ export default function NewQuotationPage() {
   });
 
   const watchedItems = watch("items");
+  const selectedDepartmentId = watch("departmentId");
+  const selectedTransactionTypeId = watch("transactionTypeId");
 
   const totalAmount = useMemo(() =>
     (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
   [watchedItems]);
 
 
-  // Fetch clients and templates
+  // Fetch clients, departments and templates
   useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
-      setClientsLoading(true);
-      setTemplatesLoading(true);
+      setRefDataLoading(true);
       try {
-        const clientsQuery = query(collection(firestore, 'clients'), orderBy('nameAr'));
-        const templatesQuery = query(collection(firestore, 'contractTemplates'), orderBy('title'));
-
-        const [clientsSnapshot, templatesSnapshot] = await Promise.all([
-            getDocs(clientsQuery),
-            getDocs(templatesQuery)
+        const [clientsSnapshot, departmentsSnapshot, templatesSnapshot] = await Promise.all([
+          getDocs(query(collection(firestore, 'clients'), orderBy('nameAr'))),
+          getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
+          getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title')))
         ]);
 
-        const fetchedClients = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-        setClients(fetchedClients);
-        
-        const fetchedTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
-        setTemplates(fetchedTemplates);
+        setClients(clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
+        setDepartments(departmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+        setTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
 
       } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
-        setClientsLoading(false);
-        setTemplatesLoading(false);
+        setRefDataLoading(false);
       }
     };
     fetchRefData();
   }, [firestore, toast]);
   
+  // Fetch transaction types when department changes
+  useEffect(() => {
+      if (!selectedDepartmentId || !firestore) {
+          setTransactionTypes([]);
+          return;
+      }
+      const fetchTransactionTypes = async () => {
+          setTransactionTypesLoading(true);
+          try {
+              const typesQuery = query(collection(firestore, `departments/${selectedDepartmentId}/transactionTypes`), orderBy('name'));
+              const typesSnapshot = await getDocs(typesQuery);
+              setTransactionTypes(typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
+          } catch(e) {
+              toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب أنواع المعاملات.' });
+          } finally {
+              setTransactionTypesLoading(false);
+          }
+      };
+      fetchTransactionTypes();
+  }, [selectedDepartmentId, firestore, toast]);
+
+  // Handle auto-population from template when transaction type is selected
+  useEffect(() => {
+    if (!selectedTransactionTypeId || transactionTypes.length === 0 || templates.length === 0) return;
+
+    const transType = transactionTypes.find(t => t.id === selectedTransactionTypeId);
+    if (!transType) return;
+    
+    setValue('subject', transType.name, { shouldValidate: true });
+
+    const template = templates.find(t => t.transactionTypes?.includes(transType.name));
+    
+    // Reset fields before populating
+    replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }]);
+    setScopeOfWork([]);
+    setTerms([]);
+    setOpenClauses([]);
+    setValue('notes', '');
+    
+    if (template) {
+      const notesParts: string[] = [];
+      if (template.description) {
+        notesParts.push(`**ملخص:**\n${template.description}`);
+      }
+      
+      setScopeOfWork(template.scopeOfWork || []);
+      if (template.scopeOfWork && template.scopeOfWork.length > 0) {
+          notesParts.push(`\n**نطاق العمل:**\n${template.scopeOfWork.map((item, index) => `${index + 1}. ${item.title}: ${item.description || ''}`).join('\n')}`);
+      }
+
+      setTerms(template.termsAndConditions || []);
+      if (template.termsAndConditions && template.termsAndConditions.length > 0) {
+          notesParts.push(`\n**الشروط والأحكام:**\n${template.termsAndConditions.map(term => `- ${term.text}`).join('\n')}`);
+      }
+      
+      setOpenClauses(template.openClauses || []);
+      if (template.openClauses && template.openClauses.length > 0) {
+          notesParts.push(`\n**بنود إضافية:**\n${template.openClauses.map(clause => `- ${clause.text}`).join('\n')}`);
+      }
+      
+      setValue('notes', notesParts.join('\n\n'), { shouldValidate: true });
+
+      const newItems = template.financials?.milestones?.map(milestone => ({
+        id: milestone.id || generateId(),
+        description: milestone.name,
+        quantity: 1,
+        unitPrice: milestone.value,
+        condition: milestone.condition || '',
+      })) || [];
+
+      if (newItems.length > 0) {
+        replace(newItems);
+      }
+    }
+  }, [selectedTransactionTypeId, transactionTypes, templates, setValue, replace]);
+
   // Generate Quotation Number
   useEffect(() => {
     if (!firestore) return;
@@ -161,59 +238,13 @@ export default function NewQuotationPage() {
     };
     generateNumber();
   }, [firestore]);
-
-  // Handle template selection
-  useEffect(() => {
-    const template = templates.find(t => t.id === selectedTemplateId);
-    if (template) {
-      setValue('subject', template.title, { shouldValidate: true });
-
-      const notesParts: string[] = [];
-      if (template.description) {
-        notesParts.push(`**ملخص:**\n${template.description}`);
-      }
-      
-      setScopeOfWork(template.scopeOfWork || []);
-      if (template.scopeOfWork && template.scopeOfWork.length > 0) {
-          notesParts.push(`\n**نطاق العمل:**\n${template.scopeOfWork.map((item, index) => `${index + 1}. ${item.title}: ${item.description || ''}`).join('\n')}`);
-      }
-
-      setTerms(template.termsAndConditions || []);
-      if (template.termsAndConditions && template.termsAndConditions.length > 0) {
-          notesParts.push(`\n**الشروط والأحكام:**\n${template.termsAndConditions.map(term => `- ${term.text}`).join('\n')}`);
-      }
-      
-      setOpenClauses(template.openClauses || []);
-      if (template.openClauses && template.openClauses.length > 0) {
-          notesParts.push(`\n**بنود إضافية:**\n${template.openClauses.map(clause => `- ${clause.text}`).join('\n')}`);
-      }
-      
-      setValue('notes', notesParts.join('\n\n'), { shouldValidate: true });
-
-
-      const newItems = template.financials?.milestones?.map(milestone => ({
-        id: milestone.id || generateId(),
-        description: milestone.name,
-        quantity: 1,
-        unitPrice: milestone.value,
-        condition: milestone.condition || '',
-      })) || [];
-
-      if (newItems.length > 0) {
-        replace(newItems);
-      } else {
-        replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }]);
-      }
-    }
-  }, [selectedTemplateId, templates, replace, setValue]);
   
   const clientOptions = useMemo(() =>
     clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile }))
   , [clients]);
   
-  const templateOptions = useMemo(() =>
-    templates.map(t => ({ value: t.id!, label: t.title }))
-  , [templates]);
+  const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
+  const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id, label: t.name })), [transactionTypes]);
 
   const onSubmit = async (data: QuotationFormValues) => {
     if (!firestore || isGeneratingNumber) return;
@@ -236,7 +267,7 @@ export default function NewQuotationPage() {
             const newQuotationRef = doc(collection(firestore, 'quotations'));
             newQuotationId = newQuotationRef.id;
             const client = clients.find(c => c.id === data.clientId);
-            const template = templates.find(t => t.id === selectedTemplateId);
+            const template = templates.find(t => t.transactionTypes?.includes(transactionTypes.find(tt => tt.id === data.transactionTypeId)?.name || ''));
             
             const processedItems = data.items.map(item => ({
                 ...item,
@@ -254,12 +285,13 @@ export default function NewQuotationPage() {
                 date: new Date(data.date),
                 validUntil: new Date(data.validUntil),
                 subject: data.subject,
+                departmentId: data.departmentId,
+                transactionTypeId: data.transactionTypeId,
                 items: processedItems,
                 totalAmount: totalAmount,
                 notes: data.notes,
                 status: 'draft',
                 createdAt: serverTimestamp(),
-                // Store structured data for later contract conversion
                 scopeOfWork: scopeOfWork,
                 termsAndConditions: terms,
                 openClauses: openClauses,
@@ -300,33 +332,34 @@ export default function NewQuotationPage() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="grid gap-2">
                         <Label>العميل <span className="text-destructive">*</span></Label>
                         <Controller
-                            control={control}
-                            name="clientId"
+                            control={control} name="clientId"
                             render={({ field }) => (
-                                <InlineSearchList
-                                    value={field.value}
-                                    onSelect={field.onChange}
-                                    options={clientOptions}
-                                    placeholder={clientsLoading ? 'تحميل...' : 'ابحث عن عميل...'}
-                                    disabled={clientsLoading || !!clientIdFromUrl}
-                                />
+                                <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder={refDataLoading ? 'تحميل...' : 'ابحث عن عميل...'} disabled={refDataLoading || !!clientIdFromUrl} />
                             )}
                         />
                         {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
                     </div>
-                    <div className="grid gap-2">
-                        <Label>استيراد من نموذج عقد (اختياري)</Label>
-                        <InlineSearchList
-                            value={selectedTemplateId}
-                            onSelect={setSelectedTemplateId}
-                            options={[{value: '', label: '-- بدون نموذج --'}, ...templateOptions]}
-                            placeholder={templatesLoading ? 'تحميل النماذج...' : 'ابحث عن نموذج عقد...'}
-                            disabled={templatesLoading}
+                     <div className="grid gap-2">
+                        <Label>القسم <span className="text-destructive">*</span></Label>
+                        <Controller control={control} name="departmentId"
+                            render={({ field }) => (
+                                <InlineSearchList value={field.value} onSelect={field.onChange} options={departmentOptions} placeholder={refDataLoading ? 'تحميل...' : 'اختر القسم...'} disabled={refDataLoading} />
+                            )}
                         />
+                        {errors.departmentId && <p className="text-xs text-destructive">{errors.departmentId.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
+                        <Controller control={control} name="transactionTypeId"
+                            render={({ field }) => (
+                                <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionTypeOptions} placeholder={transactionTypesLoading ? 'تحميل...' : 'اختر نوع المعاملة...'} disabled={!selectedDepartmentId || transactionTypesLoading}/>
+                            )}
+                        />
+                        {errors.transactionTypeId && <p className="text-xs text-destructive">{errors.transactionTypeId.message}</p>}
                     </div>
                 </div>
 
@@ -424,3 +457,5 @@ export default function NewQuotationPage() {
     </Card>
   );
 }
+
+    

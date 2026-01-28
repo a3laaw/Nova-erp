@@ -192,6 +192,7 @@
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
             "departmentId": { "type": "string", "description": "The ID of the department this transaction belongs to." },
+            "transactionTypeId": { "type": "string", "description": "The ID of the transaction type." },
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
@@ -245,7 +246,7 @@
                 "required": ["clauses", "totalAmount"]
             }
         },
-        "required": ["clientId", "transactionType", "status", "createdAt"]
+        "required": ["clientId", "transactionType", "departmentId", "status", "createdAt"]
     },
     "TransactionTimelineEvent": {
       "title": "Transaction Timeline Event",
@@ -963,6 +964,8 @@
         "date": { "type": "string", "format": "date-time" },
         "validUntil": { "type": "string", "format": "date-time" },
         "subject": { "type": "string" },
+        "departmentId": { "type": "string", "description": "The ID of the department this quotation is for." },
+        "transactionTypeId": { "type": "string", "description": "The ID of the transaction type this quotation is for." },
         "items": {
           "type": "array",
           "items": {
@@ -1141,3 +1144,5 @@
     }
   }
 }
+
+    

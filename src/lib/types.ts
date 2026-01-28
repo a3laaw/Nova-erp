@@ -1,5 +1,6 @@
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -372,6 +373,7 @@ export type ClientTransaction = {
     description?: string;
     status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
     departmentId?: string;
+    transactionTypeId?: string;
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;
@@ -567,6 +569,8 @@ export interface Quotation {
   date: any; // Timestamp
   validUntil: any; // Timestamp
   subject: string;
+  departmentId?: string;
+  transactionTypeId?: string;
   items: QuotationItem[];
   totalAmount: number;
   notes?: string;
@@ -579,3 +583,5 @@ export interface Quotation {
   templateDescription?: string;
   transactionId?: string;
 }
+
+    
