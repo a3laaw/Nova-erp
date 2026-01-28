@@ -36,6 +36,8 @@ import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
 const itemSchema = z.object({
   id: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب"),
@@ -78,7 +80,7 @@ export default function NewQuotationPage() {
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
       validUntil: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
-      items: [{ description: '', quantity: 1, unitPrice: 0 }],
+      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }],
       notes: '',
     },
   });
@@ -155,9 +157,29 @@ export default function NewQuotationPage() {
     const template = templates.find(t => t.id === selectedTemplateId);
     if (template) {
       setValue('subject', template.title, { shouldValidate: true });
-      setValue('notes', template.description || '', { shouldValidate: true });
+
+      const notesParts: string[] = [];
+      if (template.description) {
+        notesParts.push(`**ملخص:**\n${template.description}`);
+      }
+
+      if (template.scopeOfWork && template.scopeOfWork.length > 0) {
+          notesParts.push(`\n**نطاق العمل:**\n${template.scopeOfWork.map((item, index) => `${index + 1}. ${item.title}: ${item.description || ''}`).join('\n')}`);
+      }
+      
+      if (template.termsAndConditions && template.termsAndConditions.length > 0) {
+          notesParts.push(`\n**الشروط والأحكام:**\n${template.termsAndConditions.map(term => `- ${term.text}`).join('\n')}`);
+      }
+      
+      if (template.openClauses && template.openClauses.length > 0) {
+          notesParts.push(`\n**بنود إضافية:**\n${template.openClauses.map(clause => `- ${clause.text}`).join('\n')}`);
+      }
+      
+      setValue('notes', notesParts.join('\n\n'), { shouldValidate: true });
+
 
       const newItems = template.financials?.milestones?.map(milestone => ({
+        id: milestone.id || generateId(),
         description: milestone.name,
         quantity: 1,
         unitPrice: milestone.value,
@@ -166,11 +188,8 @@ export default function NewQuotationPage() {
       if (newItems.length > 0) {
         replace(newItems);
       } else {
-        replace([{ description: '', quantity: 1, unitPrice: 0 }]);
+        replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }]);
       }
-    } else {
-        // Optionally reset if no template is selected
-        // reset({ ...getValues(), subject: '', notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }]});
     }
   }, [selectedTemplateId, templates, replace, setValue]);
   
@@ -349,7 +368,7 @@ export default function NewQuotationPage() {
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة بند
                         </Button>
@@ -358,7 +377,7 @@ export default function NewQuotationPage() {
 
                 <div className="grid gap-2">
                     <Label htmlFor="notes">ملاحظات إضافية</Label>
-                    <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ."/>
+                    <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
                 </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
