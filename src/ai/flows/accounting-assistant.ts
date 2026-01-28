@@ -674,12 +674,6 @@ const accountingAssistantFlow = ai.defineFlow(
     if (!output) {
       throw new Error('The AI model did not return a valid response.');
     }
-    try {
-      // The output from the model with JSON output format is already an object.
-      return output;
-    } catch (e) {
-      console.error('Invalid JSON output from model:', output);
-      throw new Error('The AI model returned a malformed JSON response.');
-    }
+    return output;
   }
 );
