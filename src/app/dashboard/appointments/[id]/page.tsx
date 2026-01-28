@@ -305,10 +305,11 @@ export default function AppointmentDetailsPage() {
 
             let commentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
             let paymentNotificationText = '';
+            
+            const nextDueClause = contractClauses.find(c => c.status !== 'مدفوعة');
 
-            const triggeredClause = contractClauses.find(c => c.condition === selectedStage.name);
-            if (triggeredClause && triggeredClause.status !== 'مدفوعة') {
-                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === triggeredClause.id);
+            if (nextDueClause && nextDueClause.condition === selectedStage.name) {
+                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === nextDueClause.id);
                 if (clauseToUpdateIndex > -1 && contractClauses[clauseToUpdateIndex].status === 'غير مستحقة') {
                     contractClauses[clauseToUpdateIndex].status = 'مستحقة';
                 }
