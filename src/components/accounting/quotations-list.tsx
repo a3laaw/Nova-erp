@@ -160,11 +160,11 @@ export function QuotationsList() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" dir="rtl">
                                         <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/quotations/${quotation.id}`)}>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}`)}>
                                             <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                         </DropdownMenuItem>
                                         {quotation.status === 'draft' && (
-                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/quotations/${quotation.id}/edit`)}>
+                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)}>
                                                 <Pencil className="ml-2 h-4 w-4" /> تعديل
                                             </DropdownMenuItem>
                                         )}

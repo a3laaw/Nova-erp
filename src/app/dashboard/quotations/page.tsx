@@ -1,38 +1,20 @@
 'use client';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
-import { QuotationsList } from '@/components/accounting/quotations-list';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '@/components/ui/card';
 
-export default function QuotationsPage() {
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle>عروض الأسعار</CardTitle>
-                        <CardDescription>
-                        إنشاء وإدارة عروض الأسعار المقدمة للعملاء.
-                        </CardDescription>
-                    </div>
-                    <Button asChild>
-                        <Link href="/dashboard/quotations/new">
-                            <PlusCircle className="ml-2 h-4 w-4" />
-                            إنشاء عرض سعر
-                        </Link>
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <QuotationsList />
-            </CardContent>
-        </Card>
-    )
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader } from 'lucide-react';
+
+export default function QuotationsRedirectPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/accounting/quotations');
+  }, [router]);
+
+  return (
+    <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
+    </div>
+  );
 }

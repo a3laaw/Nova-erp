@@ -13,6 +13,12 @@ import { useLanguage } from '@/context/language-context';
 
 const accountingSections = [
     {
+        title: 'عروض الأسعار',
+        description: 'إنشاء وإدارة عروض الأسعار المقدمة للعملاء.',
+        link: '/dashboard/accounting/quotations',
+        icon: <FileText className="h-8 w-8 text-primary" />,
+    },
+    {
         title: 'سندات القبض',
         description: 'عرض وإدارة جميع سندات القبض الواردة من العملاء.',
         link: '/dashboard/accounting/cash-receipts',
