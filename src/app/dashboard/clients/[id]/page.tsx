@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2 } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -38,7 +38,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
@@ -231,7 +230,7 @@ export default function ClientProfilePage() {
                     userId: targetUserId,
                     title: `تم إلغاء عقد`,
                     body: `قام ${currentUser.fullName} بإلغاء عقد معاملة "${transactionToCancel.transactionType}" للعميل ${client.nameAr}.`,
-                    link: `/dashboard/clients/${clientId}/transactions/${transactionToCancel.id!}`
+                    link: `/dashboard/clients/${client.id}/transactions/${transactionToCancel.id!}`
                 });
             }
         }
@@ -417,10 +416,18 @@ export default function ClientProfilePage() {
                         <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
                         <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
                     </div>
-                    <Button onClick={() => setIsFormOpen(true)}>
-                        <PlusCircle className="ml-2 h-4 w-4" />
-                        إضافة معاملة
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button asChild variant="outline">
+                            <Link href={`/dashboard/clients/${id}/statement`}>
+                                <Printer className="ml-2 h-4 w-4" />
+                                كشف حساب
+                            </Link>
+                        </Button>
+                        <Button onClick={() => setIsFormOpen(true)}>
+                            <PlusCircle className="ml-2 h-4 w-4" />
+                            إضافة معاملة
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {transactionsLoading && <Skeleton className="h-24 w-full" />}
