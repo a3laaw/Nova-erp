@@ -11,15 +11,19 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Wand2, Sparkles, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Loader2, Wand2, Sparkles, ArrowRight, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { runAccountingAssistant, type AccountingAssistantOutput } from '@/ai/flows/accounting-assistant';
 import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 export default function AccountingAssistantPage() {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [result, setResult] = useState<AccountingAssistantOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +37,10 @@ export default function AccountingAssistantPage() {
     setError(null);
     setResult(null);
     try {
-      const response = await runAccountingAssistant(prompt);
+      const response = await runAccountingAssistant({
+        command: prompt,
+        currentDate: date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+      });
       setResult(response);
     } catch (e: any) {
       console.error(e);
@@ -52,23 +59,46 @@ export default function AccountingAssistantPage() {
                 المساعد المحاسبي الذكي
                 </CardTitle>
                 <CardDescription>
-                أدخل أوامرك المحاسبية باللغة العربية، وسيقوم المساعد بتحويلها إلى عمليات منظمة.
+                أدخل أوامرك المحاسبية باللغة العربية (الفصحى أو العامية)، وسيقوم المساعد بتحويلها إلى عمليات منظمة.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid gap-4">
-                <Textarea
-                    id="prompt-input"
-                    placeholder='مثال: "اعمل قيد يومية لشراء أثاث مكتبي بمبلغ 1500 دينار بشيك رقم 101 بتاريخ اليوم"'
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={3}
-                    disabled={isLoading}
-                />
-                <Button onClick={handleProcessCommand} disabled={isLoading || !prompt.trim()}>
-                    {isLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Wand2 className="ml-2 h-4 w-4" />}
-                    {isLoading ? 'جاري المعالجة...' : 'معالجة الأمر'}
-                </Button>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center">
+                        <Input
+                            id="prompt-input"
+                            placeholder='مثال: "اعمل قيد مرتب خالد بـ 500 دينار من البنك النهارده"'
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            disabled={isLoading}
+                        />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                        "w-full md:w-[280px] justify-start text-left font-normal",
+                                        !date && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="ml-2 h-4 w-4" />
+                                    {date ? format(date, "PPP") : <span>اختر تاريخًا</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={date}
+                                    onSelect={setDate}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <Button onClick={handleProcessCommand} disabled={isLoading || !prompt.trim()} className="w-full md:w-auto">
+                        {isLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Wand2 className="ml-2 h-4 w-4" />}
+                        {isLoading ? 'جاري المعالجة...' : 'معالجة الأمر'}
+                    </Button>
                 </div>
             </CardContent>
         </Card>
