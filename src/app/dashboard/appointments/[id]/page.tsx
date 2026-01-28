@@ -355,34 +355,47 @@ export default function AppointmentDetailsPage() {
             // --- Notifications (outside batch) ---
             const link = `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId}`;
 
-            // 1. Notify Engineer about Stage Completion (and payment if due)
-            const engineerId = appointment.engineerId;
-            if (engineerId && engineerId !== currentUser.employeeId) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
-                if (targetUserId) {
-                    let body = `أنجز ${currentUser.fullName} مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`;
-                    if (paymentClauses.length > 0) {
-                        body += ` بناءً على ذلك، أصبحت الدفعة "${paymentClauses[0].name}" مستحقة.`;
-                    }
-            
-                    await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: `تم إنجاز مرحلة`,
-                        body: body,
-                        link: link,
-                    });
+            // 1. Notify Engineer and Creator about Stage Completion
+            const stageCompletionRecipients = new Set<string>();
+            if (currentUser) {
+                stageCompletionRecipients.add(currentUser.id);
+            }
+            if (appointment.engineerId) {
+                const engineerUserId = await findUserIdByEmployeeId(firestore, appointment.engineerId);
+                if (engineerUserId) {
+                    stageCompletionRecipients.add(engineerUserId);
                 }
             }
-            
-            // 2. Notify Accountants of Payment Due
+
+            for (const recipientId of stageCompletionRecipients) {
+                const isCreator = recipientId === currentUser?.id;
+                let body = isCreator
+                    ? `لقد أكملت مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`
+                    : `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`;
+
+                if (paymentClauses.length > 0) {
+                     body += ` بناءً على ذلك، أصبحت الدفعة "${paymentClauses[0].name}" مستحقة.`;
+                }
+                
+                await createNotification(firestore, {
+                    userId: recipientId,
+                    title: isCreator ? "تم إنجاز مرحلة بنجاح" : `تحديث على معاملة`,
+                    body: body,
+                    link: link,
+                });
+            }
+
+            // 2. Notify Accountants of Payment Due (separately)
             if (paymentClauses.length > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
                 
-                for (const clause of paymentClauses) {
-                    const notificationBody = `استحقاق دفعة "${clause.name}" بقيمة ${formatCurrency(clause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${selectedStage.name}".`;
-                    
-                    for (const accountantDoc of accountantsSnap.docs) {
+                const clause = paymentClauses[0];
+                const notificationBody = `استحقاق دفعة "${clause.name}" بقيمة ${formatCurrency(clause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${selectedStage.name}".`;
+                
+                for (const accountantDoc of accountantsSnap.docs) {
+                    // To avoid double-notifying an accountant who is also the engineer/creator, check the set.
+                    if (!stageCompletionRecipients.has(accountantDoc.id)) {
                         await createNotification(firestore, {
                             userId: accountantDoc.id,
                             title: 'إشعار استحقاق دفعة مالية',
