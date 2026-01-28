@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -20,12 +20,12 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import type { ClientTransaction, Employee } from '@/lib/types';
+import type { ClientTransaction, Employee, Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 import {
@@ -55,6 +55,7 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { formatCurrency } from '@/lib/utils';
 
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
@@ -99,6 +100,112 @@ const transactionStatusColors: Record<string, string> = {
   submitted: 'bg-purple-100 text-purple-800 border-purple-200',
   'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
 };
+
+// --- Quotations List Component ---
+function ClientQuotationsList({ clientId, clientName }: { clientId: string, clientName: string }) {
+  const { firestore } = useFirebase();
+  const router = useRouter();
+
+  const quotationsQuery = useMemo(() => {
+    if (!firestore || !clientId) return null;
+    return query(collection(firestore, 'quotations'), where('clientId', '==', clientId), orderBy('date', 'desc'));
+  }, [firestore, clientId]);
+
+  const [snapshot, loading, error] = useCollection(quotationsQuery);
+
+  const quotations = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
+  }, [snapshot]);
+  
+  const formatDate = (dateValue: any) => {
+    if (!dateValue) return '-';
+    try {
+      return format(dateValue.toDate(), 'dd/MM/yyyy');
+    } catch (e) {
+      return '-';
+    }
+  };
+
+  const statusTranslations: Record<Quotation['status'], string> = {
+    draft: 'مسودة',
+    sent: 'تم الإرسال',
+    accepted: 'مقبول',
+    rejected: 'مرفوض',
+    expired: 'منتهي الصلاحية'
+  };
+
+  const statusColors: Record<Quotation['status'], string> = {
+      draft: 'bg-yellow-100 text-yellow-800',
+      sent: 'bg-blue-100 text-blue-800',
+      accepted: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800',
+      expired: 'bg-gray-100 text-gray-800'
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <div>
+          <CardTitle className='flex items-center gap-2'><FileText className='text-primary'/> عروض الأسعار</CardTitle>
+          <CardDescription>جميع عروض الأسعار الخاصة بالعميل: {clientName}</CardDescription>
+        </div>
+        <Button asChild>
+          <Link href={`/dashboard/accounting/quotations/new?clientId=${clientId}`}>
+            <PlusCircle className="ml-2 h-4 w-4" />
+            إنشاء عرض سعر
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading && <Skeleton className="h-24 w-full" />}
+        {!loading && quotations.length === 0 && (
+          <div className="p-8 text-center border-2 border-dashed rounded-lg">
+            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-medium">لا توجد عروض أسعار بعد</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              قم بإنشاء عرض سعر جديد لهذا العميل ليظهر هنا.
+            </p>
+          </div>
+        )}
+        {!loading && quotations.length > 0 && (
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>رقم العرض</TableHead>
+                  <TableHead>الموضوع</TableHead>
+                  <TableHead>التاريخ</TableHead>
+                  <TableHead>الإجمالي</TableHead>
+                  <TableHead>الحالة</TableHead>
+                  <TableHead><span className="sr-only">الإجراءات</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {quotations.map(q => (
+                  <TableRow key={q.id}>
+                    <TableCell className="font-mono">{q.quotationNumber}</TableCell>
+                    <TableCell>{q.subject}</TableCell>
+                    <TableCell>{formatDate(q.date)}</TableCell>
+                    <TableCell className="font-mono">{formatCurrency(q.totalAmount)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={statusColors[q.status]}>{statusTranslations[q.status]}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => router.push(`/dashboard/accounting/quotations/${q.id}`)}>
+                        عرض
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 
 export default function ClientProfilePage() {
@@ -394,8 +501,9 @@ export default function ClientProfilePage() {
         </Card>
 
         <Tabs defaultValue="profile" dir="rtl">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
+            <TabsTrigger value="quotations">عروض الأسعار</TabsTrigger>
             <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
           </TabsList>
           <TabsContent value="profile" className="mt-6 space-y-6">
@@ -506,6 +614,9 @@ export default function ClientProfilePage() {
                 </CardContent>
             </Card>
           </TabsContent>
+           <TabsContent value="quotations" className="mt-6">
+                <ClientQuotationsList clientId={id} clientName={(client as any).nameAr} />
+           </TabsContent>
           <TabsContent value="history" className="mt-6">
             <ClientHistoryTimeline clientId={id} />
           </TabsContent>

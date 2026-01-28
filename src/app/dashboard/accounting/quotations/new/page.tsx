@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -58,8 +58,11 @@ type QuotationFormValues = z.infer<typeof quotationSchema>;
 
 export default function NewQuotationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { firestore } = useFirebase();
   const { toast } = useToast();
+
+  const clientIdFromUrl = searchParams.get('clientId');
 
   // Reference data states
   const [clients, setClients] = useState<Client[]>([]);
@@ -78,6 +81,7 @@ export default function NewQuotationPage() {
     resolver: zodResolver(quotationSchema),
     mode: 'onChange',
     defaultValues: {
+      clientId: clientIdFromUrl || '',
       date: new Date().toISOString().split('T')[0],
       validUntil: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
       items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }],
@@ -286,7 +290,7 @@ export default function NewQuotationPage() {
                                     onSelect={field.onChange}
                                     options={clientOptions}
                                     placeholder={clientsLoading ? 'تحميل...' : 'ابحث عن عميل...'}
-                                    disabled={clientsLoading}
+                                    disabled={clientsLoading || !!clientIdFromUrl}
                                 />
                             )}
                         />
