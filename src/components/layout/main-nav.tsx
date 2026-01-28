@@ -41,6 +41,7 @@ const navItems = {
     { href: '/dashboard/notifications', label: 'تنبيهات النظام', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/quotations', label: 'عروض الأسعار', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
     { 
       label: 'المحاسبة', 
@@ -66,6 +67,7 @@ const navItems = {
       { href: '/dashboard/notifications', label: 'System Alerts', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
       { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
       { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+      { href: '/dashboard/quotations', label: 'Quotations', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'] },
       { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
       { 
           label: 'Accounting', 

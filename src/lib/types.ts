@@ -547,3 +547,29 @@ export interface WorkStageProgress {
   selectedBy: string; // Employee ID
   selectedAt: any; // Timestamp
 }
+
+export interface QuotationItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Quotation {
+  id?: string;
+  quotationNumber: string;
+  quotationSequence: number;
+  quotationYear: number;
+  clientId: string;
+  clientName: string;
+  date: any; // Timestamp
+  validUntil: any; // Timestamp
+  subject: string;
+  items: QuotationItem[];
+  totalAmount: number;
+  notes?: string;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+  createdAt: any; // Timestamp
+  createdBy?: string;
+}
