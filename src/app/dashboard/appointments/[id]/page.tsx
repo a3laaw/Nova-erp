@@ -219,7 +219,6 @@ export default function AppointmentDetailsPage() {
             const currentStages = [...(transactionData.stages || [])];
             let contractClauses = transactionData.contract ? [...transactionData.contract.clauses] : [];
             const now = new Date();
-            let outstandingBalance = 0;
             
             // --- ROLLBACK LOGIC (if editing as Admin) ---
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
@@ -293,7 +292,7 @@ export default function AppointmentDetailsPage() {
                 }
             }
 
-            // --- REVISED PAYMENT DUE LOGIC & COMMENT CREATION ---
+            // --- SMART PAYMENT DUE LOGIC ---
             let logContent = isEditing
                 ? `قام ${currentUser.fullName} (مدير) بتعديل مرحلة الزيارة رقم ${appointment.visitCount || ''} إلى: "${selectedStage.name}".`
                 : `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
@@ -303,31 +302,30 @@ export default function AppointmentDetailsPage() {
             }
 
             let commentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
+            let outstandingBalance = 0;
+
+            const completedStageNames = new Set(currentStages.filter(s => s.status === 'completed').map(s => s.name));
             
-            const triggeredClause = contractClauses.find(c => c.condition === selectedStage.name);
-            let clausesUpdated = false;
-
-            if (triggeredClause && triggeredClause.status === 'غير مستحقة') {
-                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === triggeredClause.id);
-                if (clauseToUpdateIndex > -1) {
-                    contractClauses[clauseToUpdateIndex].status = 'مستحقة';
-                    clausesUpdated = true;
-
-                    const totalAmountNowDue = contractClauses
-                        .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
-                        .reduce((sum, c) => sum + c.amount, 0);
-                    
-                    const totalPaid = await getTotalPaidForProject(appointment.transactionId, firestore);
-                    outstandingBalance = totalAmountNowDue - totalPaid;
-
-                    if (outstandingBalance > 0) {
-                        const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
-                        commentContent += paymentNotificationText;
-                    }
+            const newContractClauses = contractClauses.map(clause => {
+                if (clause.condition && completedStageNames.has(clause.condition) && clause.status === 'غير مستحقة') {
+                    return { ...clause, status: 'مستحقة' as const };
                 }
+                return clause;
+            });
+            
+            const totalAmountNowDue = newContractClauses
+                .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
+                .reduce((sum, c) => sum + c.amount, 0);
+
+            const totalPaid = await getTotalPaidForProject(appointment.transactionId, firestore);
+            outstandingBalance = totalAmountNowDue - totalPaid;
+
+            if (outstandingBalance > 0) {
+                const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+                commentContent += paymentNotificationText;
             }
 
-            // --- Write Log and Comment to Batch ---
+            // --- Write to Batch ---
             const logData = {
                 type: 'log', content: logContent, userId: currentUser.id || 'system', userName: currentUser.fullName || 'System', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
             };
@@ -340,7 +338,7 @@ export default function AppointmentDetailsPage() {
             batch.set(doc(timelineRef), commentData);
             batch.set(doc(historyRef), commentData);
     
-            batch.update(transactionRef, { stages: currentStages, ...(clausesUpdated && { 'contract.clauses': contractClauses }) });
+            batch.update(transactionRef, { stages: currentStages, 'contract.clauses': newContractClauses });
     
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
                 const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
