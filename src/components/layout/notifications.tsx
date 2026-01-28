@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,26 +31,22 @@ const formatDate = (dateValue: any) => {
 };
 
 export function Notifications() {
-  const { notifications, loading } = useNotifications(); // Replaced old fetching logic
-  const router = useRouter();
+  const { notifications, loading } = useNotifications();
   const { firestore } = useFirebase();
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.isRead).length;
   }, [notifications]);
 
-  const handleNotificationClick = async (notification: Notification) => {
-    if (!firestore) return;
+  const handleMarkAsRead = (notificationId: string) => {
+    if (!firestore || !notificationId) return;
 
-    if (!notification.isRead && notification.id) {
-      const notifRef = doc(firestore, 'notifications', notification.id);
-      try {
-        await updateDoc(notifRef, { isRead: true });
-      } catch (error) {
-        console.error("Failed to mark notification as read:", error);
-      }
-    }
-    router.push(notification.link);
+    const notifRef = doc(firestore, 'notifications', notificationId);
+    // This is a "fire-and-forget" operation, we don't await it
+    // to avoid blocking navigation.
+    updateDoc(notifRef, { isRead: true }).catch(error => {
+      console.error("Failed to mark notification as read:", error);
+    });
   };
 
   return (
@@ -77,13 +72,23 @@ export function Notifications() {
           <DropdownMenuItem disabled className="text-center">لا توجد إشعارات جديدة.</DropdownMenuItem>
         )}
         {!loading && notifications.slice(0, 10).map(notif => ( // slice to show only latest
-          <DropdownMenuItem key={notif.id} className="flex items-start gap-2 cursor-pointer p-2" onClick={() => handleNotificationClick(notif)}>
-            {!notif.isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary flex-shrink-0" />}
-            <div className={`flex-1 ${notif.isRead ? 'ml-4' : ''}`}>
-              <p className="font-semibold">{notif.title}</p>
-              <p className="text-xs text-muted-foreground whitespace-normal">{notif.body}</p>
-              <p className="text-xs text-muted-foreground mt-1">{formatDate(notif.createdAt)}</p>
-            </div>
+          <DropdownMenuItem key={notif.id} className="p-0" asChild>
+             <Link
+              href={notif.link || '#'}
+              className="flex items-start gap-2 cursor-pointer p-2 w-full h-full"
+              onClick={() => {
+                if (!notif.isRead && notif.id) {
+                    handleMarkAsRead(notif.id);
+                }
+              }}
+            >
+                {!notif.isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary flex-shrink-0" />}
+                <div className={`flex-1 ${notif.isRead ? 'ml-4' : ''}`}>
+                <p className="font-semibold">{notif.title}</p>
+                <p className="text-xs text-muted-foreground whitespace-normal">{notif.body}</p>
+                <p className="text-xs text-muted-foreground mt-1">{formatDate(notif.createdAt)}</p>
+                </div>
+            </Link>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
