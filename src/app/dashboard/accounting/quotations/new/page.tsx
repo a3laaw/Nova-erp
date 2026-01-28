@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,6 +13,14 @@ import {
   CardTitle,
   CardFooter,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +67,45 @@ const quotationSchema = z.object({
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
+function TemplateSelectionView({
+  templates,
+  onSelect,
+  onContinueWithout,
+}: {
+  templates: ContractTemplate[];
+  onSelect: (template: ContractTemplate) => void;
+  onContinueWithout: () => void;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>اختر نموذج العقد</DialogTitle>
+        <DialogDescription>
+          تم العثور على عدة نماذج مرتبطة بنوع هذه المعاملة. الرجاء اختيار النموذج المناسب للبدء.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-4 space-y-2 max-h-[60vh] overflow-y-auto">
+        {templates.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => onSelect(t)}
+            className="block w-full text-right p-4 border rounded-lg hover:bg-accent transition-colors"
+          >
+            <p className="font-semibold">{t.title}</p>
+            <p className="text-sm text-muted-foreground">{t.description}</p>
+          </button>
+        ))}
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" type="button" onClick={onContinueWithout}>
+          متابعة بدون نموذج (إنشاء يدوي)
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+
 export default function NewQuotationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -84,6 +130,11 @@ export default function NewQuotationPage() {
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
+
+  // Control flow for template selection
+  const [step, setStep] = useState<'form' | 'select'>('form');
+  const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
+
 
   const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset, getValues } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
@@ -160,18 +211,9 @@ export default function NewQuotationPage() {
       fetchTransactionTypes();
   }, [selectedDepartmentId, firestore, toast]);
 
-  // Handle auto-population from template when transaction type is selected
-  useEffect(() => {
-    if (!selectedTransactionTypeId || transactionTypes.length === 0 || templates.length === 0) return;
-
-    const transType = transactionTypes.find(t => t.id === selectedTransactionTypeId);
-    if (!transType) return;
-    
-    setValue('subject', transType.name, { shouldValidate: true });
-
-    const template = templates.find(t => t.transactionTypes?.includes(transType.name));
-    
-    // Reset fields before populating
+  // Use a callback to populate form from a template
+  const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
+    // Reset fields first
     replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }]);
     setScopeOfWork([]);
     setTerms([]);
@@ -213,7 +255,29 @@ export default function NewQuotationPage() {
         replace(newItems);
       }
     }
-  }, [selectedTransactionTypeId, transactionTypes, templates, setValue, replace]);
+  }, [replace, setValue]);
+
+
+  // Handle template selection logic
+  useEffect(() => {
+    if (!selectedTransactionTypeId || transactionTypes.length === 0 || templates.length === 0) return;
+
+    const transType = transactionTypes.find(t => t.id === selectedTransactionTypeId);
+    if (!transType) return;
+    
+    setValue('subject', transType.name, { shouldValidate: true });
+    
+    const matchingTemplates = templates.filter(t => t.transactionTypes?.includes(transType.name));
+    
+    if (matchingTemplates.length > 1) {
+        setAvailableTemplates(matchingTemplates);
+        setStep('select');
+    } else {
+        const templateToUse = matchingTemplates.length === 1 ? matchingTemplates[0] : null;
+        populateFormFromTemplate(templateToUse);
+        setStep('form');
+    }
+  }, [selectedTransactionTypeId, transactionTypes, templates, setValue, populateFormFromTemplate]);
 
   // Generate Quotation Number
   useEffect(() => {
@@ -315,7 +379,24 @@ export default function NewQuotationPage() {
   };
 
   return (
-    <Card className="max-w-4xl mx-auto" dir="rtl">
+    <>
+      <Dialog open={step === 'select'} onOpenChange={(open) => !open && setStep('form')}>
+        <DialogContent>
+          <TemplateSelectionView
+            templates={availableTemplates}
+            onSelect={(template) => {
+              populateFormFromTemplate(template);
+              setStep('form');
+            }}
+            onContinueWithout={() => {
+              populateFormFromTemplate(null);
+              setStep('form');
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    
+      <Card className="max-w-4xl mx-auto" dir="rtl">
         <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader>
                 <div className="flex justify-between items-start">
@@ -454,8 +535,7 @@ export default function NewQuotationPage() {
                 </Button>
             </CardFooter>
         </form>
-    </Card>
+      </Card>
+    </>
   );
 }
-
-    
