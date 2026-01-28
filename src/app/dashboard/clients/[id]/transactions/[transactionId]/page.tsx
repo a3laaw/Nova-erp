@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -36,6 +36,17 @@ import { cn, cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { format, isPast, formatDistanceToNowStrict } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+
+const getTotalPaidForProject = async (projectId: string, db: any) => {
+    let total = 0;
+    if (!projectId || !db) return total;
+    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        total += doc.data().amount || 0;
+    });
+    return total;
+};
 
 
 // Using the same translation objects from client profile page
@@ -276,7 +287,7 @@ export default function TransactionDetailPage() {
 };
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
-    if (!firestore || !transaction || !currentUser) return;
+    if (!firestore || !transaction || !currentUser || !client) return;
 
     const originalProgress = [...(transaction.stages || [])];
     const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
@@ -366,82 +377,68 @@ export default function TransactionDetailPage() {
     
     const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
-    let newlyCompletedStage: Partial<TransactionStage> | null = null;
-    let newlyTriggeredClause: any = null;
     
     try {
         const batch = writeBatch(firestore);
         
-        const dataToUpdate = { stages: newProgressForFirestore };
-        const safeDataToUpdate = cleanFirestoreData(dataToUpdate);
-        
-        batch.update(transactionRefDoc, safeDataToUpdate);
-        
-        const logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
-        batch.set(doc(timelineCollectionRef), {
-            type: 'log',
-            content: logContent,
-            userId: currentUser.id,
-            userName: currentUser.fullName,
-            userAvatar: currentUser.avatarUrl,
-            createdAt: serverTimestamp(),
-        });
-        
-        // Add Engineering Comment when completed
-        if (newStatus === 'completed') {
-            const engineeringCommentContent = `تم إكمال مرحلة: ${updatedProgress.name}.`;
-            const engineeringCommentRef = doc(timelineCollectionRef);
-            batch.set(engineeringCommentRef, {
-                type: 'comment',
-                content: engineeringCommentContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            });
+        let commentContent = `تم إكمال مرحلة: ${updatedProgress.name}.`;
+        let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        let contractClauses = transaction.contract ? [...transaction.contract.clauses] : [];
+        let clausesUpdated = false;
+
+        if (shouldStartNextStage) {
+            const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
+            const nextStageInTemplate = stages[completedStageOrderIndex + 1];
+            if (nextStageInTemplate) {
+                 logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+            }
         }
-        
-        if (newStatus === 'completed' && oldStatus !== 'completed') {
-            newlyCompletedStage = updatedProgress;
-            
-            const allClauses = transaction.contract?.clauses || [];
-            const nextDueClause = allClauses.find((c: any) => c.status !== 'مدفوعة');
+
+        if (newStatus === 'completed' && oldStatus !== 'completed' && contractClauses.length > 0) {
+            const newlyCompletedStage = updatedProgress;
+            const nextDueClause = contractClauses.find((c: any) => c.status !== 'مدفوعة');
 
             if (nextDueClause && nextDueClause.condition === newlyCompletedStage?.name) {
-                newlyTriggeredClause = nextDueClause;
-                const paymentCommentRef = doc(timelineCollectionRef);
-                const commentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${newlyCompletedStage.name}"، أصبحت الدفعة "${nextDueClause.name}" مستحقة للدفع.`;
-                batch.set(paymentCommentRef, {
-                    type: 'comment',
-                    content: commentContent,
-                    userId: currentUser.id,
-                    userName: "النظام الآلي",
-                    userAvatar: '',
-                    createdAt: serverTimestamp(),
-                });
+                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === nextDueClause.id);
+                if (clauseToUpdateIndex > -1 && contractClauses[clauseToUpdateIndex].status === 'غير مستحقة') {
+                    contractClauses[clauseToUpdateIndex].status = 'مستحقة';
+                    clausesUpdated = true;
+                }
+
+                const totalAmountNowDue = contractClauses
+                    .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
+                    .reduce((sum, c) => sum + c.amount, 0);
+                
+                const totalPaid = await getTotalPaidForProject(transactionId, firestore);
+                const outstandingBalance = totalAmountNowDue - totalPaid;
+
+                if (outstandingBalance > 0) {
+                    const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+                    commentContent += paymentNotificationText; // Append to main comment
+                }
             }
         }
-
-        await batch.commit();
-        toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
         
-        if (newlyTriggeredClause && newlyCompletedStage) {
-            const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
-            const accountantsSnap = await getDocs(accountantsQuery);
-
-            const notificationBody = `استحقاق دفعة "${newlyTriggeredClause.name}" بقيمة ${formatCurrency(newlyTriggeredClause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${newlyCompletedStage.name}".`;
-
-            for (const accountantDoc of accountantsSnap.docs) {
-                const accountantId = accountantDoc.id;
-                await createNotification(firestore, {
-                    userId: accountantId,
-                    title: 'إشعار استحقاق دفعة مالية',
-                    body: notificationBody,
-                    link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
-                });
-            }
+        // Write Log and Comment to Batch
+        batch.set(doc(timelineCollectionRef), {
+            type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
+        });
+        
+        batch.set(doc(timelineCollectionRef), {
+            type: 'comment', content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
+        });
+        
+        const updateData: any = { stages: newProgressForFirestore };
+        if(clausesUpdated) {
+            updateData['contract.clauses'] = contractClauses;
         }
 
+        batch.update(transactionRefDoc, cleanFirestoreData(updateData));
+        
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
+    
     } catch (e) {
         console.error("Failed to update stage status:", e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' });
