@@ -27,6 +27,18 @@ import Link from 'next/link';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
 
+const getTotalPaidForProject = async (projectId: string, db: any) => {
+    let total = 0;
+    if (!projectId || !db) return total;
+    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        total += doc.data().amount || 0;
+    });
+    return total;
+};
+
+
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
     return (
         <div className="flex items-start gap-4 text-sm">
@@ -192,7 +204,6 @@ export default function AppointmentDetailsPage() {
         }
         
         const isEditing = !!appointment.workStageUpdated;
-        let paymentClauses: any[] = [];
 
         try {
             const batch = writeBatch(firestore);
@@ -205,8 +216,12 @@ export default function AppointmentDetailsPage() {
             }
             const transactionData = transactionSnap.data() as ClientTransaction;
             const currentStages = [...(transactionData.stages || [])];
+            const contractClauses = transactionData.contract ? [...transactionData.contract.clauses] : [];
             const now = new Date();
             let logContent = '';
+            let paymentNotificationText = '';
+            let outstandingBalance = 0;
+
 
             // --- ROLLBACK LOGIC (if editing as Admin) ---
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
@@ -283,8 +298,39 @@ export default function AppointmentDetailsPage() {
                     }
                 }
             }
+
+            // --- PAYMENT DUE LOGIC ---
+            const triggeredClause = contractClauses.find(c => c.condition === selectedStage.name);
+            if (triggeredClause && triggeredClause.status !== 'مدفوعة') {
+                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === triggeredClause.id);
+                if (clauseToUpdateIndex > -1 && contractClauses[clauseToUpdateIndex].status === 'غير مستحقة') {
+                    contractClauses[clauseToUpdateIndex].status = 'مستحقة';
+                }
+
+                const totalAmountNowDue = contractClauses
+                    .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
+                    .reduce((sum, c) => sum + c.amount, 0);
+                
+                const totalPaid = await getTotalPaidForProject(appointment.transactionId, firestore);
+                outstandingBalance = totalAmountNowDue - totalPaid;
+
+                if (outstandingBalance > 0) {
+                    paymentNotificationText = `بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة ${formatCurrency(outstandingBalance)}.`;
+                    const paymentCommentData = {
+                        type: 'comment' as const,
+                        content: `[إشعار مالي] ${paymentNotificationText}`,
+                        userId: currentUser.id,
+                        userName: "النظام الآلي",
+                        userAvatar: '',
+                        createdAt: serverTimestamp(),
+                    };
+                    batch.set(doc(collection(transactionRef, 'timelineEvents')), paymentCommentData);
+                    batch.set(doc(historyRef), paymentCommentData);
+                }
+            }
+
     
-            batch.update(transactionRef, { stages: currentStages });
+            batch.update(transactionRef, { stages: currentStages, 'contract.clauses': contractClauses });
     
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
                 const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
@@ -319,34 +365,6 @@ export default function AppointmentDetailsPage() {
             };
             batch.set(doc(timelineRef), engineeringCommentData);
             batch.set(doc(historyRef), engineeringCommentData); // Dual write comment
-            
-            // Check for payment due - NEW LOGIC
-            const completedStageName = selectedStage.name;
-            const allClauses = transactionData.contract?.clauses || [];
-            
-            // Find the very next clause that isn't fully paid.
-            const nextDueClause = allClauses.find((c: any) => c.status !== 'مدفوعة');
-
-            // Reset paymentClauses to be used for notifications
-            paymentClauses = []; 
-
-            // Check if this next due clause is triggered by the stage we just completed.
-            if (nextDueClause && nextDueClause.condition === completedStageName) {
-                // This is the one!
-                paymentClauses.push(nextDueClause); // Add it to the list for notifications
-
-                const paymentCommentContent = `[إشعار مالي] بناءً على إكمال مرحلة "${completedStageName}"، أصبحت الدفعة "${nextDueClause.name}" مستحقة للدفع.`;
-                const paymentCommentData = {
-                    type: 'comment' as const,
-                    content: paymentCommentContent,
-                    userId: currentUser.id,
-                    userName: "النظام الآلي",
-                    userAvatar: '',
-                    createdAt: serverTimestamp(),
-                };
-                batch.set(doc(timelineRef), paymentCommentData);
-                batch.set(doc(historyRef), paymentCommentData); // Dual write payment comment
-            }
     
             await batch.commit();
     
@@ -373,8 +391,8 @@ export default function AppointmentDetailsPage() {
                     ? `لقد أكملت مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`
                     : `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`;
 
-                if (paymentClauses.length > 0) {
-                     body += ` بناءً على ذلك، أصبحت الدفعة "${paymentClauses[0].name}" مستحقة.`;
+                if (paymentNotificationText) {
+                     body += ` ${paymentNotificationText}`;
                 }
                 
                 await createNotification(firestore, {
@@ -386,23 +404,19 @@ export default function AppointmentDetailsPage() {
             }
 
             // 2. Notify Accountants of Payment Due (separately)
-            if (paymentClauses.length > 0) {
+            if (outstandingBalance > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
                 
-                const clause = paymentClauses[0];
-                const notificationBody = `استحقاق دفعة "${clause.name}" بقيمة ${formatCurrency(clause.amount)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${selectedStage.name}".`;
+                const notificationBody = `استحقاق دفعة بقيمة ${formatCurrency(outstandingBalance)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${selectedStage.name}".`;
                 
                 for (const accountantDoc of accountantsSnap.docs) {
-                    // To avoid double-notifying an accountant who is also the engineer/creator, check the set.
-                    if (!stageCompletionRecipients.has(accountantDoc.id)) {
-                        await createNotification(firestore, {
-                            userId: accountantDoc.id,
-                            title: 'إشعار استحقاق دفعة مالية',
-                            body: notificationBody,
-                            link: link
-                        });
-                    }
+                    await createNotification(firestore, {
+                        userId: accountantDoc.id,
+                        title: 'إشعار استحقاق دفعة مالية',
+                        body: notificationBody,
+                        link: link
+                    });
                 }
             }
 
