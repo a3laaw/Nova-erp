@@ -58,11 +58,13 @@ export default function ClientStatementPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
+                // Queries are simplified to avoid needing composite indexes.
+                // Sorting will be handled on the client-side.
                 const [clientSnap, companySnap, journalEntriesSnap, cashReceiptsSnap] = await Promise.all([
                     getDoc(doc(firestore, 'clients', id)),
                     getDocs(query(collection(firestore, 'companies'), limit(1))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('clientId', '==', id), orderBy('date', 'asc'))),
-                    getDocs(query(collection(firestore, 'cashReceipts'), where('clientId', '==', id), orderBy('receiptDate', 'asc'))),
+                    getDocs(query(collection(firestore, 'journalEntries'), where('clientId', '==', id))),
+                    getDocs(query(collection(firestore, 'cashReceipts'), where('clientId', '==', id))),
                 ]);
 
                 if (!clientSnap.exists()) {
