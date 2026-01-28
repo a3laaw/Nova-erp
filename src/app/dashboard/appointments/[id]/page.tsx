@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot } from 'firebase/firestore';
-import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction } from '@/lib/types';
+import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction, TransactionStage } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -209,6 +209,7 @@ export default function AppointmentDetailsPage() {
             const batch = writeBatch(firestore);
             const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
             const historyRef = collection(firestore, 'clients', appointment.clientId, 'history');
+            const timelineRef = collection(transactionRef, 'timelineEvents');
     
             const transactionSnap = await getDoc(transactionRef);
             if (!transactionSnap.exists()) {
@@ -216,13 +217,10 @@ export default function AppointmentDetailsPage() {
             }
             const transactionData = transactionSnap.data() as ClientTransaction;
             const currentStages = [...(transactionData.stages || [])];
-            const contractClauses = transactionData.contract ? [...transactionData.contract.clauses] : [];
+            let contractClauses = transactionData.contract ? [...transactionData.contract.clauses] : [];
             const now = new Date();
-            let logContent = '';
-            let paymentNotificationText = '';
             let outstandingBalance = 0;
-
-
+            
             // --- ROLLBACK LOGIC (if editing as Admin) ---
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
                 const progressDocRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
@@ -268,13 +266,9 @@ export default function AppointmentDetailsPage() {
                 });
             }
             
-            logContent = isEditing
-                ? `قام ${currentUser.fullName} (مدير) بتعديل مرحلة الزيارة رقم ${appointment.visitCount || ''} إلى: "${selectedStage.name}".`
-                : `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
-
-
             const completedStageOrderIndex = workStages.findIndex(s => s.id === selectedStage.id);
             const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
+            let shouldStartNextStage = false;
 
             if (nextStageInTemplate) {
                 const nextStageId = nextStageInTemplate.id!;
@@ -288,18 +282,30 @@ export default function AppointmentDetailsPage() {
                             stageToStart.status = 'in-progress';
                             stageToStart.startDate = now;
                             currentStages[nextStageIndexInProg] = stageToStart;
-                            logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+                            shouldStartNextStage = true;
                         }
                     } else {
                         currentStages.push({
                             stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
                         });
-                        logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+                        shouldStartNextStage = true;
                     }
                 }
             }
 
-            // --- PAYMENT DUE LOGIC ---
+
+            // --- PAYMENT DUE LOGIC & COMMENT CREATION ---
+            let logContent = isEditing
+                ? `قام ${currentUser.fullName} (مدير) بتعديل مرحلة الزيارة رقم ${appointment.visitCount || ''} إلى: "${selectedStage.name}".`
+                : `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
+
+            if (shouldStartNextStage && nextStageInTemplate) {
+                logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+            }
+
+            let commentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
+            let paymentNotificationText = '';
+
             const triggeredClause = contractClauses.find(c => c.condition === selectedStage.name);
             if (triggeredClause && triggeredClause.status !== 'مدفوعة') {
                 const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === triggeredClause.id);
@@ -315,20 +321,23 @@ export default function AppointmentDetailsPage() {
                 outstandingBalance = totalAmountNowDue - totalPaid;
 
                 if (outstandingBalance > 0) {
-                    paymentNotificationText = `بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة ${formatCurrency(outstandingBalance)}.`;
-                    const paymentCommentData = {
-                        type: 'comment' as const,
-                        content: `[إشعار مالي] ${paymentNotificationText}`,
-                        userId: currentUser.id,
-                        userName: "النظام الآلي",
-                        userAvatar: '',
-                        createdAt: serverTimestamp(),
-                    };
-                    batch.set(doc(collection(transactionRef, 'timelineEvents')), paymentCommentData);
-                    batch.set(doc(historyRef), paymentCommentData);
+                    paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+                    commentContent += paymentNotificationText;
                 }
             }
+            
+            // --- Write Log and Comment to Batch ---
+            const logData = {
+                type: 'log', content: logContent, userId: currentUser.id || 'system', userName: currentUser.fullName || 'System', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
+            };
+            const commentData = {
+                type: 'comment' as const, content: commentContent, userId: currentUser.id || 'system', userName: currentUser.fullName || 'System', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
+            };
 
+            batch.set(doc(timelineRef), logData);
+            batch.set(doc(historyRef), logData);
+            batch.set(doc(timelineRef), commentData);
+            batch.set(doc(historyRef), commentData);
     
             batch.update(transactionRef, { stages: currentStages, 'contract.clauses': contractClauses });
     
@@ -346,26 +355,6 @@ export default function AppointmentDetailsPage() {
                 batch.update(apptRef, { workStageUpdated: true, workStageProgressId: progressRef.id });
             }
             
-            const timelineRef = collection(transactionRef, 'timelineEvents');
-            const logData = {
-                type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
-            };
-            batch.set(doc(timelineRef), logData);
-            batch.set(doc(historyRef), logData); // Dual write log
-
-            // Add Engineering Comment
-            const engineeringCommentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
-            const engineeringCommentData = {
-                type: 'comment' as const,
-                content: engineeringCommentContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            };
-            batch.set(doc(timelineRef), engineeringCommentData);
-            batch.set(doc(historyRef), engineeringCommentData); // Dual write comment
-    
             await batch.commit();
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
@@ -373,16 +362,11 @@ export default function AppointmentDetailsPage() {
             // --- Notifications (outside batch) ---
             const link = `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId}`;
 
-            // 1. Notify Engineer and Creator about Stage Completion
             const stageCompletionRecipients = new Set<string>();
-            if (currentUser) {
-                stageCompletionRecipients.add(currentUser.id);
-            }
+            if (currentUser) stageCompletionRecipients.add(currentUser.id);
             if (appointment.engineerId) {
                 const engineerUserId = await findUserIdByEmployeeId(firestore, appointment.engineerId);
-                if (engineerUserId) {
-                    stageCompletionRecipients.add(engineerUserId);
-                }
+                if (engineerUserId) stageCompletionRecipients.add(engineerUserId);
             }
 
             for (const recipientId of stageCompletionRecipients) {
@@ -392,7 +376,7 @@ export default function AppointmentDetailsPage() {
                     : `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`;
 
                 if (paymentNotificationText) {
-                     body += ` ${paymentNotificationText}`;
+                     body += ` ${paymentNotificationText.replace(/\*/g, '')}`; // Remove markdown for notification
                 }
                 
                 await createNotification(firestore, {
@@ -403,7 +387,6 @@ export default function AppointmentDetailsPage() {
                 });
             }
 
-            // 2. Notify Accountants of Payment Due (separately)
             if (outstandingBalance > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
