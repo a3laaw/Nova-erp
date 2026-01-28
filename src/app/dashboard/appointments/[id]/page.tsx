@@ -233,8 +233,8 @@ export default function AppointmentDetailsPage() {
                         const previousStageIndexInProg = currentStages.findIndex(s => s.stageId === previousStageId);
                         if (previousStageIndexInProg !== -1 && currentStages[previousStageIndexInProg].status === 'completed') {
                             currentStages[previousStageIndexInProg].status = 'pending';
-                            currentStages[previousStageIndexInProg].endDate = null;
-                            currentStages[previousStageIndexInProg].startDate = null; 
+                            (currentStages[previousStageIndexInProg] as any).endDate = null;
+                            (currentStages[previousStageIndexInProg] as any).startDate = null; 
                         }
 
                         const autoStartedStageTemplate = workStages[previousStageIndexInTemplate + 1];
@@ -242,7 +242,7 @@ export default function AppointmentDetailsPage() {
                             const autoStartedStageIndexInProg = currentStages.findIndex(s => s.stageId === autoStartedStageTemplate.id);
                             if (autoStartedStageIndexInProg !== -1 && currentStages[autoStartedStageIndexInProg].status === 'in-progress') {
                                 currentStages[autoStartedStageIndexInProg].status = 'pending';
-                                currentStages[autoStartedStageIndexInProg].startDate = null;
+                                (currentStages[autoStartedStageIndexInProg] as any).startDate = null;
                             }
                         }
                     }
@@ -256,13 +256,13 @@ export default function AppointmentDetailsPage() {
                 const stageToUpdate = { ...currentStages[completedStageIndex] };
                 if (stageToUpdate.status !== 'completed') {
                     stageToUpdate.status = 'completed';
-                    stageToUpdate.endDate = now;
-                    if (!stageToUpdate.startDate) stageToUpdate.startDate = now;
+                    stageToUpdate.endDate = now as any;
+                    if (!stageToUpdate.startDate) stageToUpdate.startDate = now as any;
                     currentStages[completedStageIndex] = stageToUpdate;
                 }
             } else {
                 currentStages.push({
-                    stageId: selectedStage.id, name: selectedStage.name, status: 'completed', startDate: now, endDate: now, allowedRoles: selectedStage.allowedRoles,
+                    stageId: selectedStage.id, name: selectedStage.name, status: 'completed', startDate: now as any, endDate: now as any, allowedRoles: selectedStage.allowedRoles,
                 });
             }
             
@@ -280,21 +280,20 @@ export default function AppointmentDetailsPage() {
                         const stageToStart = { ...currentStages[nextStageIndexInProg] };
                         if (stageToStart.status === 'pending') {
                             stageToStart.status = 'in-progress';
-                            stageToStart.startDate = now;
+                            stageToStart.startDate = now as any;
                             currentStages[nextStageIndexInProg] = stageToStart;
                             shouldStartNextStage = true;
                         }
                     } else {
                         currentStages.push({
-                            stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
+                            stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now as any, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
                         });
                         shouldStartNextStage = true;
                     }
                 }
             }
 
-
-            // --- PAYMENT DUE LOGIC & COMMENT CREATION ---
+            // --- REVISED PAYMENT DUE LOGIC & COMMENT CREATION ---
             let logContent = isEditing
                 ? `قام ${currentUser.fullName} (مدير) بتعديل مرحلة الزيارة رقم ${appointment.visitCount || ''} إلى: "${selectedStage.name}".`
                 : `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
@@ -304,29 +303,30 @@ export default function AppointmentDetailsPage() {
             }
 
             let commentContent = `تم إكمال مرحلة: ${selectedStage.name}.`;
-            let paymentNotificationText = '';
             
-            const nextDueClause = contractClauses.find(c => c.status !== 'مدفوعة');
+            const triggeredClause = contractClauses.find(c => c.condition === selectedStage.name);
+            let clausesUpdated = false;
 
-            if (nextDueClause && nextDueClause.condition === selectedStage.name) {
-                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === nextDueClause.id);
-                if (clauseToUpdateIndex > -1 && contractClauses[clauseToUpdateIndex].status === 'غير مستحقة') {
+            if (triggeredClause && triggeredClause.status === 'غير مستحقة') {
+                const clauseToUpdateIndex = contractClauses.findIndex(c => c.id === triggeredClause.id);
+                if (clauseToUpdateIndex > -1) {
                     contractClauses[clauseToUpdateIndex].status = 'مستحقة';
-                }
+                    clausesUpdated = true;
 
-                const totalAmountNowDue = contractClauses
-                    .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
-                    .reduce((sum, c) => sum + c.amount, 0);
-                
-                const totalPaid = await getTotalPaidForProject(appointment.transactionId, firestore);
-                outstandingBalance = totalAmountNowDue - totalPaid;
+                    const totalAmountNowDue = contractClauses
+                        .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
+                        .reduce((sum, c) => sum + c.amount, 0);
+                    
+                    const totalPaid = await getTotalPaidForProject(appointment.transactionId, firestore);
+                    outstandingBalance = totalAmountNowDue - totalPaid;
 
-                if (outstandingBalance > 0) {
-                    paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
-                    commentContent += paymentNotificationText;
+                    if (outstandingBalance > 0) {
+                        const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+                        commentContent += paymentNotificationText;
+                    }
                 }
             }
-            
+
             // --- Write Log and Comment to Batch ---
             const logData = {
                 type: 'log', content: logContent, userId: currentUser.id || 'system', userName: currentUser.fullName || 'System', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
@@ -340,7 +340,7 @@ export default function AppointmentDetailsPage() {
             batch.set(doc(timelineRef), commentData);
             batch.set(doc(historyRef), commentData);
     
-            batch.update(transactionRef, { stages: currentStages, 'contract.clauses': contractClauses });
+            batch.update(transactionRef, { stages: currentStages, ...(clausesUpdated && { 'contract.clauses': contractClauses }) });
     
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
                 const progressRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
@@ -376,8 +376,8 @@ export default function AppointmentDetailsPage() {
                     ? `لقد أكملت مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`
                     : `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`;
 
-                if (paymentNotificationText) {
-                     body += ` ${paymentNotificationText.replace(/\*/g, '')}`; // Remove markdown for notification
+                if (outstandingBalance > 0) {
+                     body += ` نتج عن ذلك رصيد مستحق بقيمة ${formatCurrency(outstandingBalance)}.`;
                 }
                 
                 await createNotification(firestore, {
