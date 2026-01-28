@@ -402,6 +402,53 @@ export default function TransactionDetailPage() {
         await batch.commit();
 
         toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
+
+        // --- Notification Logic ---
+        const engineerId = transaction.assignedEngineerId;
+        const link = `/dashboard/clients/${clientId}/transactions/${transactionId}`;
+
+        const recipients = new Set<string>();
+        if (currentUser) recipients.add(currentUser.id);
+
+        if (engineerId && engineerId !== currentUser.employeeId) {
+            const engineerUserId = await findUserIdByEmployeeId(firestore, engineerId);
+            if (engineerUserId) recipients.add(engineerUserId);
+        }
+
+        const stageName = updatedProgress.name;
+        for (const recipientId of recipients) {
+            const isCreator = recipientId === currentUser.id;
+            let body = isCreator 
+                ? `لقد قمت بتغيير حالة المرحلة "${stageName}" إلى "${stageStatusTranslations[newStatus]}" لمعاملة العميل ${client?.nameAr}.`
+                : `${currentUser.fullName} قام بتغيير حالة المرحلة "${stageName}" إلى "${stageStatusTranslations[newStatus]}" لمعاملة العميل ${client?.nameAr}.`;
+            
+            if (newStatus === 'completed' && outstandingBalance > 0) {
+                body += ` نتج عن ذلك رصيد مستحق بقيمة ${formatCurrency(outstandingBalance)}.`;
+            }
+
+            await createNotification(firestore, {
+                userId: recipientId,
+                title: isCreator ? "تم تحديث مرحلة" : `تحديث على معاملة "${transaction.transactionType}"`,
+                body: body,
+                link: link,
+            });
+        }
+
+        if (newStatus === 'completed' && outstandingBalance > 0) {
+            const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
+            const accountantsSnap = await getDocs(accountantsQuery);
+            
+            const accountantNotificationBody = `استحقاق دفعة بقيمة ${formatCurrency(outstandingBalance)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${stageName}".`;
+            
+            for (const accountantDoc of accountantsSnap.docs) {
+                await createNotification(firestore, {
+                    userId: accountantDoc.id,
+                    title: 'إشعار استحقاق دفعة مالية',
+                    body: accountantNotificationBody,
+                    link: link
+                });
+            }
+        }
     
     } catch (e) {
         console.error("Failed to update stage status:", e);
@@ -465,7 +512,7 @@ export default function TransactionDetailPage() {
             onClose={() => setIsContractFormOpen(false)}
             transaction={transaction}
             clientId={clientId}
-            clientName={client.nameAr}
+            clientName={(client as any).nameAr}
         />
     )}
     <div className='space-y-6' dir='rtl'>
@@ -498,7 +545,7 @@ export default function TransactionDetailPage() {
                     </Badge>
                 </div>
                  <CardDescription>
-                    معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link>
+                    معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{(client as any).nameAr}</Link>
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -659,3 +706,4 @@ export default function TransactionDetailPage() {
     
 
     
+
