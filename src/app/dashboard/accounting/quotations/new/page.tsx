@@ -43,6 +43,7 @@ const itemSchema = z.object({
   description: z.string().min(1, "الوصف مطلوب"),
   quantity: z.preprocess(v => parseFloat(String(v)), z.number().min(0.01, "الكمية يجب أن تكون أكبر من صفر")),
   unitPrice: z.preprocess(v => parseFloat(String(v)), z.number().min(0, "السعر يجب أن لا يكون سالبًا")),
+  condition: z.string().optional(),
 });
 
 const quotationSchema = z.object({
@@ -84,7 +85,7 @@ export default function NewQuotationPage() {
       clientId: clientIdFromUrl || '',
       date: new Date().toISOString().split('T')[0],
       validUntil: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
-      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }],
+      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }],
       notes: '',
     },
   });
@@ -187,12 +188,13 @@ export default function NewQuotationPage() {
         description: milestone.name,
         quantity: 1,
         unitPrice: milestone.value,
+        condition: milestone.condition || '',
       })) || [];
 
       if (newItems.length > 0) {
         replace(newItems);
       } else {
-        replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }]);
+        replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }]);
       }
     }
   }, [selectedTemplateId, templates, replace, setValue]);
@@ -347,6 +349,11 @@ export default function NewQuotationPage() {
                                     <TableCell>
                                         <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..."/>
                                         {errors.items?.[index]?.description && <p className="text-xs text-destructive mt-1">{errors.items?.[index]?.description?.message}</p>}
+                                        {watchedItems[index]?.condition && (
+                                            <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
+                                                <span className="font-semibold">شرط الاستحقاق:</span> {watchedItems[index].condition}
+                                            </div>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <Input type="number" {...register(`items.${index}.quantity`)} defaultValue={1} className="dir-ltr" />
@@ -372,7 +379,7 @@ export default function NewQuotationPage() {
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' })}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة بند
                         </Button>

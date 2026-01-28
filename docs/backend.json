@@ -972,7 +972,8 @@
               "description": { "type": "string" },
               "quantity": { "type": "number" },
               "unitPrice": { "type": "number" },
-              "total": { "type": "number" }
+              "total": { "type": "number" },
+              "condition": { "type": "string", "description": "The condition for this item to be due, often linked to a work stage."}
             },
             "required": ["description", "quantity", "unitPrice", "total"]
           }
@@ -1140,4 +1141,3 @@
     }
   }
 }
-

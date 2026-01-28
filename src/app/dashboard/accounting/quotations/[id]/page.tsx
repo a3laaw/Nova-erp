@@ -168,7 +168,14 @@ export default function ViewQuotationPage() {
                             {quotation.items.map((item, index) => (
                                 <TableRow key={item.id || index}>
                                     <TableCell>{index + 1}</TableCell>
-                                    <TableCell className="font-medium">{item.description}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {item.description}
+                                        {item.condition && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                (شرط الاستحقاق: {item.condition})
+                                            </p>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-center font-mono">{item.quantity}</TableCell>
                                     <TableCell className="text-center font-mono">{formatCurrency(item.unitPrice)}</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(item.total)}</TableCell>

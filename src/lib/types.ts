@@ -554,6 +554,7 @@ export interface QuotationItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  condition?: string;
 }
 
 export interface Quotation {
