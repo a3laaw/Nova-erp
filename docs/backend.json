@@ -583,6 +583,10 @@
             "type": "array",
             "description": "A list of job titles responsible for this stage.",
             "items": { "type": "string" }
+        },
+        "expectedDurationDays": {
+            "type": "number",
+            "description": "The expected duration in days for this stage."
         }
       },
       "required": ["name"]
@@ -945,6 +949,41 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["voucherNumber", "clientId", "amount", "receiptDate", "paymentMethod"]
+    },
+    "Quotation": {
+      "title": "Quotation",
+      "description": "Represents a price quotation provided to a client.",
+      "type": "object",
+      "properties": {
+        "quotationNumber": { "type": "string" },
+        "quotationSequence": { "type": "number" },
+        "quotationYear": { "type": "number" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "validUntil": { "type": "string", "format": "date-time" },
+        "subject": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" }
+            },
+            "required": ["description", "quantity", "unitPrice", "total"]
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent", "accepted", "rejected", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["quotationNumber", "clientId", "date", "subject", "items", "totalAmount", "status", "createdAt"]
     }
   },
   "auth": {
@@ -1092,6 +1131,13 @@
     "/cashReceipts/{receiptId}": {
       "schema": { "$ref": "#/entities/CashReceipt" },
       "description": "Stores all cash receipt vouchers received by the company."
+    },
+    "/quotations/{quotationId}": {
+      "schema": {
+        "$ref": "#/entities/Quotation"
+      },
+      "description": "Stores all quotations sent to clients."
     }
   }
 }
+

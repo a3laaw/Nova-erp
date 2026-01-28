@@ -549,7 +549,7 @@ export interface WorkStageProgress {
 }
 
 export interface QuotationItem {
-  id: string;
+  id?: string;
   description: string;
   quantity: number;
   unitPrice: number;
