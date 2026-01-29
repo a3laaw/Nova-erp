@@ -283,14 +283,6 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
-        const debitAccount = paymentMethod === 'Cash'
-            ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
-            : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
-
-        if (!debitAccount) {
-            throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
-        }
-
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
@@ -313,6 +305,14 @@ export default function NewCashReceiptPage() {
             const clientAccount = accounts.find(acc => acc.name === selectedClient?.nameAr);
             if (!clientAccount) {
                 throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient?.nameAr}. تأكد من إنشاء عقد له أولاً.`);
+            }
+
+            const debitAccount = paymentMethod === 'Cash'
+                ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
+                : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+
+            if (!debitAccount) {
+                throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
             }
 
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));

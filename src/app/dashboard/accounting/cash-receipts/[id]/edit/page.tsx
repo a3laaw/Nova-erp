@@ -244,27 +244,6 @@ export default function EditCashReceiptPage() {
  const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
 
-    if (journalEntryIsPosted) {
-        const shouldProceed = await new Promise((resolve) => {
-            toast({
-                variant: 'destructive',
-                title: 'القيد المحاسبي مرحّل',
-                description: 'هذا السند مرتبط بقيد مرحّل. تعديله سيؤثر على الحسابات. هل تريد المتابعة وتحديث القيد تلقائياً؟',
-                action: (
-                    <>
-                        <Button onClick={() => resolve(true)} variant="default">نعم، متابعة</Button>
-                        <Button onClick={() => resolve(false)} variant="outline">إلغاء</Button>
-                    </>
-                ),
-                duration: 10000,
-            });
-        });
-        if (!shouldProceed) {
-            return;
-        }
-    }
-
-
     if (!amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
@@ -318,7 +297,6 @@ export default function EditCashReceiptPage() {
                 totalCredit: parseFloat(amount),
                 narration: `تحديث سند قبض رقم ${originalReceipt.voucherNumber} من العميل ${originalReceipt.clientNameAr}`,
                 transactionId: selectedProjectId || null,
-                status: 'posted',
             };
 
             if (originalReceipt.journalEntryId) {
@@ -328,6 +306,7 @@ export default function EditCashReceiptPage() {
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
                 transaction_fs.set(newJournalEntryRef, {
                     ...jeUpdatePayload,
+                    status: 'posted',
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
                     clientId: originalReceipt.clientId,
@@ -411,7 +390,7 @@ export default function EditCashReceiptPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>تنبيه: القيد مرحّل</AlertTitle>
                     <AlertDescription>
-                        هذا السند مرتبط بقيد مرحّل. سيتم تحديث القيد تلقائيًا عند الحفظ، مما سيؤثر على الحسابات النهائية.
+                        سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
                     </AlertDescription>
                 </Alert>
             )}

@@ -136,25 +136,6 @@ export default function EditPaymentVoucherPage() {
 
   const onSubmit = async (data: PaymentVoucherFormValues) => {
     if (!firestore || !currentUser || !id || !voucherSnap?.exists()) return;
-
-    if (journalEntryIsPosted) {
-        const shouldProceed = await new Promise((resolve) => {
-            toast({
-                variant: 'destructive',
-                title: 'القيد المحاسبي مرحّل',
-                description: 'هذا السند مرتبط بقيد مرحّل. تعديله سيؤثر على الحسابات. هل تريد المتابعة وتحديث القيد تلقائياً؟',
-                action: (
-                    <>
-                        <Button onClick={() => resolve(true)} variant="default">نعم، متابعة</Button>
-                        <Button onClick={() => resolve(false)} variant="outline">إلغاء</Button>
-                    </>
-                ),
-            });
-        });
-        if (!shouldProceed) {
-            return;
-        }
-    }
     
     setIsSaving(true);
     try {
