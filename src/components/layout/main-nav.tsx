@@ -62,7 +62,6 @@ const navItems = {
       roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting', label: 'لوحة التحكم المحاسبية' },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
@@ -94,6 +93,7 @@ const navItems = {
             { href: '/dashboard/accounting/cash-flow', label: 'قائمة التدفقات النقدية' },
             { href: '/dashboard/accounting/equity-statement', label: 'قائمة التغير في حقوق الملكية' },
             { href: '/dashboard/accounting/financial-statement-notes', label: 'الإيضاحات المتممة' },
+            { href: '/dashboard/accounting/financial-forecast', label: 'التنبؤات المالية' },
           ]
         }
       ]
@@ -113,7 +113,6 @@ const navItems = {
           roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
           hrefPrefix: '/dashboard/accounting',
           children: [
-            { href: '/dashboard/accounting', label: 'Accounting Dashboard' },
             { href: '/dashboard/accounting/quotations', label: 'Quotations' },
             { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
             { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },

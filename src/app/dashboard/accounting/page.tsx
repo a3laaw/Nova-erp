@@ -1,146 +1,20 @@
 'use client';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle, Banknote, Scale, LineChart, Users, ArrowLeftRight, TrendingUp } from 'lucide-react';
-import { useLanguage } from '@/context/language-context';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader } from 'lucide-react';
 
-const accountingSections = [
-    {
-        title: 'قيود اليومية',
-        description: 'إنشاء وتصفح قيود اليومية العامة.',
-        link: '/dashboard/accounting/journal-entries',
-        icon: <BookOpen className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'شجرة الحسابات',
-        description: 'إدارة دليل الحسابات الخاص بالشركة.',
-        link: '/dashboard/accounting/chart-of-accounts',
-        icon: <BookUser className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'سندات القبض',
-        description: 'عرض وإدارة جميع سندات القبض الواردة من العملاء.',
-        link: '/dashboard/accounting/cash-receipts',
-        icon: <ArrowDownCircle className="h-8 w-8 text-green-600" />,
-    },
-    {
-        title: 'سندات الصرف',
-        description: 'إدارة الشيكات والمدفوعات الصادرة للموردين والموظفين.',
-        link: '/dashboard/accounting/payment-vouchers',
-        icon: <ArrowUpCircle className="h-8 w-8 text-red-600" />,
-    },
-     {
-        title: 'عروض الأسعار',
-        description: 'إنشاء وإدارة عروض الأسعار المقدمة للعملاء.',
-        link: '/dashboard/accounting/quotations',
-        icon: <FileText className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'الفواتير',
-        description: 'إنشاء وتتبع فواتير العملاء المستحقة والمدفوعة.',
-        link: '/dashboard/accounting/invoices',
-        icon: <FileText className="h-8 w-8 text-primary" />,
-    },
-     {
-        title: 'المساعد المحاسبي الذكي',
-        description: 'استخدم الذكاء الاصطناعي لتحويل الأوامر النصية إلى قيود محاسبية.',
-        link: '/dashboard/accounting/assistant',
-        icon: <Sparkles className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'دفتر الأستاذ العام',
-        description: 'عرض تفصيلي لجميع الحركات على أي حساب.',
-        link: '/dashboard/accounting/general-ledger',
-        icon: <Banknote className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'ميزان المراجعة',
-        description: 'عرض أرصدة الحسابات المدينة والدائنة خلال فترة.',
-        link: '/dashboard/accounting/trial-balance',
-        icon: <Scale className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'قائمة المركز المالي',
-        description: 'عرض الأصول والالتزامات وحقوق الملكية.',
-        link: '/dashboard/accounting/balance-sheet',
-        icon: <Scale className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'قائمة الدخل',
-        description: 'قياس الأداء المالي والربحية خلال فترة.',
-        link: '/dashboard/accounting/income-statement',
-        icon: <LineChart className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'قائمة التدفقات النقدية',
-        description: 'تتبع حركة النقد الداخل والخارج.',
-        link: '/dashboard/accounting/cash-flow',
-        icon: <ArrowLeftRight className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'قائمة التغير في حقوق الملكية',
-        description: 'تتبع التغير في حصص الملاك والأرباح المحتجزة.',
-        link: '/dashboard/accounting/equity-statement',
-        icon: <Users className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'الإيضاحات المتممة',
-        description: 'تفاصيل وشروحات إضافية حول بنود القوائم المالية.',
-        link: '/dashboard/accounting/financial-statement-notes',
-        icon: <FileText className="h-8 w-8 text-primary" />,
-    },
-    {
-        title: 'التنبؤات المالية',
-        description: 'استخدم الذكاء الاصطناعي لتحليل البيانات التاريخية وتوقع الأداء المالي المستقبلي.',
-        link: '/dashboard/accounting/financial-forecast',
-        icon: <TrendingUp className="h-8 w-8 text-primary" />,
-    },
-];
+export default function AccountingRedirectPage() {
+  const router = useRouter();
 
-export default function AccountingPage() {
-  const { language } = useLanguage();
+  useEffect(() => {
+    // Redirect to the first meaningful page in the accounting section.
+    router.replace('/dashboard/accounting/journal-entries');
+  }, [router]);
+
   return (
-    <div dir="rtl">
-        <Card className='mb-6'>
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle>لوحة التحكم المحاسبية</CardTitle>
-                        <CardDescription>
-                            نظرة عامة على القسم المحاسبي وانتقال سريع للأقسام المختلفة.
-                        </CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-        </Card>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {accountingSections.map((section) => (
-                <Card key={section.link}>
-                    <CardHeader className="flex flex-row items-center gap-4">
-                        {section.icon}
-                        <div>
-                            <CardTitle>{section.title}</CardTitle>
-                            <CardDescription>{section.description}</CardDescription>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                         <Button asChild className="w-full">
-                            <Link href={section.link}>
-                                الانتقال إلى {section.title} <ArrowRight className="mr-2 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
+    <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
     </div>
   );
 }
