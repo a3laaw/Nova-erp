@@ -344,7 +344,7 @@ export default function NewCashReceiptPage() {
             const journalEntryData = {
                 entryNumber: `CRV-JE-${newVoucherNumber}`,
                 date: newReceiptData.receiptDate,
-                narration: `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
+                narration: description || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
                 status: 'posted' as const,
@@ -506,7 +506,7 @@ export default function NewCashReceiptPage() {
             </div>
         </CardContent>
       <CardFooter className="flex justify-end gap-2 no-print">
-        <Button variant="outline" onClick={() => router.push('/dashboard/accounting')} disabled={isSaving}>
+        <Button type="button" variant="outline" onClick={() => router.push('/dashboard/accounting')} disabled={isSaving}>
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
@@ -518,3 +518,5 @@ export default function NewCashReceiptPage() {
     </Card>
   );
 }
+
+    

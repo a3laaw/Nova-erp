@@ -75,6 +75,7 @@ export default function EditCashReceiptPage() {
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [reference, setReference] = useState('');
+  const [debitAccountId, setDebitAccountId] = useState('');
   
   const receiptRef = useMemo(() => {
     if (!firestore || !id) return null;
@@ -130,20 +131,32 @@ export default function EditCashReceiptPage() {
 
   // Fetch journal entry details
    useEffect(() => {
-    if (receipt?.journalEntryId && firestore) {
+    if (receipt?.journalEntryId && firestore && accounts.length > 0) {
         const fetchJournalEntry = async () => {
             const jeRef = doc(firestore, 'journalEntries', receipt.journalEntryId!);
             const jeSnap = await getDoc(jeRef);
             if (jeSnap.exists()) {
                 const jeData = jeSnap.data();
                 setJournalEntryIsPosted(jeData.status === 'posted');
+                // Set the debitAccountId from the fetched journal entry
+                const debitLine = jeData.lines?.find((l: any) => l.debit > 0);
+                if (debitLine?.accountId) {
+                    setDebitAccountId(debitLine.accountId);
+                }
             }
         };
         fetchJournalEntry();
     } else {
         setJournalEntryIsPosted(false);
+        // Set debit account based on payment method if not editing or no JE
+        const defaultDebitAccount = paymentMethod === 'Cash'
+            ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
+            : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+        if (defaultDebitAccount) {
+            setDebitAccountId(defaultDebitAccount.id!);
+        }
     }
- }, [receipt, firestore]);
+ }, [receipt, firestore, accounts, paymentMethod]);
   
 
   useEffect(() => {
@@ -241,10 +254,15 @@ export default function EditCashReceiptPage() {
     }
   }), [clientProjects]);
 
+  const debitAccountOptions = useMemo(() => 
+    accounts.filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق')))
+    .map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code}))
+  , [accounts]);
+
  const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
 
-    if (!amount || !date || !paymentMethod) {
+    if (!amount || !date || !paymentMethod || !debitAccountId) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -258,20 +276,19 @@ export default function EditCashReceiptPage() {
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
-
-            const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
-            if (!clientAccount) {
-                throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${originalReceipt.clientNameAr}.`);
-            }
             
-            let debitAccount;
-            if (paymentMethod === 'Cash') {
-                debitAccount = accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'));
-            } else {
-                debitAccount = accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+            // It's safer to get the latest original receipt data inside the transaction
+            const latestReceiptSnap = await transaction_fs.get(receiptRefDoc);
+            if (!latestReceiptSnap.exists()) {
+                throw new Error("لم يتم العثور على سند القبض.");
             }
-            if (!debitAccount) {
-                 throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
+            const freshOriginalReceipt = latestReceiptSnap.data() as CashReceipt;
+
+            const clientAccount = accounts.find(acc => acc.name === freshOriginalReceipt.clientNameAr);
+            const selectedDebitAccount = accounts.find(acc => acc.id === debitAccountId);
+
+            if (!clientAccount || !selectedDebitAccount) {
+                throw new Error("الحسابات المطلوبة (العميل أو حساب الاستلام) غير موجودة.");
             }
 
             const receiptUpdatePayload = {
@@ -286,7 +303,7 @@ export default function EditCashReceiptPage() {
             transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
 
             const newLines = [
-                { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
+                { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
                 { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
             ];
 
@@ -295,27 +312,29 @@ export default function EditCashReceiptPage() {
                 lines: newLines,
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
-                narration: `تحديث سند قبض رقم ${originalReceipt.voucherNumber} من العميل ${originalReceipt.clientNameAr}`,
+                narration: description || `تحديث سند قبض رقم ${freshOriginalReceipt.voucherNumber}`,
                 transactionId: selectedProjectId || null,
             };
 
-            if (originalReceipt.journalEntryId) {
-                const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
+            if (freshOriginalReceipt.journalEntryId) {
+                const jeRef = doc(firestore, 'journalEntries', freshOriginalReceipt.journalEntryId);
                 transaction_fs.update(jeRef, jeUpdatePayload);
             } else {
+                // This logic is a fallback in case a JE was never created.
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
                 transaction_fs.set(newJournalEntryRef, {
                     ...jeUpdatePayload,
                     status: 'posted',
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
-                    clientId: originalReceipt.clientId,
-                    entryNumber: `CRV-JE-${originalReceipt.voucherNumber}`,
+                    clientId: freshOriginalReceipt.clientId,
+                    entryNumber: `CRV-JE-${freshOriginalReceipt.voucherNumber}`,
                 });
                 transaction_fs.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
             }
         });
 
+        // Post-transaction logic for updating contract clauses
         if (originalReceipt.projectId) {
             const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore);
             const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);
@@ -385,15 +404,6 @@ export default function EditCashReceiptPage() {
                     </CardDescription>
                 </div>
             </div>
-             {journalEntryIsPosted && (
-                <Alert variant="destructive" className="mt-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>تنبيه: القيد مرحّل</AlertTitle>
-                    <AlertDescription>
-                        سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
-                    </AlertDescription>
-                </Alert>
-            )}
         </CardHeader>
         <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
@@ -403,7 +413,7 @@ export default function EditCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
+                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
                 </div>
             </div>
             
@@ -414,14 +424,14 @@ export default function EditCashReceiptPage() {
                     onSelect={setSelectedProjectId}
                     options={projectOptions}
                     placeholder={'اختر العقد المراد سداد دفعة له...'}
-                    disabled={isSaving}
+                    disabled={isSaving || journalEntryIsPosted}
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
@@ -432,12 +442,12 @@ export default function EditCashReceiptPage() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="description">وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
+                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
-                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
+                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving || journalEntryIsPosted}>
                         <SelectTrigger id="paymentMethod">
                             <SelectValue placeholder="اختر طريقة الدفع" />
                         </SelectTrigger>
@@ -449,9 +459,19 @@ export default function EditCashReceiptPage() {
                         </SelectContent>
                     </Select>
                 </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="debitAccountId">حساب الاستلام <span className="text-destructive">*</span></Label>
+                    <InlineSearchList 
+                        value={debitAccountId}
+                        onSelect={setDebitAccountId}
+                        options={debitAccountOptions}
+                        placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
+                        disabled={accountsLoading || isSaving || journalEntryIsPosted}
+                    />
+                </div>
                 <div className="grid gap-2">
                 <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
+                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
                 </div>
             </div>
         </CardContent>
@@ -460,7 +480,7 @@ export default function EditCashReceiptPage() {
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading}>
+        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading || journalEntryIsPosted}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
@@ -468,3 +488,5 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
+
+    
