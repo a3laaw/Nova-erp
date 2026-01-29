@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
+import { defaultChartOfAccounts } from '@/lib/default-coa';
 
 
 const accountTypeTranslations: Record<Account['type'], string> = {
@@ -78,44 +79,6 @@ const accountTypeColors: Record<Account['type'], string> = {
     income: 'bg-green-100 text-green-800 border-green-200',
     expense: 'bg-orange-100 text-orange-800 border-orange-200',
 };
-
-const defaultChartOfAccounts: Omit<Account, 'id'>[] = [
-    { code: '1', name: 'الأصول', type: 'asset', level: 0 },
-    { code: '11', name: 'الأصول المتداولة', type: 'asset', level: 1 },
-    { code: '1101', name: 'النقدية وما في حكمها', type: 'asset', level: 2 },
-    { code: '110101', name: 'الصندوق', type: 'asset', level: 3 },
-    { code: '110102', name: 'البنوك', type: 'asset', level: 3 },
-    { code: '1102', name: 'الذمم المدينة', type: 'asset', level: 2 },
-    { code: '110201', name: 'العملاء', type: 'asset', level: 3 },
-    { code: '1103', name: 'المخزون', type: 'asset', level: 2 },
-    { code: '12', name: 'الأصول غير المتداولة', type: 'asset', level: 1 },
-    { code: '1201', name: 'الأصول الثابتة', type: 'asset', level: 2 },
-    { code: '120101', name: 'الأراضي والمباني', type: 'asset', level: 3 },
-    { code: '120102', name: 'الأثاث والمعدات', type: 'asset', level: 3 },
-    { code: '2', name: 'الخصوم (الالتزامات)', type: 'liability', level: 0 },
-    { code: '21', name: 'الخصوم المتداولة', type: 'liability', level: 1 },
-    { code: '2101', name: 'الذمم الدائنة', type: 'liability', level: 2 },
-    { code: '210101', name: 'الموردون', type: 'liability', level: 3 },
-    { code: '2102', name: 'المصروفات المستحقة', type: 'liability', level: 2 },
-    { code: '2103', name: 'الضرائب المستحقة', type: 'liability', level: 2 },
-    { code: '210301', name: 'ضريبة القيمة المضافة المستحقة', type: 'liability', level: 3 },
-    { code: '22', name: 'الخصوم غير المتداولة', type: 'liability', level: 1 },
-    { code: '2201', name: 'القروض طويلة الأجل', type: 'liability', level: 2 },
-    { code: '3', name: 'حقوق الملكية', type: 'equity', level: 0 },
-    { code: '31', name: 'رأس المال', type: 'equity', level: 1 },
-    { code: '3101', name: 'رأس المال المدفوع', type: 'equity', level: 2 },
-    { code: '32', name: 'الأرباح المحتجزة', type: 'equity', level: 1 },
-    { code: '4', name: 'الإيرادات', type: 'income', level: 0 },
-    { code: '41', name: 'إيرادات النشاط الرئيسي', type: 'income', level: 1 },
-    { code: '4101', name: 'إيرادات استشارات هندسية', type: 'income', level: 2 },
-    { code: '42', name: 'إيرادات أخرى', type: 'income', level: 1 },
-    { code: '5', name: 'المصروفات', type: 'expense', level: 0 },
-    { code: '51', name: 'تكلفة الإيرادات', type: 'expense', level: 1 },
-    { code: '52', name: 'المصاريف العمومية والإدارية', type: 'expense', level: 1 },
-    { code: '5201', name: 'رواتب وأجور', type: 'expense', level: 2 },
-    { code: '5202', name: 'مصاريف إيجار', type: 'expense', level: 2 },
-    { code: '5203', name: 'مصاريف كهرباء ومياه', type: 'expense', level: 2 },
-];
 
 
 function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null, accounts: Account[] }) {
@@ -245,7 +208,7 @@ export default function ChartOfAccountsPage() {
             journalEntries.forEach(entry => {
                 entry.lines.forEach(line => {
                     const acc = fetchedAccounts.find(a => a.id === line.accountId);
-                    if (!acc) return;
+                    if (!acc || !acc.isPayable) return; // Only aggregate payable accounts directly
                     
                     const currentBalance = directBalances.get(line.accountId) || 0;
                     let balanceChange = 0;
@@ -261,14 +224,12 @@ export default function ChartOfAccountsPage() {
 
             const aggregatedBalances = new Map<string, number>();
             fetchedAccounts
-              .sort((a, b) => b.level - a.level) // Start from deepest level
+              .sort((a, b) => (b.level || 0) - (a.level || 0)) // Start from deepest level
               .forEach(account => {
                   let totalBalance = directBalances.get(account.id!) || 0;
                   
-                  // Find direct children only
                   const children = fetchedAccounts.filter(child => 
-                      child.code.startsWith(account.code) &&
-                      child.level === account.level + 1
+                      child.parentCode === account.code
                   );
                   
                   children.forEach(child => {
@@ -302,7 +263,7 @@ export default function ChartOfAccountsPage() {
             displayed.push(account);
             if (openAccounts.has(account.code)) {
                 const children = accounts
-                    .filter(child => child.code.startsWith(account.code) && child.level === account.level + 1)
+                    .filter(child => child.parentCode === account.code)
                     .sort((a,b) => a.code.localeCompare(b.code));
                 children.forEach(addChildrenRecursively);
             }
@@ -453,18 +414,20 @@ export default function ChartOfAccountsPage() {
                                 ) : (
                                     displayedAccounts.map(account => {
                                         const balance = accountBalances.get(account.id!) || 0;
-                                        const children = accounts.filter(a => a.code.startsWith(account.code) && a.level === account.level + 1);
+                                        const children = accounts.filter(a => a.parentCode === account.code);
                                         const hasChildren = children.length > 0;
                                         const isOpen = openAccounts.has(account.code);
 
                                         return (
-                                            <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''} onClick={() => hasChildren && toggleAccount(account.code)} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
-                                                <TableCell style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
+                                            <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''}>
+                                                <TableCell style={{ paddingRight: `${(account.level || 0) * 1.5 + 1}rem` }}>
                                                     <div className="flex items-center gap-2 group">
                                                         {hasChildren ? (
-                                                            isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
+                                                            <button onClick={() => toggleAccount(account.code)} className="p-1 -mr-1">
+                                                               {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
+                                                            </button>
                                                         ) : (
-                                                            <span className="w-4 h-4 inline-block"></span>
+                                                            <span className="w-6 h-4 inline-block"></span>
                                                         )}
                                                         <span className="font-medium">{account.name}</span>
                                                         {account.level < 3 && (

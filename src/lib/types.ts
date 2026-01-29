@@ -2,6 +2,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -515,6 +516,9 @@ export interface Account {
     name: string;
     type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
     level: number;
+    description?: string;
+    isPayable?: boolean;
+    parentCode?: string;
 }
 
 export interface JournalEntryLine {

@@ -300,7 +300,7 @@
         "name": { "type": "string", "description": "Name of the stage, stored for convenience. The name in the reference data is the source of truth." },
         "status": {
           "type": "string",
-          "enum": ["pending", "in-progress", "completed", "skipped"],
+          "enum": ["pending", "in-progress", "completed", "skipped", "awaiting-review"],
           "description": "The current status of the stage."
         },
         "allowedRoles": {
@@ -679,7 +679,7 @@
             "description": "Hex color code for calendar display based on visit status."
         }
       },
-      "required": ["title", "appointmentDate", "createdAt", "type"]
+      "required": ["engineerId", "title", "appointmentDate", "createdAt", "type"]
     },
     "WorkStageProgress": {
         "title": "Work Stage Progress",
@@ -819,9 +819,12 @@
             "name": { "type": "string" },
             "code": { "type": "string" },
             "type": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
-            "level": { "type": "number", "description": "The hierarchy level of the account (0 for main, 1 for sub, etc.)" }
+            "level": { "type": "number", "description": "The hierarchy level of the account (0 for main, 1 for sub, etc.)" },
+            "description": { "type": "string" },
+            "isPayable": { "type": "boolean" },
+            "parentCode": { "type": ["string", "null"] }
         },
-        "required": ["name", "code", "type", "level"]
+        "required": ["name", "code", "type", "level", "isPayable"]
     },
     "JournalEntryLine": {
       "title": "Journal Entry Line",
