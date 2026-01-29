@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle, Banknote } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 
 const accountingSections = [
@@ -35,6 +35,12 @@ const accountingSections = [
         description: 'إنشاء وتصفح قيود اليومية العامة.',
         link: '/dashboard/accounting/journal-entries',
         icon: <BookOpen className="h-8 w-8 text-primary" />,
+    },
+    {
+        title: 'كشف حساب',
+        description: 'عرض كشف حساب تفصيلي لأي حساب في شجرة الحسابات.',
+        link: '/dashboard/accounting/account-statement',
+        icon: <Banknote className="h-8 w-8 text-primary" />,
     },
     {
         title: 'شجرة الحسابات',
