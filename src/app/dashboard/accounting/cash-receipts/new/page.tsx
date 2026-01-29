@@ -68,7 +68,6 @@ export default function NewCashReceiptPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [debitAccountId, setDebitAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [amountInWords, setAmountInWords] = useState('');
   const [description, setDescription] = useState('');
@@ -260,26 +259,17 @@ export default function NewCashReceiptPage() {
     }
   }), [clientProjects]);
 
-  const debitAccountOptions = useMemo(() => 
-    accounts
-      .filter(acc => acc.type === 'asset' && (acc.name.includes('صندوق') || acc.name.includes('بنك')))
-      .map(acc => ({
-        value: acc.id!,
-        label: `${acc.name} (${acc.code})`,
-      }))
-  , [accounts]);
-
   const handleSave = async () => {
     if (!firestore || !currentUser) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح أو المستخدم غير مسجل.' });
         return;
     }
     
-    if (!selectedClientId || !amount || !date || !paymentMethod || !debitAccountId) {
+    if (!selectedClientId || !amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
-            description: 'الرجاء تعبئة حقول العميل، المبلغ، التاريخ، طريقة الدفع، وحساب الاستلام.',
+            description: 'الرجاء تعبئة حقول العميل، المبلغ، التاريخ، وطريقة الدفع.',
         });
         return;
     }
@@ -293,6 +283,14 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
+        const debitAccount = paymentMethod === 'Cash'
+            ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
+            : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+
+        if (!debitAccount) {
+            throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
+        }
+
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
@@ -317,10 +315,7 @@ export default function NewCashReceiptPage() {
                 throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient?.nameAr}. تأكد من إنشاء عقد له أولاً.`);
             }
 
-            console.log("حساب الاستلام:", debitAccountId, "حساب العميل:", clientAccount.id, "المبلغ:", parseFloat(amount));
-
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-            const debitAccount = accounts.find(a => a.id === debitAccountId);
 
             const newReceiptData: any = { 
                 voucherNumber: newVoucherNumber,
@@ -354,7 +349,7 @@ export default function NewCashReceiptPage() {
                 totalCredit: parseFloat(amount),
                 status: 'posted' as const,
                 lines: [
-                    { accountId: debitAccountId, accountName: debitAccount?.name || '', debit: parseFloat(amount), credit: 0 },
+                    { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
                     { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
                 ],
                 clientId: selectedClientId,
@@ -462,27 +457,15 @@ export default function NewCashReceiptPage() {
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="grid gap-2">
-                    <Label htmlFor="project">ربط بعقد/مشروع</Label>
-                    <InlineSearchList 
-                        value={selectedProjectId}
-                        onSelect={setSelectedProjectId}
-                        options={projectOptions}
-                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب المشاريع...' : 'اختر المشروع (اختياري)...'}
-                        disabled={!selectedClientId || projectsLoading || isSaving}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="debitAccountId">حساب الاستلام (البنك/الصندوق) <span className="text-destructive">*</span></Label>
-                    <InlineSearchList
-                        value={debitAccountId}
-                        onSelect={setDebitAccountId}
-                        options={debitAccountOptions}
-                        placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
-                        disabled={accountsLoading || isSaving}
-                    />
-                </div>
+            <div className="grid gap-2">
+                <Label htmlFor="project">ربط بعقد/مشروع</Label>
+                <InlineSearchList 
+                    value={selectedProjectId}
+                    onSelect={setSelectedProjectId}
+                    options={projectOptions}
+                    placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : projectsLoading ? 'جاري جلب المشاريع...' : 'اختر المشروع (اختياري)...'}
+                    disabled={!selectedClientId || projectsLoading || isSaving}
+                />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -70,7 +70,6 @@ export default function EditCashReceiptPage() {
   // Form state
   const [date, setDate] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [debitAccountId, setDebitAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [amountInWords, setAmountInWords] = useState('');
   const [description, setDescription] = useState('');
@@ -138,10 +137,6 @@ export default function EditCashReceiptPage() {
             if (jeSnap.exists()) {
                 const jeData = jeSnap.data();
                 setJournalEntryIsPosted(jeData.status === 'posted');
-                const debitLine = jeData.lines.find((l: any) => l.debit > 0);
-                if (debitLine) {
-                    setDebitAccountId(debitLine.accountId);
-                }
             }
         };
         fetchJournalEntry();
@@ -246,15 +241,6 @@ export default function EditCashReceiptPage() {
     }
   }), [clientProjects]);
 
-  const debitAccountOptions = useMemo(() => 
-    accounts
-      .filter(acc => acc.type === 'asset' && (acc.name.includes('صندوق') || acc.name.includes('بنك')))
-      .map(acc => ({
-        value: acc.id!,
-        label: `${acc.name} (${acc.code})`,
-      }))
-  , [accounts]);
-
  const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
 
@@ -267,7 +253,7 @@ export default function EditCashReceiptPage() {
         return;
     }
 
-    if (!amount || !date || !paymentMethod || !debitAccountId) {
+    if (!amount || !date || !paymentMethod) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -283,7 +269,6 @@ export default function EditCashReceiptPage() {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
 
             // --- Reads ---
-            let jeStatus = 'draft';
             if(originalReceipt.journalEntryId) {
                 const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
                 const jeSnap = await transaction_fs.get(jeRef);
@@ -295,9 +280,16 @@ export default function EditCashReceiptPage() {
             if (!clientAccount) {
                 throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${originalReceipt.clientNameAr}.`);
             }
-            const debitAccount = accounts.find(a => a.id === debitAccountId);
+            
+            // Auto-determine debit account
+            let debitAccount;
+            if (paymentMethod === 'Cash') {
+                debitAccount = accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'));
+            } else {
+                debitAccount = accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+            }
             if (!debitAccount) {
-                throw new Error(`لم يتم العثور على حساب الاستلام المحدد.`);
+                 throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
             }
 
             // --- Writes ---
@@ -316,7 +308,7 @@ export default function EditCashReceiptPage() {
 
             // Update Journal Entry Document
             const newLines = [
-                { accountId: debitAccountId, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
+                { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
                 { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
             ];
 
@@ -438,27 +430,15 @@ export default function EditCashReceiptPage() {
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="grid gap-2">
-                    <Label htmlFor="project">ربط بعقد/مشروع</Label>
-                    <InlineSearchList 
-                        value={selectedProjectId}
-                        onSelect={setSelectedProjectId}
-                        options={projectOptions}
-                        placeholder={'اختر العقد المراد سداد دفعة له...'}
-                        disabled={isSaving || journalEntryIsPosted}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="debitAccountId">حساب الاستلام (البنك/الصندوق) <span className="text-destructive">*</span></Label>
-                    <InlineSearchList
-                        value={debitAccountId}
-                        onSelect={setDebitAccountId}
-                        options={debitAccountOptions}
-                        placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
-                        disabled={accountsLoading || isSaving || journalEntryIsPosted}
-                    />
-                </div>
+            <div className="grid gap-2">
+                <Label htmlFor="project">ربط بعقد/مشروع</Label>
+                <InlineSearchList 
+                    value={selectedProjectId}
+                    onSelect={setSelectedProjectId}
+                    options={projectOptions}
+                    placeholder={'اختر العقد المراد سداد دفعة له...'}
+                    disabled={isSaving || journalEntryIsPosted}
+                />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
