@@ -51,14 +51,38 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting', label: 'لوحة التحكم المحاسبية' },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
-        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف' },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
-        { href: '/dashboard/accounting/account-statement', label: 'كشف حساب' },
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
-        { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
         { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
+        {
+          label: 'قيود وسندات',
+          hrefPrefix: '/dashboard/accounting',
+          children: [
+            { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
+            { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
+            { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف' },
+          ]
+        },
+        {
+          label: 'التقارير المالية',
+          hrefPrefix: '/dashboard/accounting',
+          children: [
+            { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
+            { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
+            { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
+          ]
+        },
+        {
+          label: 'القوائم المالية',
+          hrefPrefix: '/dashboard/accounting',
+          children: [
+            { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل' },
+            { href: '/dashboard/accounting/balance-sheet', label: 'قائمة المركز المالي' },
+            { href: '/dashboard/accounting/cash-flow', label: 'قائمة التدفقات النقدية' },
+            { href: '/dashboard/accounting/equity-statement', label: 'قائمة التغير في حقوق الملكية' },
+            { href: '/dashboard/accounting/financial-statement-notes', label: 'الإيضاحات المتممة' },
+          ]
+        }
       ]
     },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
@@ -78,14 +102,38 @@ const navItems = {
           children: [
             { href: '/dashboard/accounting', label: 'Accounting Dashboard' },
             { href: '/dashboard/accounting/quotations', label: 'Quotations' },
-            { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
-            { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
-            { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
-            { href: '/dashboard/accounting/account-statement', label: 'Account Statement' },
-            { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
-            { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
             { href: '/dashboard/accounting/invoices', label: 'Invoices' },
+            { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
             { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
+            {
+              label: 'Entries & Vouchers',
+              hrefPrefix: '/dashboard/accounting',
+              children: [
+                { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
+                { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
+                { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
+              ]
+            },
+            {
+              label: 'Financial Reports',
+              hrefPrefix: '/dashboard/accounting',
+              children: [
+                { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
+                { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
+                { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
+              ]
+            },
+            {
+              label: 'Financial Statements',
+              hrefPrefix: '/dashboard/accounting',
+              children: [
+                { href: '/dashboard/accounting/income-statement', label: 'Income Statement' },
+                { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet' },
+                { href: '/dashboard/accounting/cash-flow', label: 'Cash Flow Statement' },
+                { href: '/dashboard/accounting/equity-statement', label: 'Statement of Equity' },
+                { href: '/dashboard/accounting/financial-statement-notes', label: 'Notes to Financial Statements' },
+              ]
+            }
           ]
         },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
@@ -145,17 +193,44 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {item.children.map((child) => (
-                        <SidebarMenuSubItem key={child.href}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={pathname === child.href}
-                          >
-                            <Link href={child.href}>
-                              <span>{child.label}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+                      {item.children.map((child: any) => (
+                        child.children ? (
+                          <SidebarMenuSubItem key={child.label}>
+                            <Collapsible key={child.label} defaultOpen={pathname.startsWith(child.hrefPrefix || '')} className="w-full">
+                              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent/50 [&_svg]:data-[state=open]:rotate-180">
+                                <span className="font-medium">{child.label}</span>
+                                <ChevronDown className="h-4 w-4 transition-transform" />
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="pl-4">
+                                <SidebarMenuSub>
+                                  {child.children.map((grandchild: any) => (
+                                    <SidebarMenuSubItem key={grandchild.href}>
+                                      <SidebarMenuSubButton
+                                        asChild
+                                        isActive={pathname === grandchild.href}
+                                      >
+                                        <Link href={grandchild.href}>
+                                          <span>{grandchild.label}</span>
+                                        </Link>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  ))}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </SidebarMenuSubItem>
+                        ) : (
+                          <SidebarMenuSubItem key={child.href}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={pathname === child.href}
+                            >
+                              <Link href={child.href}>
+                                <span>{child.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        )
                       ))}
                     </SidebarMenuSub>
                   </CollapsibleContent>
