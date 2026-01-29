@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud, Folder, FolderOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where } from 'firebase/firestore';
+import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -240,38 +240,46 @@ export default function ChartOfAccountsPage() {
             fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
             setAccounts(fetchedAccounts);
 
-            const balances = new Map<string, number>();
             const journalEntries = entriesSnapshot.docs.map(doc => doc.data() as JournalEntry);
             
+            const directBalances = new Map<string, number>();
             journalEntries.forEach(entry => {
                 entry.lines.forEach(line => {
                     const acc = fetchedAccounts.find(a => a.id === line.accountId);
                     if (!acc) return;
                     
-                    const currentBalance = balances.get(line.accountId) || 0;
+                    const currentBalance = directBalances.get(line.accountId) || 0;
                     let balanceChange = 0;
                     
                     if (acc.type === 'asset' || acc.type === 'expense') {
                         balanceChange = (line.debit || 0) - (line.credit || 0);
-                    } else { // Liability, Equity, Income
+                    } else {
                         balanceChange = (line.credit || 0) - (line.debit || 0);
                     }
-                    balances.set(line.accountId, currentBalance + balanceChange);
+                    directBalances.set(line.accountId, currentBalance + balanceChange);
                 });
             });
 
-            // Calculate parent balances by summing up children
-            fetchedAccounts.filter(a => a.level < 3).sort((a,b) => b.level - a.level).forEach(parentAcc => {
-                let parentBalance = balances.get(parentAcc.id!) || 0;
-                 fetchedAccounts.forEach(childAcc => {
-                    if(childAcc.code.startsWith(parentAcc.code) && childAcc.code !== parentAcc.code) {
-                         parentBalance += balances.get(childAcc.id!) || 0;
-                    }
-                });
-                balances.set(parentAcc.id!, parentBalance);
-            });
-            
-            setAccountBalances(balances);
+            const aggregatedBalances = new Map<string, number>();
+            fetchedAccounts
+              .sort((a, b) => b.level - a.level)
+              .forEach(account => {
+                  let totalBalance = directBalances.get(account.id!) || 0;
+                  
+                  const children = fetchedAccounts.filter(child => 
+                      child.code.startsWith(account.code) &&
+                      child.code !== account.code &&
+                      child.level === account.level + 1
+                  );
+                  
+                  children.forEach(child => {
+                      totalBalance += aggregatedBalances.get(child.id!) || 0;
+                  });
+                  
+                  aggregatedBalances.set(account.id!, totalBalance);
+              });
+
+            setAccountBalances(aggregatedBalances);
 
         } catch (e) {
             console.error("Error fetching data: ", e);
@@ -381,53 +389,59 @@ export default function ChartOfAccountsPage() {
         });
     };
 
-    const renderAccountRow = (account: Account) => {
+    const renderAccountRow = (account: Account): JSX.Element[] => {
         const balance = accountBalances.get(account.id!) || 0;
         const children = accounts.filter(a => a.code.startsWith(account.code) && a.level === account.level + 1);
         const hasChildren = children.length > 0;
         const isOpen = openAccounts.has(account.code);
 
-        return (
-            <React.Fragment key={account.id}>
-                <TableRow className={account.level === 0 ? 'bg-muted/50' : ''} onClick={() => hasChildren && toggleAccount(account.code)} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
-                    <TableCell style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
-                        <div className="flex items-center gap-2 group">
-                             {hasChildren ? (
-                                isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                                <span className="w-4 h-4 inline-block"></span>
-                            )}
-                            <span className="font-medium">{account.name}</span>
+        const row = (
+             <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''} onClick={() => hasChildren && toggleAccount(account.code)} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
+                <TableCell style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
+                    <div className="flex items-center gap-2 group">
+                         {hasChildren ? (
+                            isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                            <span className="w-4 h-4 inline-block"></span>
+                        )}
+                        <span className="font-medium">{account.name}</span>
+                        {account.level < 3 && (
                             <Button
                                 type="button" variant="ghost" size="icon"
                                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={(e) => { e.stopPropagation(); handleAddSubAccountClick(account); }}>
                                 <PlusCircle className="h-4 w-4 text-primary" />
                             </Button>
-                        </div>
-                    </TableCell>
-                    <TableCell className="font-mono">{account.code}</TableCell>
-                    <TableCell>
-                        <Badge variant="outline" className={cn(accountTypeColors[account.type], "whitespace-nowrap")}>
-                            {accountTypeTranslations[account.type]}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className={cn("text-left font-mono", balance < 0 && "text-destructive")}>
-                        {formatCurrency(balance)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenuItem onClick={() => handleEditClick(account)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </TableCell>
-                </TableRow>
-                {hasChildren && isOpen && children.map(child => renderAccountRow(child))}
-            </React.Fragment>
+                        )}
+                    </div>
+                </TableCell>
+                <TableCell className="font-mono">{account.code}</TableCell>
+                <TableCell>
+                    <Badge variant="outline" className={cn(accountTypeColors[account.type], "whitespace-nowrap")}>
+                        {accountTypeTranslations[account.type]}
+                    </Badge>
+                </TableCell>
+                <TableCell className={cn("text-left font-mono", balance < 0 && "text-destructive")}>
+                    {formatCurrency(balance)}
+                </TableCell>
+                <TableCell className="text-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={() => handleEditClick(account)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </TableCell>
+            </TableRow>
         );
+        
+        let childRows: JSX.Element[] = [];
+        if (hasChildren && isOpen) {
+            childRows = children.flatMap(child => renderAccountRow(child));
+        }
+
+        return [row, ...childRows];
     };
 
     const rootAccounts = accounts.filter(a => a.level === 0);
@@ -474,7 +488,7 @@ export default function ChartOfAccountsPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    rootAccounts.map(account => renderAccountRow(account))
+                                    rootAccounts.flatMap(account => renderAccountRow(account))
                                 )}
                             </TableBody>
                             {!loading && accounts.length > 0 && (
@@ -520,3 +534,4 @@ export default function ChartOfAccountsPage() {
         </div>
     );
 }
+
