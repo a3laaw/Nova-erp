@@ -33,13 +33,14 @@ export default function FinancialForecastPage() {
                 const oneYearAgo = new Date();
                 oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
                 
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'), where('date', '>=', Timestamp.fromDate(oneYearAgo)))),
-                ]);
-                
+                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+                const entriesQuery = query(collection(firestore, 'journalEntries'), where('date', '>=', Timestamp.fromDate(oneYearAgo)));
+                const entriesSnap = await getDocs(entriesQuery);
+
                 const accounts = accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as Account }));
-                const entries = entriesSnap.docs.map(doc => doc.data() as JournalEntry);
+                const entries = entriesSnap.docs
+                    .map(doc => doc.data() as JournalEntry)
+                    .filter(entry => entry.status === 'posted');
                 
                 const incomeAccountIds = new Set(accounts.filter(a => a.type === 'income').map(a => a.id));
                 const expenseAccountIds = new Set(accounts.filter(a => a.type === 'expense').map(a => a.id));
