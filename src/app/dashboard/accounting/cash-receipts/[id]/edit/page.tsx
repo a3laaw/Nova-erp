@@ -336,9 +336,32 @@ export default function EditCashReceiptPage() {
             }
         });
 
-        // --- Post-transaction logic ---
-        // You could add logic here to update contract clauses or send notifications
-        // if the amount or project has changed. For now, we'll keep it simple.
+        // --- Post-transaction logic to update contract statuses ---
+        if (originalReceipt.projectId) {
+            const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore);
+            const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);
+            const transactionDoc = await getDoc(transactionRef);
+
+            if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
+                const transactionData = transactionDoc.data();
+                let accumulatedAmount = 0;
+                let dueClauseFound = false;
+                const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                    const newClause = {...clause};
+                    if (totalPaid >= accumulatedAmount + clause.amount) {
+                        newClause.status = 'مدفوعة';
+                    } else if (totalPaid > accumulatedAmount && !dueClauseFound) {
+                        newClause.status = 'مستحقة';
+                        dueClauseFound = true;
+                    } else {
+                        newClause.status = 'غير مستحقة';
+                    }
+                    accumulatedAmount += clause.amount;
+                    return newClause;
+                });
+                await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
+            }
+        }
 
         toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي بنجاح.' });
         router.push(`/dashboard/accounting/cash-receipts/${id}`);
