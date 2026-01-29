@@ -64,7 +64,6 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting', label: 'لوحة التحكم المحاسبية' },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
-        { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
         {
@@ -74,6 +73,7 @@ const navItems = {
             { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
             { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
             { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف' },
+            { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
           ]
         },
         {
@@ -115,7 +115,6 @@ const navItems = {
           children: [
             { href: '/dashboard/accounting', label: 'Accounting Dashboard' },
             { href: '/dashboard/accounting/quotations', label: 'Quotations' },
-            { href: '/dashboard/accounting/invoices', label: 'Invoices' },
             { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
             { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
             {
@@ -125,6 +124,7 @@ const navItems = {
                 { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
                 { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
                 { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
+                { href: '/dashboard/accounting/invoices', label: 'Invoices' },
               ]
             },
             {
