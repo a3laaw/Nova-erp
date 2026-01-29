@@ -84,6 +84,12 @@ const accountingSections = [
         link: '/dashboard/accounting/equity-statement',
         icon: <Users className="h-8 w-8 text-primary" />,
     },
+    {
+        title: 'الإيضاحات المتممة',
+        description: 'تفاصيل وشروحات إضافية حول بنود القوائم المالية.',
+        link: '/dashboard/accounting/financial-statement-notes',
+        icon: <FileText className="h-8 w-8 text-primary" />,
+    },
 ];
 
 export default function AccountingPage() {

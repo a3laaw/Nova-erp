@@ -32,6 +32,11 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     attendance: 'الحضور والرواتب',
     reports: 'التقارير',
     'leave-reports': 'تقارير الإجازات',
+    'balance-sheet': 'قائمة المركز المالي',
+    'income-statement': 'قائمة الدخل',
+    'cash-flow': 'قائمة التدفقات النقدية',
+    'equity-statement': 'قائمة التغير في حقوق الملكية',
+    'financial-statement-notes': 'الإيضاحات المتممة',
   },
   en: {
     dashboard: 'Dashboard',
@@ -58,6 +63,11 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     attendance: 'Attendance & Payroll',
     reports: 'Reports',
     'leave-reports': 'Leave Reports',
+    'balance-sheet': 'Balance Sheet',
+    'income-statement': 'Income Statement',
+    'cash-flow': 'Cash Flow Statement',
+    'equity-statement': 'Statement of Equity',
+    'financial-statement-notes': 'Notes to Financial Statements',
   },
 };
 
