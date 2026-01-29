@@ -40,6 +40,7 @@ import {
   HeartHandshake,
   FileText,
   ChevronDown,
+  ShoppingCart,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,7 @@ const navItems = {
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
+    { href: '/dashboard/purchasing', label: 'المشتريات', icon: ShoppingCart, roles: ['Admin', 'Accountant'] },
     { 
       label: 'المحاسبة', 
       icon: Wallet, 
@@ -107,6 +109,7 @@ const navItems = {
       { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
       { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
       { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
+      { href: '/dashboard/purchasing', label: 'Purchasing', icon: ShoppingCart, roles: ['Admin', 'Accountant'] },
       { 
           label: 'Accounting', 
           icon: Wallet, 

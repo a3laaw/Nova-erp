@@ -1001,6 +1001,52 @@
         "createdBy": { "type": "string" }
       },
       "required": ["quotationNumber", "clientId", "date", "subject", "items", "totalAmount", "status", "createdAt"]
+    },
+    "Vendor": {
+      "title": "Vendor",
+      "description": "Represents a supplier or vendor.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "description": "Represents a purchase order for materials or services.",
+      "type": "object",
+      "properties": {
+        "poNumber": { "type": "string", "description": "Sequential PO number." },
+        "orderDate": { "type": "string", "format": "date-time" },
+        "vendorId": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "projectId": { "type": "string", "description": "Optional link to a project." },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" }
+            },
+            "required": ["description", "quantity", "unitPrice", "total"]
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "paymentTerms": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
+        }
+      },
+      "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
     }
   },
   "auth": {
@@ -1152,6 +1198,18 @@
         "$ref": "#/entities/Quotation"
       },
       "description": "Stores all quotations sent to clients."
+    },
+    "/vendors/{vendorId}": {
+      "schema": {
+        "$ref": "#/entities/Vendor"
+      },
+      "description": "Stores information about suppliers and vendors."
+    },
+    "/purchaseOrders/{poId}": {
+      "schema": {
+        "$ref": "#/entities/PurchaseOrder"
+      },
+      "description": "Stores all purchase orders issued to vendors."
     }
   }
 }

@@ -1,5 +1,6 @@
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -583,4 +584,34 @@ export interface Quotation {
   openClauses?: ContractTerm[];
   templateDescription?: string;
   transactionId?: string;
+}
+
+export interface Vendor {
+    id?: string;
+    name: string;
+    contactPerson?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+}
+
+export interface PurchaseOrderItem {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+}
+
+export interface PurchaseOrder {
+    id?: string;
+    poNumber: string;
+    orderDate: any;
+    vendorId: string;
+    vendorName: string;
+    projectId?: string;
+    items: PurchaseOrderItem[];
+    totalAmount: number;
+    paymentTerms?: string;
+    notes?: string;
+    status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
