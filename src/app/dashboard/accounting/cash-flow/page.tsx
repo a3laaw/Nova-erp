@@ -17,7 +17,7 @@ import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore
 import type { Account, JournalEntry } from '@/lib/types';
 import { format, startOfYear, endOfYear, parseISO, subDays } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Printer, ArrowLeftRight, TrendingUp, TrendingDown, Scale } from 'lucide-react';
+import { Loader2, Printer, ArrowLeftRight } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
@@ -56,42 +56,61 @@ export default function CashFlowStatementPage() {
         setDateTo(format(endOfYear(now), 'yyyy-MM-dd'));
     }, []);
 
+    // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
-        const fetchData = async () => {
+        const fetchAccountsData = async () => {
+            try {
+                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            } catch (error) {
+                console.error("Error fetching accounts:", error);
+            }
+        };
+        fetchAccountsData();
+    }, [firestore]);
+
+    // Fetch entries when date changes
+    useEffect(() => {
+        if (!firestore || !dateTo) return;
+        const fetchEntries = async () => {
             setLoading(true);
             try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'))),
-                ]);
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+                const endDate = parseISO(dateTo);
+                endDate.setHours(23, 59, 59, 999);
+
+                const entriesQuery = query(
+                    collection(firestore, 'journalEntries'),
+                    where('status', '==', 'posted'),
+                    where('date', '<=', Timestamp.fromDate(endDate))
+                );
+                const entriesSnap = await getDocs(entriesQuery);
                 setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error fetching journal entries:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, [firestore]);
+        fetchEntries();
+    }, [firestore, dateTo]);
+
 
     const cashFlowData = useMemo(() => {
-        if (loading || !dateFrom || !dateTo) return null;
+        if (loading || !dateFrom || !dateTo || accounts.length === 0) return null;
 
         const startDate = parseISO(dateFrom);
         const endDate = parseISO(dateTo);
-        endDate.setHours(23, 59, 59, 999);
         const prevPeriodEndDate = subDays(startDate, 1);
         
         const getAccountBalanceAsOf = (accountCodes: string[], asOfDate: Date) => {
-            const accountIds = accounts.filter(acc => accountCodes.some(code => acc.code.startsWith(code))).map(acc => acc.id);
-            if(accountIds.length === 0) return 0;
+            const accountIds = new Set(accounts.filter(acc => accountCodes.some(code => acc.code.startsWith(code))).map(acc => acc.id));
+            if(accountIds.size === 0) return 0;
             
             return journalEntries
                 .filter(entry => (entry.date as Timestamp).toDate() <= asOfDate)
                 .flatMap(entry => entry.lines)
-                .filter(line => accountIds.includes(line.accountId))
+                .filter(line => accountIds.has(line.accountId))
                 .reduce((balance, line) => {
                      const acc = accounts.find(a => a.id === line.accountId)!;
                      if(acc.type === 'asset' || acc.type === 'expense') {
@@ -120,12 +139,12 @@ export default function CashFlowStatementPage() {
         
         const netIncome = getNetIncome();
         
-        const arStart = getAccountBalanceAsOf(['110201'], prevPeriodEndDate);
-        const arEnd = getAccountBalanceAsOf(['110201'], endDate);
+        const arStart = getAccountBalanceAsOf(['1102'], prevPeriodEndDate);
+        const arEnd = getAccountBalanceAsOf(['1102'], endDate);
         const changeInAR = (arEnd - arStart) * -1; // Increase in AR is a cash outflow
 
-        const apStart = getAccountBalanceAsOf(['210101'], prevPeriodEndDate);
-        const apEnd = getAccountBalanceAsOf(['210101'], endDate);
+        const apStart = getAccountBalanceAsOf(['2101'], prevPeriodEndDate);
+        const apEnd = getAccountBalanceAsOf(['2101'], endDate);
         const changeInAP = apEnd - apStart; // Increase in AP is a cash inflow
         
         const cashFromOps = netIncome + changeInAR + changeInAP;

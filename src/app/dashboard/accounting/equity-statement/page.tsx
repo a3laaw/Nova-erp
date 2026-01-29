@@ -53,25 +53,44 @@ export default function EquityStatementPage() {
         setDateTo(format(endOfYear(now), 'yyyy-MM-dd'));
     }, []);
 
+    // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
-        const fetchData = async () => {
+        const fetchAccountsData = async () => {
+            try {
+                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            } catch (error) {
+                console.error("Error fetching accounts:", error);
+            }
+        };
+        fetchAccountsData();
+    }, [firestore]);
+
+    // Fetch entries when date changes
+    useEffect(() => {
+        if (!firestore || !dateTo) return;
+        const fetchEntries = async () => {
             setLoading(true);
             try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'))),
-                ]);
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+                const endDate = parseISO(dateTo);
+                endDate.setHours(23, 59, 59, 999);
+
+                const entriesQuery = query(
+                    collection(firestore, 'journalEntries'),
+                    where('status', '==', 'posted'),
+                    where('date', '<=', Timestamp.fromDate(endDate))
+                );
+                const entriesSnap = await getDocs(entriesQuery);
                 setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error fetching journal entries:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, [firestore]);
+        fetchEntries();
+    }, [firestore, dateTo]);
     
     const equityAccounts = useMemo(() => accounts.filter(acc => acc.code.startsWith('3')), [accounts]);
     
@@ -80,9 +99,7 @@ export default function EquityStatementPage() {
 
         const startDate = parseISO(dateFrom);
         const endDate = parseISO(dateTo);
-        endDate.setHours(23, 59, 59, 999);
 
-        // 1. Calculate Net Income for the period
         const netIncome = journalEntries
             .filter(entry => {
                 const entryDate = (entry.date as Timestamp).toDate();
@@ -97,7 +114,6 @@ export default function EquityStatementPage() {
                 return income;
             }, 0);
 
-        // 2. Calculate balances for each equity account
         const lines = equityAccounts.map(account => {
             const openingBalance = journalEntries
                 .filter(entry => (entry.date as Timestamp).toDate() < startDate)
@@ -105,7 +121,6 @@ export default function EquityStatementPage() {
                 .filter(line => line.accountId === account.id)
                 .reduce((balance, line) => balance + (line.credit || 0) - (line.debit || 0), 0);
 
-            // The net income is typically added to Retained Earnings
             const isRetainedEarnings = account.name.includes('أرباح');
             const incomeForThisAccount = isRetainedEarnings ? netIncome : 0;
 

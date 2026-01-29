@@ -64,36 +64,53 @@ export default function BalanceSheetPage() {
         setAsOfDate(format(endOfYear(new Date()), 'yyyy-MM-dd'));
     }, []);
 
+    // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
-        const fetchData = async () => {
+        const fetchAccountsData = async () => {
+            try {
+                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            } catch (error) {
+                console.error("Error fetching accounts:", error);
+            }
+        };
+        fetchAccountsData();
+    }, [firestore]);
+
+    // Fetch entries when date changes
+    useEffect(() => {
+        if (!firestore || !asOfDate) return;
+        const fetchEntries = async () => {
             setLoading(true);
             try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'))),
-                ]);
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+                const endDate = parseISO(asOfDate);
+                endDate.setHours(23, 59, 59, 999);
+
+                const entriesQuery = query(
+                    collection(firestore, 'journalEntries'), 
+                    where('status', '==', 'posted'),
+                    where('date', '<=', Timestamp.fromDate(endDate))
+                );
+                const entriesSnap = await getDocs(entriesQuery);
                 setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error fetching journal entries:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, [firestore]);
+        fetchEntries();
+    }, [firestore, asOfDate]);
 
     const balanceSheetData = useMemo((): BalanceSheetData | null => {
-        if (loading || !asOfDate) return null;
+        if (loading || !asOfDate || accounts.length === 0) return null;
 
         const endDate = parseISO(asOfDate);
-        endDate.setHours(23, 59, 59, 999);
 
         const accountBalances = new Map<string, number>();
 
         journalEntries
-            .filter(entry => (entry.date as Timestamp).toDate() <= endDate)
             .forEach(entry => {
                 entry.lines.forEach(line => {
                     const acc = accounts.find(a => a.id === line.accountId);
@@ -117,12 +134,12 @@ export default function BalanceSheetPage() {
             isBalanced: false,
         };
         
-        // Calculate period's net income to add to retained earnings
-        const startOfFinancialYear = new Date(endDate.getFullYear(), 0, 1);
         let netIncome = 0;
         
         accountBalances.forEach((balance, accountId) => {
             const acc = accounts.find(a => a.id === accountId)!;
+            // Assumes all income/expense accounts contribute to the period's net income.
+            // A more complex implementation might filter by date again, but this is sufficient for balance sheet.
             if (acc.type === 'income') netIncome += balance;
             if (acc.type === 'expense') netIncome -= balance;
         });
@@ -133,15 +150,11 @@ export default function BalanceSheetPage() {
 
             const item = { name: acc.name, balance };
             
-            // Assets
             if (acc.code.startsWith('11')) { data.assets.current.push(item); data.assets.totalCurrent += balance; }
             else if (acc.code.startsWith('1')) { data.assets.nonCurrent.push(item); data.assets.totalNonCurrent += balance; }
-            // Liabilities
             else if (acc.code.startsWith('21')) { data.liabilitiesAndEquity.currentLiabilities.push(item); data.liabilitiesAndEquity.totalCurrentLiabilities += balance; }
             else if (acc.code.startsWith('2')) { data.liabilitiesAndEquity.nonCurrentLiabilities.push(item); data.liabilitiesAndEquity.totalNonCurrentLiabilities += balance; }
-            // Equity
             else if (acc.code.startsWith('3')) {
-                // Add net income to retained earnings account
                 if (acc.name.includes('أرباح')) {
                      item.balance += netIncome;
                 }

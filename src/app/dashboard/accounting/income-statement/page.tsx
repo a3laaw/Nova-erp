@@ -17,8 +17,7 @@ import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore
 import type { Account, JournalEntry } from '@/lib/types';
 import { format, startOfYear, endOfYear, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Printer, LineChart, TrendingUp, TrendingDown, Scale } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Loader2, Printer, LineChart } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
@@ -50,34 +49,51 @@ export default function IncomeStatementPage() {
         setDateTo(format(endOfYear(now), 'yyyy-MM-dd'));
     }, []);
 
+    // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
-        const fetchData = async () => {
+        const fetchAccountsData = async () => {
+            try {
+                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            } catch (error) {
+                console.error("Error fetching accounts:", error);
+            }
+        };
+        fetchAccountsData();
+    }, [firestore]);
+
+    // Fetch entries when date changes
+    useEffect(() => {
+        if (!firestore || !dateFrom || !dateTo) return;
+        const fetchEntries = async () => {
             setLoading(true);
             try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'))),
-                ]);
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+                const startDate = parseISO(dateFrom);
+                startDate.setHours(0, 0, 0, 0);
+                const endDate = parseISO(dateTo);
+                endDate.setHours(23, 59, 59, 999);
+
+                const entriesQuery = query(
+                    collection(firestore, 'journalEntries'),
+                    where('status', '==', 'posted'),
+                    where('date', '>=', Timestamp.fromDate(startDate)),
+                    where('date', '<=', Timestamp.fromDate(endDate))
+                );
+                const entriesSnap = await getDocs(entriesQuery);
                 setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error fetching journal entries:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, [firestore]);
+        fetchEntries();
+    }, [firestore, dateFrom, dateTo]);
 
     const incomeStatementData = useMemo((): IncomeStatementData | null => {
-        if (loading || !dateFrom || !dateTo) return null;
+        if (loading || accounts.length === 0) return null;
 
-        const startDate = parseISO(dateFrom);
-        const endDate = parseISO(dateTo);
-        endDate.setHours(23, 59, 59, 999);
-
-        // Categorize accounts by code prefix for IFRS-like structure
         const accountMaps = {
             revenue: new Map<string, string>(),
             cogs: new Map<string, string>(), // Cost of Goods Sold
@@ -88,9 +104,9 @@ export default function IncomeStatementPage() {
             if (!acc.id) return;
             if (acc.code.startsWith('4')) {
                 accountMaps.revenue.set(acc.id, acc.name);
-            } else if (acc.code.startsWith('51')) { // Cost of Revenue
+            } else if (acc.code.startsWith('51')) {
                 accountMaps.cogs.set(acc.id, acc.name);
-            } else if (acc.code.startsWith('5')) { // Other expenses
+            } else if (acc.code.startsWith('5')) {
                 accountMaps.expense.set(acc.id, acc.name);
             }
         });
@@ -101,27 +117,20 @@ export default function IncomeStatementPage() {
             expense: new Map<string, number>(),
         };
 
-        journalEntries
-            .filter(entry => {
-                const entryDate = (entry.date as Timestamp).toDate();
-                return entryDate >= startDate && entryDate <= endDate;
-            })
-            .forEach(entry => {
-                entry.lines.forEach(line => {
-                    if (accountMaps.revenue.has(line.accountId)) {
-                        const current = totals.revenue.get(line.accountId) || 0;
-                        // For revenue, credit increases the balance
-                        totals.revenue.set(line.accountId, current + (line.credit || 0) - (line.debit || 0));
-                    } else if (accountMaps.cogs.has(line.accountId)) {
-                        const current = totals.cogs.get(line.accountId) || 0;
-                        // For expenses, debit increases the balance
-                        totals.cogs.set(line.accountId, current + (line.debit || 0) - (line.credit || 0));
-                    } else if (accountMaps.expense.has(line.accountId)) {
-                        const current = totals.expense.get(line.accountId) || 0;
-                        totals.expense.set(line.accountId, current + (line.debit || 0) - (line.credit || 0));
-                    }
-                });
+        journalEntries.forEach(entry => {
+            entry.lines.forEach(line => {
+                if (accountMaps.revenue.has(line.accountId)) {
+                    const current = totals.revenue.get(line.accountId) || 0;
+                    totals.revenue.set(line.accountId, current + (line.credit || 0) - (line.debit || 0));
+                } else if (accountMaps.cogs.has(line.accountId)) {
+                    const current = totals.cogs.get(line.accountId) || 0;
+                    totals.cogs.set(line.accountId, current + (line.debit || 0) - (line.credit || 0));
+                } else if (accountMaps.expense.has(line.accountId)) {
+                    const current = totals.expense.get(line.accountId) || 0;
+                    totals.expense.set(line.accountId, current + (line.debit || 0) - (line.credit || 0));
+                }
             });
+        });
 
         const totalRevenue = Array.from(totals.revenue.values()).reduce((sum, val) => sum + val, 0);
         const totalCogs = Array.from(totals.cogs.values()).reduce((sum, val) => sum + val, 0);
@@ -146,7 +155,7 @@ export default function IncomeStatementPage() {
 
         return { totalRevenue, totalCogs, grossProfit, totalExpenses, netIncome, revenueAccounts, cogsAccounts, expenseAccounts };
 
-    }, [loading, accounts, journalEntries, dateFrom, dateTo]);
+    }, [loading, accounts, journalEntries]);
 
     const handlePrint = () => window.print();
     

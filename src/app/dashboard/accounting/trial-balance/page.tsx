@@ -59,32 +59,53 @@ export default function TrialBalancePage() {
         setDateTo(format(endOfMonth(now), 'yyyy-MM-dd'));
     }, []);
 
+    // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
-        const fetchData = async () => {
+        const fetchAccountsData = async () => {
+            try {
+                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code')));
+                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            } catch (error) {
+                console.error("Error fetching accounts:", error);
+            }
+        };
+        fetchAccountsData();
+    }, [firestore]);
+
+    // Fetch entries when date changes
+    useEffect(() => {
+        if (!firestore || !dateTo) return;
+        const fetchEntries = async () => {
             setLoading(true);
             try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'))),
-                ]);
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+                const endDate = parseISO(dateTo);
+                endDate.setHours(23, 59, 59, 999);
+
+                const entriesQuery = query(
+                    collection(firestore, 'journalEntries'),
+                    where('status', '==', 'posted'),
+                    where('date', '<=', Timestamp.fromDate(endDate))
+                );
+                const entriesSnap = await getDocs(entriesQuery);
                 setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error fetching journal entries:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, [firestore]);
+        fetchEntries();
+    }, [firestore, dateTo]);
     
     const trialBalanceData = useMemo(() => {
-        if (loading || !dateFrom || !dateTo) return { lines: [], totals: {} };
+        if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: {} };
 
         const startDate = parseISO(dateFrom);
+        startDate.setHours(0, 0, 0, 0);
         const endDate = parseISO(dateTo);
         endDate.setHours(23, 59, 59, 999);
+
 
         const lines: TrialBalanceLine[] = accounts.map(account => {
             let openingBalance = 0;
@@ -185,7 +206,7 @@ export default function TrialBalancePage() {
                             </div>
                         )}
                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(parseISO(dateFrom), 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(parseISO(dateTo), 'dd/MM/yyyy')}</p>
+                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
                          </div>
                     </CardHeader>
                     <CardContent className="px-8 md:px-12">
