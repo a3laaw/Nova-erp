@@ -365,47 +365,47 @@ export default function AppointmentDetailsPage() {
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
             
-            // --- Notifications (outside batch) ---
+            // --- Notification Logic (Revised) ---
+            const recipientsToNotify = new Set<string>();
             const link = `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId}`;
 
-            const stageCompletionRecipients = new Set<string>();
-            if (currentUser) stageCompletionRecipients.add(currentUser.id);
-            if (appointment.engineerId) {
-                const engineerUserId = await findUserIdByEmployeeId(firestore, appointment.engineerId);
-                if (engineerUserId) stageCompletionRecipients.add(engineerUserId);
+            // Notify the engineer assigned to the TRANSACTION, if they are not the current user
+            if (transactionData.assignedEngineerId && transactionData.assignedEngineerId !== currentUser?.employeeId) {
+                const assigneeUserId = await findUserIdByEmployeeId(firestore, transactionData.assignedEngineerId);
+                if (assigneeUserId) {
+                    recipientsToNotify.add(assigneeUserId);
+                }
             }
 
-            for (const recipientId of stageCompletionRecipients) {
-                const isCreator = recipientId === currentUser?.id;
-                let body = isCreator
-                    ? `لقد أكملت مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`
-                    : `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.`;
-
-                if (outstandingBalance > 0) {
-                     body += ` نتج عن ذلك رصيد مستحق بقيمة ${formatCurrency(outstandingBalance)}.`;
-                }
+            // Send notifications to the gathered recipients
+            for (const recipientId of recipientsToNotify) {
+                const body = `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.` + 
+                             (outstandingBalance > 0 ? ` نتج عن ذلك رصيد مستحق بقيمة ${formatCurrency(outstandingBalance)}.` : '');
                 
                 await createNotification(firestore, {
                     userId: recipientId,
-                    title: isCreator ? "تم إنجاز مرحلة بنجاح" : `تحديث على معاملة`,
+                    title: `تحديث على معاملة "${transactionData.transactionType}"`,
                     body: body,
                     link: link,
                 });
             }
 
+            // Notify accountants separately if a payment is due and they are not the current user
             if (outstandingBalance > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
                 
-                const notificationBody = `استحقاق دفعة بقيمة ${formatCurrency(outstandingBalance)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${selectedStage.name}".`;
+                const accountantNotificationBody = `استحقاق دفعة بقيمة ${formatCurrency(outstandingBalance)} للعميل ${client?.nameAr} بعد إكمال مرحلة "${selectedStage.name}".`;
                 
                 for (const accountantDoc of accountantsSnap.docs) {
-                    await createNotification(firestore, {
-                        userId: accountantDoc.id,
-                        title: 'إشعار استحقاق دفعة مالية',
-                        body: notificationBody,
-                        link: link
-                    });
+                    if (accountantDoc.id !== currentUser?.id) {
+                        await createNotification(firestore, {
+                            userId: accountantDoc.id,
+                            title: 'إشعار استحقاق دفعة مالية',
+                            body: accountantNotificationBody,
+                            link: link
+                        });
+                    }
                 }
             }
 
