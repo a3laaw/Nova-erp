@@ -11,7 +11,7 @@ import { useFirebase, useStorage } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Upload } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Progress } from '../ui/progress';
 import Image from 'next/image';
@@ -25,17 +25,26 @@ export function BrandingManager() {
     const [formData, setFormData] = useState<Partial<BrandingSettings>>({});
     const [isSaving, setIsSaving] = useState(false);
     
-    // File upload state
+    // Logo state
     const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-    const [uploadError, setUploadError] = useState<string | null>(null);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [logoUploadProgress, setLogoUploadProgress] = useState<number | null>(null);
+    const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+    const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+    
+    // Letterhead state
+    const [letterheadFile, setLetterheadFile] = useState<File | null>(null);
+    const [letterheadUploadProgress, setLetterheadUploadProgress] = useState<number | null>(null);
+    const [letterheadUploadError, setLetterheadUploadError] = useState<string | null>(null);
+    const [letterheadPreviewUrl, setLetterheadPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (branding) {
             setFormData(branding);
             if (branding.logo_url) {
-                setPreviewUrl(branding.logo_url);
+                setLogoPreviewUrl(branding.logo_url);
+            }
+             if (branding.letterhead_image_url) {
+                setLetterheadPreviewUrl(branding.letterhead_image_url);
             }
         }
     }, [branding]);
@@ -44,26 +53,31 @@ export function BrandingManager() {
         const { id, value } = e.target;
         setFormData(prev => ({...prev, [id]: value}));
     };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'letterhead') => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validation
+        const isLogo = type === 'logo';
+        const setError = isLogo ? setLogoUploadError : setLetterheadUploadError;
+        const setFile = isLogo ? setLogoFile : setLetterheadFile;
+        const setPreview = isLogo ? setLogoPreviewUrl : setLetterheadPreviewUrl;
+        
         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
         if (!allowedTypes.includes(file.type)) {
-            setUploadError('نوع الملف غير صالح. الرجاء رفع صورة (jpg, png).');
+            setError('نوع الملف غير صالح. الرجاء رفع صورة (jpg, png).');
             return;
         }
-        if (file.size > 500 * 1024) { // 500KB
-            setUploadError('حجم الصورة كبير جدًا. الحد الأقصى 500KB.');
+        if (file.size > 1024 * 1024) { // 1MB limit
+            setError('حجم الصورة كبير جدًا. الحد الأقصى 1MB.');
             return;
         }
-
-        setUploadError(null);
-        setLogoFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        
+        setError(null);
+        setFile(file);
+        setPreview(URL.createObjectURL(file));
     };
+
 
     const handleSave = async () => {
         if (!firestore) {
@@ -77,54 +91,61 @@ export function BrandingManager() {
 
         setIsSaving(true);
         let finalLogoUrl = formData.logo_url || '';
+        let finalLetterheadUrl = formData.letterhead_image_url || '';
+        
+        const uploadPromises: Promise<any>[] = [];
 
-        // If a new file is selected, upload it first
         if (logoFile && storage) {
-            const timestamp = Date.now();
-            const storageRef = ref(storage, `company_logos/main/logo_${timestamp}_${logoFile.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, logoFile);
-
-            await new Promise<void>((resolve, reject) => {
+            const logoPromise = new Promise<void>((resolve, reject) => {
+                const timestamp = Date.now();
+                const storageRef = ref(storage, `company_assets/logo_${timestamp}_${logoFile.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, logoFile);
                 uploadTask.on('state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        setUploadProgress(progress);
-                    },
-                    (error) => {
-                        console.error("Upload failed:", error);
-                        setUploadError('فشل رفع الشعار. الرجاء المحاولة مرة أخرى.');
-                        reject(error);
-                    },
+                    (snapshot) => setLogoUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+                    (error) => { console.error("Logo upload failed:", error); reject(error); },
                     async () => {
-                        try {
-                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                            console.log("تم رفع اللوجو:", downloadURL);
-                            finalLogoUrl = downloadURL;
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
+                        finalLogoUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve();
                     }
                 );
-            }).catch(error => {
-                 toast({ variant: 'destructive', title: 'خطأ في الرفع', description: 'فشل الحصول على رابط الشعار بعد الرفع.' });
-                 setIsSaving(false);
-                 setUploadProgress(null);
-                 return; // Stop execution
             });
+            uploadPromises.push(logoPromise);
+        }
+
+        if (letterheadFile && storage) {
+            const letterheadPromise = new Promise<void>((resolve, reject) => {
+                const timestamp = Date.now();
+                const storageRef = ref(storage, `company_assets/letterhead_${timestamp}_${letterheadFile.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, letterheadFile);
+                 uploadTask.on('state_changed',
+                    (snapshot) => setLetterheadUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+                    (error) => { console.error("Letterhead upload failed:", error); reject(error); },
+                    async () => {
+                        finalLetterheadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve();
+                    }
+                );
+            });
+            uploadPromises.push(letterheadPromise);
         }
         
-        // Now save all data to Firestore
         try {
+            await Promise.all(uploadPromises);
+            
             const settingsRef = doc(firestore, 'company_settings', 'main');
-            const dataToSave = { ...formData, logo_url: finalLogoUrl };
+            const dataToSave = { ...formData, logo_url: finalLogoUrl, letterhead_image_url: finalLetterheadUrl };
             await setDoc(settingsRef, dataToSave, { merge: true });
+            
             toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية.' });
-            setLogoFile(null); // Clear file after successful save
-            setUploadProgress(null); // Clear progress
+            
+            setLogoFile(null);
+            setLetterheadFile(null);
+            setLogoUploadProgress(null);
+            setLetterheadUploadProgress(null);
+
         } catch (error) {
-            console.error("Error saving branding settings:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الإعدادات في قاعدة البيانات.' });
+            console.error("Error during save process:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الإعدادات.' });
         } finally {
             setIsSaving(false);
         }
@@ -157,19 +178,39 @@ export function BrandingManager() {
                     قم بتخصيص هوية النظام لتناسب شركتك. ستظهر هذه البيانات في التقارير والفواتير.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="grid gap-2">
-                    <Label htmlFor="logo-upload">شعار الشركة (اللوجو)</Label>
-                    <div className="flex items-center gap-4">
-                        {previewUrl && <Image src={previewUrl} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />}
-                         <div className="flex-1">
-                            <Input id="logo-upload" type="file" onChange={handleFileChange} accept="image/png, image/jpeg, image/jpg" />
-                             <p className="text-xs text-muted-foreground mt-2">.jpg, .png | الحد الأقصى 500KB</p>
+            <CardContent className="space-y-8">
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-semibold text-base">شعار الشركة (اللوجو)</h3>
+                     <div className="grid gap-2">
+                        <div className="flex items-center gap-4">
+                            {logoPreviewUrl && <Image src={logoPreviewUrl} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />}
+                             <div className="flex-1">
+                                <Input id="logo-upload" type="file" onChange={(e) => handleFileChange(e, 'logo')} accept="image/png, image/jpeg, image/jpg" />
+                                 <p className="text-xs text-muted-foreground mt-2">.jpg, .png | الحد الأقصى 1MB</p>
+                            </div>
                         </div>
+                        {logoUploadProgress !== null && <Progress value={logoUploadProgress} className="w-full h-2" />}
+                        {logoUploadError && <p className="text-xs text-destructive">{logoUploadError}</p>}
                     </div>
-                    {uploadProgress !== null && <Progress value={uploadProgress} className="w-full h-2" />}
-                    {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
                 </div>
+
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-semibold text-base">ترويسة الشركة (Letterhead)</h3>
+                     <div className="grid gap-2">
+                        <div className="flex items-center gap-4">
+                            {letterheadPreviewUrl && <Image src={letterheadPreviewUrl} alt="Letterhead Preview" width={128} height={64} className="rounded-md border object-contain p-1" />}
+                             <div className="flex-1">
+                                <Input id="letterhead-upload" type="file" onChange={(e) => handleFileChange(e, 'letterhead')} accept="image/png, image/jpeg, image/jpg" />
+                                 <p className="text-xs text-muted-foreground mt-2">.jpg, .png | الحد الأقصى 1MB. يفضل أن تكون الصورة أفقية (Landscape).</p>
+                            </div>
+                        </div>
+                        {letterheadUploadProgress !== null && <Progress value={letterheadUploadProgress} className="w-full h-2" />}
+                        {letterheadUploadError && <p className="text-xs text-destructive">{letterheadUploadError}</p>}
+                    </div>
+                </div>
+                
+                <Separator />
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="company_name">اسم الشركة <span className="text-destructive">*</span></Label>

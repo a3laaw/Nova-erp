@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -15,6 +16,7 @@ import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useBranding } from '@/context/branding-context';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -33,9 +35,8 @@ export default function ViewJournalEntryPage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const { branding, loading: brandingLoading } = useBranding();
 
-  const [company, setCompany] = useState<Company | null>(null);
-  const [companyLoading, setCompanyLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const entryRef = useMemo(() => {
@@ -51,26 +52,6 @@ export default function ViewJournalEntryPage() {
     }
     return null;
   }, [entrySnap]);
-
-
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchCompany = async () => {
-        setCompanyLoading(true);
-        try {
-            const q = query(collection(firestore, 'companies'), limit(1));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                setCompany({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() as Company });
-            }
-        } catch (error) {
-            console.error("Error fetching company data:", error);
-        } finally {
-            setCompanyLoading(false);
-        }
-    };
-    fetchCompany();
-  }, [firestore]);
   
   const handlePrint = () => {
     window.print();
@@ -116,7 +97,7 @@ export default function ViewJournalEntryPage() {
   }, [entry]);
 
 
-  if (entryLoading || companyLoading) {
+  if (entryLoading || brandingLoading) {
       return (
          <div className="p-8 max-w-4xl mx-auto bg-white space-y-8">
             <header className="flex justify-between items-center pb-4 border-b">
@@ -147,23 +128,34 @@ export default function ViewJournalEntryPage() {
     <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
         <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
             <div id="printable-area" className="p-8 md:p-12 printable-content">
-                <header className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                     <div className="text-left flex-shrink-0">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قـيـد يـومـيـة</h2>
-                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Journal Entry</p>
-                        <div className='flex items-center gap-2 mt-2'>
-                           <p className="font-mono text-sm text-muted-foreground">{entry.entryNumber} : <span className='font-sans'>رقم القيد</span></p>
-                           <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
+                 <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                    {branding?.letterhead_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img 
+                            src={branding.letterhead_image_url} 
+                            alt={`${branding.company_name || ''} Letterhead`}
+                            className="w-full h-auto object-contain max-h-[150px] mb-4"
+                        />
+                    ) : (
+                        <div className="flex justify-between items-start">
+                             <div className="text-left flex-shrink-0">
+                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قـيـد يـومـيـة</h2>
+                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Journal Entry</p>
+                                <div className='flex items-center gap-2 mt-2'>
+                                   <p className="font-mono text-sm text-muted-foreground">{entry.entryNumber} : <span className='font-sans'>رقم القيد</span></p>
+                                   <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
+                                </div>
+                            </div>
+                             <div className="flex items-center gap-4">
+                               <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                <div>
+                                   <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                                   <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
+                                   <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                     <div className="flex items-center gap-4">
-                       <Logo className="h-16 w-16 !p-3" />
-                        <div>
-                           <h1 className="font-bold text-lg">{company?.name || 'Nova ERP'}</h1>
-                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'Nova ERP'}</p>
-                           <p className="text-xs text-muted-foreground mt-2">{company?.address}</p>
-                        </div>
-                    </div>
+                    )}
                 </header>
 
                 <main className="py-8 space-y-8">

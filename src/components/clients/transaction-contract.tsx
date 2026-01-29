@@ -12,6 +12,7 @@ import { contractTemplates } from '@/lib/contract-templates';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
+import Image from 'next/image';
 
 interface TransactionContractProps {
   client: Client;
@@ -73,25 +74,37 @@ export function TransactionContract({ client, transaction }: TransactionContract
 
     return (
         <div id="contract-content" className="space-y-8 printable-content">
-            <header className="flex justify-between items-center pb-4 border-b">
-                <div className="flex items-center gap-4">
-                    <Logo className="h-20 w-20 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                    <div>
-                        <h1 className="text-xl font-bold">{branding?.company_name}</h1>
-                        <p className="text-sm text-gray-500">{branding?.letterhead_text}</p>
-                        <p className="text-xs text-gray-500 mt-2">{branding?.address}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                            {branding?.phone && `Phone: ${branding.phone}`}
-                            {branding?.phone && branding?.email && ' | '}
-                            {branding?.email && `Email: ${branding.email}`}
-                        </p>
+            <header className="pb-4 border-b">
+                 {branding?.letterhead_image_url ? (
+                    // Using a standard img tag for better PDF rendering
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                        src={branding.letterhead_image_url} 
+                        alt={`${branding.company_name || ''} Letterhead`}
+                        className="w-full h-auto object-contain max-h-[150px]"
+                    />
+                ) : (
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <Logo className="h-20 w-20 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                            <div>
+                                <h1 className="text-xl font-bold">{branding?.company_name}</h1>
+                                <p className="text-sm text-gray-500">{branding?.letterhead_text}</p>
+                                <p className="text-xs text-gray-500 mt-2">{branding?.address}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {branding?.phone && `Phone: ${branding.phone}`}
+                                    {branding?.phone && branding?.email && ' | '}
+                                    {branding?.email && `Email: ${branding.email}`}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-left">
+                            <h2 className="text-2xl font-bold text-gray-700">{contractTitle}</h2>
+                            <p className="font-mono text-sm mt-1">{contractDate}</p>
+                            <p className="font-mono text-xs text-gray-500">{contractNumber}</p>
+                        </div>
                     </div>
-                </div>
-                <div className="text-left">
-                    <h2 className="text-2xl font-bold text-gray-700">{contractTitle}</h2>
-                    <p className="font-mono text-sm mt-1">{contractDate}</p>
-                    <p className="font-mono text-xs text-gray-500">{contractNumber}</p>
-                </div>
+                )}
             </header>
 
             <section>

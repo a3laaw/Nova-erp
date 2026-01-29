@@ -14,6 +14,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import Link from 'next/link';
+import { useBranding } from '@/context/branding-context';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -35,9 +36,7 @@ export default function ViewCashReceiptPage() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { firestore } = useFirebase();
-
-  const [company, setCompany] = useState<Company | null>(null);
-  const [companyLoading, setCompanyLoading] = useState(true);
+  const { branding, loading: brandingLoading } = useBranding();
 
   const receiptRef = useMemo(() => {
     if (!firestore || !id) return null;
@@ -52,26 +51,6 @@ export default function ViewCashReceiptPage() {
     }
     return null;
   }, [receiptSnap]);
-
-
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchCompany = async () => {
-        setCompanyLoading(true);
-        try {
-            const q = query(collection(firestore, 'companies'), limit(1));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                setCompany({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() as Company });
-            }
-        } catch (error) {
-            console.error("Error fetching company data:", error);
-        } finally {
-            setCompanyLoading(false);
-        }
-    };
-    fetchCompany();
-  }, [firestore]);
   
   const handlePrint = () => {
     window.print();
@@ -87,7 +66,7 @@ export default function ViewCashReceiptPage() {
   }, [receipt]);
 
 
-  if (receiptLoading || companyLoading) {
+  if (receiptLoading || brandingLoading) {
       return (
          <div className="p-8 max-w-4xl mx-auto bg-white space-y-8">
             <header className="flex justify-between items-center pb-4 border-b">
@@ -118,20 +97,31 @@ export default function ViewCashReceiptPage() {
     <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
         <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
             <div id="printable-area" className="p-8 md:p-12 printable-content">
-                <header className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                     <div className="text-left flex-shrink-0">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">سـنـد قـبـض</h2>
-                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Cash Receipt Voucher</p>
-                        <p className="font-mono text-sm mt-2 text-muted-foreground">{receipt.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
-                    </div>
-                     <div className="flex items-center gap-4">
-                       <Logo className="h-16 w-16 !p-3" />
-                        <div>
-                           <h1 className="font-bold text-lg">{company?.name || 'Nova ERP'}</h1>
-                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'Nova ERP'}</p>
-                           <p className="text-xs text-muted-foreground mt-2">{company?.address}</p>
+                <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                    {branding?.letterhead_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img 
+                            src={branding.letterhead_image_url} 
+                            alt={`${branding.company_name || ''} Letterhead`}
+                            className="w-full h-auto object-contain max-h-[150px] mb-4"
+                        />
+                    ) : (
+                         <div className="flex justify-between items-start">
+                             <div className="text-left flex-shrink-0">
+                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">سـنـد قـبـض</h2>
+                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Cash Receipt Voucher</p>
+                                <p className="font-mono text-sm mt-2 text-muted-foreground">{receipt.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
+                            </div>
+                             <div className="flex items-center gap-4">
+                               <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                <div>
+                                   <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                                   <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
+                                   <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </header>
 
                 <main className="py-8 space-y-8">

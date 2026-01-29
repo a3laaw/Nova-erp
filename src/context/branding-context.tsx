@@ -13,6 +13,7 @@ export interface BrandingSettings {
   email?: string;
   tax_number?: string;
   letterhead_text?: string;
+  letterhead_image_url?: string;
 }
 
 interface BrandingContextType {
