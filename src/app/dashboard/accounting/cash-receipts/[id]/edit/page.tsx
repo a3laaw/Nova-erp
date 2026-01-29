@@ -256,6 +256,7 @@ export default function EditCashReceiptPage() {
                         <Button onClick={() => resolve(false)} variant="outline">إلغاء</Button>
                     </>
                 ),
+                duration: 10000,
             });
         });
         if (!shouldProceed) {
@@ -408,9 +409,9 @@ export default function EditCashReceiptPage() {
              {journalEntryIsPosted && (
                 <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>القيد مرحّل</AlertTitle>
+                    <AlertTitle>تنبيه: القيد مرحّل</AlertTitle>
                     <AlertDescription>
-                        لا يمكن تعديل هذا السند لأن القيد المحاسبي المرتبط به قد تم ترحيله. سيتم تحديث القيد تلقائياً عند الحفظ.
+                        هذا السند مرتبط بقيد مرحّل. سيتم تحديث القيد تلقائيًا عند الحفظ، مما سيؤثر على الحسابات النهائية.
                     </AlertDescription>
                 </Alert>
             )}
