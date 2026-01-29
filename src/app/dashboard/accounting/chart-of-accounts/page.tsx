@@ -253,13 +253,18 @@ export default function ChartOfAccountsPage() {
                                         const isOpen = openAccounts.has(account.code);
 
                                         return (
-                                            <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''}>
+                                            <TableRow 
+                                                key={account.id} 
+                                                className={cn(
+                                                    account.level === 0 ? 'bg-muted/50' : '',
+                                                    hasChildren && 'cursor-pointer'
+                                                )}
+                                                onClick={() => hasChildren && toggleAccount(account.code)}
+                                            >
                                                 <TableCell style={{ paddingRight: `${(account.level || 0) * 1.5 + 1}rem` }}>
                                                     <div className="flex items-center gap-2">
                                                         {hasChildren ? (
-                                                            <button onClick={() => toggleAccount(account.code)} className="p-1 -mr-1">
-                                                               {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
-                                                            </button>
+                                                             isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
                                                         ) : (
                                                             <span className="w-6 h-4 inline-block"></span>
                                                         )}
@@ -281,8 +286,12 @@ export default function ChartOfAccountsPage() {
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                                                        <DropdownMenuContent dir="rtl">
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                                                <MoreHorizontal className="h-4 w-4"/>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
                                                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                                                             <DropdownMenuItem disabled={account.level >= 4}>
                                                                 <PlusCircle className="ml-2 h-4 w-4"/>
