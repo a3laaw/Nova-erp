@@ -79,14 +79,6 @@ const accountTypeColors: Record<Account['type'], string> = {
     expense: 'bg-orange-100 text-orange-800 border-orange-200',
 };
 
-const getLevelFromCode = (code: string): number => {
-    const len = String(code).length;
-    if (len === 1) return 0;
-    if (len <= 3) return 1;
-    if (len <= 5) return 2;
-    return 3;
-};
-
 const getStatementType = (code: string): Account['statement'] => {
     if (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) return 'Balance Sheet';
     return 'Income Statement';
@@ -134,7 +126,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const code = formData.code || '';
-        const level = getLevelFromCode(code);
+        const level = parentAccount !== null ? (parentAccount.level || 0) + 1 : 0;
         const statement = getStatementType(code);
         const balanceType = getBalanceType(code);
         onSave({ ...formData, level, statement, balanceType, parentCode: parentAccount?.code || null });
