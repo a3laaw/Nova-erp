@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -13,17 +13,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp, updateDoc, doc, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -32,9 +25,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function NewArchitecturalAppointmentPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
@@ -50,9 +46,28 @@ export default function NewArchitecturalAppointmentPage() {
     const [notes, setNotes] = useState('');
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
+    
+    const [isNewClient, setIsNewClient] = useState(false);
+    const [newClientName, setNewClientName] = useState('');
+    const [newClientMobile, setNewClientMobile] = useState('');
 
     const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' }[]>([]);
     const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+    
+    // Pre-fill from URL
+    useEffect(() => {
+        const nameFromUrl = searchParams.get('nameAr');
+        const mobileFromUrl = searchParams.get('mobile');
+        const engineerFromUrl = searchParams.get('engineerId');
+        if (nameFromUrl || mobileFromUrl) {
+            setIsNewClient(true);
+            setNewClientName(nameFromUrl || '');
+            setNewClientMobile(mobileFromUrl || '');
+        }
+        if(engineerFromUrl) {
+            setEngineerId(engineerFromUrl);
+        }
+    }, [searchParams]);
 
 
     useEffect(() => {
@@ -96,15 +111,19 @@ export default function NewArchitecturalAppointmentPage() {
         return clients.filter(c => !c.assignedEngineer || c.assignedEngineer === engineerId);
     }, [clients, engineerId]);
     
+    const clientOptions = useMemo(() => filteredClients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.fileId })), [filteredClients]);
+    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber })), [engineers]);
+    
     useEffect(() => {
-        if (clientId && filteredClients.length > 0 && !filteredClients.some(c => c.id === clientId)) {
+        if (!isNewClient && clientId && filteredClients.length > 0 && !filteredClients.some(c => c.id === clientId)) {
             setClientId('');
         }
-    }, [filteredClients, clientId]);
+    }, [filteredClients, clientId, isNewClient]);
     
     useEffect(() => {
         const fetchSchedule = async () => {
-            if (!date || (!clientId && !engineerId) || !firestore) {
+            const checkClientId = isNewClient ? null : clientId;
+            if (!date || (!checkClientId && !engineerId) || !firestore) {
                 setDailySchedule([]);
                 return;
             }
@@ -147,9 +166,9 @@ export default function NewArchitecturalAppointmentPage() {
                 }
 
                 // Filter for client
-                if (clientId) {
+                if (checkClientId) {
                     dailyAppointments.forEach(appt => {
-                        if (appt.clientId === clientId && !processedApptIds.has(appt.id)) {
+                        if (appt.clientId === checkClientId && !processedApptIds.has(appt.id)) {
                              bookedSlots.push({
                                 time: format(appt.appointmentDate.toDate(), 'HH:mm'),
                                 title: appt.title,
@@ -169,12 +188,23 @@ export default function NewArchitecturalAppointmentPage() {
         };
 
         fetchSchedule();
-    }, [date, clientId, engineerId, firestore]);
+    }, [date, clientId, engineerId, isNewClient, firestore]);
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !clientId || !engineerId || !title || !date || !time) {
+
+        if (!firestore || !currentUser || !engineerId || !title || !date || !time) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
+            return;
+        }
+
+        if (isNewClient && (!newClientName || !newClientMobile)) {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة اسم وجوال العميل الجديد.' });
+            return;
+        }
+        
+        if (!isNewClient && !clientId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار عميل مسجل.' });
             return;
         }
 
@@ -182,68 +212,58 @@ export default function NewArchitecturalAppointmentPage() {
         try {
             const appointmentDateTime = new Date(`${date}T${time}`);
             
+            if (isNewClient) {
+                const clientsRef = collection(firestore, 'clients');
+                const q = query(clientsRef, where('mobile', '==', newClientMobile));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}.`);
+                }
+            }
+            
             // --- Conflict Validation ---
-            const dayStart = new Date(appointmentDateTime);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(appointmentDateTime);
-            dayEnd.setHours(23, 59, 59, 999);
-
             const appointmentsRef = collection(firestore, 'appointments');
+            const dayStart = new Date(appointmentDateTime); dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(appointmentDateTime); dayEnd.setHours(23, 59, 59, 999);
             const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
             const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
             const dayAppointments = dayAppointmentsSnap.docs.map(d => d.data());
-
             const windowStart = new Date(appointmentDateTime.getTime() - 59 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 59 * 60 * 1000);
 
-            // Check for engineer conflict
-            const engineerHasConflict = dayAppointments.some(appt => {
-                const apptDate = appt.appointmentDate.toDate();
-                return appt.engineerId === engineerId && apptDate >= windowStart && apptDate <= windowEnd;
-            });
+            const engineerHasConflict = dayAppointments.some(appt => appt.engineerId === engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd);
+            if (engineerHasConflict) throw new Error('المهندس لديه موعد آخر في نفس الوقت.');
 
-            if (engineerHasConflict) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تعارض في المواعيد',
-                    description: 'المهندس لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.',
-                });
-                setIsSaving(false);
-                return;
+            if (!isNewClient && clientId) {
+                 const clientHasConflict = dayAppointments.some(appt => appt.clientId === clientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd);
+                 if (clientHasConflict) throw new Error('العميل لديه موعد آخر في نفس الوقت.');
             }
-
-            // Check for client conflict
-            const clientHasConflict = dayAppointments.some(appt => {
-                const apptDate = appt.appointmentDate.toDate();
-                return appt.clientId === clientId && apptDate >= windowStart && apptDate <= windowEnd;
-            });
-
-            if (clientHasConflict) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تعارض في المواعيد',
-                    description: 'العميل لديه موعد آخر في نفس الوقت. الرجاء اختيار وقت مختلف.',
-                });
-                setIsSaving(false);
-                return;
-            }
-            // --- End of Conflict Validation ---
-
-            const newAppointment = {
-                clientId,
+            
+            const newAppointmentData: any = {
                 engineerId: engineerId,
-                title,
-                notes,
+                title, notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
                 type: 'architectural',
             };
             
-            await addDoc(collection(firestore, 'appointments'), newAppointment);
+            if(isNewClient) {
+                newAppointmentData.clientName = newClientName;
+                newAppointmentData.clientMobile = newClientMobile;
+            } else {
+                newAppointmentData.clientId = clientId;
+            }
+
+            const newApptRef = await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+            
+            const fromAppointmentId = searchParams.get('fromAppointmentId');
+            if (fromAppointmentId && !isNewClient) {
+                const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
+                await updateDoc(appointmentRef, { clientId: clientId, clientName: deleteField(), clientMobile: deleteField() });
+            }
 
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
             
-            // Notification Logic
             const client = clients.find(c => c.id === clientId);
             const engineer = engineers.find(e => e.id === engineerId);
 
@@ -253,8 +273,8 @@ export default function NewArchitecturalAppointmentPage() {
                      await createNotification(firestore, {
                         userId: targetUserId,
                         title: `موعد جديد: ${title}`,
-                        body: `تم تحديد موعد لك مع العميل ${client?.nameAr} يوم ${date} الساعة ${time}.`,
-                        link: `/dashboard/appointments`
+                        body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : client?.nameAr} يوم ${date} الساعة ${time}.`,
+                        link: `/dashboard/appointments/${newApptRef.id}`
                     });
                 }
             }
@@ -262,8 +282,8 @@ export default function NewArchitecturalAppointmentPage() {
             router.push('/dashboard/appointments');
 
         } catch (error) {
-            console.error("Error creating appointment:", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل حفظ الموعد.' });
+            const message = error instanceof Error ? error.message : 'فشل حفظ الموعد.';
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: message });
         } finally {
             setIsSaving(false);
         }
@@ -287,31 +307,45 @@ export default function NewArchitecturalAppointmentPage() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
-                             <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر المهندس..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {engineers.map(e => (
-                                        <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                             <InlineSearchList
+                                value={engineerId}
+                                onSelect={setEngineerId}
+                                options={engineerOptions}
+                                placeholder={loading ? "تحميل..." : "اختر المهندس..."}
+                                disabled={loading}
+                             />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="clientId">العميل <span className="text-destructive">*</span></Label>
-                            <Select dir="rtl" onValueChange={setClientId} value={clientId} required disabled={loading || !engineerId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "تحميل..." : !engineerId ? "اختر مهندسًا أولاً" : "اختر العميل..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {filteredClients.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>{c.nameAr}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="flex items-center space-x-2 self-end mb-2">
+                            <Checkbox id="isNewClient" checked={isNewClient} onCheckedChange={(checked) => setIsNewClient(checked as boolean)} />
+                            <Label htmlFor="isNewClient">عميل جديد (غير مسجل)</Label>
                         </div>
                     </div>
+                    
+                    {isNewClient ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="new-client-name">اسم العميل <span className="text-destructive">*</span></Label>
+                                <Input id="new-client-name" value={newClientName} onChange={e => setNewClientName(e.target.value)} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="new-client-mobile">رقم الجوال <span className="text-destructive">*</span></Label>
+                                <Input id="new-client-mobile" value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} dir="ltr" required />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid gap-2">
+                            <Label htmlFor="clientId">العميل <span className="text-destructive">*</span></Label>
+                            <InlineSearchList
+                                value={clientId}
+                                onSelect={setClientId}
+                                options={clientOptions}
+                                placeholder={loading ? "تحميل..." : !engineerId ? "اختر مهندسًا أولاً" : "اختر العميل..."}
+                                disabled={loading || !engineerId}
+                            />
+                        </div>
+                    )}
+
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>

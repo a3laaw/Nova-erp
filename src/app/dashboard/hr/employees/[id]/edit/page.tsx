@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { fromFirestoreDate, toFirestoreDate } from '@/services/date-converter';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 export default function EditEmployeePage() {
@@ -151,7 +152,7 @@ export default function EditEmployeePage() {
         setFormData(prev => prev ? ({ ...prev, [id]: sanitizedValue }) : null);
     };
 
-    const handleSelectChange = (id: keyof Employee, value: any) => {
+    const handleSelectChange = (id: keyof Employee | 'departmentId', value: any) => {
         setFormData(prev => prev ? ({ ...prev, [id]: value }) : null);
     };
     
@@ -159,6 +160,9 @@ export default function EditEmployeePage() {
         setFormData(prev => prev ? ({ ...prev, departmentId: deptId, jobTitle: '' }) : null);
         fetchJobsForDepartment(deptId);
     };
+    
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
+    const jobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -429,35 +433,28 @@ export default function EditEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" value={formData.departmentId} onValueChange={handleDepartmentChange}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="اختر القسم..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {departments.map(dept => (
-                                            <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList
+                                    value={formData.departmentId || ''}
+                                    onSelect={handleDepartmentChange}
+                                    options={departmentOptions}
+                                    placeholder="اختر القسم..."
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} disabled={!formData.departmentId || jobsLoading || jobs.length === 0}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={
-                                            jobsLoading 
-                                            ? "تحميل الوظائف..." 
-                                            : !formData.departmentId 
-                                                ? "اختر قسمًا أولاً" 
-                                                : (jobs.length === 0 ? "لا توجد وظائف بهذا القسم" : "اختر الوظيفة...")
-                                        } />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {jobs.map(job => (
-                                            <SelectItem key={job.id} value={job.name}>{job.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList
+                                    value={formData.jobTitle || ''}
+                                    onSelect={(v) => handleSelectChange('jobTitle', v)}
+                                    options={jobOptions}
+                                    placeholder={
+                                        jobsLoading 
+                                        ? "تحميل..." 
+                                        : !formData.departmentId 
+                                            ? "اختر قسمًا أولاً" 
+                                            : (jobs.length === 0 ? "لا يوجد وظائف" : "اختر الوظيفة...")
+                                    }
+                                    disabled={!formData.departmentId || jobsLoading || jobs.length === 0}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>

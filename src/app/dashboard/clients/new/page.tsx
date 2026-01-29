@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Employee, Governorate, Area } from '@/lib/types';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 export default function NewClientPage() {
@@ -52,15 +53,11 @@ export default function NewClientPage() {
     const [fileId, setFileId] = useState('جاري التوليد...');
     const [isGeneratingId, setIsGeneratingId] = useState(true);
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
-    const [engineerIdFromUrl, setEngineerIdFromUrl] = useState<string | null>(null);
-    const fromAppointmentId = searchParams.get('fromAppointmentId');
     
     const [engineers, setEngineers] = useState<Employee[]>([]);
-    const [engineersLoading, setEngineersLoading] = useState(true);
-    
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
-    const [locationsLoading, setLocationsLoading] = useState(true);
+    const [refDataLoading, setRefDataLoading] = useState(true);
 
      // Effect to pre-fill from URL
     useEffect(() => {
@@ -75,21 +72,11 @@ export default function NewClientPage() {
             setFormData(prev => ({...prev, mobile: mobileFromUrl}));
         }
         if (engineerFromUrl) {
-            setEngineerIdFromUrl(engineerFromUrl);
+           setAssignedEngineerId(engineerFromUrl);
         }
     }, [searchParams]);
 
-    // New effect to set the engineer ID after engineers have loaded
-    useEffect(() => {
-        if (engineerIdFromUrl && !engineersLoading) {
-            const engineerExists = engineers.some(e => e.id === engineerIdFromUrl);
-            if (engineerExists) {
-                setAssignedEngineerId(engineerIdFromUrl);
-            }
-        }
-    }, [engineerIdFromUrl, engineersLoading, engineers]);
-
-    // Fetch File ID
+    // Fetch File ID & Ref Data
     useEffect(() => {
         if (!firestore) return;
 
@@ -117,20 +104,14 @@ export default function NewClientPage() {
             }
         };
 
-        generateFileId();
-    }, [firestore, toast]);
-    
-    // Fetch Reference Data (Engineers, Governorates)
-    useEffect(() => {
-        if (!firestore) return;
-    
         const fetchReferenceData = async () => {
-            setEngineersLoading(true);
-            setLocationsLoading(true);
+            setRefDataLoading(true);
             try {
-                // Fetch engineers
                 const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const engSnapshot = await getDocs(engQuery);
+                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
+                
+                const [engSnapshot, govSnapshot] = await Promise.all([getDocs(engQuery), getDocs(govSnapshot)]);
+
                 const fetchedEngineers: Employee[] = [];
                 engSnapshot.forEach(doc => {
                     const employee = { id: doc.id, ...doc.data() } as Employee;
@@ -142,21 +123,18 @@ export default function NewClientPage() {
                     }
                 });
                 setEngineers(fetchedEngineers);
-                setEngineersLoading(false);
 
-                // Fetch Governorates
-                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
-                const govSnapshot = await getDocs(govQuery);
                 setGovernorates(govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Governorate)));
-                setLocationsLoading(false);
 
             } catch (error) {
                 console.error("Failed to fetch reference data:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
-                setEngineersLoading(false);
-                setLocationsLoading(false);
+            } finally {
+                setRefDataLoading(false);
             }
         };
+
+        generateFileId();
         fetchReferenceData();
     }, [firestore, toast]);
 
@@ -174,6 +152,11 @@ export default function NewClientPage() {
     const handleSelectChange = (id: string, value: string) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
+    
+    const engineerOptions = useMemo(() => engineers.map(e => ({value: e.id!, label: e.fullName})), [engineers]);
+    const governorateOptions = useMemo(() => governorates.map(g => ({value: g.id, label: g.name})), [governorates]);
+    const areaOptions = useMemo(() => areas.map(a => ({value: a.name, label: a.name})), [areas]);
+
 
     const handleGovernorateChange = useCallback(async (govId: string) => {
         setFormData(prev => ({ ...prev, governorateId: govId, area: '' }));
@@ -209,7 +192,7 @@ export default function NewClientPage() {
         }
 
         setIsLoading(true);
-
+        let newClientId = '';
         try {
             const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', formData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
@@ -254,9 +237,11 @@ export default function NewClientPage() {
                     isActive: true,
                 };
                 const newClientRef = doc(collection(firestore, 'clients'));
+                newClientId = newClientRef.id;
                 transaction.set(newClientRef, clientData);
 
                 // If coming from an appointment, update it with the new client ID
+                const fromAppointmentId = searchParams.get('fromAppointmentId');
                 if (fromAppointmentId) {
                     const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
                     transaction.update(appointmentRef, {
@@ -270,10 +255,11 @@ export default function NewClientPage() {
 
             toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
             
+            const fromAppointmentId = searchParams.get('fromAppointmentId');
             if (fromAppointmentId) {
                 router.push(`/dashboard/appointments/${fromAppointmentId}`);
             } else {
-                router.push('/dashboard/clients');
+                router.push(`/dashboard/clients/${newClientId}`);
             }
 
         } catch (error) {
@@ -374,16 +360,13 @@ export default function NewClientPage() {
 
                      <div className="grid gap-2">
                         <Label htmlFor="assignedEngineerId">{t.engineer} <span className="text-destructive">*</span></Label>
-                        <Select dir="rtl" value={assignedEngineerId} onValueChange={setAssignedEngineerId} disabled={engineersLoading} required>
-                            <SelectTrigger>
-                                <SelectValue placeholder={engineersLoading ? "تحميل..." : t.engineerPlaceholder} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {engineers.map(eng => (
-                                    <SelectItem key={eng.id} value={eng.id!}>{eng.fullName}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                         <InlineSearchList 
+                            value={assignedEngineerId}
+                            onSelect={setAssignedEngineerId}
+                            options={engineerOptions}
+                            placeholder={refDataLoading ? "تحميل..." : "اختر مهندسًا..."}
+                            disabled={refDataLoading}
+                         />
                     </div>
 
                     <Separator className="my-6" />
@@ -393,29 +376,23 @@ export default function NewClientPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div className="grid gap-2">
                                 <Label htmlFor="governorate">{t.governorate}</Label>
-                                <Select dir="rtl" value={formData.governorateId} onValueChange={handleGovernorateChange} disabled={locationsLoading}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={locationsLoading ? "تحميل..." : t.governoratePlaceholder} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {governorates.map(gov => (
-                                            <SelectItem key={gov.id} value={gov.id}>{gov.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList
+                                    value={formData.governorateId}
+                                    onSelect={handleGovernorateChange}
+                                    options={governorateOptions}
+                                    placeholder={refDataLoading ? "تحميل..." : "اختر محافظة..."}
+                                    disabled={refDataLoading}
+                                />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="area">{t.area}</Label>
-                                <Select dir="rtl" value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!formData.governorateId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={t.areaPlaceholder} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {areas.map(area => (
-                                            <SelectItem key={area.id} value={area.name}>{area.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList 
+                                    value={formData.area}
+                                    onSelect={(v) => handleSelectChange('area', v)}
+                                    options={areaOptions}
+                                    placeholder={!formData.governorateId ? "اختر محافظة أولاً" : "اختر منطقة..."}
+                                    disabled={!formData.governorateId}
+                                />
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

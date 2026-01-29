@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -13,6 +13,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Save, X } from 'lucide-react';
+import { useFirebase, useCollection } from '@/firebase';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/language-context';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -20,14 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Save } from 'lucide-react';
-import type { Employee, Department, Job } from '@/lib/types';
-import { useFirebase, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, type DocumentData, query, where, getDocs, writeBatch, doc, orderBy } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
+import type { Employee, Governorate, Area, Department, Job } from '@/lib/types';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -35,11 +36,11 @@ import { toFirestoreDate } from '@/services/date-converter';
 
 export default function NewEmployeePage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { firestore } = useFirebase();
-    const { user: currentUser } = useAuth();
     const { toast } = useToast();
-    const [isClient, setIsClient] = useState(false);
-
+    const { language } = useLanguage();
+    
     const [formData, setFormData] = useState<Partial<Employee> & { departmentId?: string }>({
         employeeNumber: '',
         fullName: '',
@@ -68,62 +69,73 @@ export default function NewEmployeePage() {
         iban: '',
         status: 'active',
     });
-
-    const [includeHousing, setIncludeHousing] = useState(false);
-    const [includeTransport, setIncludeTransport] = useState(false);
+    
     const [isLoading, setIsLoading] = useState(false);
     const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
+    const fromAppointmentId = searchParams.get('fromAppointmentId');
     
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
     const [jobsLoading, setJobsLoading] = useState(false);
+    
+    const [includeHousing, setIncludeHousing] = useState(false);
+    const [includeTransport, setIncludeTransport] = useState(false);
 
+
+     // Effect to pre-fill from URL
     useEffect(() => {
-        setIsClient(true);
-        if (firestore) {
-            // Fetch next employee number
-            setIsGeneratingNumber(true);
-            const fetchNextEmployeeNumber = async () => {
-                try {
-                    const employeesRef = collection(firestore, 'employees');
-                    const querySnapshot = await getDocs(employeesRef);
-                    let maxNumber = 100; // Start calculation from 100 to get 101 as the first
-                    
-                    querySnapshot.forEach(doc => {
-                         const num = parseInt(doc.data().employeeNumber, 10);
-                         if (!isNaN(num) && num > maxNumber) {
-                             maxNumber = num;
-                         }
-                    });
-                    
-                    const nextNumber = String(maxNumber + 1);
-                    setFormData(prev => ({ ...prev, employeeNumber: nextNumber }));
-                } catch (error) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'فشل توليد الرقم الوظيفي.' });
-                } finally {
-                    setIsGeneratingNumber(false);
-                }
-            };
-            fetchNextEmployeeNumber();
+        const nameFromUrl = searchParams.get('nameAr');
+        const mobileFromUrl = searchParams.get('mobile');
+        const engineerFromUrl = searchParams.get('engineerId');
 
-            // Fetch departments
-            setRefDataLoading(true);
-            const fetchDepartments = async () => {
-                try {
-                    const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
-                    const deptsSnapshot = await getDocs(deptsQuery);
-                    setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
-                } catch(e) {
-                     toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب الأقسام.' });
-                } finally {
-                    setRefDataLoading(false);
-                }
-            };
-            fetchDepartments();
+        if (nameFromUrl) {
+            setFormData(prev => ({...prev, fullName: nameFromUrl}));
         }
-    }, [firestore, toast]);
+        if (mobileFromUrl) {
+            setFormData(prev => ({...prev, mobile: mobileFromUrl}));
+        }
+    }, [searchParams]);
 
+    // Fetch File ID & Ref Data
+    useEffect(() => {
+        if (!firestore) return;
+
+        const generateFileId = async () => {
+            setIsGeneratingNumber(true);
+            try {
+                const employeesRef = collection(firestore, 'employees');
+                const querySnapshot = await getDocs(employeesRef);
+                let maxNumber = 100;
+                querySnapshot.forEach(doc => {
+                     const num = parseInt(doc.data().employeeNumber, 10);
+                     if (!isNaN(num) && num > maxNumber) maxNumber = num;
+                });
+                const nextNumber = String(maxNumber + 1);
+                setFormData(prev => ({ ...prev, employeeNumber: nextNumber }));
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل توليد الرقم الوظيفي.' });
+            } finally {
+                setIsGeneratingNumber(false);
+            }
+        };
+        
+        const fetchRefData = async () => {
+            setRefDataLoading(true);
+            try {
+                const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
+                const deptsSnapshot = await getDocs(deptsQuery);
+                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+            } catch (e) {
+                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب الأقسام.' });
+            } finally {
+                setRefDataLoading(false);
+            }
+        };
+
+        generateFileId();
+        fetchRefData();
+    }, [firestore, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -136,10 +148,10 @@ export default function NewEmployeePage() {
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
 
-    const handleSelectChange = (id: keyof Employee, value: any) => {
+    const handleSelectChange = (id: keyof Employee | 'departmentId', value: any) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
-    
+
     const handleDepartmentChange = useCallback(async (deptId: string) => {
         if (!deptId || !firestore) return;
 
@@ -156,6 +168,9 @@ export default function NewEmployeePage() {
             setJobsLoading(false);
         }
     }, [firestore, toast]);
+    
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
+    const jobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -287,48 +302,7 @@ export default function NewEmployeePage() {
             setIsLoading(false);
         }
     };
-
-
-    if (!isClient) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-1/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <CardContent className="space-y-8">
-                   <div className="space-y-4">
-                        <Skeleton className="h-6 w-1/5" />
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-                             <div className="md:col-span-1 flex flex-col items-center gap-2">
-                                <Skeleton className="h-32 w-32 rounded-full" />
-                                <Skeleton className="h-8 w-24" />
-                            </div>
-                            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Skeleton className="h-10" />
-                                <Skeleton className="h-10" />
-                                <Skeleton className="h-10" />
-                                <Skeleton className="h-10" />
-                            </div>
-                        </div>
-                   </div>
-                    <Separator />
-                     <div className="space-y-4">
-                        <Skeleton className="h-6 w-1/4" />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                           <Skeleton className="h-10" />
-                           <Skeleton className="h-10" />
-                           <Skeleton className="h-10" />
-                        </div>
-                    </div>
-                </CardContent>
-                 <CardFooter className="flex justify-end">
-                    <Skeleton className="h-10 w-28" />
-                </CardFooter>
-            </Card>
-        )
-    }
-
+    
     return (
         <Card dir="rtl">
             <form onSubmit={handleSubmit}>
@@ -433,35 +407,29 @@ export default function NewEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" value={formData.departmentId} onValueChange={handleDepartmentChange} disabled={refDataLoading}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="اختر القسم..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {departments.map(dept => (
-                                            <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList 
+                                    value={formData.departmentId || ''}
+                                    onSelect={handleDepartmentChange}
+                                    options={departmentOptions}
+                                    placeholder={refDataLoading ? "تحميل..." : "اختر القسم..."}
+                                    disabled={refDataLoading}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="jobTitle">الوظيفة <span className="text-destructive">*</span></Label>
-                                <Select dir="rtl" value={formData.jobTitle} onValueChange={(v) => handleSelectChange('jobTitle', v)} disabled={!formData.departmentId || jobsLoading || jobs.length === 0}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={
-                                            jobsLoading
-                                            ? "تحميل الوظائف..."
-                                            : !formData.departmentId
-                                                ? "اختر قسمًا أولاً"
-                                                : (jobs.length === 0 ? "لا توجد وظائف بهذا القسم" : "اختر الوظيفة...")
-                                        } />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {jobs.map(job => (
-                                            <SelectItem key={job.id} value={job.name}>{job.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <InlineSearchList
+                                    value={formData.jobTitle || ''}
+                                    onSelect={(v) => handleSelectChange('jobTitle', v)}
+                                    options={jobOptions}
+                                    placeholder={
+                                        jobsLoading 
+                                        ? "تحميل الوظائف..." 
+                                        : !formData.departmentId 
+                                            ? "اختر قسمًا أولاً" 
+                                            : (jobs.length === 0 ? "لا توجد وظائف بهذا القسم" : "اختر الوظيفة...")
+                                    }
+                                    disabled={!formData.departmentId || jobsLoading || jobs.length === 0}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="position">المنصب</Label>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -33,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -110,6 +110,10 @@ export default function NewOtherAppointmentPage() {
 
         return allOtherEngineers.filter(eng => eng.department === selectedDeptName);
     }, [selectedDepartment, allOtherEngineers, departments]);
+    
+    const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.fileId })), [clients]);
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
+    const engineerOptions = useMemo(() => filteredEngineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber })), [filteredEngineers]);
 
     const handleDepartmentChange = (deptId: string) => {
         setSelectedDepartment(deptId);
@@ -266,6 +270,8 @@ export default function NewOtherAppointmentPage() {
                 meetingRoom: meetingRoom,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
+                type: 'room',
+                department: departments.find(d => d.id === selectedDepartment)?.name,
             };
             
             await addDoc(collection(firestore, 'appointments'), newAppointment);
@@ -313,16 +319,13 @@ export default function NewOtherAppointmentPage() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="clientId">العميل <span className="text-destructive">*</span></Label>
-                            <Select dir="rtl" onValueChange={setClientId} value={clientId} required disabled={loading}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر العميل..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {clients.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>{c.nameAr}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <InlineSearchList 
+                                value={clientId}
+                                onSelect={setClientId}
+                                options={clientOptions}
+                                placeholder={loading ? "تحميل..." : "اختر العميل..."}
+                                disabled={loading}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="meetingRoom">قاعة الاجتماع <span className="text-destructive">*</span></Label>
@@ -341,33 +344,27 @@ export default function NewOtherAppointmentPage() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="department">القسم الهندسي <span className="text-destructive">*</span></Label>
-                             <Select dir="rtl" onValueChange={handleDepartmentChange} value={selectedDepartment} required disabled={loading}>
-                                <SelectTrigger id="department">
-                                    <SelectValue placeholder={loading ? "تحميل..." : "اختر القسم..."} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {departments.map(d => (
-                                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                             <InlineSearchList
+                                value={selectedDepartment}
+                                onSelect={handleDepartmentChange}
+                                options={departmentOptions}
+                                placeholder={loading ? "تحميل..." : "اختر القسم..."}
+                                disabled={loading}
+                             />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
-                             <Select dir="rtl" onValueChange={setEngineerId} value={engineerId} required disabled={loading || !selectedDepartment || filteredEngineers.length === 0}>
-                                <SelectTrigger id="engineerId">
-                                    <SelectValue placeholder={
-                                        !selectedDepartment 
-                                        ? "اختر قسمًا أولاً" 
-                                        : (filteredEngineers.length === 0 ? "لا يوجد مهندسين بهذا القسم" : "اختر المهندس...")
-                                        } />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {filteredEngineers.map(e => (
-                                        <SelectItem key={e.id!} value={e.id!}>{e.fullName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                             <InlineSearchList
+                                value={engineerId}
+                                onSelect={setEngineerId}
+                                options={engineerOptions}
+                                placeholder={
+                                    !selectedDepartment 
+                                    ? "اختر قسمًا أولاً" 
+                                    : (filteredEngineers.length === 0 ? "لا يوجد مهندسين بهذا القسم" : "اختر المهندس...")
+                                }
+                                disabled={loading || !selectedDepartment || filteredEngineers.length === 0}
+                             />
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

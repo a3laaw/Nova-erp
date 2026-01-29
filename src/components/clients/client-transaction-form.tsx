@@ -22,6 +22,7 @@ import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
     const [transactionTypes, setTransactionTypes] = useState<FetchedTransactionType[]>([]);
     const [typesLoading, setTypesLoading] = useState(true);
 
-    const [transactionType, setTransactionType] = useState('');
+    const [transactionTypeName, setTransactionTypeName] = useState('');
     const [description, setDescription] = useState('');
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -109,8 +110,16 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         fetchTransactionTypes();
     }, [firestore, isOpen, toast]);
 
+    const transactionTypeOptions = useMemo(() => 
+        transactionTypes.map(t => ({ value: t.name, label: t.name })), 
+    [transactionTypes]);
+
+    const engineerOptions = useMemo(() => 
+        engineers.map(e => ({ value: e.id!, label: e.fullName })), 
+    [engineers]);
+
     const resetForm = () => {
-        setTransactionType('');
+        setTransactionTypeName('');
         setDescription('');
         setAssignedEngineerId('');
     };
@@ -122,7 +131,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             return;
         }
 
-        if (!transactionType) {
+        if (!transactionTypeName) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار نوع المعاملة.' });
             return;
         }
@@ -136,10 +145,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             let engineerForTransactionId: string | null = assignedEngineerId || null;
 
-            const selectedType = transactionTypes.find(t => t.name === transactionType);
+            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
 
             // Special logic for "بلدية سكن خاص"
-            if (transactionType.includes('بلدية') && transactionType.includes('سكن خاص')) {
+            if (transactionTypeName.includes('بلدية') && transactionTypeName.includes('سكن خاص')) {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
                 if (clientSnap.exists()) {
@@ -158,7 +167,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
                 clientId,
-                transactionType,
+                transactionType: transactionTypeName,
                 description,
                 departmentId: selectedType?.parentDeptId,
                 transactionTypeId: selectedType?.id,
@@ -174,7 +183,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
             const logEventRef = doc(timelineCollectionRef);
             
-            let logContent = `أنشأ المعاملة "${transactionType}".`;
+            let logContent = `أنشأ المعاملة "${transactionTypeName}".`;
             if (engineer) {
                 logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
             }
@@ -207,8 +216,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 const isCreator = recipientId === currentUser.id;
                 const title = isCreator ? 'تم إنشاء معاملة بنجاح' : 'تم إسناد معاملة جديدة لك';
                 const body = isCreator 
-                    ? `لقد أنشأت المعاملة "${transactionType}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`
-                    : `أسند إليك ${currentUser.fullName} المعاملة "${transactionType}" للعميل ${clientName}.`;
+                    ? `لقد أنشأت المعاملة "${transactionTypeName}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`
+                    : `أسند إليك ${currentUser.fullName} المعاملة "${transactionTypeName}" للعميل ${clientName}.`;
                 
                 await createNotification(firestore, { userId: recipientId, title, body, link: `/dashboard/clients/${clientId}/transactions/${newTransactionRefId}` });
             }
@@ -237,21 +246,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
                             <Label htmlFor="transactionType">نوع المعاملة <span className="text-destructive">*</span></Label>
-                            <select
-                                id="transactionType"
-                                value={transactionType}
-                                onChange={(e) => setTransactionType(e.target.value)}
-                                className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50")}
-                                required
+                            <InlineSearchList 
+                                value={transactionTypeName}
+                                onSelect={setTransactionTypeName}
+                                options={transactionTypeOptions}
+                                placeholder={typesLoading ? 'جاري التحميل...' : 'اختر نوع المعاملة...'}
                                 disabled={typesLoading}
-                            >
-                                <option value="" disabled>{typesLoading ? 'جاري التحميل...' : 'اختر نوع المعاملة...'}</option>
-                                {transactionTypes.map(type => (
-                                    <option key={type.id} value={type.name}>{type.name}</option>
-                                ))}
-                            </select>
+                            />
                         </div>
-                        {transactionType.includes('بلدية') && transactionType.includes('سكن خاص') ? (
+                        {transactionTypeName.includes('بلدية') && transactionTypeName.includes('سكن خاص') ? (
                             <Alert>
                                 <Info className="h-4 w-4" />
                                 <AlertTitle>إسناد تلقائي</AlertTitle>
@@ -262,18 +265,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                         ) : (
                             <div className="grid gap-2">
                                 <Label htmlFor="assignedEngineerId">إسناد إلى مهندس (اختياري)</Label>
-                                <select
-                                    id="assignedEngineerId"
+                                <InlineSearchList
                                     value={assignedEngineerId}
-                                    onChange={(e) => setAssignedEngineerId(e.target.value)}
-                                    className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50")}
+                                    onSelect={setAssignedEngineerId}
+                                    options={engineerOptions}
+                                    placeholder={engineersLoading ? 'جاري التحميل...' : 'اختر مهندسًا...'}
                                     disabled={engineersLoading}
-                                >
-                                    <option value="">{engineersLoading ? 'جاري التحميل...' : 'اختر مهندسًا...'}</option>
-                                    {engineers.map(e => (
-                                        <option key={e.id} value={e.id!}>{e.fullName}</option>
-                                    ))}
-                                </select>
+                                />
                             </div>
                         )}
                         
