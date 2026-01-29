@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot, updateDoc } from 'firebase/firestore';
 import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction, TransactionStage } from '@/lib/types';
 import {
   Card,
@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil, UserPlus } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil, UserPlus, Link2 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -60,8 +60,6 @@ export default function AppointmentDetailsPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
-    const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
-    const transactionId = Array.isArray(params.id) ? params.id[0] : params.id;
 
 
     // Data states
@@ -79,6 +77,12 @@ export default function AppointmentDetailsPage() {
     const [isEditingStage, setIsEditingStage] = useState(false);
     const [minutesContent, setMinutesContent] = useState('');
     const [isSavingMinutes, setIsSavingMinutes] = useState(false);
+
+    // For manual linking
+    const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
+    const [selectedTransactionToLink, setSelectedTransactionToLink] = useState('');
+    const [isLinking, setIsLinking] = useState(false);
+
 
     // Fetch main appointment data
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
@@ -106,43 +110,36 @@ export default function AppointmentDetailsPage() {
         const fetchRelatedData = async () => {
             setLoading(true);
             try {
-                const promises: Promise<any>[] = [];
-
-                // Conditionally fetch client only if clientId exists
                 if (appointment.clientId) {
                     const clientRef = doc(firestore, 'clients', appointment.clientId);
-                    promises.push(getDoc(clientRef));
-                } else {
-                    promises.push(Promise.resolve(null)); // Placeholder if no clientId
+                    const clientSnap = await getDoc(clientRef);
+                    if (clientSnap.exists()) {
+                        setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
+                    }
                 }
 
-                // Always fetch engineer
                 if (appointment.engineerId) {
                     const engineerRef = doc(firestore, 'employees', appointment.engineerId);
-                    promises.push(getDoc(engineerRef));
-                } else {
-                    promises.push(Promise.resolve(null));
+                    const engineerSnap = await getDoc(engineerRef);
+                    if (engineerSnap.exists()) {
+                        setEngineer(engineerSnap.data() as Employee);
+                    }
                 }
 
-                const [clientSnap, engineerSnap] = await Promise.all(promises);
-
-                if (clientSnap && clientSnap.exists()) {
-                    setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
-                } else {
-                    setClient(null);
-                }
-
-                if (engineerSnap && engineerSnap.exists()) {
-                    setEngineer(engineerSnap.data() as Employee);
-                }
-
-                // Fetch the transaction to get stage progress
+                // If transaction is already linked, fetch it.
                 if (appointment.transactionId && appointment.clientId) {
                     const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
                     const transactionSnap = await getDoc(transactionRef);
                     if (transactionSnap.exists()) {
                         setTransaction(transactionSnap.data() as ClientTransaction);
                     }
+                    setClientTransactions([]); // Clear other transactions since one is linked
+                } 
+                // If no transaction is linked but there is a client, fetch all transactions for linking.
+                else if (appointment.clientId) {
+                    const transQuery = query(collection(firestore, `clients/${appointment.clientId}/transactions`));
+                    const transSnap = await getDocs(transQuery);
+                    setClientTransactions(transSnap.docs.map(d => ({id: d.id, ...d.data()} as ClientTransaction)));
                 }
 
                 // Fetch architectural department work stages
@@ -157,7 +154,7 @@ export default function AppointmentDetailsPage() {
 
             } catch (error) {
                 console.error("Error fetching related data:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل بيانات العميل أو المهندس.' });
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل البيانات المرتبطة بالموعد.' });
             } finally {
                 setLoading(false);
             }
@@ -217,6 +214,47 @@ export default function AppointmentDetailsPage() {
             .map(stage => ({ value: stage.id!, label: stage.name }));
             
     }, [workStages, transaction, currentUser, isEditingStage, progressDoc]);
+    
+    const handleLinkTransaction = async () => {
+        if (!firestore || !currentUser || !appointment || !selectedTransactionToLink) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار معاملة لربطها.' });
+            return;
+        }
+
+        setIsLinking(true);
+        try {
+            const batch = writeBatch(firestore);
+            const apptRef = doc(firestore, 'appointments', appointment.id);
+            batch.update(apptRef, { transactionId: selectedTransactionToLink });
+
+            // Log the event
+            const selectedTx = clientTransactions.find(tx => tx.id === selectedTransactionToLink);
+            const logContent = `قام ${currentUser.fullName} بربط هذا الموعد بالمعاملة: "${selectedTx?.transactionType || 'غير معروف'}".`;
+            const logData = {
+                type: 'log',
+                content: logContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            };
+
+            const timelineRef = doc(collection(firestore, `clients/${appointment.clientId}/transactions/${selectedTransactionToLink}/timelineEvents`));
+            batch.set(timelineRef, logData);
+
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم ربط الموعد بالمعاملة.' });
+            
+            // Optimistically update local state to refresh UI
+            setAppointment(prev => prev ? { ...prev, transactionId: selectedTransactionToLink } : null);
+
+        } catch (error) {
+            console.error("Error linking transaction:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل ربط المعاملة.' });
+        } finally {
+            setIsLinking(false);
+        }
+    };
 
 
     const handleUpdateStage = async () => {
@@ -568,6 +606,30 @@ export default function AppointmentDetailsPage() {
                 </CardContent>
             </Card>
 
+            {client && !appointment.transactionId && clientTransactions.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>ربط بمعاملة</CardTitle>
+                        <CardDescription>هذا الموعد غير مرتبط بأي معاملة. اختر معاملة لربطه بها.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-end gap-4">
+                        <div className="grid gap-2 flex-grow">
+                            <Label htmlFor="link-transaction">اختر معاملة</Label>
+                            <InlineSearchList 
+                                value={selectedTransactionToLink}
+                                onSelect={setSelectedTransactionToLink}
+                                options={clientTransactions.map(tx => ({ value: tx.id!, label: tx.transactionType }))}
+                                placeholder="اختر من معاملات العميل..."
+                            />
+                        </div>
+                        <Button onClick={handleLinkTransaction} disabled={isLinking || !selectedTransactionToLink}>
+                            {isLinking ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Link2 className="ml-2 h-4 w-4"/>}
+                            ربط
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
             <Card>
                 <CardHeader>
                     <CardTitle>إجراءات الزيارة</CardTitle>
@@ -578,7 +640,7 @@ export default function AppointmentDetailsPage() {
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>زيارة غير مرتبطة بمعاملة</AlertTitle>
                             <AlertDescription>
-                                لا يمكن تحديث مرحلة العمل لأن هذه الزيارة غير مرتبطة بأي معاملة. الرجاء تعديل الموعد وربطه بمعاملة أولاً.
+                                لا يمكن تحديث مرحلة العمل لأن هذه الزيارة غير مرتبطة بأي معاملة. الرجاء ربطها بمعاملة أولاً.
                             </AlertDescription>
                         </Alert>
                     ) : !appointment.workStageUpdated || (isEditingStage && currentUser?.role === 'Admin') ? (
