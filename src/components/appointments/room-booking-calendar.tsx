@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -195,48 +194,9 @@ export function RoomBookingCalendar() {
         setIsDialogOpen(true);
     };
 
-    const handleSaveBooking = async (formData: any) => {
-        if (!firestore) return;
-
-        const isEditing = !!formData.id;
-        
-        try {
-            const dataToSave: any = {
-                clientId: formData.clientId,
-                clientName: formData.clientName,
-                clientMobile: formData.clientMobile,
-                engineerId: formData.engineerId,
-                title: formData.title,
-                notes: formData.notes || '',
-                meetingRoom: formData.room,
-                department: formData.department,
-                appointmentDate: Timestamp.fromDate(formData.appointmentDate),
-                type: 'room',
-            };
-
-            if (!dataToSave.clientId) delete dataToSave.clientId;
-            
-            if(!isEditing) {
-                dataToSave.createdAt = serverTimestamp();
-            }
-
-            if(isEditing) {
-                const appointmentRef = doc(firestore, 'appointments', formData.id);
-                await updateDoc(appointmentRef, dataToSave);
-                toast({ title: "تم التعديل بنجاح!" });
-            } else {
-                await addDoc(collection(firestore, 'appointments'), dataToSave);
-                toast({ title: "تم الحجز بنجاح!" });
-            }
-            
-            setIsDialogOpen(false);
-            if (date) {
-                await fetchData(date);
-            }
-
-        } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الموعد.' });
+    const handleSaveBooking = async () => {
+        if (date) {
+            await fetchData(date);
         }
     };
     
@@ -464,7 +424,7 @@ export function RoomBookingCalendar() {
                 <BookingDialog 
                     isOpen={isDialogOpen}
                     onClose={() => setIsDialogOpen(false)}
-                    onSave={handleSaveBooking}
+                    onSaveSuccess={handleSaveBooking}
                     dialogData={dialogData}
                     clients={clients}
                     engineers={engineers}
@@ -494,7 +454,7 @@ export function RoomBookingCalendar() {
 
 // --- Booking Dialog Component ---
 
-function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore }: any) {
     const { toast } = useToast();
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
@@ -540,108 +500,109 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        let finalClientId: string | undefined = formData.clientId;
-        let finalClientName: string | undefined = formData.clientName;
-        let finalClientMobile: string | undefined = formData.clientMobile;
-        
-        if (isNewClient) {
-            if (!formData.clientName || !formData.clientMobile) {
-                toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة اسم وجوال العميل الجديد.' });
-                return;
-            }
-            finalClientId = undefined;
-        } else {
-             if (!formData.clientId) {
-                toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار عميل مسجل.' });
-                return;
-            }
-            finalClientName = undefined;
-            finalClientMobile = undefined;
+        // Basic validation
+        if (isNewClient && (!formData.clientName || !formData.clientMobile)) {
+            toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة اسم وجوال العميل الجديد.' });
+            return;
         }
-        
+        if (!isNewClient && !formData.clientId) {
+            toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار عميل مسجل.' });
+            return;
+        }
         if (!formData.department || !formData.engineerId) {
             toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار القسم والمهندس المسؤول.' });
             return;
         }
-        
+
         setIsSaving(true);
         
         try {
-            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-
-            if (isPast(appointmentDateTime) && !isEditing) {
-                toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن حجز موعد في وقت قد مضى.'});
-                setIsSaving(false); return;
+            // Check for existing mobile for new clients
+            if (isNewClient) {
+                const clientsRef = collection(firestore, 'clients');
+                const q = query(clientsRef, where('mobile', '==', formData.clientMobile));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`);
+                }
             }
-            
+
+            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
+            if (isPast(appointmentDateTime) && !isEditing) {
+                throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
+            }
+
+            // Conflict validation
             const appointmentsRef = collection(firestore, 'appointments');
             const dayStart = startOfDay(appointmentDateTime);
             const dayEnd = endOfDay(appointmentDateTime);
-
             const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
             const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
             const latestDayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
-
-            // --- Conflict Validation ---
             const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
             
-            // Check room conflict
             const roomHasConflict = latestDayAppointments.some((appt: any) => {
                 if (isEditing && appt.id === dialogData.id) return false;
-                const apptDate = appt.appointmentDate.toDate();
-                return appt.meetingRoom === roomName && apptDate >= windowStart && apptDate <= windowEnd;
+                return appt.meetingRoom === roomName && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
             });
-            if (roomHasConflict) {
-                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'قاعة الاجتماعات محجوزة في هذا الوقت.' });
-                setIsSaving(false); return;
-            }
+            if (roomHasConflict) throw new Error('قاعة الاجتماعات محجوزة في هذا الوقت.');
 
-            // Check engineer conflict
             if (formData.engineerId) {
                 const engineerHasConflict = latestDayAppointments.some((appt: any) => {
                     if (isEditing && appt.id === dialogData.id) return false;
-                    const apptDate = appt.appointmentDate.toDate();
-                    return appt.engineerId === formData.engineerId && apptDate >= windowStart && apptDate <= windowEnd;
+                    return appt.engineerId === formData.engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
                 });
-                if (engineerHasConflict) {
-                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'المهندس لديه موعد آخر في نفس الوقت.' });
-                    setIsSaving(false); return;
-                }
+                if (engineerHasConflict) throw new Error('المهندس لديه موعد آخر في نفس الوقت.');
             }
             
-            // Check client conflict
             const checkClientId = isNewClient ? null : formData.clientId;
             if (checkClientId) {
                 const clientHasConflict = latestDayAppointments.some((appt: any) => {
                     if (isEditing && appt.id === dialogData.id) return false;
-                    const apptDate = appt.appointmentDate.toDate();
-                    return appt.clientId === checkClientId && apptDate >= windowStart && apptDate <= windowEnd;
+                    return appt.clientId === checkClientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
                 });
-                if (clientHasConflict) {
-                    toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
-                    setIsSaving(false); return;
-                }
+                if (clientHasConflict) throw new Error('العميل لديه موعد آخر في نفس الوقت.');
             }
+            
+            // Prepare data for saving
+            const dataToSave: any = {
+                clientId: isNewClient ? undefined : formData.clientId,
+                clientName: isNewClient ? formData.clientName : undefined,
+                clientMobile: isNewClient ? formData.clientMobile : undefined,
+                engineerId: formData.engineerId,
+                title: formData.title,
+                notes: formData.notes || '',
+                meetingRoom: roomName,
+                department: formData.department,
+                appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                type: 'room',
+            };
+            if (!dataToSave.clientId) delete dataToSave.clientId;
 
-            await onSave({ 
-                ...formData, 
-                clientId: finalClientId,
-                clientName: finalClientName,
-                clientMobile: finalClientMobile,
-                id: dialogData.id,
-                room: roomName,
-                appointmentDate: appointmentDateTime,
-            });
-            setIsSaving(false);
+            if (isEditing) {
+                const appointmentRef = doc(firestore, 'appointments', dialogData.id);
+                await updateDoc(appointmentRef, dataToSave);
+                toast({ title: "تم التعديل بنجاح!" });
+            } else {
+                dataToSave.createdAt = serverTimestamp();
+                await addDoc(collection(firestore, 'appointments'), dataToSave);
+                toast({ title: "تم الحجز بنجاح!" });
+            }
+            
+            onClose();
+            onSaveSuccess();
+
         } catch (error) {
              console.error("Error during save:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'حدث خطأ أثناء التحقق من المواعيد أو حفظها.' });
+             const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
+             toast({ variant: 'destructive', title: 'خطأ', description: message });
+        } finally {
             setIsSaving(false);
         }
     };
-
+    
     const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
     const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id!, label: e.fullName, searchKey: e.civilId })), [engineers]);
     const departmentOptionsForSelect = useMemo(() => departmentOptions.map(d => ({ value: d, label: d, searchKey: d })), []);
@@ -720,4 +681,3 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         </Dialog>
     );
 }
-    

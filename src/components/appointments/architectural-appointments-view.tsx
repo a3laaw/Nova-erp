@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -177,6 +176,8 @@ export function ArchitecturalAppointmentsView() {
             engineerId: appointment.engineerId,
             engineerName: engineers.find(e => e.id === appointment.engineerId)?.fullName,
             clientId: appointment.clientId,
+            clientName: appointment.clientName,
+            clientMobile: appointment.clientMobile,
             appointmentDate: appointment.appointmentDate.toDate(),
             title: appointment.title,
             transactionId: appointment.transactionId,
@@ -577,6 +578,22 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال اسم وجوال العميل الجديد.' });
                     setIsSaving(false); return;
                 }
+                 // Check for existing mobile number before proceeding
+                const clientsRef = collection(firestore, 'clients');
+                const q = query(clientsRef, where('mobile', '==', newClientMobile));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const existingClient = querySnapshot.docs[0].data();
+                    toast({
+                        variant: 'destructive',
+                        title: 'عميل موجود بالفعل',
+                        description: `رقم الجوال هذا مسجل بالفعل للعميل: ${existingClient.nameAr}. الرجاء اختيار العميل من القائمة.`,
+                    });
+                    setIsSaving(false);
+                    return;
+                }
+
                 const newAppointmentData = {
                     title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile,
                     engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime),
