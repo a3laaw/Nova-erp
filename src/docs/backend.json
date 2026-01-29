@@ -35,6 +35,11 @@
             "type": "string",
             "format": "uri",
             "description": "URL to the company's logo."
+        },
+        "letterhead_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the company's full letterhead image."
         }
       },
       "required": ["company_name"]
