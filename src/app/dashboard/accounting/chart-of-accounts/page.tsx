@@ -545,7 +545,7 @@ export default function ChartOfAccountsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            تحذير: سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** في قاعدة البيانات واستبدالها بشجرة حسابات أساسية. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟
+                           **تحذير خطير:** سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** في قاعدة البيانات واستبدالها بشجرة حسابات أساسية. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
