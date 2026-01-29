@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -19,9 +20,10 @@ export default function FinancialStatementNotesPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg">
+        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg bg-muted/50">
           <FileText className="w-16 h-16 text-muted-foreground" />
           <p className="mt-4 text-muted-foreground">هذه الميزة قيد التطوير حاليًا.</p>
+          <p className="mt-1 text-xs text-muted-foreground">سيتم إضافة محرر لإدارة الإيضاحات هنا قريبًا.</p>
         </div>
       </CardContent>
     </Card>
