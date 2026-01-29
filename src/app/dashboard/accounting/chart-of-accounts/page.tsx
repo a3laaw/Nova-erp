@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -60,8 +59,78 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
-import { defaultChartOfAccounts } from '@/lib/default-coa';
 
+
+const defaultChartOfAccounts: Omit<Account, 'id'>[] = [
+  // --- الأصول (1) ---
+  { code: '1', name: 'الأصول', parentCode: null, isPayable: false, level: 0, description: '', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '11', name: 'أصول متداولة', parentCode: '1', isPayable: false, level: 1, description: '', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '1101', name: 'النقد وما يعادله', parentCode: '11', isPayable: false, level: 2, description: 'النقدية وما في حكمها (في الخزينة والعهد)', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '110101', name: 'النقدية في الخزينة', parentCode: '1101', isPayable: true, level: 3, description: 'النقدية في الخزينة', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '110102', name: 'العهد النقدية', parentCode: '1101', isPayable: true, level: 3, description: 'العهد النقدية للموظفين بشكل مؤقت أو دائم لدفع مصروفات المنشأة', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '1102', name: 'النقدية في البنك', parentCode: '11', isPayable: false, level: 2, description: 'النقدية في البنوك', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '110201', name: 'حساب البنك الجاري - اسم البنك', parentCode: '1102', isPayable: true, level: 3, description: 'حساب البنك الجاري - اسم البنك', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '1103', name: 'العملاء', parentCode: '11', isPayable: true, level: 2, description: 'مبالغ مستحقة على حساب العملاء (بالأجل)', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '1104', name: 'مصروفات مقدمة', parentCode: '11', isPayable: false, level: 2, description: 'مصروف مدفوع مقدماً مثل التأمين وسلف الموظفين وإيجار المكتب', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '110401', name: 'تأمين طبي مقدم', parentCode: '1104', isPayable: true, level: 3, description: 'تأمين طبي مدفوع مقدماً يتم إطفاء ما يخص السنة المالية إلى مصروف', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12', name: 'أصول غير متداولة', parentCode: '1', isPayable: false, level: 1, description: '', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '121', name: 'الأصول الثابتة', parentCode: '12', isPayable: false, level: 2, description: '', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12101', name: 'الأصول الثابتة - المباني', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - المباني', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12102', name: 'الأصول الثابتة - المعدات', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - المعدات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12103', name: 'الأصول الثابتة - الأجهزة المكتبية والطابعات', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - الأجهزة المكتبية والطابعات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12104', name: 'الأصول الثابتة - الأثاث والتجهيزات', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - الأثاث والتجهيزات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12105', name: 'الأصول الثابتة - السيارات', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - السيارات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12106', name: 'الأصول الثابتة - الآلات', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - الآلات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12107', name: 'الأصول الثابتة - أخرى', parentCode: '121', isPayable: false, level: 3, description: 'الأصول الثابتة - أخرى', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '122', name: 'إهلاك الأصول الثابتة المتراكم', parentCode: '12', isPayable: false, level: 2, description: 'إهلاك الأصول الثابتة المتراكم', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12201', name: 'إهلاك متراكم المباني', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم المباني', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12202', name: 'إهلاك متراكم المعدات', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم المعدات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12203', name: 'إهلاك متراكم أجهزة مكتبية وطابعات', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم أجهزة مكتبية وطابعات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12204', name: 'إهلاك متراكم الأثاث والتجهيزات', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم الأثاث والتجهيزات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12205', name: 'إهلاك متراكم السيارات', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم السيارات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12206', name: 'إهلاك متراكم الآلات', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم الآلات', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '12207', name: 'إهلاك متراكم أخرى', parentCode: '122', isPayable: false, level: 3, description: 'إهلاك متراكم أخرى', type: 'asset', statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '2', name: 'الخصوم', parentCode: null, isPayable: false, level: 0, description: '', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '21', name: 'الخصوم المتداولة', parentCode: '2', isPayable: false, level: 1, description: '', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '2101', name: 'الموردون', parentCode: '21', isPayable: true, level: 2, description: 'المبالغ المستحقة للدفع للموردين', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '2102', name: 'أوراق دفع', parentCode: '21', isPayable: true, level: 2, description: 'الشيكات المستحقة الدفع', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '2103', name: 'إيرادات غير مكتسبة', parentCode: '21', isPayable: true, level: 2, description: 'مبالغ مستلمة من العملاء مقدماً قبل تقديم الخدمة', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '2104', name: 'مصاريف مستحقة', parentCode: '21', isPayable: false, level: 2, description: 'مصروفات تخص الفترة المالية الحالية ولكن لم يتم سدادها بعد', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '210401', name: 'رواتب مستحقة', parentCode: '2104', isPayable: true, level: 3, description: 'رواتب الموظفين المستحقة عن الفترة', type: 'liability', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '3', name: 'حقوق الملكية', parentCode: null, isPayable: false, level: 0, description: '', type: 'equity', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '31', name: 'رأس المال', parentCode: '3', isPayable: false, level: 1, description: '', type: 'equity', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '3101', name: 'رأس المال المدفوع', parentCode: '31', isPayable: true, level: 2, description: '', type: 'equity', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '32', name: 'جاري الشركاء', parentCode: '3', isPayable: true, level: 1, description: 'حسابات الشركاء الشخصية مع الشركة', type: 'equity', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '33', name: 'أرباح مبقاة / خسائر مدورة', parentCode: '3', isPayable: true, level: 1, description: '', type: 'equity', statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '4', name: 'الإيرادات', parentCode: null, isPayable: false, level: 0, description: '', type: 'income', statement: 'Income Statement', balanceType: 'Credit' },
+  { code: '41', name: 'إيرادات النشاط التشغيلي', parentCode: '4', isPayable: false, level: 1, description: '', type: 'income', statement: 'Income Statement', balanceType: 'Credit' },
+  { code: '4101', name: 'إيرادات استشارات هندسية', parentCode: '41', isPayable: true, level: 2, description: 'إيرادات من تقديم استشارات هندسية', type: 'income', statement: 'Income Statement', balanceType: 'Credit' },
+  { code: '4102', name: 'إيرادات تصميم', parentCode: '41', isPayable: true, level: 2, description: 'إيرادات من أعمال التصميم', type: 'income', statement: 'Income Statement', balanceType: 'Credit' },
+  { code: '4103', name: 'إيرادات إشراف', parentCode: '41', isPayable: true, level: 2, description: 'إيرادات من الإشراف على المشاريع', type: 'income', statement: 'Income Statement', balanceType: 'Credit' },
+  { code: '5', name: 'المصروفات', parentCode: null, isPayable: false, level: 0, description: '', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '51', name: 'تكلفة الإيرادات', parentCode: '5', isPayable: false, level: 1, description: '', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5101', name: 'رواتب المهندسين والفنيين', parentCode: '51', isPayable: true, level: 2, description: 'رواتب الفريق الهندسي والفني المباشر على المشاريع', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5102', name: 'تكاليف استشاريين من الباطن', parentCode: '51', isPayable: true, level: 2, description: 'تكاليف الاستعانة باستشاريين خارجيين للمشاريع', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5103', name: 'مواد مباشرة للمشاريع', parentCode: '51', isPayable: true, level: 2, description: 'تكاليف المواد المستخدمة مباشرة في المشاريع', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '52', name: 'مصاريف عمومية وإدارية', parentCode: '5', isPayable: false, level: 1, description: '', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5201', name: 'رواتب وأجور الموظفين', parentCode: '52', isPayable: true, level: 2, description: 'رواتب موظفي الإدارة والمحاسبة والموارد البشرية', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5202', name: 'مصاريف تسويق ومبيعات', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف متعلقة بالتسويق والإعلان', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5203', name: 'إيجارات', parentCode: '52', isPayable: true, level: 2, description: 'مصروف إيجار المكتب', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5204', name: 'فواتير كهرباء وماء واتصالات', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف الخدمات العامة للمكتب', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5205', name: 'تراخيص واشتراكات حكومية', parentCode: '52', isPayable: true, level: 2, description: 'رسوم التراخيص والاشتراكات الحكومية', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5206', name: 'مصروفات بنكية', parentCode: '52', isPayable: true, level: 2, description: 'الرسوم والمصاريف البنكية', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5207', name: 'صيانة وإصلاحات', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف صيانة المكتب والمعدات', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5208', name: 'نثريات ومصاريف متنوعة', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف صغيرة ومتفرقة', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5209', name: 'وقود وزيوت سيارات', parentCode: '52', isPayable: true, level: 2, description: 'مصروف وقود وزيوت سيارات الشركة', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5210', name: 'ضيافة وبوفيه', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف الضيافة والبوفيه للمكتب', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5211', name: 'أدوات مكتبية ومطبوعات', parentCode: '52', isPayable: true, level: 2, description: 'تكاليف الأدوات المكتبية والورق والأحبار', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5212', name: 'اشتراكات برامج وتطبيقات', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف الاشتراكات في البرامج السحابية والتطبيقات', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5213', name: 'رسوم التأمينات الاجتماعية', parentCode: '52', isPayable: true, level: 2, description: 'حصة الشركة في التأمينات الاجتماعية', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5214', name: 'صيانة سيارات الشركة', parentCode: '52', isPayable: true, level: 2, description: 'مصاريف الصيانة الدورية وإصلاح السيارات', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '5215', name: 'مصاريف الإهلاك', parentCode: '52', isPayable: false, level: 2, description: 'إهلاك الأصول الثابتة', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '521501', name: 'مصروف إهلاك المباني', parentCode: '5215', isPayable: false, level: 3, description: 'قسط الإهلاك السنوي للمباني', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+  { code: '521502', name: 'مصروف إهلاك المعدات', parentCode: '5215', isPayable: false, level: 3, description: 'قسط الإهلاك السنوي للمعدات', type: 'expense', statement: 'Income Statement', balanceType: 'Debit' },
+];
 
 const accountTypeTranslations: Record<Account['type'], string> = {
     asset: 'أصل',
@@ -78,6 +147,16 @@ const accountTypeColors: Record<Account['type'], string> = {
     income: 'bg-green-100 text-green-800 border-green-200',
     expense: 'bg-orange-100 text-orange-800 border-orange-200',
 };
+
+const getTypeFromCode = (code: string): Account['type'] => {
+    if (code.startsWith('1')) return 'asset';
+    if (code.startsWith('2')) return 'liability';
+    if (code.startsWith('3')) return 'equity';
+    if (code.startsWith('4')) return 'income';
+    if (code.startsWith('5')) return 'expense';
+    return 'asset'; // Default
+};
+
 
 const getStatementType = (code: string): Account['statement'] => {
     if (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) return 'Balance Sheet';
@@ -101,14 +180,15 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
             } else {
                 let nextCode = '';
                 let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
+                const level = parentAccount !== null ? (parentAccount.level || 0) + 1 : 0;
 
                 const relevantAccounts = parentAccount
                     ? accounts.filter(acc => acc.parentCode === parentAccount.code)
-                    : accounts.filter(acc => !acc.parentCode);
+                    : accounts.filter(acc => acc.level === 0);
                 
                 if (relevantAccounts.length === 0) {
                      if (parentAccount) {
-                         nextCode = parentAccount.code + (parentAccount.code.length === 1 ? '1' : '01');
+                         nextCode = parentAccount.code + (level < 3 ? '1' : '01');
                      } else {
                          const maxRootCode = Math.max(0, ...accounts.filter(a => a.level === 0).map(a => parseInt(a.code, 10)));
                          nextCode = String(maxRootCode + 1);
@@ -127,9 +207,10 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         e.preventDefault();
         const code = formData.code || '';
         const level = parentAccount !== null ? (parentAccount.level || 0) + 1 : 0;
+        const type = parentAccount ? parentAccount.type : getTypeFromCode(code);
         const statement = getStatementType(code);
         const balanceType = getBalanceType(code);
-        onSave({ ...formData, level, statement, balanceType, parentCode: parentAccount?.code || null });
+        onSave({ ...formData, level, type, statement, balanceType, parentCode: parentAccount?.code || null });
     };
 
     return (
@@ -163,7 +244,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                         </div>
                          <div className="flex items-center space-x-2">
                            <input type="checkbox" id="isPayable" checked={!!formData.isPayable} onChange={(e) => setFormData(p => ({...p, isPayable: e.target.checked}))} className="h-4 w-4" />
-                           <Label htmlFor="isPayable">حساب قابل للتحصيل والدفع</Label>
+                           <Label htmlFor="isPayable">حساب قابل للدفع والتحصيل</Label>
                         </div>
                     </div>
                     <DialogFooter>
@@ -278,10 +359,10 @@ export default function ChartOfAccountsPage() {
         });
 
         const getChildren = (code: string): Account[] => {
-            return (childrenMap.get(code) || []).sort((a, b) => a.code.localeCompare(b.code));
+            return (childrenMap.get(code) || []).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
         };
         
-        const roots = accounts.filter(a => a.level === 0).sort((a,b) => a.code.localeCompare(b.code));
+        const roots = accounts.filter(a => a.level === 0).sort((a,b) => (a.code || '').localeCompare(b.code || ''));
         
         const finalDisplayedList: Account[] = [];
         
