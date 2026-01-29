@@ -18,10 +18,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DownloadCloud, MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, Plus, Minus, RefreshCw, FolderOpen, Folder } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, Plus, Minus, FolderOpen, Folder } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where, orderBy, doc, addDoc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, where, orderBy, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -37,7 +37,6 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
-import { hardcodedChartOfAccounts } from '@/lib/chart-of-accounts-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -186,12 +185,6 @@ export default function ChartOfAccountsPage() {
     const [loading, setLoading] = useState(true);
     const [accountBalances, setAccountBalances] = useState<Map<string, number>>(new Map());
 
-    // Seeding state
-    const [isSeeding, setIsSeeding] = useState(false);
-    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
-
-
     // Form and Dialog state
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -301,118 +294,6 @@ export default function ChartOfAccountsPage() {
         });
     };
 
-    const handleSeedChartOfAccounts = async () => {
-        setIsSeedAlertOpen(false);
-        if (!firestore) return;
-        setIsSeeding(true);
-        try {
-            const batch = writeBatch(firestore);
-            const accountsRef = collection(firestore, 'chartOfAccounts');
-            
-            const existingAccountsSnap = await getDocs(accountsRef);
-            existingAccountsSnap.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-
-            hardcodedChartOfAccounts.forEach(account => {
-                const docRef = doc(accountsRef);
-                batch.set(docRef, account);
-            });
-
-            await batch.commit();
-            toast({ title: 'نجاح', description: 'تم مسح الشجرة القديمة وتثبيت شجرة الحسابات الأساسية بنجاح.' });
-            await fetchAllData();
-        } catch (e) {
-            console.error(e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تثبيت شجرة الحسابات.' });
-        } finally {
-            setIsSeeding(false);
-        }
-    };
-    
-    const handleSyncClients = async () => {
-        if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
-            return;
-        }
-        setIsSyncing(true);
-        toast({ title: 'جاري المزامنة...', description: 'يتم البحث عن عملاء العقود لإضافتهم إلى شجرة الحسابات.' });
-
-        try {
-            const batch = writeBatch(firestore);
-            let newClientsSynced = 0;
-
-            // 1. Get all contracted clients
-            const clientsQuery = query(collection(firestore, 'clients'), where('status', 'in', ['contracted', 'reContracted']));
-            const clientsSnap = await getDocs(clientsQuery);
-            const contractedClients = clientsSnap.docs.map(doc => doc.data() as { nameAr: string });
-
-            if (contractedClients.length === 0) {
-                toast({ title: 'لا يوجد عملاء للمزامنة', description: 'لم يتم العثور على عملاء لديهم عقود حاليًا.' });
-                setIsSyncing(false);
-                return;
-            }
-
-            // 2. Get existing accounts and parent account info
-            const accountsQuery = query(collection(firestore, 'chartOfAccounts'));
-            const accountsSnap = await getDocs(accountsQuery);
-            const existingAccounts = accountsSnap.docs.map(doc => doc.data() as Account);
-            const existingAccountNames = new Set(existingAccounts.map(acc => acc.name));
-
-            const parentAccount = existingAccounts.find(acc => acc.code === '1102'); // "العملاء"
-            if (!parentAccount) {
-                throw new Error("لم يتم العثور على حساب 'العملاء' الرئيسي (رمز 1102). الرجاء تثبيت شجرة الحسابات الأساسية أولاً.");
-            }
-
-            // 3. Get the client counter
-            const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
-            const coaClientCounterDoc = await getDoc(coaClientCounterRef);
-            let lastClientCodeNumber = coaClientCounterDoc.exists() ? coaClientCounterDoc.data()!.lastNumber || 0 : 0;
-
-            // 4. Iterate and create new accounts if they don't exist
-            for (const client of contractedClients) {
-                if (!existingAccountNames.has(client.nameAr)) {
-                    lastClientCodeNumber++;
-                    newClientsSynced++;
-
-                    const newAccountData: Omit<Account, 'id'> = {
-                        name: client.nameAr,
-                        code: `${parentAccount.code}${String(lastClientCodeNumber).padStart(3, '0')}`,
-                        type: 'asset',
-                        level: parentAccount.level + 1,
-                        parentCode: parentAccount.code,
-                        isPayable: true,
-                        statement: 'Balance Sheet',
-                        balanceType: 'Debit',
-                    };
-                    
-                    const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
-                    batch.set(newAccountRef, newAccountData);
-                }
-            }
-
-            if (newClientsSynced > 0) {
-                // 5. Update the counter if new clients were added
-                batch.set(coaClientCounterRef, { lastNumber: lastClientCodeNumber }, { merge: true });
-                
-                // 6. Commit the batch
-                await batch.commit();
-                toast({ title: 'نجاح المزامنة', description: `تمت إضافة ${newClientsSynced} عميل جديد إلى شجرة الحسابات.` });
-                await fetchAllData(); // Refresh the list
-            } else {
-                toast({ title: 'لا توجد تغييرات', description: 'جميع عملاء العقود موجودون بالفعل في شجرة الحسابات.' });
-            }
-
-        } catch (error) {
-            console.error("Error syncing contract clients:", error);
-            const errorMessage = error instanceof Error ? error.message : 'فشل في مزامنة العملاء.';
-            toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-
     const handleAddClick = () => {
         setEditingAccount(null);
         setParentAccount(null);
@@ -486,18 +367,10 @@ export default function ChartOfAccountsPage() {
                         <div>
                             <CardTitle>شجرة الحسابات</CardTitle>
                             <CardDescription>
-                                عرض دليل الحسابات الخاص بالشركة. يمكنك تنزيل الشجرة الأساسية للبدء.
+                                عرض دليل الحسابات الخاص بالشركة.
                             </CardDescription>
                         </div>
                          <div className="flex gap-2">
-                             <Button onClick={handleSyncClients} variant="secondary" disabled={isSyncing}>
-                                {isSyncing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <RefreshCw className="ml-2 h-4 w-4" />}
-                                {isSyncing ? 'جاري المزامنة...' : 'مزامنة عملاء العقود'}
-                            </Button>
-                             <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
-                                {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                                {isSeeding ? 'جاري التثبيت...' : 'تثبيت شجرة الحسابات الأساسية'}
-                            </Button>
                             <Button onClick={handleAddClick}><PlusCircle className="ml-2 h-4 w-4" /> إضافة حساب رئيسي</Button>
                         </div>
                     </div>
@@ -524,7 +397,7 @@ export default function ChartOfAccountsPage() {
                                 ) : displayedAccounts.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={7} className="text-center h-48 text-muted-foreground">
-                                            لا توجد حسابات. قم بتثبيت شجرة الحسابات الأساسية للبدء.
+                                            لا توجد حسابات. قم بإضافة حساب رئيسي للبدء.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -546,7 +419,7 @@ export default function ChartOfAccountsPage() {
                                                     <div className="flex items-center gap-2 group">
                                                         {hasChildren ? (
                                                              <button onClick={(e) => { e.stopPropagation(); toggleAccount(account.code); }} className="p-1 -mr-1">
-                                                                {isOpen ? <Minus className="h-4 w-4 text-primary" /> : <Plus className="h-4 w-4 text-muted-foreground" />}
+                                                                {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
                                                              </button>
                                                         ) : (
                                                             <span className="w-6 h-4 inline-block"></span>
@@ -604,23 +477,6 @@ export default function ChartOfAccountsPage() {
                 </CardContent>
             </Card>
             
-            <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد تثبيت شجرة الحسابات؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                           **تحذير خطير:** سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** في قاعدة البيانات واستبدالها بشجرة حسابات أساسية. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding} className="bg-destructive hover:bg-destructive/90">
-                            {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التثبيت...</> : 'نعم، قم بالمسح والتثبيت'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
             {isFormOpen && (
                 <AccountForm 
                     isOpen={isFormOpen} 
