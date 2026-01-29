@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -84,11 +85,13 @@ export default function TrialBalancePage() {
 
                 const entriesQuery = query(
                     collection(firestore, 'journalEntries'),
-                    where('status', '==', 'posted'),
                     where('date', '<=', Timestamp.fromDate(endDate))
                 );
                 const entriesSnap = await getDocs(entriesQuery);
-                setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
+                const postedEntries = entriesSnap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry))
+                    .filter(entry => entry.status === 'posted');
+                setJournalEntries(postedEntries);
             } catch (error) {
                 console.error("Error fetching journal entries:", error);
             } finally {
@@ -264,3 +267,5 @@ export default function TrialBalancePage() {
         </div>
     );
 }
+
+    
