@@ -89,17 +89,14 @@ export async function runCashFlowProjection(input: CashFlowProjectionInput): Pro
           tx.contract?.clauses?.forEach(clause => {
               // We only consider milestones that are due but not yet paid
               if (clause.status === 'مستحقة' || clause.status === 'غير مستحقة') {
-                   // This logic assumes milestone 'name' can be parsed into a date or is linked to a stage with a date.
-                   // For now, let's assume a simplified logic where we estimate the due date.
-                   // A proper implementation would use a `dueDate` on the clause.
-                   // For this MVP, we will distribute them evenly as a placeholder.
-                   // Let's find the stage linked to the condition
+                   // Find the stage linked to the payment condition
                    const stage = tx.stages?.find(s => s.name === clause.condition);
                    let dueDate: Date | null = null;
+                   
                    if (stage?.expectedEndDate) {
                        dueDate = (stage.expectedEndDate as any).toDate();
                    } else if (stage?.startDate) {
-                       // Estimate based on start date + 30 days if no end date
+                       // If no end date, estimate it to be 30 days after the start date as a fallback.
                        dueDate = new Date((stage.startDate as any).toDate());
                        dueDate.setDate(dueDate.getDate() + 30);
                    }
@@ -121,7 +118,7 @@ export async function runCashFlowProjection(input: CashFlowProjectionInput): Pro
       const emp = doc.data() as Employee;
       return sum + (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
   }, 0);
-  const fixedRent = 1500; // Hardcoded for now. Should be fetched from chart of accounts.
+  const fixedRent = 1500; // Hardcoded for now. Should be fetched from chart of accounts in a future update.
   const totalFixedExpenses = totalSalaries + fixedRent;
 
   // 6. Finalize projections

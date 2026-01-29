@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -22,7 +21,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, type DocumentData, doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -38,13 +37,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addMonths, format, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/context/language-context';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -58,15 +57,14 @@ const statusColors: Record<Employee['status'], string> = {
   terminated: 'bg-red-100 text-red-800 border-red-200',
 };
 
-const terminationReasons: Record<string, string> = {
-    resignation: 'استقالة',
-    termination: 'إنهاء خدمة (من الشركة)',
-    probation: 'إنهاء فترة التجربة'
-};
-
+const terminationReasons: {value: string, label: string}[] = [
+    { value: 'resignation', label: 'استقالة' },
+    { value: 'termination', label: 'إنهاء خدمة (من الشركة)' },
+    { value: 'probation', label: 'إنهاء فترة التجربة' },
+];
 
 export function EmployeesTable() {
-    const firestore = useFirestore();
+    const firestore = useFirebase();
     const { toast } = useToast();
     const { language } = useLanguage();
 
@@ -350,7 +348,9 @@ export function EmployeesTable() {
                 </Table>
             </div>
              <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent
+                    dir="rtl"
+                >
                     <AlertDialogHeader>
                         <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -359,17 +359,13 @@ export function EmployeesTable() {
                     </AlertDialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="grid gap-2">
-                             <Label htmlFor="terminationReason">سبب إنهاء الخدمة</Label>
-                             <Select dir="rtl" value={terminationReason} onValueChange={(v) => setTerminationReason(v)}>
-                                <SelectTrigger id="terminationReason">
-                                    <SelectValue placeholder="اختر السبب..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(terminationReasons).map(([key, value]) => (
-                                        <SelectItem key={key} value={key}>{value}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                             <Label>سبب إنهاء الخدمة</Label>
+                             <InlineSearchList 
+                                value={terminationReason}
+                                onSelect={setTerminationReason}
+                                options={terminationReasons}
+                                placeholder="اختر السبب..."
+                             />
                         </div>
                         <div className="flex items-center space-x-2">
                            <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
