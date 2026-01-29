@@ -8,15 +8,21 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle, Banknote } from 'lucide-react';
+import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle, Banknote, Scale, LineChart, Users, ArrowLeftRight } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 
 const accountingSections = [
     {
-        title: 'عروض الأسعار',
-        description: 'إنشاء وإدارة عروض الأسعار المقدمة للعملاء.',
-        link: '/dashboard/accounting/quotations',
-        icon: <FileText className="h-8 w-8 text-primary" />,
+        title: 'قيود اليومية',
+        description: 'إنشاء وتصفح قيود اليومية العامة.',
+        link: '/dashboard/accounting/journal-entries',
+        icon: <BookOpen className="h-8 w-8 text-primary" />,
+    },
+    {
+        title: 'شجرة الحسابات',
+        description: 'إدارة دليل الحسابات الخاص بالشركة.',
+        link: '/dashboard/accounting/chart-of-accounts',
+        icon: <BookUser className="h-8 w-8 text-primary" />,
     },
     {
         title: 'سندات القبض',
@@ -30,11 +36,23 @@ const accountingSections = [
         link: '/dashboard/accounting/payment-vouchers',
         icon: <ArrowUpCircle className="h-8 w-8 text-red-600" />,
     },
+     {
+        title: 'عروض الأسعار',
+        description: 'إنشاء وإدارة عروض الأسعار المقدمة للعملاء.',
+        link: '/dashboard/accounting/quotations',
+        icon: <FileText className="h-8 w-8 text-primary" />,
+    },
     {
-        title: 'قيود اليومية',
-        description: 'إنشاء وتصفح قيود اليومية العامة.',
-        link: '/dashboard/accounting/journal-entries',
-        icon: <BookOpen className="h-8 w-8 text-primary" />,
+        title: 'الفواتير',
+        description: 'إنشاء وتتبع فواتير العملاء المستحقة والمدفوعة.',
+        link: '/dashboard/accounting/invoices',
+        icon: <FileText className="h-8 w-8 text-primary" />,
+    },
+     {
+        title: 'المساعد المحاسبي الذكي',
+        description: 'استخدم الذكاء الاصطناعي لتحويل الأوامر النصية إلى قيود محاسبية.',
+        link: '/dashboard/accounting/assistant',
+        icon: <Sparkles className="h-8 w-8 text-primary" />,
     },
     {
         title: 'كشف حساب',
@@ -43,22 +61,28 @@ const accountingSections = [
         icon: <Banknote className="h-8 w-8 text-primary" />,
     },
     {
-        title: 'شجرة الحسابات',
-        description: 'إدارة دليل الحسابات الخاص بالشركة، بما في ذلك الأصول والخصوم.',
-        link: '/dashboard/accounting/chart-of-accounts',
-        icon: <BookUser className="h-8 w-8 text-primary" />,
+        title: 'قائمة المركز المالي',
+        description: 'عرض الأصول والالتزامات وحقوق الملكية.',
+        link: '/dashboard/accounting/balance-sheet',
+        icon: <Scale className="h-8 w-8 text-primary" />,
     },
     {
-        title: 'الفواتير',
-        description: 'إنشاء وتتبع فواتير العملاء المستحقة والمدفوعة.',
-        link: '/dashboard/accounting/invoices',
-        icon: <FileText className="h-8 w-8 text-primary" />,
+        title: 'قائمة الدخل',
+        description: 'قياس الأداء المالي والربحية خلال فترة.',
+        link: '/dashboard/accounting/income-statement',
+        icon: <LineChart className="h-8 w-8 text-primary" />,
     },
     {
-        title: 'المساعد المحاسبي الذكي',
-        description: 'استخدم الذكاء الاصطناعي لتحويل الأوامر النصية إلى قيود محاسبية.',
-        link: '/dashboard/accounting/assistant',
-        icon: <Sparkles className="h-8 w-8 text-primary" />,
+        title: 'قائمة التدفقات النقدية',
+        description: 'تتبع حركة النقد الداخل والخارج.',
+        link: '/dashboard/accounting/cash-flow',
+        icon: <ArrowLeftRight className="h-8 w-8 text-primary" />,
+    },
+    {
+        title: 'قائمة التغير في حقوق الملكية',
+        description: 'تتبع التغير في حصص الملاك والأرباح المحتجزة.',
+        link: '/dashboard/accounting/equity-statement',
+        icon: <Users className="h-8 w-8 text-primary" />,
     },
 ];
 
