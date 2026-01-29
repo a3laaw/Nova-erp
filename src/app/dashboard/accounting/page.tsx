@@ -61,6 +61,12 @@ const accountingSections = [
         icon: <Banknote className="h-8 w-8 text-primary" />,
     },
     {
+        title: 'ميزان المراجعة',
+        description: 'عرض أرصدة الحسابات المدينة والدائنة خلال فترة.',
+        link: '/dashboard/accounting/trial-balance',
+        icon: <Scale className="h-8 w-8 text-primary" />,
+    },
+    {
         title: 'قائمة المركز المالي',
         description: 'عرض الأصول والالتزامات وحقوق الملكية.',
         link: '/dashboard/accounting/balance-sheet',

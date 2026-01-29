@@ -37,6 +37,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'cash-flow': 'قائمة التدفقات النقدية',
     'equity-statement': 'قائمة التغير في حقوق الملكية',
     'financial-statement-notes': 'الإيضاحات المتممة',
+    'trial-balance': 'ميزان المراجعة',
   },
   en: {
     dashboard: 'Dashboard',
@@ -68,6 +69,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'cash-flow': 'Cash Flow Statement',
     'equity-statement': 'Statement of Equity',
     'financial-statement-notes': 'Notes to Financial Statements',
+    'trial-balance': 'Trial Balance',
   },
 };
 
