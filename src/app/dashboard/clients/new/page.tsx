@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -52,6 +51,7 @@ export default function NewClientPage() {
     const [fileId, setFileId] = useState('جاري التوليد...');
     const [isGeneratingId, setIsGeneratingId] = useState(true);
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
+    const [engineerIdFromUrl, setEngineerIdFromUrl] = useState<string | null>(null);
     
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
@@ -73,9 +73,19 @@ export default function NewClientPage() {
             setFormData(prev => ({...prev, mobile: mobileFromUrl}));
         }
         if (engineerFromUrl) {
-            setAssignedEngineerId(engineerFromUrl);
+            setEngineerIdFromUrl(engineerFromUrl);
         }
     }, [searchParams]);
+
+    // New effect to set the engineer ID after engineers have loaded
+    useEffect(() => {
+        if (engineerIdFromUrl && !engineersLoading) {
+            const engineerExists = engineers.some(e => e.id === engineerIdFromUrl);
+            if (engineerExists) {
+                setAssignedEngineerId(engineerIdFromUrl);
+            }
+        }
+    }, [engineerIdFromUrl, engineersLoading, engineers]);
 
     // Fetch File ID
     useEffect(() => {
