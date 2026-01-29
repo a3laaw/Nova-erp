@@ -268,13 +268,13 @@ export default function AccountStatementPage() {
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell colSpan={5} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
+                                    <TableCell colSpan={6} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
                                 </TableRow>
                                 {statementData.lines.map((line, index) => (
                                     <TableRow key={index}>
                                         <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell className="font-mono hover:underline">
+                                        <TableCell className="font-mono hover:underline text-primary">
                                             <Link href={`/dashboard/accounting/journal-entries/${line.entryId}`}>
                                                {line.entryNumber}
                                             </Link>
@@ -293,13 +293,12 @@ export default function AccountStatementPage() {
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="font-bold bg-muted/50">
-                                    <TableCell colSpan={3}>إجمالي الحركات</TableCell>
+                                    <TableCell colSpan={5}>إجمالي الحركات</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                    <TableCell></TableCell>
                                 </TableRow>
                                 <TableRow className="font-bold text-lg bg-muted">
-                                    <TableCell colSpan={5}>الرصيد النهائي</TableCell>
+                                    <TableCell colSpan={6}>الرصيد النهائي</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
                                 </TableRow>
                             </TableFooter>
