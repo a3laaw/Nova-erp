@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Save, X, Loader2, AlertCircle } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
-import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where, runTransaction, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where, runTransaction, Timestamp, orderBy } from 'firebase/firestore';
 import type { CashReceipt, Client, ClientTransaction, Account } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -63,7 +63,7 @@ export default function EditCashReceiptPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
   
-  const [loading, setLoading] = useState(true);
+  const [accountsLoading, setAccountsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [journalEntryIsPosted, setJournalEntryIsPosted] = useState(false);
 
@@ -112,6 +112,7 @@ export default function EditCashReceiptPage() {
   useEffect(() => {
     if (!firestore) return;
     const fetchRelatedData = async () => {
+        setAccountsLoading(true);
         try {
             const [clientsSnap, accountsSnap] = await Promise.all([
                 getDocs(query(collection(firestore, 'clients'))),
@@ -122,11 +123,11 @@ export default function EditCashReceiptPage() {
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
         } finally {
-            setLoading(receiptLoading);
+            setAccountsLoading(false);
         }
     };
     fetchRelatedData();
-  }, [firestore, toast, receiptLoading]);
+  }, [firestore, toast]);
 
   // Fetch journal entry details
    useEffect(() => {
@@ -352,7 +353,7 @@ export default function EditCashReceiptPage() {
     }
   };
 
-  if (loading) {
+  if (receiptLoading || accountsLoading) {
       return (
           <Card className="max-w-4xl mx-auto">
               <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
@@ -467,7 +468,7 @@ export default function EditCashReceiptPage() {
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || loading || journalEntryIsPosted}>
+        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading || journalEntryIsPosted}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
