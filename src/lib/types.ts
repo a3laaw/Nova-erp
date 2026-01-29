@@ -1,6 +1,5 @@
 
 
-
 export interface Company {
     id?: string;
     name: string;
@@ -174,6 +173,7 @@ export type CashReceipt = {
     paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'K-Net';
     description: string;
     reference?: string;
+    journalEntryId?: string;
     createdAt: any; // Timestamp
 };
 
@@ -583,5 +583,3 @@ export interface Quotation {
   templateDescription?: string;
   transactionId?: string;
 }
-
-    

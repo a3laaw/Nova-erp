@@ -192,6 +192,7 @@
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
             "departmentId": { "type": "string", "description": "The ID of the department this transaction belongs to." },
+            "transactionTypeId": { "type": "string", "description": "The ID of the transaction type." },
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
@@ -245,7 +246,7 @@
                 "required": ["clauses", "totalAmount"]
             }
         },
-        "required": ["clientId", "transactionType", "status", "createdAt"]
+        "required": ["clientId", "transactionType", "departmentId", "status", "createdAt"]
     },
     "TransactionTimelineEvent": {
       "title": "Transaction Timeline Event",
@@ -946,9 +947,51 @@
         "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "K-Net"] },
         "description": { "type": "string" },
         "reference": { "type": "string" },
+        "journalEntryId": {
+            "type": "string",
+            "description": "The ID of the journal entry automatically created for this receipt."
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["voucherNumber", "clientId", "amount", "receiptDate", "paymentMethod"]
+    },
+    "Quotation": {
+      "title": "Quotation",
+      "description": "Represents a price quotation provided to a client.",
+      "type": "object",
+      "properties": {
+        "quotationNumber": { "type": "string" },
+        "quotationSequence": { "type": "number" },
+        "quotationYear": { "type": "number" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "validUntil": { "type": "string", "format": "date-time" },
+        "subject": { "type": "string" },
+        "departmentId": { "type": "string", "description": "The ID of the department this quotation is for." },
+        "transactionTypeId": { "type": "string", "description": "The ID of the transaction type this quotation is for." },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" },
+              "condition": { "type": "string", "description": "The condition for this item to be due, often linked to a work stage."}
+            },
+            "required": ["description", "quantity", "unitPrice", "total"]
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent", "accepted", "rejected", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["quotationNumber", "clientId", "date", "subject", "items", "totalAmount", "status", "createdAt"]
     }
   },
   "auth": {
@@ -1096,6 +1139,12 @@
     "/cashReceipts/{receiptId}": {
       "schema": { "$ref": "#/entities/CashReceipt" },
       "description": "Stores all cash receipt vouchers received by the company."
+    },
+    "/quotations/{quotationId}": {
+      "schema": {
+        "$ref": "#/entities/Quotation"
+      },
+      "description": "Stores all quotations sent to clients."
     }
   }
 }
