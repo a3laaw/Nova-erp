@@ -1,7 +1,6 @@
-
 import type { Account } from './types';
 
-// Utility to derive the main account type from its code
+// Utility functions to derive properties from the account code
 const getTypeFromCode = (code: string): Account['type'] => {
     if (code.startsWith('1')) return 'asset';
     if (code.startsWith('2')) return 'liability';
@@ -13,20 +12,30 @@ const getTypeFromCode = (code: string): Account['type'] => {
 
 const getLevelFromCode = (code: string): number => {
     const len = code.length;
-    if (len === 1) return 0; // e.g., '1'
-    if (len === 2) return 1; // e.g., '11'
-    if (len === 3) return 2; // '121'
-    if (len === 4) return 3; // '1101'
-    if (len === 5) return 4; // '12101'
-    if (len === 6) return 5; // '110101'
-    return len > 6 ? 6 : len -1;
+    if (len === 1) return 0;
+    if (len <= 3) return 1;
+    if (len <= 5) return 2;
+    return 3;
 };
 
+const getStatementType = (code: string): Account['statement'] => {
+    if (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) {
+        return 'Balance Sheet';
+    }
+    return 'Income Statement';
+};
+
+const getBalanceType = (code: string): Account['balanceType'] => {
+    if (code.startsWith('1') || code.startsWith('5')) {
+        return 'Debit';
+    }
+    return 'Credit';
+};
+
+
 // This raw data is corrected from the user's Excel file structure.
-const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
-  // 1. الأصول
+const rawData: Omit<Account, 'id' | 'type' | 'level' | 'statement' | 'balanceType'>[] = [
   { code: '1', name: 'الأصول', parentCode: null, isPayable: false },
-  // 1.1 أصول متداولة
   { code: '11', name: 'أصول متداولة', parentCode: '1', isPayable: false },
   { code: '1101', name: 'النقد ومايعادله', parentCode: '11', isPayable: false, description: 'النقدية وما في حكمها (في الخزينة والعهد)' },
   { code: '110101', name: 'النقدية في الخزينة', parentCode: '1101', isPayable: true, description: 'النقدية في الخزينة' },
@@ -37,7 +46,6 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '1104', name: 'مصروفات مقدمة', parentCode: '11', isPayable: false, description: 'مصروف مدفوع مقدماً مثل التأمين وسلف الموظفين وإيجار المكتب' },
   { code: '110401', name: 'تأمين طبي مقدم', parentCode: '1104', isPayable: true, description: 'تأمين طبي مدفوع مقدماً يتم إطفاء مايخص السنة المالية إلى مصروف' },
   { code: '1105', name: 'سلف الموظفين', parentCode: '11', isPayable: true },
-  // 1.2 أصول غير متداولة
   { code: '12', name: 'أصول غير متداولة', parentCode: '1', isPayable: false },
   { code: '121', name: 'الأصول الثابتة', parentCode: '12', isPayable: false },
   { code: '12101', name: 'الأصول الثابتة - المباني', parentCode: '121', isPayable: true },
@@ -55,7 +63,6 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '12205', name: 'إهلاك متراكم السيارات', parentCode: '122', isPayable: true },
   { code: '12206', name: 'إهلاك متراكم الآلات', parentCode: '122', isPayable: true },
   { code: '12207', name: 'إهلاك متراكم أخرى', parentCode: '122', isPayable: true },
-  // 2. الخصوم
   { code: '2', name: 'الخصوم', parentCode: null, isPayable: false },
   { code: '21', name: 'الخصوم المتداولة', parentCode: '2', isPayable: false },
   { code: '2101', name: 'الموردون', parentCode: '21', isPayable: true },
@@ -69,14 +76,12 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '2107', name: 'ضريبة القيمة المضافة', parentCode: '21', isPayable: true },
   { code: '22', name: 'الخصوم غير المتداولة', parentCode: '2', isPayable: false },
   { code: '2201', name: 'قروض طويلة الأجل', parentCode: '22', isPayable: true },
-  // 3. حقوق الملكية
   { code: '3', name: 'حقوق الملكية', parentCode: null, isPayable: false },
   { code: '31', name: 'رأس المال', parentCode: '3', isPayable: false },
   { code: '3101', name: 'رأس مال المالك', parentCode: '31', isPayable: true },
   { code: '32', name: 'جاري الشركاء', parentCode: '3', isPayable: true },
   { code: '33', name: 'أرباح مبقاة / خسائر مدورة', parentCode: '3', isPayable: true },
   { code: '34', name: 'أرباح أو خسائر العام', parentCode: '3', isPayable: true },
-  // 4. الإيرادات
   { code: '4', name: 'الإيرادات', parentCode: null, isPayable: false },
   { code: '41', name: 'إيرادات النشاط الرئيسي', parentCode: '4', isPayable: false },
   { code: '4101', name: 'إيرادات استشارات هندسية', parentCode: '41', isPayable: true },
@@ -84,7 +89,6 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '4103', name: 'إيرادات إشراف على التنفيذ', parentCode: '41', isPayable: true },
   { code: '42', name: 'إيرادات أخرى', parentCode: '4', isPayable: false },
   { code: '4201', name: 'إيرادات متنوعة', parentCode: '42', isPayable: true },
-  // 5. المصروفات
   { code: '5', name: 'المصروفات', parentCode: null, isPayable: false },
   { code: '51', name: 'تكلفة الإيرادات', parentCode: '5', isPayable: false },
   { code: '5101', name: 'تكلفة مباشرة للمشاريع', parentCode: '51', isPayable: true },
@@ -121,4 +125,6 @@ export const defaultChartOfAccounts: Omit<Account, 'id'>[] = rawData.map(account
     ...account,
     type: getTypeFromCode(account.code),
     level: getLevelFromCode(account.code),
+    statement: getStatementType(account.code),
+    balanceType: getBalanceType(account.code),
 }));

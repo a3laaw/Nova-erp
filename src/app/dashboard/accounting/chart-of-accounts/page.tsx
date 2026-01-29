@@ -16,7 +16,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +79,24 @@ const accountTypeColors: Record<Account['type'], string> = {
     expense: 'bg-orange-100 text-orange-800 border-orange-200',
 };
 
+const getLevelFromCode = (code: string): number => {
+    const len = code.length;
+    if (len === 1) return 0;
+    if (len <= 3) return 1;
+    if (len <= 5) return 2;
+    return 3;
+};
+
+const getStatementType = (code: string): Account['statement'] => {
+    if (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) return 'Balance Sheet';
+    return 'Income Statement';
+};
+
+const getBalanceType = (code: string): Account['balanceType'] => {
+    if (code.startsWith('1') || code.startsWith('5')) return 'Debit';
+    return 'Credit';
+};
+
 
 function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null, accounts: Account[] }) {
     const isEditing = !!account;
@@ -94,13 +111,12 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                 let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
 
                 const relevantAccounts = parentAccount
-                    ? accounts.filter(acc => acc.level === parentAccount.level + 1 && acc.code.startsWith(parentAccount.code))
-                    : accounts.filter(acc => acc.level === 0);
+                    ? accounts.filter(acc => acc.parentCode === parentAccount.code)
+                    : accounts.filter(acc => !acc.parentCode);
                 
                 if (relevantAccounts.length === 0) {
                      if (parentAccount) {
-                         if (parentAccount.code.length <= 2) { nextCode = parentAccount.code + '01'; }
-                         else { nextCode = parentAccount.code + '001'; }
+                         nextCode = parentAccount.code + (parentAccount.code.length === 1 ? '1' : '01');
                      } else {
                          const maxRootCode = Math.max(0, ...accounts.filter(a => a.level === 0).map(a => parseInt(a.code, 10)));
                          nextCode = String(maxRootCode + 1);
@@ -115,19 +131,13 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         }
     }, [account, parentAccount, isEditing, isOpen, accounts]);
 
-
-    const getLevelFromCode = (code: string): number => {
-        if (code.length === 1) return 0;
-        if (code.length === 2) return 1;
-        if (code.length === 4) return 2;
-        if (code.length > 4) return 3;
-        return 0; // Default case
-    };
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const level = getLevelFromCode(formData.code || '');
-        onSave({ ...formData, level, parentCode: parentAccount?.code || null });
+        const code = formData.code || '';
+        const level = getLevelFromCode(code);
+        const statement = getStatementType(code);
+        const balanceType = getBalanceType(code);
+        onSave({ ...formData, level, statement, balanceType, parentCode: parentAccount?.code || null });
     };
 
     return (
@@ -138,10 +148,6 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                         <DialogTitle>
                            {isEditing ? 'تعديل حساب' : parentAccount ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}
                         </DialogTitle>
-                        <DialogDescription>
-                            {isEditing ? 'أدخل تفاصيل الحساب الجديدة.' : parentAccount ? `إضافة حساب جديد تحت "${parentAccount.name}".` : 'أدخل تفاصيل الحساب الرئيسي الجديد.'}
-                            {' '}سيتم تحديد المستوى تلقائياً بناءً على طول الرمز.
-                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -224,7 +230,7 @@ export default function ChartOfAccountsPage() {
                     const currentBalance = directBalances.get(line.accountId) || 0;
                     let balanceChange = 0;
                     
-                    if (acc.type === 'asset' || acc.type === 'expense') {
+                    if (acc.balanceType === 'Debit') {
                         balanceChange = (line.debit || 0) - (line.credit || 0);
                     } else {
                         balanceChange = (line.credit || 0) - (line.debit || 0);
@@ -435,8 +441,10 @@ export default function ChartOfAccountsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-2/5">اسم الحساب</TableHead>
-                                    <TableHead>رمز الحساب</TableHead>
+                                    <TableHead>الرمز</TableHead>
                                     <TableHead>النوع</TableHead>
+                                    <TableHead>طبيعة الرصيد</TableHead>
+                                    <TableHead>القائمة</TableHead>
                                     <TableHead className="text-left">الرصيد</TableHead>
                                     <TableHead className="text-center"><span className="sr-only">الإجراءات</span></TableHead>
                                 </TableRow>
@@ -444,13 +452,13 @@ export default function ChartOfAccountsPage() {
                             <TableBody>
                                 {loading ? (
                                     Array.from({length: 5}).map((_, i) => (
-                                        <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
+                                        <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
                                     ))
                                 ) : displayedAccounts.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center h-48">
+                                        <TableCell colSpan={7} className="text-center h-48">
                                             <div className="flex flex-col items-center justify-center gap-4">
-                                                <p className="text-muted-foreground">لا توجد حسابات. ابدأ بإضافة حساب رئيسي، أو قم بتنزيل شجرة الحسابات الأساسية من الزر في الأعلى.</p>
+                                                <p className="text-muted-foreground">لا توجد حسابات. ابدأ بإضافة حساب رئيسي، أو قم بتنزيل شجرة الحسابات الأساسية.</p>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -472,7 +480,7 @@ export default function ChartOfAccountsPage() {
                                                             <span className="w-6 h-4 inline-block"></span>
                                                         )}
                                                         <span className="font-medium">{account.name}</span>
-                                                        {account.level < 3 && (
+                                                        {account.level < 4 && (
                                                             <Button
                                                                 type="button" variant="ghost" size="icon"
                                                                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -488,6 +496,10 @@ export default function ChartOfAccountsPage() {
                                                         {accountTypeTranslations[account.type]}
                                                     </Badge>
                                                 </TableCell>
+                                                 <TableCell>
+                                                    <Badge variant="secondary">{account.balanceType === 'Debit' ? 'مدين' : 'دائن'}</Badge>
+                                                 </TableCell>
+                                                <TableCell className="text-xs">{account.statement === 'Balance Sheet' ? 'مركز مالي' : 'قائمة دخل'}</TableCell>
                                                 <TableCell className={cn("text-left font-mono", balance < 0 && "text-destructive")}>
                                                     {formatCurrency(balance)}
                                                 </TableCell>

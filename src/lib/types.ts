@@ -4,6 +4,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -516,6 +517,8 @@ export interface Account {
     code: string;
     name: string;
     type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+    statement?: 'Balance Sheet' | 'Income Statement';
+    balanceType?: 'Debit' | 'Credit';
     level: number;
     description?: string;
     isPayable: boolean;
