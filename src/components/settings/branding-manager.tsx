@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase, useStorage } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, Upload } from 'lucide-react';
@@ -91,65 +91,74 @@ export function BrandingManager() {
         }
 
         setIsSaving(true);
-        let finalLogoUrl = formData.logo_url || '';
-        let finalLetterheadUrl = formData.letterhead_image_url || '';
         
-        const uploadPromises: Promise<any>[] = [];
-
-        if (logoFile && storage) {
-            const logoPromise = new Promise<void>((resolve, reject) => {
-                const timestamp = Date.now();
-                const storageRef = ref(storage, `company_assets/logo_${timestamp}_${logoFile.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, logoFile);
-                uploadTask.on('state_changed',
-                    (snapshot) => setLogoUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-                    (error) => { console.error("Logo upload failed:", error); reject(error); },
-                    async () => {
-                        finalLogoUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                        resolve();
-                    }
-                );
-            });
-            uploadPromises.push(logoPromise);
-        }
-
-        if (letterheadFile && storage) {
-            const letterheadPromise = new Promise<void>((resolve, reject) => {
-                const timestamp = Date.now();
-                const storageRef = ref(storage, `company_assets/letterhead_${timestamp}_${letterheadFile.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, letterheadFile);
-                 uploadTask.on('state_changed',
-                    (snapshot) => setLetterheadUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-                    (error) => { console.error("Letterhead upload failed:", error); reject(error); },
-                    async () => {
-                        finalLetterheadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                        resolve();
-                    }
-                );
-            });
-            uploadPromises.push(letterheadPromise);
-        }
-        
+        // 1. Save text data immediately.
+        const settingsRef = doc(firestore, 'company_settings', 'main');
         try {
-            await Promise.all(uploadPromises);
+            const textData = { ...formData };
+            // Don't save URL if new file is being uploaded, it will be updated later
+            if (logoFile) delete textData.logo_url;
+            if (letterheadFile) delete textData.letterhead_image_url;
+
+            await setDoc(settingsRef, textData, { merge: true });
             
-            const settingsRef = doc(firestore, 'company_settings', 'main');
-            const dataToSave = { ...formData, logo_url: finalLogoUrl, letterhead_image_url: finalLetterheadUrl };
-            await setDoc(settingsRef, dataToSave, { merge: true });
-            
-            toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية.' });
-            
-            setLogoFile(null);
-            setLetterheadFile(null);
-            setLogoUploadProgress(null);
-            setLetterheadUploadProgress(null);
+            if (!logoFile && !letterheadFile) {
+                toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية.' });
+            } else {
+                 toast({ title: 'نجاح', description: 'تم حفظ البيانات النصية، جاري رفع الصور...' });
+            }
 
         } catch (error) {
-            console.error("Error during save process:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الإعدادات.' });
-        } finally {
+            console.error("Error saving text data:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ البيانات النصية.' });
             setIsSaving(false);
+            return; // Stop if text data fails to save
         }
+
+        // 2. Handle file uploads asynchronously
+        const uploadFile = (file: File, type: 'logo' | 'letterhead') => {
+            if (!storage) return;
+            const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
+            const urlField = type === 'logo' ? 'logo_url' : 'letterhead_image_url';
+            
+            setProgress(0);
+            const timestamp = Date.now();
+            const storageRef = ref(storage, `company_assets/${type}_${timestamp}_${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setProgress(progress);
+                },
+                (error) => {
+                    console.error(`${type} upload failed:`, error);
+                    toast({ variant: 'destructive', title: 'خطأ في الرفع', description: `فشل رفع ${type}.` });
+                    setProgress(null);
+                },
+                async () => {
+                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    await updateDoc(settingsRef, { [urlField]: downloadURL });
+                    toast({ title: 'نجاح', description: `تم رفع وتحديث ${type} بنجاح.` });
+                    
+                    setTimeout(() => {
+                        setProgress(null);
+                        if (type === 'logo') setLogoFile(null);
+                        if (type === 'letterhead') setLetterheadFile(null);
+                    }, 1000);
+                }
+            );
+        };
+
+        if (logoFile) {
+            uploadFile(logoFile, 'logo');
+        }
+
+        if (letterheadFile) {
+            uploadFile(letterheadFile, 'letterhead');
+        }
+
+        setIsSaving(false);
     };
 
     if (loading) {
