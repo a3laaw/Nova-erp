@@ -237,7 +237,6 @@ export default function ChartOfAccountsPage() {
             ]);
 
             const fetchedAccounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-            fetchedAccounts.sort((a, b) => a.code.localeCompare(b.code));
             setAccounts(fetchedAccounts);
 
             const journalEntries = entriesSnapshot.docs.map(doc => doc.data() as JournalEntry);
@@ -262,13 +261,13 @@ export default function ChartOfAccountsPage() {
 
             const aggregatedBalances = new Map<string, number>();
             fetchedAccounts
-              .sort((a, b) => b.level - a.level)
+              .sort((a, b) => b.level - a.level) // Start from deepest level
               .forEach(account => {
                   let totalBalance = directBalances.get(account.id!) || 0;
                   
+                  // Find direct children only
                   const children = fetchedAccounts.filter(child => 
                       child.code.startsWith(account.code) &&
-                      child.code !== account.code &&
                       child.level === account.level + 1
                   );
                   
@@ -292,6 +291,27 @@ export default function ChartOfAccountsPage() {
     useEffect(() => {
         fetchAllData();
     }, [fetchAllData]);
+
+    const displayedAccounts = useMemo(() => {
+        if (accounts.length === 0) return [];
+        
+        const roots = accounts.filter(a => a.level === 0).sort((a,b) => a.code.localeCompare(b.code));
+        const displayed: Account[] = [];
+        
+        const addChildrenRecursively = (account: Account) => {
+            displayed.push(account);
+            if (openAccounts.has(account.code)) {
+                const children = accounts
+                    .filter(child => child.code.startsWith(account.code) && child.level === account.level + 1)
+                    .sort((a,b) => a.code.localeCompare(b.code));
+                children.forEach(addChildrenRecursively);
+            }
+        };
+        
+        roots.forEach(addChildrenRecursively);
+        return displayed;
+    }, [accounts, openAccounts]);
+
 
     const handleAddClick = () => {
         setEditingAccount(null);
@@ -389,63 +409,6 @@ export default function ChartOfAccountsPage() {
         });
     };
 
-    const renderAccountRow = (account: Account): JSX.Element[] => {
-        const balance = accountBalances.get(account.id!) || 0;
-        const children = accounts.filter(a => a.code.startsWith(account.code) && a.level === account.level + 1);
-        const hasChildren = children.length > 0;
-        const isOpen = openAccounts.has(account.code);
-
-        const row = (
-             <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''} onClick={() => hasChildren && toggleAccount(account.code)} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
-                <TableCell style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
-                    <div className="flex items-center gap-2 group">
-                         {hasChildren ? (
-                            isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                            <span className="w-4 h-4 inline-block"></span>
-                        )}
-                        <span className="font-medium">{account.name}</span>
-                        {account.level < 3 && (
-                            <Button
-                                type="button" variant="ghost" size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => { e.stopPropagation(); handleAddSubAccountClick(account); }}>
-                                <PlusCircle className="h-4 w-4 text-primary" />
-                            </Button>
-                        )}
-                    </div>
-                </TableCell>
-                <TableCell className="font-mono">{account.code}</TableCell>
-                <TableCell>
-                    <Badge variant="outline" className={cn(accountTypeColors[account.type], "whitespace-nowrap")}>
-                        {accountTypeTranslations[account.type]}
-                    </Badge>
-                </TableCell>
-                <TableCell className={cn("text-left font-mono", balance < 0 && "text-destructive")}>
-                    {formatCurrency(balance)}
-                </TableCell>
-                <TableCell className="text-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenuItem onClick={() => handleEditClick(account)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </TableCell>
-            </TableRow>
-        );
-        
-        let childRows: JSX.Element[] = [];
-        if (hasChildren && isOpen) {
-            childRows = children.flatMap(child => renderAccountRow(child));
-        }
-
-        return [row, ...childRows];
-    };
-
-    const rootAccounts = accounts.filter(a => a.level === 0);
-
     return (
         <div className="space-y-6" dir="rtl">
             <Card>
@@ -475,7 +438,7 @@ export default function ChartOfAccountsPage() {
                                     Array.from({length: 5}).map((_, i) => (
                                         <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
                                     ))
-                                ) : accounts.length === 0 ? (
+                                ) : displayedAccounts.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center h-48">
                                             <div className="flex flex-col items-center justify-center gap-4">
@@ -488,7 +451,53 @@ export default function ChartOfAccountsPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    rootAccounts.flatMap(account => renderAccountRow(account))
+                                    displayedAccounts.map(account => {
+                                        const balance = accountBalances.get(account.id!) || 0;
+                                        const children = accounts.filter(a => a.code.startsWith(account.code) && a.level === account.level + 1);
+                                        const hasChildren = children.length > 0;
+                                        const isOpen = openAccounts.has(account.code);
+
+                                        return (
+                                            <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''} onClick={() => hasChildren && toggleAccount(account.code)} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
+                                                <TableCell style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
+                                                    <div className="flex items-center gap-2 group">
+                                                        {hasChildren ? (
+                                                            isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
+                                                        ) : (
+                                                            <span className="w-4 h-4 inline-block"></span>
+                                                        )}
+                                                        <span className="font-medium">{account.name}</span>
+                                                        {account.level < 3 && (
+                                                            <Button
+                                                                type="button" variant="ghost" size="icon"
+                                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={(e) => { e.stopPropagation(); handleAddSubAccountClick(account); }}>
+                                                                <PlusCircle className="h-4 w-4 text-primary" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="font-mono">{account.code}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className={cn(accountTypeColors[account.type], "whitespace-nowrap")}>
+                                                        {accountTypeTranslations[account.type]}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className={cn("text-left font-mono", balance < 0 && "text-destructive")}>
+                                                    {formatCurrency(balance)}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenuItem onClick={() => handleEditClick(account)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                             {!loading && accounts.length > 0 && (
@@ -534,4 +543,3 @@ export default function ChartOfAccountsPage() {
         </div>
     );
 }
-
