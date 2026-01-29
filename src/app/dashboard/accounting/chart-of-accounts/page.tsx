@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { DownloadCloud, Folder, FolderOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
+import { collection, query, writeBatch, getDocs, where, orderBy, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
