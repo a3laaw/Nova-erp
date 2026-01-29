@@ -26,7 +26,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuPortal,
   DropdownMenuSubContent
-} from '@/components/ui/dropdown-menu'; // Import DropdownMenu components
+} from '@/components/ui/dropdown-menu';
 import {
   Home,
   Briefcase,
