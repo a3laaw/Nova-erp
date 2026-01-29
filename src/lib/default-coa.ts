@@ -11,7 +11,7 @@ const getTypeFromCode = (code: string): Account['type'] => {
     return 'asset'; // Default fallback
 };
 
-// Raw data inspired by the user's Excel file, with corrections and structure
+// Raw data based on user's Excel file, with structural corrections
 const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   // الأصول
   { code: '1', name: 'الأصول', description: '', parentCode: null, isPayable: false },
@@ -20,8 +20,8 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '110101', name: 'النقدية في الخزينة', description: 'النقدية في الخزينة', parentCode: '1101', isPayable: true },
   { code: '110102', name: 'العهد النقدية', description: 'العهد النقدية للموظفين بشكل مؤقت أو دائم لدفع مصروفات المنشأة', parentCode: '1101', isPayable: true },
   { code: '1102', name: 'النقدية في البنك', description: 'النقدية في البنوك', parentCode: '11', isPayable: false },
-  { code: '110201', name: 'حساب البنك الجاري - اسم البنك', description: 'حساب البنك الجاري - اسم البنك', parentCode: '1102', isPayable: true },
-  { code: '1103', name: 'المدينون', description: 'مبالغ مستحقة على حساب العملاء (بالأجل)', parentCode: '11', isPayable: false },
+  { code: '110201', name: 'حساب البنك الجاري', description: 'حساب البنك الجاري', parentCode: '1102', isPayable: true },
+  { code: '1103', name: 'العملاء', description: 'مبالغ مستحقة على حساب العملاء (بالأجل)', parentCode: '11', isPayable: false },
   { code: '1104', name: 'مصروفات مقدمة', description: 'مصروف مدفوع مقدماً مثل التأمين وسلف الموظفين وإيجار المكتب', parentCode: '11', isPayable: false },
   { code: '110401', name: 'تأمين طبي مقدم', description: 'تأمين طبي مدفوع مقدماً يتم إطفاء مايخص السنة المالية إلى مصروف', parentCode: '1104', isPayable: true },
   { code: '12', name: 'أصول غير متداولة', description: '', parentCode: '1', isPayable: false },
@@ -92,10 +92,14 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
 ];
 
 const getLevelFromCode = (code: string): number => {
-    if (code.length === 1) return 0;
-    if (code.length === 2) return 1;
-    if (code.length <= 4) return 2;
-    return 3; // Or more levels if needed
+    if (!code.includes('.')) {
+        if (code.length === 1) return 0; // Main categories 1, 2, 3...
+        if (code.length === 2) return 1; // Sub-categories 11, 12, 21...
+        if (code.length === 4) return 2; // Sub-sub-categories 1101, 1102...
+        if (code.length > 4) return 3; // Deeper levels
+    }
+    // Fallback for any other case
+    return code.split('.').length - 1;
 };
 
 export const defaultChartOfAccounts: Omit<Account, 'id'>[] = rawData.map(account => ({
