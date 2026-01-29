@@ -255,9 +255,9 @@ export default function EditCashReceiptPage() {
       }))
   , [accounts]);
 
-  const handleSave = async () => {
+ const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
-    
+
     if (journalEntryIsPosted) {
         toast({
             variant: 'destructive',
@@ -277,37 +277,36 @@ export default function EditCashReceiptPage() {
     }
 
     setIsSaving(true);
-    
+
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
-            
-            const updatePayload: Record<string, any> = {};
-            const changes: string[] = [];
-
-            if (date !== format(originalReceipt.receiptDate.toDate(), 'yyyy-MM-dd')) {
-                updatePayload.receiptDate = new Date(date);
-                changes.push(`تغيير تاريخ السند`);
-            }
-            if (debitAccountId !== (await getDoc(doc(firestore, 'journalEntries', originalReceipt.journalEntryId!))).data()?.lines.find((l:any) => l.debit > 0)?.accountId) {
-                changes.push(`تغيير حساب الاستلام`);
-            }
-            // ... other field change checks
-            
-            if (Object.keys(updatePayload).length > 0) {
-                transaction_fs.update(receiptRefDoc, cleanFirestoreData(updatePayload));
-            }
 
             const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
             if (!clientAccount) {
                 throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${originalReceipt.clientNameAr}.`);
             }
-
-            console.log("حساب الاستلام:", debitAccountId, "حساب العميل:", clientAccount.id, "المبلغ:", parseFloat(amount));
             const debitAccount = accounts.find(a => a.id === debitAccountId);
+             if (!debitAccount) {
+                throw new Error(`لم يتم العثور على حساب الاستلام المحدد.`);
+            }
+
+            // Update Receipt Document
+            const receiptUpdatePayload = {
+                receiptDate: new Date(date),
+                projectId: selectedProjectId || null,
+                amount: parseFloat(amount),
+                amountInWords: amountInWords,
+                description: description,
+                paymentMethod: paymentMethod,
+                reference: reference,
+            };
+            transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
+
+            // Update Journal Entry Document
             const newLines = [
-                { accountId: debitAccountId, accountName: debitAccount?.name || '', debit: parseFloat(amount), credit: 0 },
-                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
+                { accountId: debitAccountId, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
+                { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
             ];
 
             const jeUpdatePayload = {
@@ -316,12 +315,14 @@ export default function EditCashReceiptPage() {
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
                 narration: `تحديث سند قبض رقم ${originalReceipt.voucherNumber} من العميل ${originalReceipt.clientNameAr}`,
+                transactionId: selectedProjectId || null,
             };
 
             if (originalReceipt.journalEntryId) {
                 const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
                 transaction_fs.update(jeRef, jeUpdatePayload);
             } else {
+                // This case handles if a receipt somehow was created without a JE.
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
                 transaction_fs.set(newJournalEntryRef, {
                     ...jeUpdatePayload,
@@ -336,7 +337,8 @@ export default function EditCashReceiptPage() {
         });
 
         // --- Post-transaction logic ---
-        // ... (existing logic for contract clauses and notifications)
+        // You could add logic here to update contract clauses or send notifications
+        // if the amount or project has changed. For now, we'll keep it simple.
 
         toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي بنجاح.' });
         router.push(`/dashboard/accounting/cash-receipts/${id}`);
