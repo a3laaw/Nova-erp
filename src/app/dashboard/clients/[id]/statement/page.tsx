@@ -36,7 +36,7 @@ import Link from 'next/link';
 
 interface StatementLine {
     id: string;
-    type: 'journal' | 'receipt';
+    type: 'journal';
     date: Date;
     voucherType: string;
     refNumber?: string;
@@ -79,12 +79,11 @@ export default function ClientStatementPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [clientSnap, companySnap, accountsSnap, journalEntriesSnap, cashReceiptsSnap] = await Promise.all([
+                const [clientSnap, companySnap, accountsSnap, journalEntriesSnap] = await Promise.all([
                     getDoc(doc(firestore, 'clients', id)),
                     getDocs(query(collection(firestore, 'companies'), limit(1))),
                     getDocs(query(collection(firestore, 'chartOfAccounts'))),
                     getDocs(query(collection(firestore, 'journalEntries'), where('clientId', '==', id))),
-                    getDocs(query(collection(firestore, 'cashReceipts'), where('clientId', '==', id))),
                 ]);
 
                 if (!clientSnap.exists()) {
@@ -109,6 +108,11 @@ export default function ClientStatementPage() {
                     if (entry.status === 'posted' && clientAccountId) {
                         const clientLine = entry.lines.find(line => line.accountId === clientAccountId);
                         if (clientLine) {
+                             let voucherType = 'قيد يومية';
+                             if (entry.entryNumber?.startsWith('CRV')) voucherType = 'سند قبض';
+                             else if (entry.entryNumber?.startsWith('PV')) voucherType = 'سند صرف';
+                             else if (entry.narration?.includes('عقد')) voucherType = 'فاتورة عقد';
+
                              transactions.push({
                                 id: entryDoc.id,
                                 date: entry.date.toDate(),
@@ -116,26 +120,11 @@ export default function ClientStatementPage() {
                                 debit: clientLine.debit,
                                 credit: clientLine.credit,
                                 refNumber: entry.entryNumber,
-                                voucherType: entry.narration.includes('عقد') ? 'فاتورة عقد' : 'قيد يومية',
+                                voucherType: voucherType,
                                 type: 'journal'
                             });
                         }
                     }
-                });
-
-                cashReceiptsSnap.forEach(receiptDoc => {
-                    const receipt = receiptDoc.data() as CashReceipt;
-                    transactions.push({
-                        id: receiptDoc.id,
-                        date: receipt.receiptDate.toDate(),
-                        description: `دفعة: ${receipt.description}`,
-                        debit: 0,
-                        credit: receipt.amount,
-                        refNumber: receipt.voucherNumber,
-                        chequeNumber: receipt.paymentMethod === 'Cheque' ? receipt.reference : undefined,
-                        voucherType: 'سند قبض',
-                        type: 'receipt'
-                    });
                 });
 
                 transactions.sort((a, b) => a.date - b.date);
@@ -315,17 +304,9 @@ export default function ClientStatementPage() {
                                     <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
                                     <TableCell>{line.voucherType}</TableCell>
                                     <TableCell className="font-mono">
-                                        {line.type === 'journal' ? (
-                                            <Link href={`/dashboard/accounting/journal-entries/${line.id}`} className="hover:underline text-primary">
-                                                {line.refNumber}
-                                            </Link>
-                                        ) : line.type === 'receipt' ? (
-                                            <Link href={`/dashboard/accounting/cash-receipts/${line.id}`} className="hover:underline text-primary">
-                                                {line.refNumber}
-                                            </Link>
-                                        ) : (
-                                            line.refNumber
-                                        )}
+                                        <Link href={`/dashboard/accounting/journal-entries/${line.id}`} className="hover:underline text-primary">
+                                            {line.refNumber}
+                                        </Link>
                                     </TableCell>
                                     <TableCell>{line.description}</TableCell>
                                     <TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
@@ -346,7 +327,7 @@ export default function ClientStatementPage() {
                                 <TableCell colSpan={4}>إجمالي الحركات المعروضة</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                <TableCell></TableCell> {/* Empty cell for balance column */}
+                                <TableCell></TableCell>
                             </TableRow>
                             <TableRow className="font-bold text-lg bg-muted">
                                 <TableCell colSpan={6}>الرصيد النهائي</TableCell>
