@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DownloadCloud, Folder, FolderOpen } from 'lucide-react';
+import { DownloadCloud, Folder, FolderOpen, MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, writeBatch, getDocs, where, orderBy, doc } from 'firebase/firestore';
@@ -34,10 +34,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { hardcodedChartOfAccounts } from '@/lib/chart-of-accounts-data';
-import { Loader2 } from 'lucide-react';
 
 
 const accountTypeTranslations: Record<Account['type'], string> = {
@@ -63,7 +63,7 @@ export default function ChartOfAccountsPage() {
     const { toast } = useToast();
     
     // UI and data state
-    const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
+    const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set(['1', '2', '3', '4', '5']));
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [accountBalances, setAccountBalances] = useState<Map<string, number>>(new Map());
@@ -232,16 +232,17 @@ export default function ChartOfAccountsPage() {
                                     <TableHead>طبيعة الرصيد</TableHead>
                                     <TableHead>القائمة</TableHead>
                                     <TableHead className="text-left">الرصيد</TableHead>
+                                    <TableHead className="text-center"><span className="sr-only">الإجراءات</span></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     Array.from({length: 5}).map((_, i) => (
-                                        <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
+                                        <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
                                     ))
                                 ) : displayedAccounts.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center h-48 text-muted-foreground">
+                                        <TableCell colSpan={7} className="text-center h-48 text-muted-foreground">
                                             لا توجد حسابات. قم بتثبيت شجرة الحسابات الأساسية للبدء.
                                         </TableCell>
                                     </TableRow>
@@ -254,7 +255,7 @@ export default function ChartOfAccountsPage() {
                                         return (
                                             <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''}>
                                                 <TableCell style={{ paddingRight: `${(account.level || 0) * 1.5 + 1}rem` }}>
-                                                    <div className="flex items-center gap-2 group">
+                                                    <div className="flex items-center gap-2">
                                                         {hasChildren ? (
                                                             <button onClick={() => toggleAccount(account.code)} className="p-1 -mr-1">
                                                                {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
@@ -277,6 +278,27 @@ export default function ChartOfAccountsPage() {
                                                 <TableCell className="text-xs">{account.statement === 'Balance Sheet' ? 'مركز مالي' : 'قائمة دخل'}</TableCell>
                                                 <TableCell className={cn("text-left font-mono", balance < 0 && "text-destructive")}>
                                                     {formatCurrency(balance)}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent dir="rtl">
+                                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                            <DropdownMenuItem disabled={account.level >= 4}>
+                                                                <PlusCircle className="ml-2 h-4 w-4"/>
+                                                                إضافة حساب فرعي
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem>
+                                                                <Pencil className="ml-2 h-4 w-4" />
+                                                                تعديل
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                                                <Trash2 className="ml-2 h-4 w-4" />
+                                                                حذف
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         );
