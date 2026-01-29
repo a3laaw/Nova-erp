@@ -4,3 +4,4 @@ config();
 import '@/ai/flows/generate-delay-reports.ts';
 import '@/ai/flows/suggest-task-prioritization.ts';
 import '@/ai/flows/accounting-assistant.ts';
+import '@/ai/flows/financial-forecast-flow.ts';

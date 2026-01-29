@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle, Banknote, Scale, LineChart, Users, ArrowLeftRight } from 'lucide-react';
+import { ArrowRight, Sparkles, BookUser, FileText, BookOpen, ArrowUpCircle, ArrowDownCircle, Banknote, Scale, LineChart, Users, ArrowLeftRight, TrendingUp } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 
 const accountingSections = [
@@ -95,6 +95,12 @@ const accountingSections = [
         description: 'تفاصيل وشروحات إضافية حول بنود القوائم المالية.',
         link: '/dashboard/accounting/financial-statement-notes',
         icon: <FileText className="h-8 w-8 text-primary" />,
+    },
+    {
+        title: 'التنبؤات المالية',
+        description: 'استخدم الذكاء الاصطناعي لتحليل البيانات التاريخية وتوقع الأداء المالي المستقبلي.',
+        link: '/dashboard/accounting/financial-forecast',
+        icon: <TrendingUp className="h-8 w-8 text-primary" />,
     },
 ];
 
