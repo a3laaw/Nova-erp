@@ -131,6 +131,7 @@ export type Appointment = {
   contractSigned?: boolean;
   projectType?: string;
   color?: string; // Hex color code
+  minutesContent?: string;
   // For display purposes, not stored in DB directly
 };
 

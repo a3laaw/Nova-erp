@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -26,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
     let total = 0;
@@ -58,6 +60,9 @@ export default function AppointmentDetailsPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
+    const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
+    const transactionId = Array.isArray(params.id) ? params.id[0] : params.id;
+
 
     // Data states
     const [appointment, setAppointment] = useState<Appointment | null>(null);
@@ -72,6 +77,8 @@ export default function AppointmentDetailsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [selectedStageId, setSelectedStageId] = useState('');
     const [isEditingStage, setIsEditingStage] = useState(false);
+    const [minutesContent, setMinutesContent] = useState('');
+    const [isSavingMinutes, setIsSavingMinutes] = useState(false);
 
     // Fetch main appointment data
     const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
@@ -413,6 +420,71 @@ export default function AppointmentDetailsPage() {
             setIsSaving(false);
         }
     };
+
+    const handleSaveMinutes = async () => {
+        if (!minutesContent.trim()) {
+            toast({ variant: 'destructive', title: 'محتوى فارغ', description: 'الرجاء كتابة ملخص للزيارة.' });
+            return;
+        }
+        if (!firestore || !currentUser || !appointment || !transaction || !client) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'لا يمكن حفظ الملخص حاليًا.' });
+            return;
+        }
+    
+        setIsSavingMinutes(true);
+        try {
+            const batch = writeBatch(firestore);
+    
+            const apptRef = doc(firestore, 'appointments', appointment.id);
+            batch.update(apptRef, { minutesContent: minutesContent });
+    
+            const timelineCommentRef = doc(collection(firestore, `clients/${appointment.clientId}/transactions/${appointment.transactionId!}/timelineEvents`));
+            const commentContent = `**[ملخص الزيارة رقم ${appointment.visitCount || ''}]**\n${minutesContent}`;
+            const commentData = {
+                type: 'comment',
+                content: commentContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            };
+            batch.set(timelineCommentRef, commentData);
+            
+            const historyLogRef = doc(collection(firestore, `clients/${appointment.clientId}/history`));
+            const logContent = `أضاف ${currentUser.fullName} ملخص اجتماع للزيارة رقم ${appointment.visitCount || ''} المتعلقة بمعاملة "${transaction.transactionType}".`;
+            const logData = {
+                type: 'log',
+                content: logContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            };
+            batch.set(historyLogRef, logData);
+    
+            await batch.commit();
+    
+            toast({ title: 'نجاح', description: 'تم حفظ ملخص الزيارة وإضافته لسجل المعاملة.' });
+    
+            // Notifications
+            if (transaction.assignedEngineerId && transaction.assignedEngineerId !== currentUser.employeeId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
+                if(targetUserId) {
+                    await createNotification(firestore, {
+                        userId: targetUserId,
+                        title: `ملخص اجتماع جديد: ${client.nameAr}`,
+                        body: `قام ${currentUser.fullName} بإضافة ملخص اجتماع جديد بخصوص معاملة "${transaction.transactionType}".`,
+                        link: `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId!}`
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error saving meeting minutes:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ ملخص الاجتماع.' });
+        } finally {
+            setIsSavingMinutes(false);
+        }
+    };
     
     if (loading || appointmentLoading) {
         return (
@@ -511,25 +583,57 @@ export default function AppointmentDetailsPage() {
                         </Alert>
                     )}
                  </CardContent>
-                <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
-                    <Button 
-                        disabled={!appointment.workStageUpdated}
-                        onClick={() => router.push('/dashboard/appointments')}
-                    >
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                        إغلاق الزيارة
-                    </Button>
-                    {!appointment.workStageUpdated && appointment.transactionId && (
-                         <Alert variant="destructive" className="w-full">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>إجراء مطلوب</AlertTitle>
-                            <AlertDescription>
-                                يجب تحديث مرحلة العمل أولاً قبل إغلاق الزيارة.
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                </CardFooter>
             </Card>
+
+            {appointment.workStageUpdated && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>ملخص الزيارة / محضر الاجتماع</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {appointment.minutesContent ? (
+                            <div className="text-sm text-muted-foreground whitespace-pre-wrap p-4 border rounded-md bg-muted/50">
+                                {appointment.minutesContent}
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <Textarea
+                                    placeholder="اكتب هنا ملخصًا للزيارة، النقاط التي تم الاتفاق عليها، والمهام المطلوبة للمتابعة..."
+                                    rows={5}
+                                    value={minutesContent}
+                                    onChange={(e) => setMinutesContent(e.target.value)}
+                                    disabled={isSavingMinutes}
+                                />
+                                <div className="flex justify-end">
+                                    <Button onClick={handleSaveMinutes} disabled={isSavingMinutes || !minutesContent.trim()}>
+                                        {isSavingMinutes ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                                        حفظ الملخص
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
+                <Button 
+                    disabled={!appointment.workStageUpdated}
+                    onClick={() => router.push('/dashboard/appointments')}
+                >
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                    إغلاق الزيارة والعودة للتقويم
+                </Button>
+                {!appointment.workStageUpdated && appointment.transactionId && (
+                        <Alert variant="destructive" className="w-full">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>إجراء مطلوب</AlertTitle>
+                        <AlertDescription>
+                            يجب تحديث مرحلة العمل أولاً قبل إغلاق الزيارة.
+                        </AlertDescription>
+                    </Alert>
+                )}
+            </CardFooter>
         </div>
     )
 }
