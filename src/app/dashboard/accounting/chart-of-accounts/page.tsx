@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DownloadCloud, MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, MinusCircle } from 'lucide-react';
+import { DownloadCloud, MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, Plus, Minus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, writeBatch, getDocs, where, orderBy, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -457,7 +457,7 @@ export default function ChartOfAccountsPage() {
                                                     <div className="flex items-center gap-2 group">
                                                         {hasChildren ? (
                                                              <button onClick={(e) => { e.stopPropagation(); toggleAccount(account.code); }} className="p-1 -mr-1">
-                                                                {isOpen ? <MinusCircle className="h-4 w-4 text-primary" /> : <PlusCircle className="h-4 w-4 text-muted-foreground" />}
+                                                                {isOpen ? <Minus className="h-4 w-4 text-primary" /> : <Plus className="h-4 w-4 text-muted-foreground" />}
                                                              </button>
                                                         ) : (
                                                             <span className="w-6 h-4 inline-block"></span>
@@ -537,7 +537,7 @@ export default function ChartOfAccountsPage() {
             {isFormOpen && (
                 <AccountForm 
                     isOpen={isFormOpen} 
-                    onClose={closeDialog} 
+                    onClose={() => setIsFormOpen(false)} 
                     onSave={handleSave} 
                     account={editingAccount} 
                     parentAccount={parentAccount}
@@ -564,3 +564,4 @@ export default function ChartOfAccountsPage() {
         </div>
     );
 }
+
