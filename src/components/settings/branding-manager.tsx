@@ -7,30 +7,63 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useStorage } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Building } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
+import { Progress } from '../ui/progress';
+import Image from 'next/image';
 
 export function BrandingManager() {
     const { firestore } = useFirebase();
+    const storage = useStorage();
     const { branding, loading } = useBranding();
     const { toast } = useToast();
     
     const [formData, setFormData] = useState<Partial<BrandingSettings>>({});
     const [isSaving, setIsSaving] = useState(false);
+    
+    // File upload state
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (branding) {
             setFormData(branding);
+            if (branding.logo_url) {
+                setPreviewUrl(branding.logo_url);
+            }
         }
     }, [branding]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormData(prev => ({...prev, [id]: value}));
-    }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validation
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(file.type)) {
+            setUploadError('نوع الملف غير صالح. الرجاء رفع صورة (jpg, png).');
+            return;
+        }
+        if (file.size > 500 * 1024) { // 500KB
+            setUploadError('حجم الصورة كبير جدًا. الحد الأقصى 500KB.');
+            return;
+        }
+
+        setUploadError(null);
+        setLogoFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+    };
 
     const handleSave = async () => {
         if (!firestore) {
@@ -43,18 +76,59 @@ export function BrandingManager() {
         }
 
         setIsSaving(true);
+        let finalLogoUrl = formData.logo_url || '';
+
+        // If a new file is selected, upload it first
+        if (logoFile && storage) {
+            const timestamp = Date.now();
+            const storageRef = ref(storage, `company_logos/main/logo_${timestamp}_${logoFile.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, logoFile);
+
+            await new Promise<void>((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        setUploadProgress(progress);
+                    },
+                    (error) => {
+                        console.error("Upload failed:", error);
+                        setUploadError('فشل رفع الشعار. الرجاء المحاولة مرة أخرى.');
+                        reject(error);
+                    },
+                    async () => {
+                        try {
+                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                            console.log("تم رفع اللوجو:", downloadURL);
+                            finalLogoUrl = downloadURL;
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                );
+            }).catch(error => {
+                 toast({ variant: 'destructive', title: 'خطأ في الرفع', description: 'فشل الحصول على رابط الشعار بعد الرفع.' });
+                 setIsSaving(false);
+                 setUploadProgress(null);
+                 return; // Stop execution
+            });
+        }
+        
+        // Now save all data to Firestore
         try {
-            // We use a static ID 'main' for the single settings document.
             const settingsRef = doc(firestore, 'company_settings', 'main');
-            await setDoc(settingsRef, formData, { merge: true });
+            const dataToSave = { ...formData, logo_url: finalLogoUrl };
+            await setDoc(settingsRef, dataToSave, { merge: true });
             toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية.' });
+            setLogoFile(null); // Clear file after successful save
+            setUploadProgress(null); // Clear progress
         } catch (error) {
             console.error("Error saving branding settings:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الإعدادات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الإعدادات في قاعدة البيانات.' });
         } finally {
             setIsSaving(false);
         }
-    }
+    };
 
     if (loading) {
         return (
@@ -85,9 +159,16 @@ export function BrandingManager() {
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid gap-2">
-                    <Label htmlFor="logo_url">رابط الشعار (Logo URL)</Label>
-                    <Input id="logo_url" value={formData.logo_url || ''} onChange={handleInputChange} placeholder="https://example.com/logo.png" dir="ltr" />
-                     <p className="text-xs text-muted-foreground">مؤقتاً، يرجى رفع الصورة لموقع خارجي ووضع الرابط هنا.</p>
+                    <Label htmlFor="logo-upload">شعار الشركة (اللوجو)</Label>
+                    <div className="flex items-center gap-4">
+                        {previewUrl && <Image src={previewUrl} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />}
+                         <div className="flex-1">
+                            <Input id="logo-upload" type="file" onChange={handleFileChange} accept="image/png, image/jpeg, image/jpg" />
+                             <p className="text-xs text-muted-foreground mt-2">.jpg, .png | الحد الأقصى 500KB</p>
+                        </div>
+                    </div>
+                    {uploadProgress !== null && <Progress value={uploadProgress} className="w-full h-2" />}
+                    {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">

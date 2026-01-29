@@ -4,6 +4,7 @@ import React, { createContext, useContext, ReactNode, useMemo } from 'react';
 import { initializeApp, getApp, getApps, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,7 +15,7 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore } | null {
+function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore; storage: FirebaseStorage; } | null {
   if (!firebaseConfig.projectId) {
     console.warn("Firebase projectId is missing in config. Firebase will not be initialized.");
     return null;
@@ -23,8 +24,9 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   const auth = getAuth(app);
   const firestore = getFirestore(app);
+  const storage = getStorage(app);
 
-  return { app, auth, firestore };
+  return { app, auth, firestore, storage };
 }
 
 // This function ensures Firebase is initialized only once.
@@ -45,13 +47,14 @@ interface FirebaseContextType {
   app: FirebaseApp | null;
   auth: Auth | null;
   firestore: Firestore | null;
+  storage: FirebaseStorage | null;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
 export function FirebaseProvider({ children }: { children: ReactNode }) {
   const services = useMemo(() => getFirebaseServices(), []);
-  const value = services ?? { app: null, auth: null, firestore: null };
+  const value = services ?? { app: null, auth: null, firestore: null, storage: null };
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -103,4 +106,15 @@ export function useFirestore() {
     throw new Error('useFirestore must be used within a FirebaseProvider');
   }
     return context.firestore;
+}
+
+/**
+ * A custom hook to specifically access the Firebase Storage instance.
+ */
+export function useStorage() {
+  const context = useContext(FirebaseContext);
+  if (context === undefined) {
+    throw new Error('useStorage must be used within a FirebaseProvider');
+  }
+  return context.storage;
 }
