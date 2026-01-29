@@ -1,4 +1,3 @@
-// This file is now deprecated. Chart of accounts management is now handled
-// via Excel file upload in the `chart-of-accounts` page component.
-// This file can be safely removed in future refactoring.
-export const defaultChartOfAccounts = [];
+// This file is intentionally left blank as it has been deprecated.
+// The default chart of accounts data is now managed directly within the
+// `chart-of-accounts` page component to ensure data integrity and avoid caching issues.

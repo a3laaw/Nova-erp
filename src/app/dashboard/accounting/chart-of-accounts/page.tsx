@@ -18,20 +18,12 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud, Folder, FolderOpen, Upload, File as FileIcon, Save } from 'lucide-react';
+import { DownloadCloud, Folder, FolderOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
+import { collection, query, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,10 +34,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import type { Account, JournalEntry } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
+import { hardcodedChartOfAccounts } from '@/lib/chart-of-accounts-data';
+import { Loader2 } from 'lucide-react';
 
 
 const accountTypeTranslations: Record<Account['type'], string> = {
@@ -64,28 +56,6 @@ const accountTypeColors: Record<Account['type'], string> = {
     expense: 'bg-orange-100 text-orange-800 border-orange-200',
 };
 
-// --- Excel Upload & Processing ---
-
-const mapArabicTypeToEnglish = (type: string): Account['type'] => {
-    const lowerType = type?.toLowerCase() || '';
-    if (lowerType.includes('أصول')) return 'asset';
-    if (lowerType.includes('التزامات') || lowerType.includes('خصوم')) return 'liability';
-    if (lowerType.includes('حقوق ملكية')) return 'equity';
-    if (lowerType.includes('إيرادات')) return 'income';
-    if (lowerType.includes('مصروف') || lowerType.includes('تكاليف')) return 'expense';
-    return 'asset'; // Fallback
-};
-
-const getStatementType = (code: string): Account['statement'] => {
-    if (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) return 'Balance Sheet';
-    return 'Income Statement';
-};
-
-const getBalanceType = (code: string): Account['balanceType'] => {
-    if (code.startsWith('1') || code.startsWith('5')) return 'Debit';
-    return 'Credit';
-};
-
 
 export default function ChartOfAccountsPage() {
     const router = useRouter();
@@ -98,12 +68,10 @@ export default function ChartOfAccountsPage() {
     const [loading, setLoading] = useState(true);
     const [accountBalances, setAccountBalances] = useState<Map<string, number>>(new Map());
 
-    // Excel processing state
-    const [file, setFile] = useState<File | null>(null);
-    const [isParsing, setIsParsing] = useState(false);
-    const [parsedData, setParsedData] = useState<Omit<Account, 'id'>[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
+    // Seeding state
+    const [isSeeding, setIsSeeding] = useState(false);
+    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
+
 
     const fetchAllData = useCallback(async () => {
         if (!firestore) return;
@@ -205,160 +173,53 @@ export default function ChartOfAccountsPage() {
         });
     };
 
-    const handleDownloadTemplate = async () => {
-        const XLSX = await import('xlsx');
-        const sampleData = [{
-            'الرمز': '1', 'اسم الحساب': 'الأصول', 'النوع': 'أصول', 'يمكن الدفع والتحصيل': 'لا', 'الوصف': 'جميع ممتلكات الشركة ذات القيمة الاقتصادية.'
-        }, {
-            'الرمز': '11', 'اسم الحساب': 'أصول متداولة', 'النوع': 'أصول', 'يمكن الدفع والتحصيل': 'لا', 'الوصف': 'الأصول التي يمكن تحويلها إلى نقد خلال عام.'
-        }, {
-             'الرمز': '110101', 'اسم الحساب': 'النقدية في الخزينة', 'النوع': 'أصول', 'يمكن الدفع والتحصيل': 'نعم', 'الوصف': 'النقدية الفعلية في خزينة الشركة.'
-        }];
-        const ws = XLSX.utils.json_to_sheet(sampleData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'ChartOfAccounts');
-        XLSX.writeFile(wb, 'COA_Template.xlsx');
-    };
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = event.target.files?.[0];
-        if (selectedFile) {
-            setFile(selectedFile);
-            handleParseFile(selectedFile);
-        }
-    };
-
-    const handleParseFile = (fileToParse: File) => {
-        setIsParsing(true);
-        setParsedData([]);
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const XLSX = await import('xlsx');
-                const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-                const newAccounts = json.map((row: any) => {
-                    const code = String(row['الرمز'] || '');
-                    let parentCode: string | null = null;
-                    if (code.length > 1) {
-                        if (code.length <= 2) parentCode = code.slice(0, 1);
-                        else if (code.length <= 4) parentCode = code.slice(0, 2);
-                        else if (code.length <= 6) parentCode = code.slice(0, 4);
-                    }
-                    let level = 0;
-                    if (code.length === 2) level = 1;
-                    else if (code.length > 2 && code.length <= 4) level = 2;
-                    else if (code.length > 4) level = 3;
-                    
-                    const account: Omit<Account, 'id'> = {
-                        code: code,
-                        name: row['اسم الحساب'] || 'اسم غير صالح',
-                        type: mapArabicTypeToEnglish(row['النوع']),
-                        isPayable: (row['يمكن الدفع والتحصيل'] || '').toString().trim().toLowerCase() === 'نعم',
-                        description: row['الوصف'] || '',
-                        parentCode: parentCode,
-                        level: level,
-                        statement: getStatementType(code),
-                        balanceType: getBalanceType(code),
-                    };
-                    return account;
-                }).filter(acc => acc.code && acc.name !== 'اسم غير صالح');
-
-                setParsedData(newAccounts);
-                toast({ title: 'نجاح', description: `تمت قراءة ${newAccounts.length} حساب بنجاح. راجع البيانات قبل الحفظ.` });
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل قراءة الملف. تأكد من أن الأعمدة صحيحة.' });
-            } finally {
-                setIsParsing(false);
-            }
-        };
-        reader.readAsBinaryString(fileToParse);
-    };
-
-    const handleSaveToFirestore = async () => {
-        setIsSaveConfirmOpen(false);
-        if (!firestore || parsedData.length === 0) return;
-        setIsSaving(true);
+    const handleSeedChartOfAccounts = async () => {
+        setIsSeedAlertOpen(false);
+        if (!firestore) return;
+        setIsSeeding(true);
         try {
             const batch = writeBatch(firestore);
             const accountsRef = collection(firestore, 'chartOfAccounts');
+            
+            // 1. Delete all existing accounts
             const existingAccountsSnap = await getDocs(accountsRef);
-            existingAccountsSnap.forEach(doc => batch.delete(doc.ref));
+            existingAccountsSnap.forEach(doc => {
+                batch.delete(doc.ref);
+            });
 
-            parsedData.forEach(accountData => {
-                const docRef = doc(accountsRef);
-                batch.set(docRef, accountData);
+            // 2. Add the new hardcoded accounts
+            hardcodedChartOfAccounts.forEach(account => {
+                const docRef = doc(accountsRef); // Create a new doc reference for each
+                batch.set(docRef, account);
             });
 
             await batch.commit();
-            toast({ title: 'نجاح', description: `تم مسح الشجرة القديمة وحفظ ${parsedData.length} حسابًا جديدًا.` });
-            await fetchAllData();
-            setParsedData([]);
-            setFile(null);
+            toast({ title: 'نجاح', description: 'تم مسح الشجرة القديمة وتثبيت شجرة الحسابات الأساسية بنجاح.' });
+            await fetchAllData(); // Refresh the data
         } catch (e) {
             console.error(e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ شجرة الحسابات الجديدة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تثبيت شجرة الحسابات.' });
         } finally {
-            setIsSaving(false);
+            setIsSeeding(false);
         }
     };
-
 
     return (
         <div className="space-y-6" dir="rtl">
              <Card>
                 <CardHeader>
-                    <CardTitle>تحميل شجرة الحسابات من ملف Excel</CardTitle>
-                    <CardDescription>
-                        استخدم هذه الأداة لمسح شجرة الحسابات الحالية واستبدالها بالكامل ببيانات من ملف Excel.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <div className="flex gap-4 items-center">
-                        <Button onClick={handleDownloadTemplate} variant="outline" className="flex-shrink-0">
-                            <DownloadCloud className="ml-2 h-4 w-4" />
-                            تحميل النموذج
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle>شجرة الحسابات</CardTitle>
+                            <CardDescription>
+                                عرض دليل الحسابات الخاص بالشركة. يمكنك تنزيل الشجرة الأساسية للبدء.
+                            </CardDescription>
+                        </div>
+                        <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
+                            {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                            {isSeeding ? 'جاري التثبيت...' : 'تثبيت شجرة الحسابات الأساسية'}
                         </Button>
-                        <div className="relative flex-grow">
-                             <Input id="file-upload" type="file" onChange={handleFileChange} accept=".xlsx, .xls" disabled={isParsing || isSaving} className="hidden" />
-                             <Label htmlFor="file-upload" className={cn("border-2 border-dashed rounded-lg p-4 text-center block cursor-pointer hover:bg-muted/50", file && "border-primary")}>
-                                <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                                <p className="mt-2 text-sm font-medium">{file ? `الملف المحدد: ${file.name}` : 'انقر هنا لاختيار ملف'}</p>
-                                <p className="text-xs text-muted-foreground">يجب أن يكون الملف بصيغة .xlsx أو .xls</p>
-                             </Label>
-                        </div>
-                     </div>
-                     {parsedData.length > 0 && (
-                        <div className='space-y-4'>
-                            <h3 className="font-semibold">معاينة البيانات (أول 5 صفوف)</h3>
-                            <div className="border rounded-lg overflow-hidden">
-                                <Table>
-                                    <TableHeader><TableRow><TableHead>الرمز</TableHead><TableHead>اسم الحساب</TableHead><TableHead>النوع</TableHead></TableRow></TableHeader>
-                                    <TableBody>
-                                        {parsedData.slice(0, 5).map((row, i) => (
-                                            <TableRow key={i}><TableCell>{row.code}</TableCell><TableCell>{row.name}</TableCell><TableCell>{row.type}</TableCell></TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                            <div className='flex justify-end'>
-                                <Button onClick={() => setIsSaveConfirmOpen(true)} disabled={isSaving}>
-                                    <Save className="ml-2 h-4 w-4" />
-                                    حفظ الشجرة الجديدة ({parsedData.length} حساب)
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>عرض شجرة الحسابات الحالية</CardTitle>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="border rounded-lg">
@@ -381,7 +242,7 @@ export default function ChartOfAccountsPage() {
                                 ) : displayedAccounts.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center h-48 text-muted-foreground">
-                                            لا توجد حسابات. قم برفع ملف Excel لإنشاء الشجرة.
+                                            لا توجد حسابات. قم بتثبيت شجرة الحسابات الأساسية للبدء.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -427,18 +288,18 @@ export default function ChartOfAccountsPage() {
                 </CardContent>
             </Card>
             
-            <AlertDialog open={isSaveConfirmOpen} onOpenChange={setIsSaveConfirmOpen}>
+            <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد استبدال شجرة الحسابات؟</AlertDialogTitle>
+                        <AlertDialogTitle>تأكيد تثبيت شجرة الحسابات؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                           **تحذير خطير:** سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** في قاعدة البيانات واستبدالها بالبيانات من ملف Excel. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟
+                           **تحذير خطير:** سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** في قاعدة البيانات واستبدالها بشجرة حسابات أساسية. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isSaving}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleSaveToFirestore} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">
-                            {isSaving ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحفظ...</> : 'نعم، قم بالمسح والحفظ'}
+                        <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding} className="bg-destructive hover:bg-destructive/90">
+                            {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التثبيت...</> : 'نعم، قم بالمسح والتثبيت'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
