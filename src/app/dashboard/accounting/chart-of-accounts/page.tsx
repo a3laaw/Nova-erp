@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -85,36 +86,42 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
     const [formData, setFormData] = useState<Partial<Account>>({});
 
     useEffect(() => {
-        if (isEditing && account) {
-            setFormData({ code: account.code, name: account.name, type: account.type, isPayable: account.isPayable });
-        } else if (isOpen) {
-            let nextCode = '';
-            let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
-
-            const relevantAccounts = parentAccount
-                ? accounts.filter(acc => acc.level === parentAccount.level + 1 && acc.code.startsWith(parentAccount.code))
-                : accounts.filter(acc => acc.level === 0);
-            
-            if (relevantAccounts.length === 0) {
-                if (parentAccount) {
-                    if (parentAccount.level === 0) { nextCode = parentAccount.code + '1'; } 
-                    else { nextCode = parentAccount.code + '01'; }
-                } else { nextCode = '1'; }
+        if (isOpen) {
+            if (isEditing && account) {
+                setFormData({ code: account.code, name: account.name, type: account.type, isPayable: account.isPayable });
             } else {
-                const lastCodeNum = Math.max(...relevantAccounts.map(acc => parseInt(acc.code, 10)));
-                nextCode = String(lastCodeNum + 1);
+                let nextCode = '';
+                let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
+
+                const relevantAccounts = parentAccount
+                    ? accounts.filter(acc => acc.level === parentAccount.level + 1 && acc.code.startsWith(parentAccount.code))
+                    : accounts.filter(acc => acc.level === 0);
+                
+                if (relevantAccounts.length === 0) {
+                     if (parentAccount) {
+                         if (parentAccount.code.length <= 2) { nextCode = parentAccount.code + '01'; }
+                         else { nextCode = parentAccount.code + '001'; }
+                     } else {
+                         const maxRootCode = Math.max(0, ...accounts.filter(a => a.level === 0).map(a => parseInt(a.code, 10)));
+                         nextCode = String(maxRootCode + 1);
+                     }
+                } else {
+                    const lastCodeNum = Math.max(...relevantAccounts.map(acc => parseInt(acc.code, 10)));
+                    nextCode = String(lastCodeNum + 1);
+                }
+                
+                setFormData({ type: newType, code: nextCode, name: '', isPayable: true });
             }
-            
-            setFormData({ type: newType, code: nextCode, name: '', isPayable: true });
         }
     }, [account, parentAccount, isEditing, isOpen, accounts]);
 
 
     const getLevelFromCode = (code: string): number => {
-        if (code.length <= 1) return 0;
-        if (code.length <= 2) return 1;
-        if (code.length <= 4) return 2;
-        return 3;
+        if (code.length === 1) return 0;
+        if (code.length === 2) return 1;
+        if (code.length === 4) return 2;
+        if (code.length > 4) return 3;
+        return 0; // Default case
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -138,8 +145,8 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="code">رمز الحساب (تلقائي)</Label>
-                            <Input id="code" value={formData.code || ''} readOnly disabled required dir="ltr" className="bg-muted/50" />
+                            <Label htmlFor="code">رمز الحساب</Label>
+                            <Input id="code" value={formData.code || ''} onChange={(e) => setFormData(p => ({ ...p, code: e.target.value }))} required dir="ltr" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="name">اسم الحساب</Label>
@@ -195,7 +202,7 @@ export default function ChartOfAccountsPage() {
         if (!firestore) return;
         setLoading(true);
         try {
-            const accountsQuery = query(collection(firestore, 'chartOfAccounts'));
+            const accountsQuery = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
             const entriesQuery = query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'));
 
             const [accountsSnapshot, entriesSnapshot] = await Promise.all([
@@ -212,7 +219,7 @@ export default function ChartOfAccountsPage() {
             journalEntries.forEach(entry => {
                 entry.lines.forEach(line => {
                     const acc = fetchedAccounts.find(a => a.id === line.accountId);
-                    if (!acc || !acc.isPayable) return; 
+                    if (!acc) return; 
                     
                     const currentBalance = directBalances.get(line.accountId) || 0;
                     let balanceChange = 0;
@@ -534,7 +541,7 @@ export default function ChartOfAccountsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** وإضافة شجرة حسابات أساسية تحتوي على أكثر من 80 حسابًا. يوصى بهذا الإجراء إذا كانت شجرة حساباتك فارغة أو إذا كنت تريد البدء من جديد. هل تريد المتابعة؟
+                            سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** وإضافة شجرة حسابات أساسية. يوصى بهذا الإجراء إذا كانت شجرة حساباتك فارغة أو إذا كنت تريد البدء من جديد. هل تريد المتابعة؟
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
