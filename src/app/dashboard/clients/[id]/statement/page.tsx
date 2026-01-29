@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from 'firebase/firestore';
-import type { Client, JournalEntry, CashReceipt, Company } from '@/lib/types';
+import type { Client, JournalEntry, CashReceipt, Company, Account } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -79,9 +79,10 @@ export default function ClientStatementPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [clientSnap, companySnap, journalEntriesSnap, cashReceiptsSnap] = await Promise.all([
+                const [clientSnap, companySnap, accountsSnap, journalEntriesSnap, cashReceiptsSnap] = await Promise.all([
                     getDoc(doc(firestore, 'clients', id)),
                     getDocs(query(collection(firestore, 'companies'), limit(1))),
+                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
                     getDocs(query(collection(firestore, 'journalEntries'), where('clientId', '==', id))),
                     getDocs(query(collection(firestore, 'cashReceipts'), where('clientId', '==', id))),
                 ]);
@@ -89,27 +90,36 @@ export default function ClientStatementPage() {
                 if (!clientSnap.exists()) {
                     throw new Error('لم يتم العثور على العميل');
                 }
-                setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
+                const clientData = { id: clientSnap.id, ...clientSnap.data() } as Client;
+                setClient(clientData);
                 
                 if (!companySnap.empty) {
                     setCompany({ id: companySnap.docs[0].id, ...companySnap.docs[0].data() as Company });
                 }
 
+                const allAccounts = accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const clientAccount = allAccounts.find(acc => acc.name === clientData.nameAr) as Account | undefined;
+                const clientAccountId = clientAccount ? clientAccount.id : null;
+
+
                 const transactions: any[] = [];
                 
                 journalEntriesSnap.forEach(entryDoc => {
                     const entry = entryDoc.data() as JournalEntry;
-                    if (entry.status === 'posted') { // Only include posted entries
-                        transactions.push({
-                            id: entryDoc.id,
-                            date: entry.date.toDate(),
-                            description: entry.narration,
-                            debit: entry.totalDebit,
-                            credit: 0,
-                            refNumber: entry.entryNumber,
-                            voucherType: 'فاتورة عقد',
-                            type: 'journal'
-                        });
+                    if (entry.status === 'posted' && clientAccountId) {
+                        const clientLine = entry.lines.find(line => line.accountId === clientAccountId);
+                        if (clientLine) {
+                             transactions.push({
+                                id: entryDoc.id,
+                                date: entry.date.toDate(),
+                                description: entry.narration,
+                                debit: clientLine.debit,
+                                credit: clientLine.credit,
+                                refNumber: entry.entryNumber,
+                                voucherType: entry.narration.includes('عقد') ? 'فاتورة عقد' : 'قيد يومية',
+                                type: 'journal'
+                            });
+                        }
                     }
                 });
 
@@ -332,11 +342,15 @@ export default function ClientStatementPage() {
                              )}
                         </TableBody>
                         <TableFooter>
-                            <TableRow className="font-bold bg-muted/50">
+                             <TableRow className="font-bold bg-muted/50">
                                 <TableCell colSpan={4}>إجمالي الحركات المعروضة</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                <TableCell className="text-left font-mono font-bold text-lg">{formatCurrency(statementData.finalBalance)}</TableCell>
+                                <TableCell></TableCell> {/* Empty cell for balance column */}
+                            </TableRow>
+                            <TableRow className="font-bold text-lg bg-muted">
+                                <TableCell colSpan={6}>الرصيد النهائي</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
