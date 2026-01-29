@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDoc, useCollection } from '@/firebase';
 import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
@@ -217,10 +217,12 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const fromAppointmentId = searchParams.get('fromAppointmentId');
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [contractTransaction, setContractTransaction] = useState<ClientTransaction | null>(null);
@@ -471,14 +473,15 @@ export default function ClientProfilePage() {
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)}
         clientId={id}
-        clientName={client.nameAr}
+        clientName={(client as any).nameAr}
+        fromAppointmentId={fromAppointmentId}
     />
      <ContractClausesForm 
         isOpen={!!contractTransaction} 
         onClose={() => setContractTransaction(null)}
         transaction={contractTransaction}
         clientId={id}
-        clientName={client.nameAr}
+        clientName={(client as any).nameAr}
     />
     <div className='space-y-6' dir='rtl'>
         <div className='flex justify-end items-center no-print'>
@@ -491,15 +494,15 @@ export default function ClientProfilePage() {
                     <User className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <div className='space-y-1'>
-                    <CardTitle className='text-3xl'>{client.nameAr}</CardTitle>
-                    <CardDescription className='text-md'>{client.nameEn}</CardDescription>
+                    <CardTitle className='text-3xl'>{(client as any).nameAr}</CardTitle>
+                    <CardDescription className='text-md'>{(client as any).nameEn}</CardDescription>
                     <div className='flex items-center gap-4 pt-1'>
                         <div className='flex items-center gap-2 text-sm text-muted-foreground font-mono'>
                             <Hash className='h-4 w-4'/>
-                            <span>{client.fileId}</span>
+                            <span>{(client as any).fileId}</span>
                         </div>
-                        <Badge variant="outline" className={clientStatusColors[client.status]}>
-                            {clientStatusTranslations[client.status]}
+                        <Badge variant="outline" className={clientStatusColors[(client as any).status]}>
+                            {clientStatusTranslations[(client as any).status]}
                         </Badge>
                     </div>
                 </div>
@@ -519,9 +522,9 @@ export default function ClientProfilePage() {
                 </CardHeader>
                 <CardContent className='space-y-4'>
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
-                    <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
+                    <InfoRow icon={<Phone />} label="رقم الجوال" value={(client as any).mobile} />
                     <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                    <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+                    <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate((client as any).createdAt)} />
                 </CardContent>
             </Card>
 

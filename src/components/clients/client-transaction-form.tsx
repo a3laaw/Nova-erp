@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -29,16 +30,18 @@ interface ClientTransactionFormProps {
   onClose: () => void;
   clientId: string;
   clientName: string;
+  fromAppointmentId?: string | null;
 }
 
 interface FetchedTransactionType extends TransactionType {
     parentDeptId: string;
 }
 
-export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
+export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
+    const router = useRouter();
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
@@ -180,22 +183,31 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             batch.set(newTransactionRef, newTransactionData);
 
             // Add creation log event to the transaction's timeline
-            const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
-            const logEventRef = doc(timelineCollectionRef);
-            
             let logContent = `أنشأ المعاملة "${transactionTypeName}".`;
             if (engineer) {
                 logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
             }
-
-            batch.set(logEventRef, {
+            
+            // Link the appointment to this new transaction if it originated from one
+            if (fromAppointmentId) {
+                const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
+                batch.update(appointmentRef, { transactionId: newTransactionRefId });
+                logContent += ` (مرتبطة بالموعد ${fromAppointmentId.substring(0, 5)}...).`;
+            }
+            
+            const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            const logEventData = {
                 type: 'log',
                 content: logContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
-            });
+            };
+            batch.set(doc(timelineCollectionRef), logEventData);
+            batch.set(doc(historyCollectionRef), logEventData);
+
 
             await batch.commit();
             
@@ -224,6 +236,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
             
             resetForm();
             onClose();
+
+            // After everything is done, if we came from an appointment, go back to it.
+            if (fromAppointmentId) {
+                router.push(`/dashboard/appointments/${fromAppointmentId}`);
+            }
 
         } catch (error) {
             console.error("Error adding transaction:", error);

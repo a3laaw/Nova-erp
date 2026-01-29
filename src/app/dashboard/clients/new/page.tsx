@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -257,7 +256,7 @@ export default function NewClientPage() {
             
             const fromAppointmentId = searchParams.get('fromAppointmentId');
             if (fromAppointmentId) {
-                router.push(`/dashboard/appointments/${fromAppointmentId}`);
+                router.push(`/dashboard/clients/${newClientId}?fromAppointmentId=${fromAppointmentId}`);
             } else {
                 router.push(`/dashboard/clients/${newClientId}`);
             }
