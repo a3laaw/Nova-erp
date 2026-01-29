@@ -7,8 +7,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { TrendingUp } from 'lucide-react';
-import { CashFlowProjectionChart } from '@/components/accounting/cash-flow-projection-chart';
+import { TrendingUp, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const CashFlowProjectionChart = dynamic(
+    () => import('@/components/accounting/cash-flow-projection-chart').then(mod => mod.CashFlowProjectionChart),
+    { 
+        ssr: false,
+        loading: () => (
+            <div className="flex justify-center items-center h-80">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="mr-2">جاري تحميل الرسم البياني...</p>
+            </div>
+        ),
+    }
+);
 
 export default function FinancialForecastPage() {
     return (
