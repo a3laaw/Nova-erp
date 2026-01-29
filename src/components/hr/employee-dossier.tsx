@@ -9,6 +9,7 @@ import { Banknote, Briefcase, Calendar, Contact, FileText, Gift, Home, User, Wal
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { fromFirestoreDate } from '@/services/date-converter';
+import { useBranding } from '@/context/branding-context';
 
 interface DossierProps {
   employee: Partial<Employee>;
@@ -55,6 +56,7 @@ function InfoItem({ label, value, className = '' }: { label: string, value: Reac
 
 export function EmployeeDossier({ employee, reportDate }: DossierProps) {
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  const { branding } = useBranding();
 
   useEffect(() => {
     // Set the date on the client side to avoid hydration mismatch.
@@ -85,17 +87,28 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
         <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2">
             {/* Header */}
             <header className="flex justify-between items-start pb-4 border-b">
-                <div className='flex items-center gap-4'>
-                    <Logo className="h-16 w-16 !p-3 print:hidden" />
-                    <div>
-                        <h1 className="text-2xl font-bold font-headline print:text-xl">ملف الموظف الشامل</h1>
-                        <p className="text-muted-foreground print:text-sm">Nova ERP</p>
-                    </div>
-                </div>
-                <div className="text-left text-xs text-muted-foreground">
-                    <p>تاريخ التقرير: {formatDate(reportDate)}</p>
-                    {currentDate && <p className="print:hidden">تاريخ الطباعة: {formatDate(currentDate)}</p>}
-                </div>
+                 {branding?.letterhead_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                        src={branding.letterhead_image_url} 
+                        alt={`${branding.company_name || ''} Letterhead`}
+                        className="w-full h-auto object-contain max-h-[150px]"
+                    />
+                ) : (
+                    <>
+                        <div className='flex items-center gap-4'>
+                            <Logo className="h-16 w-16 !p-3 print:hidden" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                            <div>
+                                <h1 className="text-2xl font-bold font-headline print:text-xl">{branding?.company_name || 'ملف الموظف الشامل'}</h1>
+                                <p className="text-muted-foreground print:text-sm">{branding?.letterhead_text || 'Nova ERP'}</p>
+                            </div>
+                        </div>
+                        <div className="text-left text-xs text-muted-foreground">
+                            <p>تاريخ التقرير: {formatDate(reportDate)}</p>
+                            {currentDate && <p className="print:hidden">تاريخ الطباعة: {formatDate(currentDate)}</p>}
+                        </div>
+                    </>
+                )}
             </header>
 
             <main className="space-y-4">
@@ -174,7 +187,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                         {serviceDuration && (
                              <InfoItem label="مدة الخدمة حتى تاريخ التقرير" value={`${serviceDuration.years || 0} سنة, ${serviceDuration.months || 0} شهر, ${serviceDuration.days || 0} يوم`} />
                         )}
-                        <Separator className='my-2 bg-blue-200 dark:bg-blue-800'/>
+                        <Separator className='my-2 bg-blue-200 dark:bg-blue-700'/>
                         <div className="flex justify-between items-center mt-2">
                             <span className="text-muted-foreground">قيمة نهاية الخدمة المستحقة:</span>
                             <span className="font-bold text-lg text-blue-600 dark:text-blue-400">{formatCurrency(employee.eosb || 0)}</span>
@@ -188,7 +201,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
 
             <footer className="text-center pt-4 mt-4 border-t print:mt-8">
                 <p className="text-xs text-muted-foreground">
-                    هذا التقرير تم إنشاؤه بواسطة نظام Nova ERP. جميع الحقوق محفوظة © {currentDate ? currentDate.getFullYear() : '...'}
+                    هذا التقرير تم إنشاؤه بواسطة نظام {branding?.company_name || 'Nova ERP'}. جميع الحقوق محفوظة © {currentDate ? currentDate.getFullYear() : '...'}
                 </p>
             </footer>
         </div>

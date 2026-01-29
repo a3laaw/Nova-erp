@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from 'firebase/firestore';
-import type { Account, JournalEntry, Company } from '@/lib/types';
+import type { Account, JournalEntry } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -34,6 +34,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import Link from 'next/link';
+import { useBranding } from '@/context/branding-context';
 
 interface StatementLine {
     date: Date;
@@ -48,9 +49,9 @@ interface StatementLine {
 export default function AccountStatementPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
+    const { branding, loading: brandingLoading } = useBranding();
 
     const [accounts, setAccounts] = useState<Account[]>([]);
-    const [company, setCompany] = useState<Company | null>(null);
     const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
     const [loading, setLoading] = useState(true);
     
@@ -77,18 +78,13 @@ export default function AccountStatementPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [accountsSnap, companySnap, entriesSnap] = await Promise.all([
+                const [accountsSnap, entriesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                    getDocs(query(collection(firestore, 'companies'), limit(1))),
                     getDocs(query(collection(firestore, 'journalEntries'))),
                 ]);
 
                 const fetchedAccounts = accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
                 setAccounts(fetchedAccounts);
-                
-                if (!companySnap.empty) {
-                    setCompany({ id: companySnap.docs[0].id, ...companySnap.docs[0].data() as Company });
-                }
                 
                 const fetchedEntries = entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry));
                 setJournalEntries(fetchedEntries);
@@ -181,6 +177,7 @@ export default function AccountStatementPage() {
     };
 
     const selectedAccount = accounts.find(a => a.id === accountId);
+    const isLoading = loading || brandingLoading;
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
@@ -222,7 +219,7 @@ export default function AccountStatementPage() {
                 </CardContent>
             </Card>
             
-            {!accountId && !loading && (
+            {!accountId && !isLoading && (
                 <Card>
                     <CardContent className="p-12 text-center text-muted-foreground">
                         الرجاء اختيار حساب لعرض كشف الحساب الخاص به.
@@ -230,25 +227,35 @@ export default function AccountStatementPage() {
                 </Card>
             )}
 
-            {loading && accountId && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
+            {isLoading && accountId && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
-            {accountId && !loading && (
+            {accountId && !isLoading && (
                 <Card id="printable-area" className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
                     <CardHeader className="p-8 md:p-12">
-                        <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                            <div className="text-left flex-shrink-0">
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">كشف حساب</h2>
-                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Nova ERP - Account Statement</p>
-                                <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                               {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-16 w-16 !p-3" />}
-                                <div>
-                                   <h1 className="font-bold text-lg">{company?.name || 'Nova ERP'}</h1>
-                                   <p className="text-sm text-muted-foreground">{company?.nameEn || 'Nova ERP'}</p>
+                        {branding?.letterhead_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img 
+                                src={branding.letterhead_image_url} 
+                                alt={`${branding.company_name || ''} Letterhead`}
+                                className="w-full h-auto object-contain max-h-[150px] mb-4"
+                            />
+                        ) : (
+                            <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                                <div className="text-left flex-shrink-0">
+                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">كشف حساب</h2>
+                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Account Statement</p>
+                                    <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                   <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                    <div>
+                                        <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
+                                        <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
+                                        <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                          <div className="mt-6 text-sm">
                             <p><span className="font-semibold w-24 inline-block">الحساب:</span> {selectedAccount?.name} ({selectedAccount?.code})</p>
                             <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(parseISO(dateFrom), 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(parseISO(dateTo), 'dd/MM/yyyy')}</p>
