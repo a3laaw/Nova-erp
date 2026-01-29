@@ -138,8 +138,22 @@ export default function EditPaymentVoucherPage() {
     if (!firestore || !currentUser || !id || !voucherSnap?.exists()) return;
 
     if (journalEntryIsPosted) {
-        toast({ variant: 'destructive', title: 'لا يمكن التعديل', description: 'القيد المحاسبي المرتبط بهذا السند مرحّل. يجب التراجع عن ترحيله أولاً.' });
-        return;
+        const shouldProceed = await new Promise((resolve) => {
+            toast({
+                variant: 'destructive',
+                title: 'القيد المحاسبي مرحّل',
+                description: 'هذا السند مرتبط بقيد مرحّل. تعديله سيؤثر على الحسابات. هل تريد المتابعة وتحديث القيد تلقائياً؟',
+                action: (
+                    <>
+                        <Button onClick={() => resolve(true)} variant="default">نعم، متابعة</Button>
+                        <Button onClick={() => resolve(false)} variant="outline">إلغاء</Button>
+                    </>
+                ),
+            });
+        });
+        if (!shouldProceed) {
+            return;
+        }
     }
     
     setIsSaving(true);
@@ -236,7 +250,7 @@ export default function EditPaymentVoucherPage() {
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>القيد مرحّل</AlertTitle>
                         <AlertDescription>
-                            لا يمكن تعديل هذا السند لأن القيد المحاسبي المرتبط به قد تم ترحيله. يجب التراجع عن الترحيل أولاً.
+                            سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -245,7 +259,7 @@ export default function EditPaymentVoucherPage() {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
                         <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
-                        <Input id="payeeName" {...register('payeeName')} disabled={journalEntryIsPosted} />
+                        <Input id="payeeName" {...register('payeeName')} disabled={isSaving} />
                         {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
                     </div>
                     <div className="grid gap-2">
@@ -254,7 +268,7 @@ export default function EditPaymentVoucherPage() {
                             name="payeeType"
                             control={control}
                             render={({ field }) => (
-                                <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={journalEntryIsPosted}>
+                                <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                                     <SelectTrigger id="payeeType"><SelectValue placeholder="اختر نوع المستفيد..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="vendor">مورد</SelectItem>
@@ -270,7 +284,7 @@ export default function EditPaymentVoucherPage() {
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="grid gap-2">
                         <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                        <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} disabled={journalEntryIsPosted} />
+                        <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} disabled={isSaving} />
                         {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
                     </div>
                     <div className="md:col-span-2 grid gap-2">
@@ -282,13 +296,13 @@ export default function EditPaymentVoucherPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="description">وذلك عن / البيان <span className="text-destructive">*</span></Label>
-                    <Textarea id="description" placeholder="وصف عملية الصرف..." {...register('description')} disabled={journalEntryIsPosted}/>
+                    <Textarea id="description" placeholder="وصف عملية الصرف..." {...register('description')} disabled={isSaving}/>
                      {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="grid gap-2">
                          <Label htmlFor="paymentDate">تاريخ الدفع <span className="text-destructive">*</span></Label>
-                        <Input id="paymentDate" type="date" {...register('paymentDate')} disabled={journalEntryIsPosted}/>
+                        <Input id="paymentDate" type="date" {...register('paymentDate')} disabled={isSaving}/>
                         {errors.paymentDate && <p className="text-xs text-destructive">{errors.paymentDate.message}</p>}
                     </div>
                     <div className="grid gap-2">
@@ -297,7 +311,7 @@ export default function EditPaymentVoucherPage() {
                             name="paymentMethod"
                             control={control}
                             render={({ field }) => (
-                                <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={journalEntryIsPosted}>
+                                <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                                     <SelectTrigger id="paymentMethod"><SelectValue placeholder="اختر طريقة الدفع" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Cash">نقداً</SelectItem>
@@ -311,7 +325,7 @@ export default function EditPaymentVoucherPage() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-                        <Input id="reference" placeholder="رقم المرجع..." {...register('reference')} disabled={journalEntryIsPosted}/>
+                        <Input id="reference" placeholder="رقم المرجع..." {...register('reference')} disabled={isSaving}/>
                     </div>
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
@@ -326,7 +340,7 @@ export default function EditPaymentVoucherPage() {
                                     onSelect={field.onChange}
                                     options={debitAccountOptions}
                                     placeholder={accountsLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."}
-                                    disabled={accountsLoading || journalEntryIsPosted}
+                                    disabled={accountsLoading || isSaving}
                                 />
                             )}
                         />
@@ -343,7 +357,7 @@ export default function EditPaymentVoucherPage() {
                                     onSelect={field.onChange}
                                     options={creditAccountOptions}
                                     placeholder={accountsLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."}
-                                    disabled={accountsLoading || journalEntryIsPosted}
+                                    disabled={accountsLoading || isSaving}
                                 />
                             )}
                         />
@@ -356,7 +370,7 @@ export default function EditPaymentVoucherPage() {
                     <X className="ml-2 h-4 w-4" />
                     إلغاء
                 </Button>
-                <Button type="submit" disabled={isSaving || journalEntryIsPosted}>
+                <Button type="submit" disabled={isSaving}>
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                     {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
                 </Button>

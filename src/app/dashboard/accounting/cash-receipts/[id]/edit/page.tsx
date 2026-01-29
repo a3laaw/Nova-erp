@@ -245,13 +245,24 @@ export default function EditCashReceiptPage() {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
 
     if (journalEntryIsPosted) {
-        toast({
-            variant: 'destructive',
-            title: 'لا يمكن التعديل',
-            description: 'القيد المحاسبي المرتبط بهذا السند قد تم ترحيله. يجب التراجع عن الترحيل أولاً.',
+        const shouldProceed = await new Promise((resolve) => {
+            toast({
+                variant: 'destructive',
+                title: 'القيد المحاسبي مرحّل',
+                description: 'هذا السند مرتبط بقيد مرحّل. تعديله سيؤثر على الحسابات. هل تريد المتابعة وتحديث القيد تلقائياً؟',
+                action: (
+                    <>
+                        <Button onClick={() => resolve(true)} variant="default">نعم، متابعة</Button>
+                        <Button onClick={() => resolve(false)} variant="outline">إلغاء</Button>
+                    </>
+                ),
+            });
         });
-        return;
+        if (!shouldProceed) {
+            return;
+        }
     }
+
 
     if (!amount || !date || !paymentMethod) {
         toast({
@@ -268,20 +279,11 @@ export default function EditCashReceiptPage() {
         await runTransaction(firestore, async (transaction_fs) => {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
 
-            // --- Reads ---
-            if(originalReceipt.journalEntryId) {
-                const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
-                const jeSnap = await transaction_fs.get(jeRef);
-                if (jeSnap.exists() && jeSnap.data().status === 'posted') {
-                    throw new Error('القيد المحاسبي المرتبط بهذا السند قد تم ترحيله. يجب التراجع عن الترحيل أولاً.');
-                }
-            }
             const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
             if (!clientAccount) {
                 throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${originalReceipt.clientNameAr}.`);
             }
             
-            // Auto-determine debit account
             let debitAccount;
             if (paymentMethod === 'Cash') {
                 debitAccount = accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'));
@@ -292,9 +294,6 @@ export default function EditCashReceiptPage() {
                  throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
             }
 
-            // --- Writes ---
-
-            // Update Receipt Document
             const receiptUpdatePayload = {
                 receiptDate: new Date(date),
                 projectId: selectedProjectId || null,
@@ -306,7 +305,6 @@ export default function EditCashReceiptPage() {
             };
             transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
 
-            // Update Journal Entry Document
             const newLines = [
                 { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
                 { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
@@ -319,7 +317,7 @@ export default function EditCashReceiptPage() {
                 totalCredit: parseFloat(amount),
                 narration: `تحديث سند قبض رقم ${originalReceipt.voucherNumber} من العميل ${originalReceipt.clientNameAr}`,
                 transactionId: selectedProjectId || null,
-                status: 'posted', // Always post on save
+                status: 'posted',
             };
 
             if (originalReceipt.journalEntryId) {
@@ -338,7 +336,6 @@ export default function EditCashReceiptPage() {
             }
         });
 
-        // --- Post-transaction logic to update contract statuses ---
         if (originalReceipt.projectId) {
             const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore);
             const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);
@@ -413,7 +410,7 @@ export default function EditCashReceiptPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>القيد مرحّل</AlertTitle>
                     <AlertDescription>
-                        لا يمكن تعديل هذا السند لأن القيد المحاسبي المرتبط به قد تم ترحيله. يجب التراجع عن الترحيل أولاً.
+                        لا يمكن تعديل هذا السند لأن القيد المحاسبي المرتبط به قد تم ترحيله. سيتم تحديث القيد تلقائياً عند الحفظ.
                     </AlertDescription>
                 </Alert>
             )}
@@ -426,7 +423,7 @@ export default function EditCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
                 </div>
             </div>
             
@@ -437,14 +434,14 @@ export default function EditCashReceiptPage() {
                     onSelect={setSelectedProjectId}
                     options={projectOptions}
                     placeholder={'اختر العقد المراد سداد دفعة له...'}
-                    disabled={isSaving || journalEntryIsPosted}
+                    disabled={isSaving}
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
@@ -455,12 +452,12 @@ export default function EditCashReceiptPage() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="description">وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
-                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving || journalEntryIsPosted}>
+                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
                         <SelectTrigger id="paymentMethod">
                             <SelectValue placeholder="اختر طريقة الدفع" />
                         </SelectTrigger>
@@ -474,7 +471,7 @@ export default function EditCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                 <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
                 </div>
             </div>
         </CardContent>
@@ -483,7 +480,7 @@ export default function EditCashReceiptPage() {
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading || journalEntryIsPosted}>
+        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
