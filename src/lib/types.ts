@@ -115,8 +115,9 @@ export type Appointment = {
   title: string;
   appointmentDate: any; // This will be the start time
   endDate?: any; // This will be the end time
-  clientId: string;
+  clientId?: string;
   clientName?: string;
+  clientMobile?: string;
   engineerId: string;
   engineerName?: string;
   meetingRoom?: string;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -36,6 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
+import { Checkbox } from '../ui/checkbox';
 
 // --- Constants & Helpers ---
 const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
@@ -105,7 +107,8 @@ export function ArchitecturalAppointmentsView() {
                 .map(appt => {
                     return {
                         ...appt,
-                        clientName: allClients.find(c => c.id === appt.clientId)?.nameAr,
+                        // For existing clients, find their name from the clients list
+                        clientName: appt.clientId ? allClients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
                     }
                 });
             
@@ -191,34 +194,37 @@ export function ArchitecturalAppointmentsView() {
             const apptToDeleteRef = doc(firestore, 'appointments', appointmentToDelete.id!);
             batch.delete(apptToDeleteRef);
 
-            const clientApptsQuery = query(
-                collection(firestore, 'appointments'),
-                where('clientId', '==', appointmentToDelete.clientId),
-                where('type', '==', 'architectural')
-            );
-            const clientApptsSnap = await getDocs(clientApptsQuery);
-            
-            let remainingAppointments = clientApptsSnap.docs
-                .map(d => ({ id: d.id, ...d.data() } as Appointment))
-                .filter(a => a.id !== appointmentToDelete.id);
-            
-            const clientRef = doc(firestore, 'clients', appointmentToDelete.clientId);
-            const clientSnap = await getDoc(clientRef);
-            const contractSigned = clientSnap.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
+            // Only perform recalculation for registered clients
+            if (appointmentToDelete.clientId) {
+                const clientApptsQuery = query(
+                    collection(firestore, 'appointments'),
+                    where('clientId', '==', appointmentToDelete.clientId),
+                    where('type', '==', 'architectural')
+                );
+                const clientApptsSnap = await getDocs(clientApptsQuery);
+                
+                let remainingAppointments = clientApptsSnap.docs
+                    .map(d => ({ id: d.id, ...d.data() } as Appointment))
+                    .filter(a => a.id !== appointmentToDelete.id);
+                
+                const clientRef = doc(firestore, 'clients', appointmentToDelete.clientId);
+                const clientSnap = await getDoc(clientRef);
+                const contractSigned = clientSnap.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
 
-            remainingAppointments.sort((a, b) => a.appointmentDate.toMillis() - b.appointmentDate.toMillis());
+                remainingAppointments.sort((a, b) => a.appointmentDate.toMillis() - b.appointmentDate.toMillis());
 
-            remainingAppointments.forEach((appt, index) => {
-                const visitCount = index + 1;
-                const newColor = getVisitColor({ visitCount, contractSigned });
+                remainingAppointments.forEach((appt, index) => {
+                    const visitCount = index + 1;
+                    const newColor = getVisitColor({ visitCount, contractSigned });
 
-                const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
+                    const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
 
-                if (needsUpdate) {
-                    const apptRef = doc(firestore, 'appointments', appt.id!);
-                    batch.update(apptRef, { visitCount, color: newColor });
-                }
-            });
+                    if (needsUpdate) {
+                        const apptRef = doc(firestore, 'appointments', appt.id!);
+                        batch.update(apptRef, { visitCount, color: newColor });
+                    }
+                });
+            }
 
             await batch.commit();
 
@@ -473,6 +479,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
+    
+    const [isNewClient, setIsNewClient] = useState(false);
+    const [newClientName, setNewClientName] = useState('');
+    const [newClientMobile, setNewClientMobile] = useState('');
 
     const isEditing = !!dialogData?.isEditing;
     
@@ -490,12 +500,20 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 setSelectedTransactionId(dialogData.transactionId || '');
                 setNewDate(format(apptDate, 'yyyy-MM-dd'));
                 setNewTime(format(apptDate, 'HH:mm'));
+                setIsNewClient(!dialogData.clientId);
+                if (!dialogData.clientId) {
+                    setNewClientName(dialogData.clientName || '');
+                    setNewClientMobile(dialogData.clientMobile || '');
+                }
             } else {
                 setSelectedClientId('');
                 setTitle('');
                 setSelectedTransactionId('');
                 setNewDate('');
                 setNewTime('');
+                setIsNewClient(false);
+                setNewClientName('');
+                setNewClientMobile('');
             }
         }
     }, [isOpen, dialogData, isEditing]);
@@ -544,91 +562,70 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const client = clients.find((c: Client) => c.id === selectedClientId);
-
-        if (!client || !selectedTransactionId) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل والمعاملة المرتبطة.' });
-            return;
-        }
-        
         setIsSaving(true);
         
+        const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
+        
+        if (isPast(appointmentDateTime) && !isEditing) {
+            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.'});
+            setIsSaving(false); return;
+        }
+
         try {
-            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-
-            if (isPast(appointmentDateTime)) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تاريخ غير صالح',
-                    description: 'لا يمكن حجز موعد في وقت قد مضى.',
-                });
-                setIsSaving(false);
-                return;
-            }
-            
-            const batch = writeBatch(firestore);
-
-            // If editing, delete the old appointment first within the same transaction
-            if (isEditing) {
-                const oldApptRef = doc(firestore, 'appointments', dialogData.id);
-                batch.delete(oldApptRef);
-            }
-            
-            const allClientApptsQuery = query(
-                collection(firestore, 'appointments'),
-                where('clientId', '==', selectedClientId),
-                where('type', '==', 'architectural')
-            );
-            const allClientApptsSnap = await getDocs(allClientApptsQuery);
-            // Exclude the one being edited from the list for recalculation
-            const existingAppointments = allClientApptsSnap.docs
-                .map(d => ({ id: d.id, ...d.data() } as Appointment))
-                .filter(a => isEditing ? a.id !== dialogData.id : true);
-
-            const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
-            
-            const newAppointmentObject = {
-                id: 'new-temp-id', // Temporary ID for processing
-                appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                clientId: client.id,
-                title: title || client.nameAr,
-                engineerId: dialogData.engineerId,
-                contractSigned,
-                type: 'architectural' as const,
-                transactionId: selectedTransactionId,
-            };
-
-            let processingList = [...existingAppointments, newAppointmentObject];
-            
-            processingList.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
-
-            processingList.forEach((appt, index) => {
-                const visitCount = index + 1;
-                const newColor = getVisitColor({ visitCount, contractSigned });
-
-                if (appt.id === 'new-temp-id') {
-                    const newApptRef = doc(collection(firestore, 'appointments'));
-                    const { id, ...dataToSave } = appt;
-                    batch.set(newApptRef, {
-                        ...dataToSave,
-                        color: newColor,
-                        visitCount,
-                        createdAt: serverTimestamp()
-                    });
-                } else {
-                    const existingData = existingAppointments.find(e => e.id === appt.id);
-                    if (existingData && (existingData.visitCount !== visitCount || existingData.color !== newColor)) {
-                        const apptRef = doc(firestore, 'appointments', appt.id!);
-                        batch.update(apptRef, { visitCount, color: newColor });
-                    }
+            if (isNewClient) {
+                if (!newClientName || !newClientMobile) {
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال اسم وجوال العميل الجديد.' });
+                    setIsSaving(false); return;
                 }
-            });
-
-            await batch.commit();
-            toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد وتحديث الجدول بنجاح.` });
+                const newAppointmentData = {
+                    title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile,
+                    engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                    type: 'architectural' as const, visitCount: 1, color: '#facc15', createdAt: serverTimestamp(),
+                };
+                await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+                toast({ title: 'نجاح', description: 'تم حفظ الموعد للعميل الجديد بنجاح.' });
+            } else {
+                const client = clients.find((c: Client) => c.id === selectedClientId);
+                if (!client || !selectedTransactionId) {
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل والمعاملة.' });
+                    setIsSaving(false); return;
+                }
+                const batch = writeBatch(firestore);
+                if (isEditing) {
+                    const oldApptRef = doc(firestore, 'appointments', dialogData.id);
+                    batch.delete(oldApptRef);
+                }
+                const allClientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'));
+                const allClientApptsSnap = await getDocs(allClientApptsQuery);
+                const existingAppointments = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment)).filter(a => isEditing ? a.id !== dialogData.id : true);
+                const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
+                const newAppointmentObject = {
+                    id: 'new-temp-id', appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                    clientId: client.id, title: title || client.nameAr, engineerId: dialogData.engineerId,
+                    contractSigned, type: 'architectural' as const, transactionId: selectedTransactionId,
+                };
+                let processingList: (Appointment | typeof newAppointmentObject)[] = [...existingAppointments, newAppointmentObject];
+                processingList.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
+                processingList.forEach((appt, index) => {
+                    const visitCount = index + 1;
+                    const newColor = getVisitColor({ visitCount, contractSigned });
+                    if (appt.id === 'new-temp-id') {
+                        const newApptRef = doc(collection(firestore, 'appointments'));
+                        const { id, ...dataToSave } = appt;
+                        batch.set(newApptRef, { ...dataToSave, color: newColor, visitCount, createdAt: serverTimestamp() });
+                    } else {
+                        const existingData = existingAppointments.find(e => e.id === appt.id);
+                        if (existingData && (existingData.visitCount !== visitCount || existingData.color !== newColor)) {
+                            const apptRef = doc(firestore, 'appointments', appt.id!);
+                            batch.update(apptRef, { visitCount, color: newColor });
+                        }
+                    }
+                });
+                await batch.commit();
+                toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد وتحديث الجدول بنجاح.` });
+            }
             onClose();
             onSaveSuccess();
-
         } catch (error) {
              console.error("Error during save:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'حدث خطأ أثناء التحقق من المواعيد أو حفظها.' });
@@ -660,7 +657,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                         <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
                         <DialogDescription>
                              {isEditing 
-                                ? `تعديل الموعد الخاص بـ: ${clients.find((c: Client) => c.id === dialogData.clientId)?.nameAr}`
+                                ? `تعديل الموعد الخاص بـ: ${dialogData.clientName || dialogData.clientId}`
                                 : `للمهندس: ${dialogData.engineerName} في ${format(dialogData.appointmentDate, "PPP 'الساعة' HH:mm", { locale: ar })}`
                             }
                         </DialogDescription>
@@ -682,30 +679,49 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                             <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
-                            <InlineSearchList 
-                                value={selectedClientId}
-                                onSelect={setSelectedClientId}
-                                options={clientOptions}
-                                placeholder={clientOptions.length === 0 && dialogData?.engineerId ? "لا يوجد عملاء متاحون لهذا المهندس" : "ابحث بالاسم أو رقم الجوال..."}
-                                disabled={isEditing}
-                            />
+                        <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <Checkbox id="isNewClient" checked={isNewClient} onCheckedChange={(checked) => setIsNewClient(checked as boolean)} disabled={isEditing} />
+                            <Label htmlFor="isNewClient">إضافة عميل جديد غير مسجل</Label>
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="transaction-search">المعاملة <span className="text-destructive">*</span></Label>
-                            <InlineSearchList
-                                value={selectedTransactionId}
-                                onSelect={setSelectedTransactionId}
-                                options={transactionOptions}
-                                placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : loadingTransactions ? 'جاري جلب المعاملات...' : 'اختر المعاملة...'}
-                                disabled={!selectedClientId || loadingTransactions}
-                            />
-                        </div>
+                        {isNewClient ? (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="new-client-name">اسم العميل <span className="text-destructive">*</span></Label>
+                                    <Input id="new-client-name" value={newClientName} onChange={e => setNewClientName(e.target.value)} required />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="new-client-mobile">رقم الجوال <span className="text-destructive">*</span></Label>
+                                    <Input id="new-client-mobile" value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} dir="ltr" required />
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="client-search">العميل <span className="text-destructive">*</span></Label>
+                                    <InlineSearchList 
+                                        value={selectedClientId}
+                                        onSelect={setSelectedClientId}
+                                        options={clientOptions}
+                                        placeholder={clientOptions.length === 0 && dialogData?.engineerId ? "لا يوجد عملاء متاحون لهذا المهندس" : "ابحث بالاسم أو رقم الجوال..."}
+                                        disabled={isEditing && !!dialogData.clientId}
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="transaction-search">المعاملة <span className="text-destructive">*</span></Label>
+                                    <InlineSearchList
+                                        value={selectedTransactionId}
+                                        onSelect={setSelectedTransactionId}
+                                        options={transactionOptions}
+                                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : loadingTransactions ? 'جاري جلب المعاملات...' : 'اختر المعاملة...'}
+                                        disabled={!selectedClientId || loadingTransactions}
+                                    />
+                                </div>
+                            </>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !selectedClientId || !selectedTransactionId}>
+                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : (!selectedClientId || !selectedTransactionId))}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>

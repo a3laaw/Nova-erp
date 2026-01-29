@@ -40,6 +40,10 @@
             "type": "string",
             "format": "uri",
             "description": "URL to the company's full letterhead image."
+        },
+        "financial_statement_notes": {
+            "type": "string",
+            "description": "The full text content for the notes to the financial statements."
         }
       },
       "required": ["company_name"]
@@ -604,7 +608,15 @@
       "properties": {
         "clientId": {
           "type": "string",
-          "description": "The ID of the client for this appointment."
+          "description": "The ID of the client for this appointment. Can be null for a new prospect."
+        },
+        "clientName": {
+            "type": "string",
+            "description": "The name of the client, especially if not yet a registered client."
+        },
+        "clientMobile": {
+            "type": "string",
+            "description": "The mobile number of the client, especially if not yet a registered client."
         },
         "engineerId": {
           "type": "string",
@@ -667,7 +679,7 @@
             "description": "Hex color code for calendar display based on visit status."
         }
       },
-      "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+      "required": ["title", "appointmentDate", "createdAt", "type"]
     },
     "WorkStageProgress": {
         "title": "Work Stage Progress",
@@ -997,6 +1009,52 @@
         "createdBy": { "type": "string" }
       },
       "required": ["quotationNumber", "clientId", "date", "subject", "items", "totalAmount", "status", "createdAt"]
+    },
+    "Vendor": {
+      "title": "Vendor",
+      "description": "Represents a supplier or vendor.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "description": "Represents a purchase order for materials or services.",
+      "type": "object",
+      "properties": {
+        "poNumber": { "type": "string", "description": "Sequential PO number." },
+        "orderDate": { "type": "string", "format": "date-time" },
+        "vendorId": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "projectId": { "type": "string", "description": "Optional link to a project." },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" }
+            },
+            "required": ["description", "quantity", "unitPrice", "total"]
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "paymentTerms": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
+        }
+      },
+      "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
     }
   },
   "auth": {
@@ -1148,6 +1206,18 @@
         "$ref": "#/entities/Quotation"
       },
       "description": "Stores all quotations sent to clients."
+    },
+    "/vendors/{vendorId}": {
+      "schema": {
+        "$ref": "#/entities/Vendor"
+      },
+      "description": "Stores information about suppliers and vendors."
+    },
+    "/purchaseOrders/{poId}": {
+      "schema": {
+        "$ref": "#/entities/PurchaseOrder"
+      },
+      "description": "Stores all purchase orders issued to vendors."
     }
   }
 }

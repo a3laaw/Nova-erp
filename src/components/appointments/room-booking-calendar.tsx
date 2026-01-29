@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -36,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { Checkbox } from '../ui/checkbox';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
@@ -114,7 +116,7 @@ export function RoomBookingCalendar() {
                 .map(appt => {
                     return {
                         ...appt,
-                        clientName: fetchedClients.find(c => c.id === appt.clientId)?.nameAr,
+                        clientName: appt.clientId ? fetchedClients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
                         engineerName: appt.engineerId ? fetchedEngineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
                     }
                 });
@@ -201,6 +203,8 @@ export function RoomBookingCalendar() {
         try {
             const dataToSave: any = {
                 clientId: formData.clientId,
+                clientName: formData.clientName,
+                clientMobile: formData.clientMobile,
                 engineerId: formData.engineerId,
                 title: formData.title,
                 notes: formData.notes || '',
@@ -209,6 +213,8 @@ export function RoomBookingCalendar() {
                 appointmentDate: Timestamp.fromDate(formData.appointmentDate),
                 type: 'room',
             };
+
+            if (!dataToSave.clientId) delete dataToSave.clientId;
             
             if(!isEditing) {
                 dataToSave.createdAt = serverTimestamp();
@@ -493,6 +499,8 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     const isEditing = !!dialogData?.id;
     const [formData, setFormData] = useState({
         clientId: '',
+        clientName: '',
+        clientMobile: '',
         department: '',
         engineerId: '',
         title: '',
@@ -502,6 +510,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
     
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
+    const [isNewClient, setIsNewClient] = useState(false);
     
     const roomName = useMemo(() => dialogData?.meetingRoom || dialogData?.room, [dialogData]);
 
@@ -517,23 +526,41 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
             }
             setFormData({
                 clientId: dialogData.clientId || '',
+                clientName: dialogData.clientName || '',
+                clientMobile: dialogData.clientMobile || '',
                 department: dialogData.department || '',
                 engineerId: dialogData.engineerId || '',
                 title: dialogData.title || '',
                 notes: dialogData.notes || '',
             });
+            setIsNewClient(!dialogData.clientId);
         }
     }, [isOpen, dialogData, isEditing]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.clientId || !formData.department || !formData.engineerId) {
-            toast({
-                variant: 'destructive',
-                title: 'حقول مطلوبة',
-                description: 'الرجاء تعبئة حقول العميل، القسم، والمهندس المسؤول.',
-            });
+        let finalClientId: string | undefined = formData.clientId;
+        let finalClientName: string | undefined = formData.clientName;
+        let finalClientMobile: string | undefined = formData.clientMobile;
+        
+        if (isNewClient) {
+            if (!formData.clientName || !formData.clientMobile) {
+                toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة اسم وجوال العميل الجديد.' });
+                return;
+            }
+            finalClientId = undefined;
+        } else {
+             if (!formData.clientId) {
+                toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار عميل مسجل.' });
+                return;
+            }
+            finalClientName = undefined;
+            finalClientMobile = undefined;
+        }
+        
+        if (!formData.department || !formData.engineerId) {
+            toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار القسم والمهندس المسؤول.' });
             return;
         }
         
@@ -542,14 +569,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         try {
             const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
 
-            if (isPast(appointmentDateTime)) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تاريخ غير صالح',
-                    description: 'لا يمكن حجز موعد في وقت قد مضى.',
-                });
-                setIsSaving(false);
-                return;
+            if (isPast(appointmentDateTime) && !isEditing) {
+                toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن حجز موعد في وقت قد مضى.'});
+                setIsSaving(false); return;
             }
             
             const appointmentsRef = collection(firestore, 'appointments');
@@ -590,11 +612,12 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
             }
             
             // Check client conflict
-            if (formData.clientId) {
-                    const clientHasConflict = latestDayAppointments.some((appt: any) => {
+            const checkClientId = isNewClient ? null : formData.clientId;
+            if (checkClientId) {
+                const clientHasConflict = latestDayAppointments.some((appt: any) => {
                     if (isEditing && appt.id === dialogData.id) return false;
                     const apptDate = appt.appointmentDate.toDate();
-                    return appt.clientId === formData.clientId && apptDate >= windowStart && apptDate <= windowEnd;
+                    return appt.clientId === checkClientId && apptDate >= windowStart && apptDate <= windowEnd;
                 });
                 if (clientHasConflict) {
                     toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'العميل لديه موعد آخر في نفس الوقت.' });
@@ -604,6 +627,9 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
 
             await onSave({ 
                 ...formData, 
+                clientId: finalClientId,
+                clientName: finalClientName,
+                clientMobile: finalClientMobile,
                 id: dialogData.id,
                 room: roomName,
                 appointmentDate: appointmentDateTime,
@@ -652,10 +678,27 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                             <Label htmlFor="title">الغرض من الموعد (اختياري)</Label>
                             <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
                         </div>
-                        <div className="grid gap-2">
-                            <Label>العميل <span className="text-destructive">*</span></Label>
-                            <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." />
+                        <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <Checkbox id="isNewClient" checked={isNewClient} onCheckedChange={(checked) => setIsNewClient(checked as boolean)} disabled={isEditing} />
+                            <Label htmlFor="isNewClient">إضافة عميل جديد غير مسجل</Label>
                         </div>
+                         {isNewClient ? (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="new-client-name">اسم العميل <span className="text-destructive">*</span></Label>
+                                    <Input id="new-client-name" value={formData.clientName} onChange={e => setFormData(p => ({...p, clientName: e.target.value}))} required />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="new-client-mobile">رقم الجوال <span className="text-destructive">*</span></Label>
+                                    <Input id="new-client-mobile" value={formData.clientMobile} onChange={e => setFormData(p => ({...p, clientMobile: e.target.value}))} dir="ltr" required />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid gap-2">
+                                <Label>العميل <span className="text-destructive">*</span></Label>
+                                <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." disabled={isEditing}/>
+                            </div>
+                        )}
                         <div className="grid gap-2">
                             <Label>القسم <span className="text-destructive">*</span></Label>
                              <InlineSearchList value={formData.department} onSelect={(v) => setFormData(p => ({...p, department: v}))} options={departmentOptionsForSelect} placeholder="ابحث عن قسم..." />
@@ -667,7 +710,7 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !formData.clientId || !formData.department || !formData.engineerId}>
+                        <Button type="submit" disabled={isSaving || (isNewClient ? (!formData.clientName || !formData.clientMobile) : !formData.clientId) || !formData.department || !formData.engineerId}>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
