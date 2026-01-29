@@ -11,7 +11,7 @@ const getTypeFromCode = (code: string): Account['type'] => {
 };
 
 const getLevelFromCode = (code: string): number => {
-    const len = code.length;
+    const len = String(code).length;
     if (len === 1) return 0;
     if (len <= 3) return 1;
     if (len <= 5) return 2;

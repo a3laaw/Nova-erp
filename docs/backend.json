@@ -816,15 +816,17 @@
         "description": "An account in the Chart of Accounts.",
         "type": "object",
         "properties": {
-            "name": { "type": "string" },
             "code": { "type": "string" },
+            "name": { "type": "string" },
             "type": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
-            "level": { "type": "number", "description": "The hierarchy level of the account (0 for main, 1 for sub, etc.)" },
+            "statement": { "type": "string", "enum": ["Balance Sheet", "Income Statement"] },
+            "balanceType": { "type": "string", "enum": ["Debit", "Credit"] },
+            "level": { "type": "number", "description": "The hierarchy level of the account." },
             "description": { "type": "string" },
             "isPayable": { "type": "boolean" },
             "parentCode": { "type": ["string", "null"] }
         },
-        "required": ["name", "code", "type", "level", "isPayable"]
+        "required": ["name", "code", "type", "level", "isPayable", "statement", "balanceType"]
     },
     "JournalEntryLine": {
       "title": "Journal Entry Line",
