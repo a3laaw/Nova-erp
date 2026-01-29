@@ -282,14 +282,25 @@ export default function EditCashReceiptPage() {
         await runTransaction(firestore, async (transaction_fs) => {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
 
+            // --- Reads ---
+            let jeStatus = 'draft';
+            if(originalReceipt.journalEntryId) {
+                const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
+                const jeSnap = await transaction_fs.get(jeRef);
+                if (jeSnap.exists() && jeSnap.data().status === 'posted') {
+                    throw new Error('القيد المحاسبي المرتبط بهذا السند قد تم ترحيله. يجب التراجع عن الترحيل أولاً.');
+                }
+            }
             const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
             if (!clientAccount) {
                 throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${originalReceipt.clientNameAr}.`);
             }
             const debitAccount = accounts.find(a => a.id === debitAccountId);
-             if (!debitAccount) {
+            if (!debitAccount) {
                 throw new Error(`لم يتم العثور على حساب الاستلام المحدد.`);
             }
+
+            // --- Writes ---
 
             // Update Receipt Document
             const receiptUpdatePayload = {
@@ -316,17 +327,16 @@ export default function EditCashReceiptPage() {
                 totalCredit: parseFloat(amount),
                 narration: `تحديث سند قبض رقم ${originalReceipt.voucherNumber} من العميل ${originalReceipt.clientNameAr}`,
                 transactionId: selectedProjectId || null,
+                status: 'posted', // Always post on save
             };
 
             if (originalReceipt.journalEntryId) {
                 const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
                 transaction_fs.update(jeRef, jeUpdatePayload);
             } else {
-                // This case handles if a receipt somehow was created without a JE.
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
                 transaction_fs.set(newJournalEntryRef, {
                     ...jeUpdatePayload,
-                    status: 'posted',
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
                     clientId: originalReceipt.clientId,

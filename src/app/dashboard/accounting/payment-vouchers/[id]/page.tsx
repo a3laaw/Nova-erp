@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, Printer, Pencil, BookOpen } from 'lucide-react';
+import { ArrowRight, Printer, Pencil } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
@@ -186,14 +186,6 @@ export default function ViewPaymentVoucherPage() {
                              />
                          )}
                     </div>
-                    {voucher.journalEntryId && (
-                        <div className="pt-4 text-xs text-muted-foreground">
-                            <Link href={`/dashboard/accounting/journal-entries/${voucher.journalEntryId}`} className="flex items-center gap-1 hover:underline">
-                                <BookOpen className="h-3 w-3" />
-                                <span>عرض القيد المحاسبي المرتبط</span>
-                            </Link>
-                        </div>
-                    )}
                 </main>
                 
                  <footer className="pt-24">
