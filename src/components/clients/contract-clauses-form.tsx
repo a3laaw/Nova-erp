@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -24,7 +25,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-re
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, WorkStage } from '@/lib/types';
+import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -122,7 +123,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setStep('loading');
       setAvailableTemplates([]);
       setChosenTemplate(null);
-      setReferenceData({ stages: [], templates: [] });
+      setReferenceData({ templates: [], templates: [] });
       setDepartmentWorkStages([]);
       setLoadingRefData(true);
     }
@@ -342,8 +343,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
             if (contractStageIndex > -1 && updatedStages[contractStageIndex].status !== 'completed') {
                 const stageToUpdate = { ...updatedStages[contractStageIndex] };
-                stageToUpdate.status = 'completed';
-                stageToUpdate.endDate = new Date();
+                stageToUpdate.status = 'awaiting-review';
                 if (!stageToUpdate.startDate) stageToUpdate.startDate = new Date();
                 updatedStages[contractStageIndex] = stageToUpdate as TransactionStage;
             }

@@ -1,5 +1,6 @@
 
 
+
       'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -73,6 +74,7 @@ const stageStatusColors: Record<string, string> = {
   'in-progress': 'bg-blue-100 text-blue-800',
   completed: 'bg-green-100 text-green-800',
   skipped: 'bg-yellow-100 text-yellow-800',
+  'awaiting-review': 'bg-orange-100 text-orange-800',
 };
 
 const stageStatusTranslations: Record<string, string> = {
@@ -80,6 +82,7 @@ const stageStatusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
   skipped: 'تم تخطيها',
+  'awaiting-review': 'قيد المراجعة المالية',
 };
 
 
@@ -642,10 +645,11 @@ export default function TransactionDetailPage() {
                             <div className="space-y-4">
                                 {stages.map((stage, index) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
+                                    const isContractStage = stage.name === 'توقيع العقد';
                                     return (
                                         <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <Badge variant="outline" className={cn("w-24 justify-center", stageStatusColors[stage.status])}>
+                                                <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
@@ -656,18 +660,18 @@ export default function TransactionDetailPage() {
                                             </div>
                                             <div className="flex gap-2">
                                                 {stage.status === 'pending' && (
-                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract}>
+                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || isContractStage}>
                                                         <Play className="ml-2 h-4 w-4" />
                                                         بدء
                                                     </Button>
                                                 )}
                                                 {stage.status === 'in-progress' && (
                                                     <>
-                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
+                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract || isContractStage}>
                                                             <Check className="ml-2 h-4 w-4" />
                                                             إكمال
                                                         </Button>
-                                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'pending')} disabled={!canInteract}>
+                                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'pending')} disabled={!canInteract || isContractStage}>
                                                             <Pause className="ml-2 h-4 w-4" />
                                                             إيقاف مؤقت
                                                         </Button>
@@ -722,6 +726,7 @@ export default function TransactionDetailPage() {
     
 
     
+
 
 
 

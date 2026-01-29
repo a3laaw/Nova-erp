@@ -1,6 +1,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -360,7 +361,7 @@ export type Payslip = {
 export interface TransactionStage {
   stageId: string;
   name: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'skipped';
+  status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
   allowedRoles?: string[];
   startDate: any | null;
   endDate: any | null;

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Printer, Pencil, CheckCircle, Undo2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
-import { doc, getDocs, collection, query, limit, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, collection, query, limit, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import type { JournalEntry, Company } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -63,6 +63,28 @@ export default function ViewJournalEntryPage() {
     try {
         const entryRefDoc = doc(firestore, 'journalEntries', entry.id);
         await updateDoc(entryRefDoc, { status: 'posted' });
+
+        // --- NEW LOGIC ---
+        if (entry.clientId && entry.transactionId && entry.narration.startsWith('إثبات مديونية')) {
+            const transactionRef = doc(firestore, 'clients', entry.clientId, 'transactions', entry.transactionId);
+            const transactionSnap = await getDoc(transactionRef);
+            if (transactionSnap.exists()) {
+                const transactionData = transactionSnap.data();
+                const stages = transactionData.stages || [];
+                const contractStageIndex = stages.findIndex((s: any) => s.name === 'توقيع العقد');
+
+                if (contractStageIndex > -1 && stages[contractStageIndex].status === 'awaiting-review') {
+                    stages[contractStageIndex].status = 'completed';
+                    stages[contractStageIndex].endDate = serverTimestamp();
+                    
+                    await updateDoc(transactionRef, { stages: stages });
+                    
+                    toast({ title: 'تحديث تلقائي', description: 'تم تحديث مرحلة توقيع العقد إلى "مكتملة".' });
+                }
+            }
+        }
+        // --- END NEW LOGIC ---
+
         toast({ title: 'نجاح', description: 'تم ترحيل القيد بنجاح.' });
     } catch (error) {
         console.error('Error posting journal entry:', error);
