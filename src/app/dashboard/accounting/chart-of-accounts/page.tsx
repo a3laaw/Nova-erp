@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -19,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, ArrowRight, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud, Folder, FolderOpen } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud, Folder, FolderOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where } from 'firebase/firestore';
@@ -60,7 +61,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 
 const accountTypeTranslations: Record<Account['type'], string> = {
@@ -218,7 +218,7 @@ export default function ChartOfAccountsPage() {
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
     const [parentAccount, setParentAccount] = useState<Account | null>(null);
-    const [openCollapsibles, setOpenCollapsibles] = useState<Set<string>>(new Set());
+    const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
 
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
@@ -260,20 +260,17 @@ export default function ChartOfAccountsPage() {
                 });
             });
 
-            // Calculate parent balances
-            fetchedAccounts.forEach(parentAcc => {
-                if (parentAcc.level < 3) { // Only calculate for parent levels
-                    let parentBalance = balances.get(parentAcc.id!) || 0;
-                    fetchedAccounts.forEach(childAcc => {
-                        if (childAcc.code.startsWith(parentAcc.code) && childAcc.code !== parentAcc.code) {
-                            parentBalance += balances.get(childAcc.id!) || 0;
-                        }
-                    });
-                     balances.set(parentAcc.id!, parentBalance);
-                }
+            // Calculate parent balances by summing up children
+            fetchedAccounts.filter(a => a.level < 3).sort((a,b) => b.level - a.level).forEach(parentAcc => {
+                let parentBalance = balances.get(parentAcc.id!) || 0;
+                 fetchedAccounts.forEach(childAcc => {
+                    if(childAcc.code.startsWith(parentAcc.code) && childAcc.code !== parentAcc.code) {
+                         parentBalance += balances.get(childAcc.id!) || 0;
+                    }
+                });
+                balances.set(parentAcc.id!, parentBalance);
             });
-
-
+            
             setAccountBalances(balances);
 
         } catch (e) {
@@ -372,8 +369,8 @@ export default function ChartOfAccountsPage() {
         }
     };
 
-    const toggleCollapsible = (code: string) => {
-        setOpenCollapsibles(prev => {
+    const toggleAccount = (code: string) => {
+        setOpenAccounts(prev => {
             const newSet = new Set(prev);
             if (newSet.has(code)) {
                 newSet.delete(code);
@@ -384,23 +381,19 @@ export default function ChartOfAccountsPage() {
         });
     };
 
-    const renderAccountRow = (account: Account, allAccounts: Account[]) => {
+    const renderAccountRow = (account: Account) => {
         const balance = accountBalances.get(account.id!) || 0;
-        const children = allAccounts.filter(a => a.code.startsWith(account.code) && a.level === account.level + 1);
+        const children = accounts.filter(a => a.code.startsWith(account.code) && a.level === account.level + 1);
         const hasChildren = children.length > 0;
-        const isOpen = openCollapsibles.has(account.code);
+        const isOpen = openAccounts.has(account.code);
 
         return (
             <React.Fragment key={account.id}>
-                <TableRow className={account.level === 0 ? 'bg-muted/50' : ''}>
+                <TableRow className={account.level === 0 ? 'bg-muted/50' : ''} onClick={() => hasChildren && toggleAccount(account.code)} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
                     <TableCell style={{ paddingRight: `${account.level * 1.5 + 1}rem` }}>
                         <div className="flex items-center gap-2 group">
                              {hasChildren ? (
-                                <CollapsibleTrigger asChild>
-                                    <button onClick={() => toggleCollapsible(account.code)}>
-                                        {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
-                                    </button>
-                                </CollapsibleTrigger>
+                                isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />
                             ) : (
                                 <span className="w-4 h-4 inline-block"></span>
                             )}
@@ -425,22 +418,14 @@ export default function ChartOfAccountsPage() {
                     <TableCell className="text-center">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent dir="rtl">
+                            <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuItem onClick={() => handleEditClick(account)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </TableCell>
                 </TableRow>
-                {hasChildren && (
-                    <CollapsibleContent asChild>
-                        <tr>
-                            <td colSpan={5} className="p-0">
-                                {isOpen && children.map(child => renderAccountRow(child, allAccounts))}
-                            </td>
-                        </tr>
-                    </CollapsibleContent>
-                )}
+                {hasChildren && isOpen && children.map(child => renderAccountRow(child))}
             </React.Fragment>
         );
     };
@@ -489,11 +474,7 @@ export default function ChartOfAccountsPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    rootAccounts.map(account => (
-                                        <Collapsible key={account.id} asChild>
-                                           {renderAccountRow(account, accounts)}
-                                        </Collapsible>
-                                    ))
+                                    rootAccounts.map(account => renderAccountRow(account))
                                 )}
                             </TableBody>
                             {!loading && accounts.length > 0 && (
