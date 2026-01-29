@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -30,6 +30,10 @@ interface ClientTransactionFormProps {
   clientName: string;
 }
 
+interface FetchedTransactionType extends TransactionType {
+    parentDeptId: string;
+}
+
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -37,7 +41,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
-    const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
+    const [transactionTypes, setTransactionTypes] = useState<FetchedTransactionType[]>([]);
     const [typesLoading, setTypesLoading] = useState(true);
 
     const [transactionType, setTransactionType] = useState('');
@@ -72,12 +76,26 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
         const fetchTransactionTypes = async () => {
              setTypesLoading(true);
              try {
-                const q = query(collection(firestore, 'transactionTypes'));
+                const q = query(collectionGroup(firestore, 'transactionTypes'));
                 const querySnapshot = await getDocs(q);
-                const fetchedTypes: TransactionType[] = [];
+                const fetchedTypes: FetchedTransactionType[] = [];
+                const uniqueNames = new Set<string>();
+    
                 querySnapshot.forEach((doc) => {
-                    fetchedTypes.push({ id: doc.id, ...doc.data() } as TransactionType);
+                    const data = doc.data() as TransactionType;
+                    const parentDeptId = doc.ref.parent.parent?.id;
+                    
+                    if (data.name && parentDeptId && !uniqueNames.has(data.name)) {
+                        fetchedTypes.push({
+                            id: doc.id,
+                            name: data.name,
+                            parentDeptId: parentDeptId
+                        });
+                        uniqueNames.add(data.name);
+                    }
                 });
+                
+                fetchedTypes.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
                 setTransactionTypes(fetchedTypes);
             } catch (error) {
                 console.error("Failed to fetch transaction types:", error);
@@ -118,6 +136,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
 
             let engineerForTransactionId: string | null = assignedEngineerId || null;
 
+            const selectedType = transactionTypes.find(t => t.name === transactionType);
+
             // Special logic for "بلدية سكن خاص"
             if (transactionType.includes('بلدية') && transactionType.includes('سكن خاص')) {
                 const clientRef = doc(firestore, 'clients', clientId);
@@ -140,6 +160,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }:
                 clientId,
                 transactionType,
                 description,
+                departmentId: selectedType?.parentDeptId,
+                transactionTypeId: selectedType?.id,
                 assignedEngineerId: engineerForTransactionId,
                 status: 'new',
                 createdAt: serverTimestamp(),
