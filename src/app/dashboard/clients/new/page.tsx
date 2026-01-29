@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -15,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,6 +53,7 @@ export default function NewClientPage() {
     const [isGeneratingId, setIsGeneratingId] = useState(true);
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
     const [engineerIdFromUrl, setEngineerIdFromUrl] = useState<string | null>(null);
+    const fromAppointmentId = searchParams.get('fromAppointmentId');
     
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
@@ -253,11 +255,26 @@ export default function NewClientPage() {
                 };
                 const newClientRef = doc(collection(firestore, 'clients'));
                 transaction.set(newClientRef, clientData);
+
+                // If coming from an appointment, update it with the new client ID
+                if (fromAppointmentId) {
+                    const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
+                    transaction.update(appointmentRef, {
+                        clientId: newClientRef.id,
+                        clientName: deleteField(),
+                        clientMobile: deleteField()
+                    });
+                }
             });
 
 
             toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
-            router.push('/dashboard/clients');
+            
+            if (fromAppointmentId) {
+                router.push(`/dashboard/appointments/${fromAppointmentId}`);
+            } else {
+                router.push('/dashboard/clients');
+            }
 
         } catch (error) {
             console.error("Error saving client:", error);

@@ -554,7 +554,7 @@ export default function AppointmentDetailsPage() {
                                     <p className="text-xs text-muted-foreground font-mono dir-ltr">{appointment.clientMobile}</p>
                                 </div>
                                 <Button asChild size="sm">
-                                    <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${appointment.engineerId}`}>
+                                    <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${appointment.engineerId}&fromAppointmentId=${appointment.id}`}>
                                         <UserPlus className="ml-2 h-4 w-4" />
                                         إنشاء ملف عميل
                                     </Link>

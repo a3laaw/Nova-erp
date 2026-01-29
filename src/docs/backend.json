@@ -608,7 +608,15 @@
       "properties": {
         "clientId": {
           "type": "string",
-          "description": "The ID of the client for this appointment."
+          "description": "The ID of the client for this appointment. Can be null for a new prospect."
+        },
+        "clientName": {
+            "type": "string",
+            "description": "The name of the client, especially if not yet a registered client."
+        },
+        "clientMobile": {
+            "type": "string",
+            "description": "The mobile number of the client, especially if not yet a registered client."
         },
         "engineerId": {
           "type": "string",
@@ -671,7 +679,7 @@
             "description": "Hex color code for calendar display based on visit status."
         }
       },
-      "required": ["clientId", "title", "appointmentDate", "createdAt", "type"]
+      "required": ["engineerId", "title", "appointmentDate", "createdAt", "type"]
     },
     "WorkStageProgress": {
         "title": "Work Stage Progress",
