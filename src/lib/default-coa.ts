@@ -23,9 +23,9 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '110201', name: 'حساب البنك الجاري - اسم البنك', description: 'حساب البنك الجاري - اسم البنك', parentCode: '1102', isPayable: true },
   { code: '1103', name: 'المدينون', description: 'مبالغ مستحقة على حساب العملاء (بالأجل)', parentCode: '11', isPayable: false },
   { code: '1104', name: 'مصروفات مقدمة', description: 'مصروف مدفوع مقدماً مثل التأمين وسلف الموظفين وإيجار المكتب', parentCode: '11', isPayable: false },
-  { code: '110401', name: 'تأمين طبي مقدم', description: 'تأمين طبي مدفوع مقدماً يتم إطفاء مايخص السنة المالية إلى مصروف', parentCode: '1104', isPayable: false },
-  { code: '12', name: 'أصول غير متداولة', description: '', parentCode: '1', isPayable: false }, // Corrected code from 11 to 12
-  { code: '121', name: 'الأصول الثابتة', description: '', parentCode: '12', isPayable: false }, // Adjusted code for hierarchy
+  { code: '110401', name: 'تأمين طبي مقدم', description: 'تأمين طبي مدفوع مقدماً يتم إطفاء مايخص السنة المالية إلى مصروف', parentCode: '1104', isPayable: true },
+  { code: '12', name: 'أصول غير متداولة', description: '', parentCode: '1', isPayable: false },
+  { code: '121', name: 'الأصول الثابتة', description: '', parentCode: '12', isPayable: false },
   { code: '1211', name: 'الأصول الثابتة - المباني', description: 'الأصول الثابتة - المباني', parentCode: '121', isPayable: false },
   { code: '1212', name: 'الأصول الثابتة - المعدات', description: 'الأصول الثابتة - المعدات', parentCode: '121', isPayable: false },
   { code: '1213', name: 'الأصول الثابتة - الأجهزة المكتبية والطابعات', description: 'الأصول الثابتة - الأجهزة المكتبية والطابعات', parentCode: '121', isPayable: false },
@@ -33,7 +33,7 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '1215', name: 'الأصول الثابتة - السيارات', description: 'الأصول الثابتة - السيارات', parentCode: '121', isPayable: false },
   { code: '1216', name: 'الأصول الثابتة - الآلات', description: 'الأصول الثابتة - الآلات', parentCode: '121', isPayable: false },
   { code: '1217', name: 'الأصول الثابتة - أخرى', description: 'الأصول الثابتة - أخرى', parentCode: '121', isPayable: false },
-  { code: '122', name: 'إهلاك الأصول الثابتة المتراكم', description: 'إهلاك الأصول الثابتة المتراكم', parentCode: '12', isPayable: false }, // Adjusted code for hierarchy
+  { code: '122', name: 'إهلاك الأصول الثابتة المتراكم', description: 'إهلاك الأصول الثابتة المتراكم', parentCode: '12', isPayable: false },
   { code: '1221', name: 'إهلاك متراكم المباني', description: 'إهلاك متراكم المباني', parentCode: '122', isPayable: false },
   { code: '1222', name: 'إهلاك متراكم المعدات', description: 'إهلاك متراكم المعدات', parentCode: '122', isPayable: false },
   { code: '1223', name: 'إهلاك متراكم أجهزة مكتبية وطابعات', description: 'إهلاك متراكم أجهزة مكتبية وطابعات', parentCode: '122', isPayable: false },
@@ -43,7 +43,7 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '1227', name: 'إهلاك متراكم أخرى', description: 'إهلاك متراكم أخرى', parentCode: '122', isPayable: false },
 
   // الخصوم
-  { code: '2', name: 'الخصوم', description: '', parentCode: null, isPayable: false }, // Corrected code and name
+  { code: '2', name: 'الخصوم', description: '', parentCode: null, isPayable: false },
   { code: '21', name: 'الخصوم المتداولة', description: '', parentCode: '2', isPayable: false },
   { code: '2101', name: 'الدائنون', description: 'المبالغ المستحقة للدائنين مثل الموردين ومقدمي الخدمات', parentCode: '21', isPayable: false },
   { code: '2102', name: 'إيرادات مقدمة', description: 'إيراد مستلم مقدم من العملاء مقابل خدمات لم تقدم بعد', parentCode: '21', isPayable: false },
