@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -106,15 +106,38 @@ export default function AppointmentDetailsPage() {
         const fetchRelatedData = async () => {
             setLoading(true);
             try {
-                // Fetch client and engineer
-                const clientRef = doc(firestore, 'clients', appointment.clientId);
-                const engineerRef = doc(firestore, 'employees', appointment.engineerId);
-                const [clientSnap, engineerSnap] = await Promise.all([getDoc(clientRef), getDoc(engineerRef)]);
-                if (clientSnap.exists()) setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
-                if (engineerSnap.exists()) setEngineer(engineerSnap.data() as Employee);
+                const promises: Promise<any>[] = [];
+
+                // Conditionally fetch client only if clientId exists
+                if (appointment.clientId) {
+                    const clientRef = doc(firestore, 'clients', appointment.clientId);
+                    promises.push(getDoc(clientRef));
+                } else {
+                    promises.push(Promise.resolve(null)); // Placeholder if no clientId
+                }
+
+                // Always fetch engineer
+                if (appointment.engineerId) {
+                    const engineerRef = doc(firestore, 'employees', appointment.engineerId);
+                    promises.push(getDoc(engineerRef));
+                } else {
+                    promises.push(Promise.resolve(null));
+                }
+
+                const [clientSnap, engineerSnap] = await Promise.all(promises);
+
+                if (clientSnap && clientSnap.exists()) {
+                    setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
+                } else {
+                    setClient(null);
+                }
+
+                if (engineerSnap && engineerSnap.exists()) {
+                    setEngineer(engineerSnap.data() as Employee);
+                }
 
                 // Fetch the transaction to get stage progress
-                if (appointment.transactionId) {
+                if (appointment.transactionId && appointment.clientId) {
                     const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
                     const transactionSnap = await getDoc(transactionRef);
                     if (transactionSnap.exists()) {
@@ -197,8 +220,8 @@ export default function AppointmentDetailsPage() {
 
 
     const handleUpdateStage = async () => {
-        if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء اختيار مرحلة عمل. تأكد من أن هذه الزيارة مرتبطة بمعاملة.' });
+        if (!firestore || !currentUser || !appointment || !selectedStageId || !appointment.transactionId || !appointment.clientId) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء اختيار مرحلة عمل. تأكد من أن هذه الزيارة مرتبطة بمعاملة وعميل.' });
             return;
         }
     
@@ -516,7 +539,11 @@ export default function AppointmentDetailsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <InfoRow icon={<User />} label="العميل" value={client ? <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link> : null} />
+                    <InfoRow 
+                        icon={<User />} 
+                        label="العميل" 
+                        value={client ? <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link> : (appointment.clientName || 'عميل غير مسجل')} 
+                    />
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={engineer?.fullName} />
                     <InfoRow icon={<Calendar />} label="تاريخ الموعد" value={format(appointment.appointmentDate.toDate(), "eeee, dd MMMM yyyy", { locale: ar })} />
                     <InfoRow icon={<Clock />} label="وقت الموعد" value={format(appointment.appointmentDate.toDate(), "p", { locale: ar })} />
