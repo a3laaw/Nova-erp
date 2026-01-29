@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -298,7 +299,7 @@ export default function NewClientPage() {
         saving: 'جاري الحفظ...'
     } : {
         title: 'Add New Client',
-        description: 'Fill in the new client\\'s details to create their file in the system.',
+        description: 'Fill in the new client\'s details to create their file in the system.',
         fileIdLabel: 'File No.',
         nameAr: 'Client Name (Arabic)',
         nameArPlaceholder: 'e.g., Jassim Mohammed',
@@ -424,5 +425,3 @@ export default function NewClientPage() {
         </Card>
     );
 }
-
-    
