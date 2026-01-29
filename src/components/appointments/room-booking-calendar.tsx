@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -176,6 +176,15 @@ export function RoomBookingCalendar() {
             const { hours, minutes } = parseTime(data.time!);
             const startTime = setMinutes(setHours(date, hours), minutes);
             
+            if (isPast(startTime)) {
+                toast({
+                    title: 'لا يمكن الحجز في الماضي',
+                    description: 'لا يمكن إنشاء موعد في وقت قد مضى.',
+                    variant: 'default',
+                });
+                return;
+            }
+            
             setDialogData({
                 room: data.room,
                 appointmentDate: startTime,
@@ -313,6 +322,24 @@ export function RoomBookingCalendar() {
                                 return (
                                     <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
+                                            isPast(booking.appointmentDate.toDate()) ? (
+                                                <div 
+                                                    className="flex flex-col items-center justify-center text-center opacity-75 cursor-not-allowed"
+                                                    style={{
+                                                        height: '100%',
+                                                        width: '100%',
+                                                        borderRadius: '0.375rem',
+                                                        padding: '0.25rem',
+                                                        fontSize: '0.7rem',
+                                                        ...(departmentStyles[booking.department || 'أخرى'] || {})
+                                                    }}
+                                                    title="لا يمكن تعديل المواعيد السابقة."
+                                                >
+                                                    <p style={{ fontWeight: 'bold' }}>{booking.title}</p>
+                                                    <p>{booking.clientName}</p>
+                                                    <p style={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>{booking.engineerName}</p>
+                                                </div>
+                                            ) : (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <div 
@@ -345,6 +372,7 @@ export function RoomBookingCalendar() {
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
+                                            )
                                         ) : (
                                             <button 
                                                 onClick={() => handleOpenDialog({ room, time })}
@@ -512,17 +540,27 @@ function BookingDialog({ isOpen, onClose, onSave, dialogData, clients, engineers
         setIsSaving(true);
         
         try {
+            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
+
+            if (isPast(appointmentDateTime)) {
+                toast({
+                    variant: 'destructive',
+                    title: 'تاريخ غير صالح',
+                    description: 'لا يمكن حجز موعد في وقت قد مضى.',
+                });
+                setIsSaving(false);
+                return;
+            }
+            
             const appointmentsRef = collection(firestore, 'appointments');
-            const dayStart = startOfDay(isEditing ? new Date(newDate) : dialogData.appointmentDate);
-            const dayEnd = endOfDay(isEditing ? new Date(newDate) : dialogData.appointmentDate);
+            const dayStart = startOfDay(appointmentDateTime);
+            const dayEnd = endOfDay(appointmentDateTime);
 
             const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
             const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
             const latestDayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
 
-            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-            
             // --- Conflict Validation ---
             const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
             const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);

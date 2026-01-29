@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -146,6 +146,17 @@ export function ArchitecturalAppointmentsView() {
     const handleCellClick = (engineer: Employee, time: string) => {
         if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
+
+        // Check if the appointment is in the past
+        if (isPast(appointmentDate)) {
+            toast({
+                title: 'لا يمكن الحجز في الماضي',
+                description: 'لا يمكن إنشاء موعد في وقت قد مضى.',
+                variant: 'default',
+            });
+            return;
+        }
+
         setDialogData({
             isEditing: false,
             engineerId: engineer.id,
@@ -300,13 +311,13 @@ export function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                            booking.workStageUpdated ? (
+                                            (booking.workStageUpdated || (booking.appointmentDate && isPast(booking.appointmentDate.toDate()))) ? (
                                                 <div
                                                     className="relative h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-75"
                                                     style={{ backgroundColor: booking.color }}
-                                                    title="تم إغلاق هذه الزيارة."
+                                                    title={booking.workStageUpdated ? "تم إغلاق هذه الزيارة." : "لا يمكن تعديل المواعيد السابقة."}
                                                 >
-                                                    <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />
+                                                    {booking.workStageUpdated && <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />}
                                                     <p className="font-bold">{booking.clientName}</p>
                                                     {booking.visitCount && (
                                                         <span className="text-xs mt-1 opacity-75">
@@ -544,6 +555,17 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         
         try {
             const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
+
+            if (isPast(appointmentDateTime)) {
+                toast({
+                    variant: 'destructive',
+                    title: 'تاريخ غير صالح',
+                    description: 'لا يمكن حجز موعد في وقت قد مضى.',
+                });
+                setIsSaving(false);
+                return;
+            }
+            
             const batch = writeBatch(firestore);
 
             // If editing, delete the old appointment first within the same transaction
