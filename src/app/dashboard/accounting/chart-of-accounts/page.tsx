@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -369,12 +368,21 @@ export default function ChartOfAccountsPage() {
         try {
             const batch = writeBatch(firestore);
             const accountsRef = collection(firestore, 'chartOfAccounts');
+            
+            // 1. Delete all existing accounts
+            const existingAccountsSnap = await getDocs(accountsRef);
+            existingAccountsSnap.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            // 2. Add the new default accounts
             defaultChartOfAccounts.forEach(account => {
-                const docRef = doc(accountsRef);
+                const docRef = doc(accountsRef); // Create a new doc reference for each
                 batch.set(docRef, account);
             });
+
             await batch.commit();
-            toast({ title: 'نجاح', description: 'تم تنزيل شجرة الحسابات الأساسية بنجاح.' });
+            toast({ title: 'نجاح', description: 'تم مسح الشجرة القديمة وتنزيل شجرة الحسابات الأساسية بنجاح.' });
             await fetchAllData();
         } catch (e) {
             console.error(e);
@@ -526,13 +534,13 @@ export default function ChartOfAccountsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيقوم هذا الإجراء بإضافة شجرة حسابات أساسية تحتوي على أكثر من 80 حسابًا. يوصى بهذا الإجراء إذا كانت شجرة حساباتك فارغة. هل تريد المتابعة؟
+                            سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** وإضافة شجرة حسابات أساسية تحتوي على أكثر من 80 حسابًا. يوصى بهذا الإجراء إذا كانت شجرة حساباتك فارغة أو إذا كنت تريد البدء من جديد. هل تريد المتابعة؟
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding}>
-                            {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التنزيل...</> : 'نعم، قم بالتنزيل'}
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding} className="bg-destructive hover:bg-destructive/90">
+                            {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التنزيل...</> : 'نعم، قم بالمسح والتنزيل'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
