@@ -123,7 +123,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setStep('loading');
       setAvailableTemplates([]);
       setChosenTemplate(null);
-      setReferenceData({ templates: [], templates: [] });
+      setReferenceData({ templates: [], stages: [] });
       setDepartmentWorkStages([]);
       setLoadingRefData(true);
     }
@@ -306,7 +306,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
     try {
         await runTransaction(firestore, async (transaction_firestore) => {
-            // --- ALL READS MUST GO HERE, AT THE TOP ---
             const clientRef = doc(firestore, 'clients', clientId);
             const clientSnap = await transaction_firestore.get(clientRef);
             if (!clientSnap.exists()) {
@@ -316,7 +315,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             let coaClientCounterDoc, journalEntryCounterDoc, parentAccountSnap, revenueAccountSnap, clientAccountSnap;
 
-            // Only perform accounting-related reads if they are needed
             if (clientData.status === 'new') {
                 const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
                 const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
@@ -328,16 +326,15 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                     transaction_firestore.get(coaClientCounterRef),
                     transaction_firestore.get(journalEntryCounterRef),
                     getDocs(parentAccountQuery),
-                    getDocs(revenueAccountQuery),
-                    getDocs(clientAccountQuery)
+                    getDocs(revenueAccountQuery)
                 ]);
+                clientAccountSnap = await getDocs(clientAccountQuery); // Separate to ensure no dependency issues with other reads
 
                 if (parentAccountSnap.empty || revenueAccountSnap.empty) {
                     throw new Error('حسابات رئيسية مفقودة (الإيرادات أو العملاء).');
                 }
             }
 
-            // --- ALL WRITES START FROM HERE ---
             const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
             const updatedStages = [...(transaction.stages || [])];
             const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
@@ -384,12 +381,25 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
                 let clientAccountId: string;
                 if (clientAccountSnap && clientAccountSnap.empty) {
-                    const parentCode = parentAccountSnap.docs[0].data().code as string;
+                    const parentData = parentAccountSnap.docs[0].data();
+                    const parentCode = parentData.code as string;
                     const nextClientCodeNumber = ((coaClientCounterDoc?.data()?.lastNumber) || 0) + 1;
                     const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
                     transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
+
+                    const newAccountData = {
+                        name: clientName,
+                        code: `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`,
+                        type: 'asset' as const,
+                        level: parentData.level + 1,
+                        parentCode: parentCode,
+                        isPayable: true,
+                        statement: 'Balance Sheet' as const,
+                        balanceType: 'Debit' as const,
+                    };
+                    
                     const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
-                    transaction_firestore.set(newAccountRef, { name: clientName, code: `${parentCode}${String(nextClientCodeNumber).padStart(3, '0')}`, type: 'asset', level: 4 });
+                    transaction_firestore.set(newAccountRef, newAccountData);
                     clientAccountId = newAccountRef.id;
                 } else {
                     clientAccountId = clientAccountSnap!.docs[0].id;
@@ -413,7 +423,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             if (quotationIdToUpdate) {
                 const quotationRef = doc(firestore, 'quotations', quotationIdToUpdate);
-                transaction_firestore.update(quotationRef, { transactionId: finalTransactionId });
+                transaction_firestore.update(quotationRef, { transactionId: finalTransactionId, status: 'accepted' });
             }
         });
 
@@ -639,3 +649,5 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     </Dialog>
   );
 }
+
+    

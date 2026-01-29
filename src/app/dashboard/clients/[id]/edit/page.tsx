@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -15,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { doc, getDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -165,7 +166,6 @@ export default function EditClientPage() {
             }
         };
         
-        // This check ensures we have governorates before we try to match them.
         if (!refDataLoading) {
             fetchClient();
         }
@@ -206,108 +206,91 @@ export default function EditClientPage() {
 
         setIsLoading(true);
 
+        const updatedClientData: Record<string, any> = {};
+        const auditLogs: { content: string }[] = [];
+        
+        const fieldMappings: { key: keyof typeof formData; label: string }[] = [
+            { key: 'nameAr', label: 'الاسم بالعربية' },
+            { key: 'nameEn', label: 'الاسم بالإنجليزية' },
+            { key: 'mobile', label: 'رقم الجوال' },
+        ];
+        fieldMappings.forEach(({ key, label }) => {
+            if (formData[key as 'nameAr'] !== originalData[key as 'nameAr']) {
+                updatedClientData[key] = formData[key as 'nameAr'];
+                auditLogs.push({ content: `قام بتحديث "${label}" من "${originalData[key as 'nameAr'] || '-'}" إلى "${formData[key as 'nameAr']}"` });
+            }
+        });
+        
+        const selectedGov = governorates.find(g => g.id === formData.governorateId);
+        const newAddress = {
+            governorate: selectedGov?.name || '', area: formData.area, block: formData.block, street: formData.street, houseNumber: formData.houseNumber,
+        };
+        if (JSON.stringify(originalData.address || {}) !== JSON.stringify(newAddress)) {
+            updatedClientData.address = newAddress;
+            auditLogs.push({ content: 'قام بتحديث العنوان.' });
+        }
+
+        const originalEngineerId = originalData.assignedEngineer || '';
+        if (formData.assignedEngineerId !== originalEngineerId) {
+            updatedClientData.assignedEngineer = formData.assignedEngineerId || null;
+            const oldEngineerName = originalEngineerId ? employeesMap.get(originalEngineerId) || 'غير معروف' : 'غير مسند';
+            const newEngineerName = formData.assignedEngineerId ? employeesMap.get(formData.assignedEngineerId) || 'غير معروف' : 'غير مسند';
+            auditLogs.push({ content: `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".` });
+        }
+
+        if (Object.keys(updatedClientData).length === 0) {
+            toast({ title: 'لا توجد تغييرات', description: 'لم يتم إجراء أي تعديلات للحفظ.' });
+            setIsLoading(false);
+            return;
+        }
+        
         try {
-            const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', formData.mobile));
-            const mobileSnapshot = await getDocs(mobileQuery);
-            if (!mobileSnapshot.empty && mobileSnapshot.docs[0].id !== id) {
-                toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'رقم الجوال هذا مسجل لعميل آخر.' });
-                setIsLoading(false);
-                return;
+            if (formData.mobile !== originalData.mobile) {
+                const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', formData.mobile));
+                const mobileSnapshot = await getDocs(mobileQuery);
+                if (!mobileSnapshot.empty && mobileSnapshot.docs[0].id !== id) {
+                    throw new Error('رقم الجوال هذا مسجل لعميل آخر.');
+                }
             }
 
             const batch = writeBatch(firestore);
             const clientRef = doc(firestore, 'clients', id);
+
+            batch.update(clientRef, cleanFirestoreData(updatedClientData));
+
             const historyCollectionRef = collection(firestore, `clients/${id}/history`);
-            
-            const updatedClientData: Record<string, any> = {};
-
-            const fieldMappings: { key: keyof typeof formData; label: string }[] = [
-                { key: 'nameAr', label: 'الاسم بالعربية' },
-                { key: 'nameEn', label: 'الاسم بالإنجليزية' },
-                { key: 'mobile', label: 'رقم الجوال' },
-            ];
-
-            fieldMappings.forEach(({ key, label }) => {
-                if (formData[key as 'nameAr' | 'nameEn' | 'mobile'] !== originalData[key]) {
-                    updatedClientData[key] = formData[key as 'nameAr' | 'nameEn' | 'mobile'];
-                    const logContent = `قام بتحديث "${label}" من "${originalData[key] || '-'}" إلى "${formData[key as 'nameAr' | 'nameEn' | 'mobile']}"`;
-                    batch.set(doc(historyCollectionRef), {
-                        type: 'log',
-                        content: logContent,
-                        userId: currentUser.id,
-                        userName: currentUser.fullName,
-                        userAvatar: currentUser.avatarUrl,
-                        createdAt: serverTimestamp(),
-                    });
-                }
-            });
-            
-            const selectedGov = governorates.find(g => g.id === formData.governorateId);
-
-            const originalAddress = originalData.address || {};
-            const newAddress = {
-                governorate: selectedGov?.name || '',
-                area: formData.area,
-                block: formData.block,
-                street: formData.street,
-                houseNumber: formData.houseNumber,
-            };
-
-            if (JSON.stringify(originalAddress) !== JSON.stringify(newAddress)) {
-                updatedClientData.address = newAddress;
-                const logContent = `قام بتحديث العنوان.`; // Simplified log for address
+            auditLogs.forEach(log => {
                 batch.set(doc(historyCollectionRef), {
-                    type: 'log',
-                    content: logContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
+                    type: 'log', content: log.content, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
                 });
+            });
+
+            if (updatedClientData.nameAr) {
+                const chartOfAccountsRef = collection(firestore, 'chartOfAccounts');
+                const q = query(chartOfAccountsRef, where('name', '==', originalData.nameAr), limit(1));
+                const accountSnapshot = await getDocs(q);
+                if (!accountSnapshot.empty) {
+                    const accountToUpdateRef = accountSnapshot.docs[0].ref;
+                    batch.update(accountToUpdateRef, { name: updatedClientData.nameAr });
+                }
             }
 
-            const originalEngineerId = originalData.assignedEngineer || '';
-            if (formData.assignedEngineerId !== originalEngineerId) {
-                updatedClientData.assignedEngineer = formData.assignedEngineerId || null;
-                const oldEngineerName = originalEngineerId ? employeesMap.get(originalEngineerId) || 'غير معروف' : 'غير مسند';
-                const newEngineerName = formData.assignedEngineerId ? employeesMap.get(formData.assignedEngineerId) || 'غير معروف' : 'غير مسند';
-                const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
-                batch.set(doc(historyCollectionRef), {
-                    type: 'log',
-                    content: logContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                });
-
-                // Cascade update to special transactions
+            if (updatedClientData.assignedEngineer !== undefined) {
                 const transactionsRef = collection(firestore, `clients/${id}/transactions`);
                 const q = query(transactionsRef, where('transactionType', '==', 'بلدية سكن خاص'));
                 const specialTransactionsSnap = await getDocs(q);
-                
                 specialTransactionsSnap.forEach(transactionDoc => {
-                    batch.update(transactionDoc.ref, { assignedEngineerId: formData.assignedEngineerId || null });
+                    batch.update(transactionDoc.ref, { assignedEngineerId: updatedClientData.assignedEngineer });
                 });
             }
 
-
-            if (Object.keys(updatedClientData).length > 0) {
-                const safeUpdatedClientData = cleanFirestoreData(updatedClientData);
-                console.log("البيانات قبل التنظيف (Client Edit):", JSON.stringify(updatedClientData, null, 2));
-                console.log("البيانات بعد التنظيف (Client Edit):", JSON.stringify(safeUpdatedClientData, null, 2));
-                batch.update(clientRef, safeUpdatedClientData);
-                await batch.commit();
-                toast({ title: 'نجاح', description: 'تم تحديث بيانات العميل بنجاح.' });
-            } else {
-                toast({ title: 'لا توجد تغييرات', description: 'لم يتم إجراء أي تعديلات للحفظ.' });
-            }
-            
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم تحديث بيانات العميل بنجاح.' });
             router.push(`/dashboard/clients/${id}`);
 
         } catch (error) {
             console.error("Error updating client:", error);
-            const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ التغييرات. يرجى المحاولة مرة أخرى.';
+            const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ التغييرات.';
             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
         } finally {
             setIsLoading(false);
@@ -491,7 +474,5 @@ export default function EditClientPage() {
         </Card>
     );
 }
-
-    
 
     
