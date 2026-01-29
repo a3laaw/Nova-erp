@@ -27,17 +27,20 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
     return (
         <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6", className)}>
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-4">
                 <SidebarTrigger />
-                {brandingLoading ? (
-                    <Skeleton className="h-8 w-8" />
-                ) : (
-                    <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="h-8 w-8 !p-1.5" />
-                )}
-            </div>
-            
-            <div className="hidden md:block">
-                <Breadcrumbs />
+                {/* Mobile-only Logo */}
+                <div className="md:hidden">
+                    {brandingLoading ? (
+                        <Skeleton className="h-8 w-8" />
+                    ) : (
+                        <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="h-8 w-8 !p-1.5" />
+                    )}
+                </div>
+                {/* Desktop-only Breadcrumbs */}
+                <div className="hidden md:block">
+                    <Breadcrumbs />
+                </div>
             </div>
 
             <div className="ml-auto flex items-center gap-2">
