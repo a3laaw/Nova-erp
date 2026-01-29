@@ -8,6 +8,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Label } from '@/components/ui/label';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
