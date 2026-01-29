@@ -46,19 +46,19 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '2', name: 'الخصوم', description: '', parentCode: null, isPayable: false },
   { code: '21', name: 'الخصوم المتداولة', description: '', parentCode: '2', isPayable: false },
   { code: '2101', name: 'الدائنون', description: 'المبالغ المستحقة للدائنين مثل الموردين ومقدمي الخدمات', parentCode: '21', isPayable: false },
-  { code: '2102', name: 'إيرادات مقدمة', description: 'إيراد مستلم مقدم من العملاء مقابل خدمات لم تقدم بعد', parentCode: '21', isPayable: false },
+  { code: '2102', name: 'إيرادات مقدمة', description: 'إيراد مستلم مقدم من العملاء مقابل خدمات لم تقدم بعد', parentCode: '21', isPayable: true },
   { code: '2103', name: 'مصروفات مستحقة', description: 'مصاريف استحقت ولم تدفع بعد مثل الرواتب', parentCode: '21', isPayable: false },
   { code: '2104', name: 'ضرائب مستحقة', description: 'ضرائب مستحقة للحكومة مثل ضريبة القيمة المضافة', parentCode: '21', isPayable: false },
   { code: '210401', name: 'ضريبة القيمة المضافة المستحقة', description: 'ضريبة القيمة المضافة المستحقة', parentCode: '2104', isPayable: true },
   { code: '22', name: 'الخصوم غير المتداولة', description: '', parentCode: '2', isPayable: false },
-  { code: '2201', name: 'قروض طويلة الأجل', description: 'قروض تستحق بعد أكثر من سنة مالية', parentCode: '22', isPayable: false },
+  { code: '2201', name: 'قروض طويلة الأجل', description: 'قروض تستحق بعد أكثر من سنة مالية', parentCode: '22', isPayable: true },
   
   // حقوق الملكية
   { code: '3', name: 'حقوق الملكية', description: '', parentCode: null, isPayable: false },
   { code: '31', name: 'رأس المال', description: 'رأس المال المستثمر في المنشأة', parentCode: '3', isPayable: false },
   { code: '3101', name: 'رأس مال المالك', description: 'رأس مال المالك', parentCode: '31', isPayable: true },
-  { code: '32', name: 'الأرباح المحتجزة', description: 'الأرباح المرحلة من السنوات السابقة', parentCode: '3', isPayable: false },
-  { code: '33', name: 'أرباح وخسائر العام', description: 'صافي ربح أو خسارة الفترة الحالية', parentCode: '3', isPayable: false },
+  { code: '32', name: 'الأرباح المحتجزة', description: 'الأرباح المرحلة من السنوات السابقة', parentCode: '3', isPayable: true },
+  { code: '33', name: 'أرباح وخسائر العام', description: 'صافي ربح أو خسارة الفترة الحالية', parentCode: '3', isPayable: true },
   
   // الإيرادات
   { code: '4', name: 'الإيرادات', description: '', parentCode: null, isPayable: false },
@@ -83,12 +83,12 @@ const rawData: Omit<Account, 'id' | 'type' | 'level'>[] = [
   { code: '5210', name: 'أدوات مكتبية ومطبوعات', description: 'تكاليف الأدوات المكتبية والقرطاسية', parentCode: '52', isPayable: true },
   { code: '5211', name: 'مصروفات متنوعة', description: 'أي مصروفات تشغيلية أخرى غير مصنفة', parentCode: '52', isPayable: true },
   { code: '53', name: 'مصاريف إهلاك', description: 'مصروف إهلاك الأصول الثابتة للفترة', parentCode: '5', isPayable: false },
-  { code: '5301', name: 'مصروف إهلاك المباني', description: 'مصروف إهلاك المباني', parentCode: '53', isPayable: false },
-  { code: '5302', name: 'مصروف إهلاك المعدات', description: 'مصروف إهلاك المعدات', parentCode: '53', isPayable: false },
-  { code: '5303', name: 'مصروف إهلاك الأجهزة المكتبية', description: 'مصروف إهلاك الأجهزة المكتبية', parentCode: '53', isPayable: false },
-  { code: '5304', name: 'مصروف إهلاك الأثاث', description: 'مصروف إهلاك الأثاث', parentCode: '53', isPayable: false },
-  { code: '5305', name: 'مصروف إهلاك السيارات', description: 'مصروف إهلاك السيارات', parentCode: '53', isPayable: false },
-  { code: '5306', name: 'مصروف إهلاك الآلات', description: 'مصروف إهلاك الآلات', parentCode: '53', isPayable: false },
+  { code: '5301', name: 'مصروف إهلاك المباني', description: 'مصروف إهلاك المباني', parentCode: '53', isPayable: true },
+  { code: '5302', name: 'مصروف إهلاك المعدات', description: 'مصروف إهلاك المعدات', parentCode: '53', isPayable: true },
+  { code: '5303', name: 'مصروف إهلاك الأجهزة المكتبية', description: 'مصروف إهلاك الأجهزة المكتبية', parentCode: '53', isPayable: true },
+  { code: '5304', name: 'مصروف إهلاك الأثاث', description: 'مصروف إهلاك الأثاث', parentCode: '53', isPayable: true },
+  { code: '5305', name: 'مصروف إهلاك السيارات', description: 'مصروف إهلاك السيارات', parentCode: '53', isPayable: true },
+  { code: '5306', name: 'مصروف إهلاك الآلات', description: 'مصروف إهلاك الآلات', parentCode: '53', isPayable: true },
 ];
 
 const getLevelFromCode = (code: string): number => {
