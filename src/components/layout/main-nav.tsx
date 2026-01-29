@@ -12,8 +12,21 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  useSidebar, // Import useSidebar
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent
+} from '@/components/ui/dropdown-menu'; // Import DropdownMenu components
 import {
   Home,
   Briefcase,
@@ -150,10 +163,40 @@ interface MainNavProps {
     onLogout: () => void;
 }
 
+// New recursive component for rendering sub-menus in a Dropdown
+function RecursiveSubmenu({ items, pathname }: { items: any[]; pathname: string }) {
+  return (
+    <>
+      {items.map((item: any) =>
+        item.children ? (
+          <DropdownMenuSub key={item.label}>
+            <DropdownMenuSubTrigger>
+              <span>{item.label}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                <RecursiveSubmenu items={item.children} pathname={pathname} />
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+        ) : (
+          <DropdownMenuItem key={item.href} asChild>
+            <Link href={item.href} className={pathname === item.href ? "bg-accent" : ""}>
+              {item.label}
+            </Link>
+          </DropdownMenuItem>
+        )
+      )}
+    </>
+  );
+}
+
+
 export function MainNav({ currentUser, onLogout }: MainNavProps) {
   const pathname = usePathname();
   const { language } = useLanguage();
   const { branding, loading } = useBranding();
+  const { state: sidebarState } = useSidebar();
   
   const currentNavItems = navItems[language].filter(item => currentUser.role && item.roles.includes(currentUser.role));
   const currentSettingsItem = settingsItem[language];
@@ -176,68 +219,87 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
       <SidebarContent className="p-2">
         <SidebarMenu>
           {currentNavItems.map((item) => (
-            item.children ? (
-              <Collapsible asChild key={item.label} defaultOpen={pathname.startsWith(item.hrefPrefix)}>
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                      className="justify-between"
-                      isActive={pathname.startsWith(item.hrefPrefix)}
-                    >
-                      <div className="flex items-center gap-2">
+            <SidebarMenuItem key={item.label}>
+              {item.children ? (
+                sidebarState === 'expanded' ? (
+                  <Collapsible asChild defaultOpen={pathname.startsWith(item.hrefPrefix)}>
+                    <div className='w-full'>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="justify-between w-full"
+                          isActive={pathname.startsWith(item.hrefPrefix)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </div>
+                          <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {item.children.map((child: any) => (
+                            child.children ? (
+                              <SidebarMenuSubItem key={child.label}>
+                                <Collapsible defaultOpen={child.children.some((gc: any) => pathname === gc.href)} className="w-full">
+                                  <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent/50 [&_svg]:data-[state=open]:rotate-180">
+                                    <span className="font-medium">{child.label}</span>
+                                    <ChevronDown className="h-4 w-4 transition-transform" />
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="pl-4">
+                                    <SidebarMenuSub>
+                                      {child.children.map((grandchild: any) => (
+                                        <SidebarMenuSubItem key={grandchild.href}>
+                                          <SidebarMenuSubButton
+                                            asChild
+                                            isActive={pathname === grandchild.href}
+                                          >
+                                            <Link href={grandchild.href}>
+                                              <span>{grandchild.label}</span>
+                                            </Link>
+                                          </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                      ))}
+                                    </SidebarMenuSub>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              </SidebarMenuSubItem>
+                            ) : (
+                              <SidebarMenuSubItem key={child.href}>
+                                <SidebarMenuSubButton
+                                  asChild
+                                  isActive={pathname === child.href}
+                                >
+                                  <Link href={child.href}>
+                                    <span>{child.label}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            )
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton
+                        isActive={pathname.startsWith(item.hrefPrefix)}
+                        tooltip={item.label}
+                      >
                         <item.icon />
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {item.children.map((child: any) => (
-                        child.children ? (
-                          <SidebarMenuSubItem key={child.label}>
-                            <Collapsible key={child.label} defaultOpen={pathname.startsWith(child.hrefPrefix || '')} className="w-full">
-                              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md p-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent/50 [&_svg]:data-[state=open]:rotate-180">
-                                <span className="font-medium">{child.label}</span>
-                                <ChevronDown className="h-4 w-4 transition-transform" />
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="pl-4">
-                                <SidebarMenuSub>
-                                  {child.children.map((grandchild: any) => (
-                                    <SidebarMenuSubItem key={grandchild.href}>
-                                      <SidebarMenuSubButton
-                                        asChild
-                                        isActive={pathname === grandchild.href}
-                                      >
-                                        <Link href={grandchild.href}>
-                                          <span>{grandchild.label}</span>
-                                        </Link>
-                                      </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                  ))}
-                                </SidebarMenuSub>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          </SidebarMenuSubItem>
-                        ) : (
-                          <SidebarMenuSubItem key={child.href}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathname === child.href}
-                            >
-                              <Link href={child.href}>
-                                <span>{child.label}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        )
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-            ) : (
-              <SidebarMenuItem key={item.label}>
+                        <span className="sr-only">{item.label}</span>
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" sideOffset={5} className="w-56" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                      <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <RecursiveSubmenu items={item.children} pathname={pathname} />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              ) : (
                 <SidebarMenuButton
                   asChild
                   isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
@@ -248,8 +310,8 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                     <span>{item.label}</span>
                   </Link>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
-            )
+              )}
+            </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarContent>
@@ -275,7 +337,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                   </Avatar>
                   <div className="grid flex-1 text-sm group-data-[collapsible=icon]:hidden">
                     <span className="font-semibold text-foreground">{currentUser.fullName}</span>
-                    <span className="text-muted-foreground">{currentUser.email}</span>
+                    <span className="text-xs text-muted-foreground">{currentUser.email}</span>
                   </div>
                   <Button variant="ghost" size="icon" className="mr-auto h-7 w-7 shrink-0 group-data-[collapsible=icon]:hidden" onClick={onLogout}>
                     <LogOut />
