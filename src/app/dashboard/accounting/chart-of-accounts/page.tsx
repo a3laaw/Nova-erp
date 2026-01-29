@@ -87,7 +87,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
 
     useEffect(() => {
         if (isEditing && account) {
-            setFormData({ code: account.code, name: account.name, type: account.type });
+            setFormData({ code: account.code, name: account.name, type: account.type, isPayable: account.isPayable });
         } else if (isOpen) {
             let nextCode = '';
             let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
@@ -106,7 +106,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                 nextCode = String(lastCodeNum + 1);
             }
             
-            setFormData({ type: newType, code: nextCode, name: '' });
+            setFormData({ type: newType, code: nextCode, name: '', isPayable: true });
         }
     }, [account, parentAccount, isEditing, isOpen, accounts]);
 
@@ -121,7 +121,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const level = getLevelFromCode(formData.code || '');
-        onSave({ ...formData, level });
+        onSave({ ...formData, level, parentCode: parentAccount?.code || null });
     };
 
     return (
@@ -157,6 +157,10 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                                 </SelectContent>
                             </Select>
                         </div>
+                         <div className="flex items-center space-x-2">
+                           <input type="checkbox" id="isPayable" checked={!!formData.isPayable} onChange={(e) => setFormData(p => ({...p, isPayable: e.target.checked}))} className="h-4 w-4" />
+                           <Label htmlFor="isPayable">حساب قابل للتحصيل والدفع</Label>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
@@ -178,6 +182,7 @@ export default function ChartOfAccountsPage() {
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
     const [parentAccount, setParentAccount] = useState<Account | null>(null);
@@ -208,7 +213,7 @@ export default function ChartOfAccountsPage() {
             journalEntries.forEach(entry => {
                 entry.lines.forEach(line => {
                     const acc = fetchedAccounts.find(a => a.id === line.accountId);
-                    if (!acc || !acc.isPayable) return; // Only aggregate payable accounts directly
+                    if (!acc || !acc.isPayable) return; 
                     
                     const currentBalance = directBalances.get(line.accountId) || 0;
                     let balanceChange = 0;
@@ -224,7 +229,7 @@ export default function ChartOfAccountsPage() {
 
             const aggregatedBalances = new Map<string, number>();
             fetchedAccounts
-              .sort((a, b) => (b.level || 0) - (a.level || 0)) // Start from deepest level
+              .sort((a, b) => (b.level || 0) - (a.level || 0)) 
               .forEach(account => {
                   let totalBalance = directBalances.get(account.id!) || 0;
                   
@@ -256,21 +261,40 @@ export default function ChartOfAccountsPage() {
     const displayedAccounts = useMemo(() => {
         if (accounts.length === 0) return [];
         
-        const roots = accounts.filter(a => a.level === 0).sort((a,b) => a.code.localeCompare(b.code));
-        const displayed: Account[] = [];
+        const accountMap = new Map(accounts.map(acc => [acc.code, acc]));
+        const childrenMap = new Map<string, Account[]>();
         
-        const addChildrenRecursively = (account: Account) => {
-            displayed.push(account);
-            if (openAccounts.has(account.code)) {
-                const children = accounts
-                    .filter(child => child.parentCode === account.code)
-                    .sort((a,b) => a.code.localeCompare(b.code));
-                children.forEach(addChildrenRecursively);
+        accounts.forEach(acc => {
+            if (acc.parentCode) {
+                if (!childrenMap.has(acc.parentCode)) {
+                    childrenMap.set(acc.parentCode, []);
+                }
+                childrenMap.get(acc.parentCode)!.push(acc);
             }
+        });
+
+        const getChildren = (code: string): Account[] => {
+            return (childrenMap.get(code) || []).sort((a, b) => a.code.localeCompare(b.code));
         };
         
-        roots.forEach(addChildrenRecursively);
-        return displayed;
+        const roots = accounts.filter(a => a.level === 0).sort((a,b) => a.code.localeCompare(b.code));
+        
+        const finalDisplayedList: Account[] = [];
+        
+        function buildDisplayList(accountCode: string) {
+            const account = accountMap.get(accountCode);
+            if (!account) return;
+
+            finalDisplayedList.push(account);
+
+            if (openAccounts.has(accountCode)) {
+                const children = getChildren(accountCode);
+                children.forEach(child => buildDisplayList(child.code));
+            }
+        }
+
+        roots.forEach(root => buildDisplayList(root.code));
+        return finalDisplayedList;
     }, [accounts, openAccounts]);
 
 
@@ -287,7 +311,8 @@ export default function ChartOfAccountsPage() {
     };
     
     const handleEditClick = (account: Account) => {
-        setParentAccount(null);
+        const parent = accounts.find(a => a.code === account.parentCode) || null;
+        setParentAccount(parent);
         setEditingAccount(account);
         setIsFormOpen(true);
     };
@@ -339,6 +364,7 @@ export default function ChartOfAccountsPage() {
 
     const handleSeedChartOfAccounts = async () => {
         if (!firestore) return;
+        setIsSeedAlertOpen(false);
         setIsSeeding(true);
         try {
             const batch = writeBatch(firestore);
@@ -379,7 +405,13 @@ export default function ChartOfAccountsPage() {
                             <CardTitle>شجرة الحسابات</CardTitle>
                             <CardDescription>عرض وإدارة دليل الحسابات الخاص بالشركة وأرصدتها الحالية.</CardDescription>
                         </div>
-                        <Button onClick={handleAddClick}><PlusCircle className="ml-2 h-4 w-4" /> إضافة حساب رئيسي</Button>
+                        <div className="flex gap-2">
+                             <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
+                                {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                {isSeeding ? 'جاري التنزيل...' : 'تنزيل شجرة حسابات أساسية'}
+                            </Button>
+                            <Button onClick={handleAddClick}><PlusCircle className="ml-2 h-4 w-4" /> إضافة حساب رئيسي</Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -403,19 +435,14 @@ export default function ChartOfAccountsPage() {
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center h-48">
                                             <div className="flex flex-col items-center justify-center gap-4">
-                                                <p className="text-muted-foreground">لا توجد حسابات. ابدأ بإضافة حساب جديد، أو قم بتنزيل شجرة حسابات أساسية للبدء.</p>
-                                                <Button onClick={handleSeedChartOfAccounts} disabled={isSeeding}>
-                                                    {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                                                    {isSeeding ? 'جاري التنزيل...' : 'تنزيل شجرة حسابات أساسية'}
-                                                </Button>
+                                                <p className="text-muted-foreground">لا توجد حسابات. ابدأ بإضافة حساب رئيسي، أو قم بتنزيل شجرة الحسابات الأساسية من الزر في الأعلى.</p>
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     displayedAccounts.map(account => {
                                         const balance = accountBalances.get(account.id!) || 0;
-                                        const children = accounts.filter(a => a.parentCode === account.code);
-                                        const hasChildren = children.length > 0;
+                                        const hasChildren = accounts.some(a => a.parentCode === account.code);
                                         const isOpen = openAccounts.has(account.code);
 
                                         return (
@@ -463,16 +490,6 @@ export default function ChartOfAccountsPage() {
                                     })
                                 )}
                             </TableBody>
-                            {!loading && accounts.length > 0 && (
-                                <TableFooter>
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="font-bold text-lg">الإجمالي</TableCell>
-                                        <TableCell colSpan={2} className="text-left font-bold text-lg font-mono">
-                                            {formatCurrency(0)}
-                                        </TableCell>
-                                    </TableRow>
-                                </TableFooter>
-                            )}
                         </Table>
                     </div>
                 </CardContent>
@@ -499,6 +516,23 @@ export default function ChartOfAccountsPage() {
                         <AlertDialogCancel disabled={isSaving}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteConfirm} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">
                             {isSaving ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بالحذف'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
+            <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيقوم هذا الإجراء بإضافة شجرة حسابات أساسية تحتوي على أكثر من 80 حسابًا. يوصى بهذا الإجراء إذا كانت شجرة حساباتك فارغة. هل تريد المتابعة؟
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding}>
+                            {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التنزيل...</> : 'نعم، قم بالتنزيل'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
