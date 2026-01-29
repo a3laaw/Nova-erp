@@ -15,6 +15,7 @@ import { Loader2, Save, Upload } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Progress } from '../ui/progress';
 import Image from 'next/image';
+import { Separator } from '../ui/separator';
 
 export function BrandingManager() {
     const { firestore } = useFirebase();
