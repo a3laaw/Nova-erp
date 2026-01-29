@@ -11,7 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { getFirebaseServices } from '@/firebase/provider';
+import { getFirebaseServices } from '@/firebase/init';
 import { addMonths, format, startOfMonth } from 'date-fns';
 import type { Client, ClientTransaction, Employee } from '@/lib/types';
 
@@ -43,10 +43,11 @@ export type CashFlowProjectionOutput = z.infer<typeof CashFlowProjectionOutputSc
 
 
 export async function runCashFlowProjection(input: CashFlowProjectionInput): Promise<CashFlowProjectionOutput> {
-  const { firestore } = getFirebaseServices()!;
-  if (!firestore) {
-    throw new Error('Firestore is not initialized.');
+  const firebaseServices = getFirebaseServices();
+  if (!firebaseServices) {
+    throw new Error('Firebase is not initialized.');
   }
+  const { firestore } = firebaseServices;
 
   // 1. Prepare date ranges
   const today = new Date();
@@ -96,10 +97,10 @@ export async function runCashFlowProjection(input: CashFlowProjectionInput): Pro
                    const stage = tx.stages?.find(s => s.name === clause.condition);
                    let dueDate: Date | null = null;
                    if (stage?.expectedEndDate) {
-                       dueDate = stage.expectedEndDate.toDate();
+                       dueDate = (stage.expectedEndDate as any).toDate();
                    } else if (stage?.startDate) {
                        // Estimate based on start date + 30 days if no end date
-                       dueDate = new Date(stage.startDate.toDate());
+                       dueDate = new Date((stage.startDate as any).toDate());
                        dueDate.setDate(dueDate.getDate() + 30);
                    }
 
