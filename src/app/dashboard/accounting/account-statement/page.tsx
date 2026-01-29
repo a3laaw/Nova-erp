@@ -238,14 +238,14 @@ export default function AccountStatementPage() {
                         <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
                             <div className="text-left flex-shrink-0">
                                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">كشف حساب</h2>
-                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Account Statement</p>
+                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Nova ERP - Account Statement</p>
                                 <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
                             </div>
                             <div className="flex items-center gap-4">
                                {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-16 w-16 !p-3" />}
                                 <div>
-                                   <h1 className="font-bold text-lg">{company?.name || 'درافت للاستشارات الهندسية'}</h1>
-                                   <p className="text-sm text-muted-foreground">{company?.nameEn || 'Draft Engineering Consultants'}</p>
+                                   <h1 className="font-bold text-lg">{company?.name || 'Nova ERP'}</h1>
+                                   <p className="text-sm text-muted-foreground">{company?.nameEn || 'Nova ERP'}</p>
                                 </div>
                             </div>
                         </div>
@@ -287,15 +287,16 @@ export default function AccountStatementPage() {
                                 ))}
                                 {statementData.lines.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">لا توجد حركات في هذه الفترة.</TableCell>
+                                        <TableCell colSpan={7} className="h-24 text-center">لا توجد حركات في هذه الفترة.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="font-bold bg-muted/50">
-                                    <TableCell colSpan={5}>إجمالي الحركات</TableCell>
+                                    <TableCell colSpan={3}>إجمالي الحركات</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
+                                    <TableCell colSpan={2}></TableCell>
                                 </TableRow>
                                 <TableRow className="font-bold text-lg bg-muted">
                                     <TableCell colSpan={6}>الرصيد النهائي</TableCell>

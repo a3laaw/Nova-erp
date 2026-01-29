@@ -116,9 +116,9 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
         <div className="flex items-center gap-2">
             <Logo />
             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                <span className="text-lg font-semibold font-headline tracking-tighter">scoop</span>
+                <span className="text-lg font-semibold font-headline tracking-tighter">Nova ERP</span>
                 <span className="text-xs text-muted-foreground">
-                    {language === 'ar' ? 'للاستشارات الهندسية' : 'Engineering Consultants'}
+                    {language === 'ar' ? 'نظام إدارة متكامل' : 'Integrated Management System'}
                 </span>
             </div>
         </div>

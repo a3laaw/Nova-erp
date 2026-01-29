@@ -168,10 +168,10 @@ export default function ViewQuotationPage() {
                         </div>
                     </div>
                      <div className="flex items-center gap-4">
-                       {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-16 w-16 !p-3" />}
+                       <Logo className="h-16 w-16 !p-3" />
                         <div>
-                           <h1 className="font-bold text-lg">{company?.name || 'درافت للاستشارات الهندسية'}</h1>
-                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'Draft Engineering Consultants'}</p>
+                           <h1 className="font-bold text-lg">{company?.name || 'Nova ERP'}</h1>
+                           <p className="text-sm text-muted-foreground">{company?.nameEn || 'Nova ERP'}</p>
                            <p className="text-xs text-muted-foreground mt-2">{company?.address}</p>
                         </div>
                     </div>

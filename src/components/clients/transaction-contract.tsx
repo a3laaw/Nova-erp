@@ -54,7 +54,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
             const element = document.getElementById('contract-content');
             const opt = {
               margin:       0.5,
-              filename:     `scoop_Contract_${client.nameAr}_${transaction.transactionType}.pdf`,
+              filename:     `Nova_ERP_Contract_${client.nameAr}_${transaction.transactionType}.pdf`,
               image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  { scale: 2, useCORS: true },
               jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -90,7 +90,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
 
     return (
         <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
-            <div className="print:hidden mb-6 flex justify-between items-center no-print">
+            <div className="print:hidden mb-6 flex justify-end items-center no-print">
                  <Button variant="outline" onClick={() => router.back()}>
                     <ArrowRight className="ml-2 h-4 w-4" />
                     العودة
@@ -101,10 +101,10 @@ export function TransactionContract({ client, transaction, company }: Transactio
             <div id="contract-content" className="space-y-8 printable-content">
                 <header className="flex justify-between items-center pb-4 border-b">
                     <div className="flex items-center gap-4">
-                        {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-20 w-20 !p-3" />}
+                        <Logo className="h-20 w-20 !p-3" />
                         <div>
-                           <h1 className="text-xl font-bold">{company?.name || 'سكوب للاستشارات الهندسية'}</h1>
-                           <p className="text-sm text-gray-500">{company?.nameEn || 'scoop Engineering Consultants'}</p>
+                           <h1 className="text-xl font-bold">{company?.name || 'Nova ERP'}</h1>
+                           <p className="text-sm text-gray-500">{company?.nameEn || 'Nova ERP'}</p>
                            <p className="text-xs text-gray-500 mt-2">{company?.address}</p>
                            <p className="text-xs text-gray-500 mt-1">
                                 {company?.phone && `Phone: ${company.phone}`}
@@ -125,7 +125,7 @@ export function TransactionContract({ client, transaction, company }: Transactio
                     <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
                         <div>
                             <p className="font-semibold">الطرف الأول:</p>
-                            <p>{company?.name || 'مكتب سكوب للاستشارات الهندسية (scoop)'}، ويمثله المهندس/ بليه علي المسفر.</p>
+                            <p>{company?.name || 'Nova ERP'}.</p>
                         </div>
                         <div>
                             <p className="font-semibold">الطرف الثاني:</p>
