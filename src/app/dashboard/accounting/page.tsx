@@ -55,9 +55,9 @@ const accountingSections = [
         icon: <Sparkles className="h-8 w-8 text-primary" />,
     },
     {
-        title: 'كشف حساب',
-        description: 'عرض كشف حساب تفصيلي لأي حساب في شجرة الحسابات.',
-        link: '/dashboard/accounting/account-statement',
+        title: 'دفتر الأستاذ العام',
+        description: 'عرض تفصيلي لجميع الحركات على أي حساب.',
+        link: '/dashboard/accounting/general-ledger',
         icon: <Banknote className="h-8 w-8 text-primary" />,
     },
     {

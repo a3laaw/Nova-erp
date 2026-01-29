@@ -29,7 +29,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     assistant: 'المساعد الذكي',
     employees: 'الموظفين',
     'leave-requests': 'طلبات الإجازة',
-    attendance: 'الحضور والرواتب',
+    attendance: 'الحاضرين والرواتب',
     reports: 'التقارير',
     'leave-reports': 'تقارير الإجازات',
     'balance-sheet': 'قائمة المركز المالي',
@@ -38,6 +38,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'equity-statement': 'قائمة التغير في حقوق الملكية',
     'financial-statement-notes': 'الإيضاحات المتممة',
     'trial-balance': 'ميزان المراجعة',
+    'general-ledger': 'دفتر الأستاذ العام',
+    statement: 'كشف حساب',
   },
   en: {
     dashboard: 'Dashboard',
@@ -70,6 +72,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'equity-statement': 'Statement of Equity',
     'financial-statement-notes': 'Notes to Financial Statements',
     'trial-balance': 'Trial Balance',
+    'general-ledger': 'General Ledger',
+    statement: 'Statement',
   },
 };
 

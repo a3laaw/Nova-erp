@@ -46,7 +46,7 @@ interface StatementLine {
     entryId: string;
 }
 
-export default function AccountStatementPage() {
+export default function GeneralLedgerPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
     const { branding, loading: brandingLoading } = useBranding();
@@ -167,7 +167,7 @@ export default function AccountStatementPage() {
             if (!element) return;
             const opt = {
                 margin:       [0.5, 0.5, 0.5, 0.5],
-                filename:     `AccountStatement_${accountId}.pdf`,
+                filename:     `GeneralLedger_${accountId}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -183,8 +183,8 @@ export default function AccountStatementPage() {
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
             <Card className="mb-4 no-print">
                 <CardHeader>
-                    <CardTitle>كشف حساب</CardTitle>
-                    <CardDescription>عرض كشف حساب تفصيلي لأي حساب في شجرة الحسابات.</CardDescription>
+                    <CardTitle>دفتر الأستاذ العام</CardTitle>
+                    <CardDescription>عرض تفصيلي لجميع الحركات على حساب محدد.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                      <div className="grid gap-2 lg:col-span-2">
@@ -193,7 +193,7 @@ export default function AccountStatementPage() {
                             value={accountId}
                             onSelect={setAccountId}
                             options={accountOptions}
-                            placeholder={loading ? 'جاري تحميل الحسابات...' : 'اختر حسابًا لعرض كشفه...'}
+                            placeholder={loading ? 'جاري تحميل الحسابات...' : 'اختر حسابًا لعرضه...'}
                             disabled={loading}
                         />
                      </div>
@@ -222,7 +222,7 @@ export default function AccountStatementPage() {
             {!accountId && !isLoading && (
                 <Card>
                     <CardContent className="p-12 text-center text-muted-foreground">
-                        الرجاء اختيار حساب لعرض كشف الحساب الخاص به.
+                        الرجاء اختيار حساب لعرض دفتر الأستاذ الخاص به.
                     </CardContent>
                 </Card>
             )}
@@ -242,8 +242,8 @@ export default function AccountStatementPage() {
                         ) : (
                             <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
                                 <div className="text-left flex-shrink-0">
-                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">كشف حساب</h2>
-                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Account Statement</p>
+                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">دفتر الأستاذ العام</h2>
+                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">General Ledger</p>
                                     <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
                                 </div>
                                 <div className="flex items-center gap-4">
@@ -275,7 +275,7 @@ export default function AccountStatementPage() {
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell colSpan={6} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
+                                    <TableCell colSpan={5} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
                                 </TableRow>
                                 {statementData.lines.map((line, index) => (
@@ -294,7 +294,7 @@ export default function AccountStatementPage() {
                                 ))}
                                 {statementData.lines.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">لا توجد حركات في هذه الفترة.</TableCell>
+                                        <TableCell colSpan={6} className="h-24 text-center">لا توجد حركات في هذه الفترة.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
@@ -303,10 +303,10 @@ export default function AccountStatementPage() {
                                     <TableCell colSpan={3}>إجمالي الحركات</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                    <TableCell colSpan={2}></TableCell>
+                                    <TableCell colSpan={1}></TableCell>
                                 </TableRow>
                                 <TableRow className="font-bold text-lg bg-muted">
-                                    <TableCell colSpan={6}>الرصيد النهائي</TableCell>
+                                    <TableCell colSpan={5}>الرصيد النهائي</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
                                 </TableRow>
                             </TableFooter>
