@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, X, Loader2, AlertCircle } from 'lucide-react';
+import { Save, X, Loader2, Info } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
 import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, orderBy, runTransaction, Timestamp } from 'firebase/firestore';
 import type { Account, PaymentVoucher } from '@/lib/types';
@@ -170,7 +170,7 @@ export default function EditPaymentVoucherPage() {
                 lines: newLines,
                 totalDebit: data.amount,
                 totalCredit: data.amount,
-                narration: `تحديث سند صرف رقم ${originalVoucherData.voucherNumber} إلى ${data.payeeName}`,
+                narration: data.description || `تحديث سند صرف رقم ${originalVoucherData.voucherNumber} إلى ${data.payeeName}`,
            };
 
            if (originalVoucherData.journalEntryId) {
@@ -227,9 +227,9 @@ export default function EditPaymentVoucherPage() {
                     </div>
                 </div>
                  {journalEntryIsPosted && (
-                    <Alert variant="destructive" className="mt-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>القيد مرحّل</AlertTitle>
+                    <Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
+                        <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
+                        <AlertTitle>ملاحظة</AlertTitle>
                         <AlertDescription>
                             سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
                         </AlertDescription>

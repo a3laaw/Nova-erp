@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, X, Loader2, AlertCircle } from 'lucide-react';
+import { Save, X, Loader2, AlertCircle, Info } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
 import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where, runTransaction, Timestamp, orderBy } from 'firebase/firestore';
 import type { CashReceipt, Client, ClientTransaction, Account } from '@/lib/types';
@@ -148,13 +148,6 @@ export default function EditCashReceiptPage() {
         fetchJournalEntry();
     } else {
         setJournalEntryIsPosted(false);
-        // Set debit account based on payment method if not editing or no JE
-        const defaultDebitAccount = paymentMethod === 'Cash'
-            ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
-            : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
-        if (defaultDebitAccount) {
-            setDebitAccountId(defaultDebitAccount.id!);
-        }
     }
  }, [receipt, firestore, accounts, paymentMethod]);
   
@@ -254,10 +247,11 @@ export default function EditCashReceiptPage() {
     }
   }), [clientProjects]);
 
-  const debitAccountOptions = useMemo(() => 
-    accounts.filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق')))
-    .map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code}))
-  , [accounts]);
+  const debitAccountOptions = useMemo(() => {
+    return accounts
+      .filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق')))
+      .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+  }, [accounts]);
 
  const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
@@ -304,7 +298,7 @@ export default function EditCashReceiptPage() {
 
             const newLines = [
                 { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
-                { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
+                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
             ];
 
             const jeUpdatePayload = {
@@ -404,6 +398,15 @@ export default function EditCashReceiptPage() {
                     </CardDescription>
                 </div>
             </div>
+             {journalEntryIsPosted && (
+                <Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
+                    <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
+                    <AlertTitle>ملاحظة</AlertTitle>
+                    <AlertDescription>
+                        سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
+                    </AlertDescription>
+                </Alert>
+            )}
         </CardHeader>
         <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
@@ -413,7 +416,7 @@ export default function EditCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
                 </div>
             </div>
             
@@ -424,14 +427,14 @@ export default function EditCashReceiptPage() {
                     onSelect={setSelectedProjectId}
                     options={projectOptions}
                     placeholder={'اختر العقد المراد سداد دفعة له...'}
-                    disabled={isSaving || journalEntryIsPosted}
+                    disabled={isSaving}
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
@@ -442,12 +445,12 @@ export default function EditCashReceiptPage() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="description">وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
-                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving || journalEntryIsPosted}>
+                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
                         <SelectTrigger id="paymentMethod">
                             <SelectValue placeholder="اختر طريقة الدفع" />
                         </SelectTrigger>
@@ -466,12 +469,12 @@ export default function EditCashReceiptPage() {
                         onSelect={setDebitAccountId}
                         options={debitAccountOptions}
                         placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
-                        disabled={accountsLoading || isSaving || journalEntryIsPosted}
+                        disabled={accountsLoading || isSaving}
                     />
                 </div>
                 <div className="grid gap-2">
                 <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving || journalEntryIsPosted}/>
+                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
                 </div>
             </div>
         </CardContent>
@@ -480,7 +483,7 @@ export default function EditCashReceiptPage() {
             <X className="ml-2 h-4 w-4" />
             إلغاء
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading || journalEntryIsPosted}>
+        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
