@@ -190,12 +190,6 @@ export function UsersTable() {
     return (
     <>
         <div className="flex items-center justify-between mb-4" dir="rtl">
-            <div>
-                <h3 className='text-lg font-medium'>إدارة المستخدمين</h3>
-                <p className='text-sm text-muted-foreground'>
-                    إنشاء وتعديل حسابات دخول الموظفين وأدوارهم.
-                </p>
-            </div>
             <Button onClick={handleAddUser} size="sm" className="gap-1">
                 <PlusCircle className="ml-2 h-4 w-4" />
                 إضافة مستخدم

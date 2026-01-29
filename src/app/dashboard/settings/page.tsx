@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/tabs';
 import { UsersTable } from '@/components/settings/users-table';
 import { ReferenceDataManager } from '@/components/settings/reference-data-manager';
+import { BrandingManager } from '@/components/settings/branding-manager';
 
 export default function SettingsPage() {
   return (
     <Tabs defaultValue="users" dir="rtl">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="users">إدارة المستخدمين</TabsTrigger>
+        <TabsTrigger value="branding">العلامة التجارية</TabsTrigger>
         <TabsTrigger value="reference-data">البيانات المرجعية</TabsTrigger>
       </TabsList>
       <TabsContent value="users">
@@ -34,6 +36,9 @@ export default function SettingsPage() {
             <UsersTable />
           </CardContent>
         </Card>
+      </TabsContent>
+      <TabsContent value="branding">
+        <BrandingManager />
       </TabsContent>
       <TabsContent value="reference-data">
         <ReferenceDataManager />

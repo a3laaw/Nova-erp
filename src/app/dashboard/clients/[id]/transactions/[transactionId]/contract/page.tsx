@@ -6,22 +6,21 @@ import { useFirebase, useDoc } from '@/firebase';
 import { doc, collection, query, getDocs, limit } from 'firebase/firestore';
 import { TransactionContract } from '@/components/clients/transaction-contract';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Client, ClientTransaction, Company } from '@/lib/types';
+import type { Client, ClientTransaction } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowRight } from 'lucide-react';
+import { useBranding } from '@/context/branding-context';
 
 
 export default function TransactionContractPage() {
   const params = useParams();
   const router = useRouter();
   const { firestore } = useFirebase();
+  const { branding, loading: brandingLoading } = useBranding();
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
-
-  const [company, setCompany] = useState<Company | null>(null);
-  const [companyLoading, setCompanyLoading] = useState(true);
 
   const clientRef = useMemo(() => {
       if (!firestore || !clientId) return null;
@@ -36,26 +35,6 @@ export default function TransactionContractPage() {
   const [clientSnap, clientLoading] = useDoc(clientRef);
   const [transactionSnap, transactionLoading] = useDoc(transactionRef);
   
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchCompany = async () => {
-        setCompanyLoading(true);
-        try {
-            const q = query(collection(firestore, 'companies'), limit(1));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                const companyData = snapshot.docs[0].data() as Company;
-                setCompany({ id: snapshot.docs[0].id, ...companyData });
-            }
-        } catch (error) {
-            console.error("Error fetching company data:", error);
-        } finally {
-            setCompanyLoading(false);
-        }
-    };
-    fetchCompany();
-  }, [firestore]);
-
   const client = useMemo(() => {
       if (clientSnap?.exists()) {
           return { id: clientSnap.id, ...clientSnap.data() } as Client;
@@ -70,21 +49,27 @@ export default function TransactionContractPage() {
       return null;
   }, [transactionSnap]);
 
-  const isLoading = clientLoading || transactionLoading || companyLoading;
+  const isLoading = clientLoading || transactionLoading || brandingLoading;
   
   const handlePrint = () => {
+    const element = document.getElementById('contract-content');
+    if (!element) return;
+    
+    // Temporarily add a class to the root for print-specific styles
+    document.documentElement.classList.add('print-mode');
+
     import('html2pdf.js').then(module => {
         const html2pdf = module.default;
-        const element = document.getElementById('contract-content');
-        if (!element) return;
         const opt = {
-          margin:       0.5,
-          filename:     `scoop_Contract_${client?.nameAr}_${transaction?.transactionType}.pdf`,
-          image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true },
-          jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+          margin: 0.5,
+          filename: `Contract_${client?.nameAr}_${transaction?.transactionType}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().from(element).set(opt).save();
+        html2pdf().from(element).set(opt).save().then(() => {
+             document.documentElement.classList.remove('print-mode');
+        });
     });
   };
 
@@ -122,11 +107,15 @@ export default function TransactionContractPage() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto" dir="rtl">
+    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto print:shadow-none print:p-0">
         <div className="print:hidden mb-6 flex justify-end items-center no-print">
+            <Button variant="outline" onClick={() => router.back()}>
+                <ArrowRight className="ml-2 h-4 w-4" />
+                العودة
+            </Button>
             <Button onClick={handlePrint}><Printer className="ml-2 h-4 w-4" /> تصدير PDF</Button>
         </div>
-        <TransactionContract client={client} transaction={transaction} company={company} />
+        <TransactionContract client={client} transaction={transaction} />
     </div>
   );
 }

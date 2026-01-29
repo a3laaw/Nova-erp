@@ -2,6 +2,7 @@
 
 import { AuthProvider } from '@/context/auth-context';
 import { LanguageProvider, useLanguage } from '@/context/language-context';
+import { BrandingProvider } from '@/context/branding-context';
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Loader } from 'lucide-react';
@@ -35,13 +36,15 @@ function LanguageManager({ children }: { children: React.ReactNode }) {
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <DynamicFirebaseProvider>
-            <LanguageProvider>
-                <AuthProvider>
-                    <LanguageManager>
-                        {children}
-                    </LanguageManager>
-                </AuthProvider>
-            </LanguageProvider>
+            <BrandingProvider>
+                <LanguageProvider>
+                    <AuthProvider>
+                        <LanguageManager>
+                            {children}
+                        </LanguageManager>
+                    </AuthProvider>
+                </LanguageProvider>
+            </BrandingProvider>
         </DynamicFirebaseProvider>
     );
 }

@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
+import { useBranding } from '@/context/branding-context';
 
 const navItems = {
   ar: [
@@ -104,6 +105,7 @@ interface MainNavProps {
 export function MainNav({ currentUser, onLogout }: MainNavProps) {
   const pathname = usePathname();
   const { language } = useLanguage();
+  const { branding, loading } = useBranding();
   
   const currentNavItems = navItems[language].filter(item => currentUser.role && item.roles.includes(currentUser.role));
   const currentSettingsItem = settingsItem[language];
@@ -114,9 +116,9 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
     <>
       <SidebarHeader>
         <div className="flex items-center gap-2">
-            <Logo />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} />
             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                <span className="text-lg font-semibold font-headline tracking-tighter">Nova ERP</span>
+                <span className="text-lg font-semibold tracking-tighter">{branding?.company_name || 'Nova ERP'}</span>
                 <span className="text-xs text-muted-foreground">
                     {language === 'ar' ? 'نظام إدارة متكامل' : 'Integrated Management System'}
                 </span>

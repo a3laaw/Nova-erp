@@ -1,22 +1,18 @@
 
 {
   "entities": {
-    "Company": {
-      "title": "Company",
-      "description": "Represents a company profile, typically for the main organization or branches.",
+    "CompanyBranding": {
+      "title": "Company Branding",
+      "description": "Stores the company's branding information for letterheads and general UI.",
       "type": "object",
       "properties": {
-        "name": {
+        "company_name": {
           "type": "string",
-          "description": "The full name of the company in Arabic."
-        },
-        "nameEn": {
-          "type": "string",
-          "description": "The full name of the company in English."
+          "description": "The full name of the company."
         },
         "address": {
           "type": "string",
-          "description": "The company's contact phone number."
+          "description": "The company's contact address."
         },
         "phone": {
           "type": "string",
@@ -27,17 +23,21 @@
           "format": "email",
           "description": "The company's contact email address."
         },
-        "crNumber": {
-          "type": "string",
-          "description": "The Commercial Registration number."
+        "tax_number": {
+            "type": "string",
+            "description": "The company's tax identification number."
         },
-        "logoUrl": {
+        "letterhead_text": {
+          "type": "string",
+          "description": "Additional text to display on the letterhead."
+        },
+        "logo_url": {
             "type": "string",
             "format": "uri",
             "description": "URL to the company's logo."
         }
       },
-      "required": ["name"]
+      "required": ["company_name"]
     },
     "UserProfile": {
       "title": "User Profile",
@@ -1000,11 +1000,9 @@
     ]
   },
   "firestore": {
-    "/companies/{companyId}": {
-      "schema": {
-        "$ref": "#/entities/Company"
-      },
-      "description": "Stores company profiles."
+    "/company_settings/{settingsId}": {
+      "schema": { "$ref": "#/entities/CompanyBranding" },
+      "description": "Stores the main company branding and letterhead information. Expects a single document with a known ID like 'main'."
     },
     "/users/{userId}": {
       "schema": {

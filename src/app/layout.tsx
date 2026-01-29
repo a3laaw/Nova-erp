@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from 'next/font/google';
+import { Tajawal } from 'next/font/google';
 import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
+const tajawal = Tajawal({ 
+    subsets: ['arabic', 'latin'],
+    weight: ['400', '500', '700', '800'],
+    variable: '--font-body',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -23,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
-      <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
+      <body className={`${tajawal.variable} font-body antialiased`}>
         <Providers>{children}</Providers>
         <Toaster />
       </body>
