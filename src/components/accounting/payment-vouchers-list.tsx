@@ -22,6 +22,7 @@ import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export function PaymentVouchersList() {
   const { firestore } = useFirebase();
@@ -127,7 +128,11 @@ export function PaymentVouchersList() {
             <TableBody>
               {vouchers.map((voucher) => (
                 <TableRow key={voucher.id}>
-                  <TableCell className="font-mono">{voucher.voucherNumber}</TableCell>
+                  <TableCell className="font-mono">
+                    <Link href={`/dashboard/accounting/payment-vouchers/${voucher.id}`} className="hover:underline text-primary">
+                      {voucher.voucherNumber}
+                    </Link>
+                  </TableCell>
                   <TableCell>{voucher.payeeName}</TableCell>
                   <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
                   <TableCell className="font-mono">{formatCurrency(voucher.amount)}</TableCell>
@@ -141,10 +146,10 @@ export function PaymentVouchersList() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" dir="rtl">
                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => { /*router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}`)*/ }}>
+                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}`)}>
                                     <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { /*router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}/edit`)*/ }}>
+                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}/edit`)}>
                                     <Pencil className="ml-2 h-4 w-4" /> تعديل
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />

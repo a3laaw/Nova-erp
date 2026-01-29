@@ -32,8 +32,11 @@ import { Logo } from '@/components/layout/logo';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Link from 'next/link';
 
 interface StatementLine {
+    id: string;
+    type: 'journal' | 'receipt';
     date: Date;
     voucherType: string;
     refNumber?: string;
@@ -176,6 +179,8 @@ export default function ClientStatementPage() {
             runningBalance += (tx.debit || 0) - (tx.credit || 0);
             if (filteredTransactionIds.has(tx.id)) {
                  lines.push({
+                    id: tx.id,
+                    type: tx.type,
                     date: tx.date,
                     voucherType: tx.voucherType,
                     refNumber: tx.refNumber,
@@ -299,7 +304,19 @@ export default function ClientStatementPage() {
                                 <TableRow key={index}>
                                     <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
                                     <TableCell>{line.voucherType}</TableCell>
-                                    <TableCell className="font-mono">{line.refNumber}</TableCell>
+                                    <TableCell className="font-mono">
+                                        {line.type === 'journal' ? (
+                                            <Link href={`/dashboard/accounting/journal-entries/${line.id}`} className="hover:underline text-primary">
+                                                {line.refNumber}
+                                            </Link>
+                                        ) : line.type === 'receipt' ? (
+                                            <Link href={`/dashboard/accounting/cash-receipts/${line.id}`} className="hover:underline text-primary">
+                                                {line.refNumber}
+                                            </Link>
+                                        ) : (
+                                            line.refNumber
+                                        )}
+                                    </TableCell>
                                     <TableCell>{line.description}</TableCell>
                                     <TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
                                     <TableCell className="text-left font-mono">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>

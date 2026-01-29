@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import Link from 'next/link';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -295,7 +296,11 @@ export function JournalEntriesList() {
                 ) : (
                     filteredEntries.map((entry) => (
                         <TableRow key={entry.id}>
-                        <TableCell className="font-mono">{entry.entryNumber}</TableCell>
+                        <TableCell className="font-mono">
+                            <Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline text-primary">
+                                {entry.entryNumber}
+                            </Link>
+                        </TableCell>
                         <TableCell>{formatDate(entry.date)}</TableCell>
                         <TableCell className="max-w-xs truncate">{entry.narration}</TableCell>
                         <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>

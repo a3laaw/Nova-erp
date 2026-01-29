@@ -255,7 +255,11 @@ export function CashReceiptsList() {
                 ) : (
                     filteredReceipts.map((receipt) => (
                         <TableRow key={receipt.id}>
-                        <TableCell className="font-mono">{receipt.voucherNumber}</TableCell>
+                        <TableCell className="font-mono">
+                            <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}`} className="hover:underline text-primary">
+                                {receipt.voucherNumber}
+                            </Link>
+                        </TableCell>
                         <TableCell>
                             <Link href={`/dashboard/clients/${receipt.clientId}`} className="hover:underline">
                             {receipt.clientNameAr}
