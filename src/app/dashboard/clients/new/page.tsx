@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -32,6 +33,7 @@ import type { Employee, Governorate, Area } from '@/lib/types';
 
 export default function NewClientPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { language } = useLanguage();
@@ -57,6 +59,23 @@ export default function NewClientPage() {
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
     const [locationsLoading, setLocationsLoading] = useState(true);
+
+     // Effect to pre-fill from URL
+    useEffect(() => {
+        const nameFromUrl = searchParams.get('nameAr');
+        const mobileFromUrl = searchParams.get('mobile');
+        const engineerFromUrl = searchParams.get('engineerId');
+
+        if (nameFromUrl) {
+            setFormData(prev => ({...prev, nameAr: nameFromUrl}));
+        }
+        if (mobileFromUrl) {
+            setFormData(prev => ({...prev, mobile: mobileFromUrl}));
+        }
+        if (engineerFromUrl) {
+            setAssignedEngineerId(engineerFromUrl);
+        }
+    }, [searchParams]);
 
     // Fetch File ID
     useEffect(() => {

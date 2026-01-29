@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil, UserPlus } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -539,11 +539,29 @@ export default function AppointmentDetailsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <InfoRow 
-                        icon={<User />} 
-                        label="العميل" 
-                        value={client ? <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link> : (appointment.clientName || 'عميل غير مسجل')} 
-                    />
+                    {client ? (
+                        <InfoRow 
+                            icon={<User />} 
+                            label="العميل" 
+                            value={<Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link>} 
+                        />
+                    ) : (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                            <div className="flex justify-between items-center">
+                                <div className="space-y-1">
+                                    <p className="font-semibold flex items-center gap-2"><User /> عميل محتمل (غير مسجل)</p>
+                                    <p className="text-sm text-muted-foreground">{appointment.clientName}</p>
+                                    <p className="text-xs text-muted-foreground font-mono dir-ltr">{appointment.clientMobile}</p>
+                                </div>
+                                <Button asChild size="sm">
+                                    <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${appointment.engineerId}`}>
+                                        <UserPlus className="ml-2 h-4 w-4" />
+                                        إنشاء ملف عميل
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={engineer?.fullName} />
                     <InfoRow icon={<Calendar />} label="تاريخ الموعد" value={format(appointment.appointmentDate.toDate(), "eeee, dd MMMM yyyy", { locale: ar })} />
                     <InfoRow icon={<Clock />} label="وقت الموعد" value={format(appointment.appointmentDate.toDate(), "p", { locale: ar })} />
