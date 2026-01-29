@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -120,16 +121,6 @@ export default function NewPaymentVoucherPage() {
     fetchAccounts();
   }, [firestore, toast]);
 
-  const accountOptions = useMemo(() => 
-    accounts
-      .filter(acc => !acc.code.endsWith('00') && !acc.code.endsWith('0')) // Filter for only sub-accounts
-      .map(acc => ({
-        value: acc.id!,
-        label: `${acc.name} (${acc.code})`,
-        searchKey: acc.code,
-      }))
-  , [accounts]);
-
   const creditAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق'))).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
   
   const debitAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'expense' || (acc.type === 'liability' && acc.name.includes('مورد'))).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
@@ -143,6 +134,8 @@ export default function NewPaymentVoucherPage() {
     }
     
     setIsSaving(true);
+    let newVoucherId = '';
+
     try {
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
@@ -163,6 +156,8 @@ export default function NewPaymentVoucherPage() {
             if (!debitAccount || !creditAccount) {
                 throw new Error("لم يتم العثور على حسابات المدين أو الدائن.");
             }
+            
+            const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
             const newVoucherData = {
                 voucherNumber: newVoucherNumber,
@@ -180,20 +175,38 @@ export default function NewPaymentVoucherPage() {
                 debitAccountName: debitAccount.name,
                 creditAccountId: data.creditAccountId,
                 creditAccountName: creditAccount.name,
-                status: 'draft',
+                status: 'draft' as const,
                 createdAt: serverTimestamp(),
+                journalEntryId: newJournalEntryRef.id,
             };
 
             const newVoucherRef = doc(collection(firestore, 'paymentVouchers'));
+            newVoucherId = newVoucherRef.id;
             transaction.set(newVoucherRef, cleanFirestoreData(newVoucherData));
+
+            const journalEntryData = {
+                entryNumber: `PV-JE-${newVoucherNumber}`,
+                date: newVoucherData.paymentDate,
+                narration: `سند صرف رقم ${newVoucherNumber} إلى ${data.payeeName}`,
+                totalDebit: data.amount,
+                totalCredit: data.amount,
+                status: 'posted' as const, // Payment Vouchers are final once created for now
+                lines: [
+                    { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 },
+                    { accountId: data.creditAccountId, accountName: creditAccount.name, debit: 0, credit: data.amount }
+                ],
+                createdAt: serverTimestamp(),
+                createdBy: currentUser.id,
+            };
+            transaction.set(newJournalEntryRef, journalEntryData);
         });
 
-        toast({ title: 'نجاح', description: 'تم إنشاء سند الصرف بنجاح.' });
-        router.push('/dashboard/accounting/payment-vouchers');
+        toast({ title: 'نجاح', description: 'تم إنشاء سند الصرف والقيد المحاسبي بنجاح.' });
+        router.push(`/dashboard/accounting/payment-vouchers/${newVoucherId}`);
 
     } catch (error) {
         console.error("Error saving payment voucher:", error);
-        toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل حفظ سند الصرف.' });
+        toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error instanceof Error ? error.message : 'فشل حفظ سند الصرف.' });
     } finally {
         setIsSaving(false);
     }
@@ -201,7 +214,7 @@ export default function NewPaymentVoucherPage() {
 
 
   return (
-    <Card className="max-w-4xl mx-auto">
+    <Card className="max-w-4xl mx-auto" dir="rtl">
         <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader>
                 <div className="flex justify-between items-start">
@@ -240,7 +253,7 @@ export default function NewPaymentVoucherPage() {
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="grid gap-2">
                         <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                        <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} />
+                        <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} />
                         {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
                     </div>
                     <div className="md:col-span-2 grid gap-2">

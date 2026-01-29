@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, Printer, Pencil } from 'lucide-react';
+import { ArrowRight, Printer, Pencil, BookOpen } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDoc } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
@@ -13,11 +14,25 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
     'Cheque': 'شيك',
     'Bank Transfer': 'تحويل بنكي',
+};
+
+const statusColors: Record<string, string> = {
+    draft: 'bg-yellow-100 text-yellow-800',
+    paid: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+};
+
+const statusTranslations: Record<string, string> = {
+    draft: 'مسودة',
+    paid: 'مدفوع',
+    cancelled: 'ملغي',
 };
 
 const InfoRow = ({ label, value }: { label: string, value: React.ReactNode | string | undefined | null }) => (
@@ -120,7 +135,10 @@ export default function ViewPaymentVoucherPage() {
                      <div className="text-left flex-shrink-0">
                         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">سـنـد صـرف</h2>
                         <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Payment Voucher</p>
-                        <p className="font-mono text-sm mt-2 text-muted-foreground">{voucher.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
+                        <div className='flex items-center gap-2 mt-2'>
+                           <p className="font-mono text-sm text-muted-foreground">{voucher.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
+                            <Badge variant="outline" className={statusColors[voucher.status] || ''}>{statusTranslations[voucher.status] || voucher.status}</Badge>
+                        </div>
                     </div>
                      <div className="flex items-center gap-4">
                        {company?.logoUrl ? <img src={company.logoUrl} alt={company.name} className="h-20 w-20 object-contain"/> : <Logo className="h-16 w-16 !p-3" />}
@@ -168,6 +186,14 @@ export default function ViewPaymentVoucherPage() {
                              />
                          )}
                     </div>
+                    {voucher.journalEntryId && (
+                        <div className="pt-4 text-xs text-muted-foreground">
+                            <Link href={`/dashboard/accounting/journal-entries/${voucher.journalEntryId}`} className="flex items-center gap-1 hover:underline">
+                                <BookOpen className="h-3 w-3" />
+                                <span>عرض القيد المحاسبي المرتبط</span>
+                            </Link>
+                        </div>
+                    )}
                 </main>
                 
                  <footer className="pt-24">
