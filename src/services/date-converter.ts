@@ -71,6 +71,12 @@ export function toFirestoreDate(dateInput: any): Date | null {
     const d = dateInput.toDate();
     return isNaN(d.getTime()) ? null : d;
   }
+
+  // Handle serialized Firestore Timestamp object from cache
+  if (typeof dateInput === 'object' && dateInput !== null && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
+    const d = new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
+    return isNaN(d.getTime()) ? null : d;
+  }
   
   // Handle string formats
   if (typeof dateInput === 'string') {
