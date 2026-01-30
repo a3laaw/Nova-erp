@@ -231,7 +231,7 @@ export default function IncomeStatementPage() {
 
                             {/* Cost of Revenue */}
                             <div>
-                                <h3 className="font-bold mb-2">تكلفة الإيرادات</h3>
+                                <h3 className="font-bold mb-2">تكلفة الإيرادات (المصاريف التشغيلية المباشرة)</h3>
                                 {incomeStatementData.cogsAccounts.map(acc => (
                                     <div key={acc.name} className="flex justify-between items-center text-sm p-2">
                                         <span>({acc.name})</span>
@@ -253,7 +253,7 @@ export default function IncomeStatementPage() {
 
                             {/* Operating Expenses */}
                             <div>
-                                <h3 className="font-bold mb-2 mt-4">المصاريف التشغيلية</h3>
+                                <h3 className="font-bold mb-2 mt-4">المصاريف الإدارية والعمومية</h3>
                                 {incomeStatementData.expenseAccounts.map(acc => (
                                     <div key={acc.name} className="flex justify-between items-center text-sm p-2">
                                         <span>({acc.name})</span>
@@ -262,7 +262,7 @@ export default function IncomeStatementPage() {
                                 ))}
                                 <Separator />
                                 <div className="flex justify-between items-center text-sm p-2 font-bold">
-                                    <span>إجمالي المصاريف التشغيلية</span>
+                                    <span>إجمالي المصاريف الإدارية والعمومية</span>
                                     <span className="font-mono text-red-600">({formatCurrency(incomeStatementData.totalExpenses)})</span>
                                 </div>
                             </div>

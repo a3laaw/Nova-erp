@@ -920,6 +920,18 @@
         "createdBy": {
           "type": "string",
           "description": "The ID of the user who created the entry."
+        },
+        "auto_profit_center": {
+          "type": "string",
+          "description": "ID of the client/project linked to this entry."
+        },
+        "auto_resource_id": {
+          "type": "string",
+          "description": "ID of the employee responsible for this entry's cost/revenue."
+        },
+        "auto_dept_id": {
+          "type": "string",
+          "description": "ID of the department this entry's cost/revenue belongs to."
         }
       },
       "required": ["entryNumber", "date", "narration", "totalDebit", "totalCredit", "status", "lines", "createdAt"]
@@ -934,6 +946,8 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
+        "clientId": { "type": "string" },
+        "projectId": { "type": "string" },
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },

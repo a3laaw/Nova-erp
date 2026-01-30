@@ -5,6 +5,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -191,6 +192,8 @@ export interface PaymentVoucher {
   voucherYear: number;
   payeeName: string;
   payeeType: 'vendor' | 'employee' | 'other';
+  clientId?: string;
+  projectId?: string;
   amount: number;
   amountInWords: string;
   paymentDate: any; // Timestamp
@@ -550,6 +553,9 @@ export interface JournalEntry {
   createdBy?: string;
   clientId?: string;
   transactionId?: string;
+  auto_profit_center?: string; // For client/project
+  auto_resource_id?: string; // For employee
+  auto_dept_id?: string; // For department
 }
 
 export interface WorkStageProgress {
