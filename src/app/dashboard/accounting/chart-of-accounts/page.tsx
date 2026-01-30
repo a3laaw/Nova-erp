@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -18,12 +19,20 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, Plus, Minus, FolderOpen, Folder } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, orderBy, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,12 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import type { Account, JournalEntry } from '@/lib/types';
-import { formatCurrency, cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -47,6 +52,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type { Account, JournalEntry } from '@/lib/types';
+import { formatCurrency, cn } from '@/lib/utils';
+import { defaultChartOfAccounts } from '@/lib/default-coa';
 
 
 const accountTypeTranslations: Record<Account['type'], string> = {
@@ -174,6 +188,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
     );
 }
 
+
 export default function ChartOfAccountsPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
@@ -188,10 +203,13 @@ export default function ChartOfAccountsPage() {
     // Form and Dialog state
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
+    const [confirmSeedText, setConfirmSeedText] = useState('');
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
     const [parentAccount, setParentAccount] = useState<Account | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
 
 
     const fetchAllData = useCallback(async () => {
@@ -358,19 +376,53 @@ export default function ChartOfAccountsPage() {
         }
     };
 
+    const handleSeedChartOfAccounts = async () => {
+        if (!firestore) return;
+        setIsSeeding(true);
+        try {
+            const batch = writeBatch(firestore);
+            const accountsRef = collection(firestore, 'chartOfAccounts');
+            
+            const existingAccountsSnap = await getDocs(accountsRef);
+            existingAccountsSnap.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            defaultChartOfAccounts.forEach(account => {
+                const docRef = doc(accountsRef);
+                batch.set(docRef, account);
+            });
+
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم مسح الشجرة القديمة وتنزيل شجرة الحسابات الأساسية بنجاح.' });
+            await fetchAllData();
+            setConfirmSeedText('');
+            setIsSeedAlertOpen(false);
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنزيل شجرة الحسابات.' });
+        } finally {
+            setIsSeeding(false);
+        }
+    };
+
 
     return (
         <div className="space-y-6" dir="rtl">
              <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                         <div>
                             <CardTitle>شجرة الحسابات</CardTitle>
                             <CardDescription>
-                                عرض دليل الحسابات الخاص بالشركة.
+                                عرض وإدارة دليل الحسابات الخاص بالشركة وأرصدتها الحالية.
                             </CardDescription>
                         </div>
                          <div className="flex gap-2">
+                            <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
+                                {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                {isSeeding ? 'جاري التنزيل...' : 'تنزيل شجرة حسابات أساسية'}
+                            </Button>
                             <Button onClick={handleAddClick}><PlusCircle className="ml-2 h-4 w-4" /> إضافة حساب رئيسي</Button>
                         </div>
                     </div>
@@ -419,12 +471,20 @@ export default function ChartOfAccountsPage() {
                                                     <div className="flex items-center gap-2 group">
                                                         {hasChildren ? (
                                                              <button onClick={(e) => { e.stopPropagation(); toggleAccount(account.code); }} className="p-1 -mr-1">
-                                                                {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
+                                                                {isOpen ? <Minus className="h-4 w-4 text-muted-foreground" /> : <Plus className="h-4 w-4 text-muted-foreground" />}
                                                              </button>
                                                         ) : (
                                                             <span className="w-6 h-4 inline-block"></span>
                                                         )}
                                                         <span className="font-medium">{account.name}</span>
+                                                        {account.level < 4 && (
+                                                            <Button
+                                                                type="button" variant="ghost" size="icon"
+                                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={(e) => { e.stopPropagation(); handleAddSubAccountClick(account); }}>
+                                                                <PlusCircle className="h-4 w-4 text-primary" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="font-mono">{account.code}</TableCell>
@@ -448,19 +508,11 @@ export default function ChartOfAccountsPage() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
-                                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                            {account.level < 4 && (
-                                                                <DropdownMenuItem onClick={() => handleAddSubAccountClick(account)}>
-                                                                    <PlusCircle className="ml-2 h-4 w-4 text-primary" />
-                                                                    إضافة حساب فرعي
-                                                                </DropdownMenuItem>
-                                                            )}
                                                             <DropdownMenuItem onClick={() => handleEditClick(account)}>
                                                                 <Pencil className="ml-2 h-4 w-4" />
                                                                 تعديل
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteClick(account)}>
+                                                            <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive">
                                                                 <Trash2 className="ml-2 h-4 w-4" />
                                                                 حذف
                                                             </DropdownMenuItem>
@@ -504,6 +556,33 @@ export default function ChartOfAccountsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-4">
+                            <p className="font-bold text-destructive">تحذير: هذا الإجراء سيقوم بمسح جميع الحسابات الحالية واستبدالها بشجرة حسابات أساسية. لا يمكن التراجع عن هذا الإجراء.</p>
+                            <p>للتأكيد، يرجى كتابة كلمة <span className="font-mono font-bold text-destructive">مسح</span> في المربع أدناه.</p>
+                        </AlertDialogDescription>
+                         <Input
+                            id="confirm-seed-text"
+                            value={confirmSeedText}
+                            onChange={(e) => setConfirmSeedText(e.target.value)}
+                            placeholder="اكتب 'مسح' هنا"
+                            className="mt-2"
+                        />
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding || confirmSeedText !== 'مسح'} className="bg-destructive hover:bg-destructive/90">
+                            {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التنزيل...</> : 'نعم، قم بالمسح والتنزيل'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
+
+    
