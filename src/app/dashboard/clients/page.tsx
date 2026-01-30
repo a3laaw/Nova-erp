@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,7 +48,6 @@ import { doc, deleteDoc, addDoc, collection, serverTimestamp, getDoc, runTransac
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -207,12 +206,6 @@ export default function ClientsPage() {
     }
   };
   
-  const refreshData = useCallback(async () => {
-    toast({ title: 'تحديث البيانات...', description: 'جاري إعادة المزامنة من الخادم.' });
-    await SmartCache.invalidate('clients');
-    await SmartCache.invalidate('employees');
-  }, []);
-
   const t = {
     ar: {
       title: 'إدارة العملاء',
@@ -271,10 +264,6 @@ export default function ClientsPage() {
             <CardDescription>{currentText.description}</CardDescription>
           </div>
           <div className="flex gap-2">
-             <Button variant="outline" size="sm" onClick={refreshData} disabled={loading}>
-                 {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
-                 تحديث
-             </Button>
              <Button onClick={() => setIsFormOpen(true)} size="sm" className="gap-1">
                 <PlusCircle className="h-4 w-4" />
                 {currentText.addClient}

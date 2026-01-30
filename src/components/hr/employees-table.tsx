@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,8 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
-import { useSubscription } from '@/hooks/use-subscription';
-import { SmartCache } from '@/lib/cache/smart-cache';
+import { useSubscription, SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -244,11 +243,6 @@ export function EmployeesTable() {
       }
   }
 
-  const refreshData = useCallback(async () => {
-    toast({ title: 'تحديث البيانات...', description: 'جاري إعادة المزامنة من الخادم.' });
-    await SmartCache.invalidate('employees');
-  }, []);
-
   const t = {
     ar: {
       title: 'إدارة الموظفين',
@@ -307,10 +301,6 @@ export function EmployeesTable() {
           </p>
         </div>
          <div className="flex gap-2">
-             <Button variant="outline" size="sm" onClick={refreshData} disabled={loading}>
-                 {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
-                 تحديث
-             </Button>
             <Button size="sm" className="gap-1" asChild>
                 <Link href="/dashboard/hr/employees/new">
                     <PlusCircle className="ml-2 h-4 w-4" />
@@ -525,5 +515,3 @@ export function EmployeesTable() {
         </>
     );
 }
-
-    
