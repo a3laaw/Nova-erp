@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -17,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -218,7 +217,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
             
             // --- Notification Logic ---
-            const engineer = engineers.find(e => e.id === (assignedEngineerId || client.assignedEngineer));
+            const clientDoc = await getDoc(doc(firestore, 'clients', clientId));
+            const engineer = engineers.find(e => e.id === (assignedEngineerId || clientDoc.data()?.assignedEngineer));
             const engineerName = engineer ? engineer.fullName : 'غير مسند';
             const recipients = new Set<string>();
 
