@@ -18,77 +18,72 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit, Timestamp, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useLanguage } from '@/context/language-context';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
+import { useSubscription } from '@/lib/cache/smart-cache';
 
 export function UpcomingAppointments() {
   const { language } = useLanguage();
   const { firestore } = useFirebase();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [engineersMap, setEngineersMap] = useState<Map<string, string>>(new Map());
+  const [clientsMap, setClientsMap] = useState<Map<string, string>>(new Map());
+  const [relatedDataLoading, setRelatedDataLoading] = useState(true);
 
+  // Memoize the query constraints to prevent re-renders
+  const appointmentsQuery = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return [
+      where('appointmentDate', '>=', Timestamp.fromDate(today)),
+      orderBy('appointmentDate', 'asc'),
+      limit(5)
+    ];
+  }, []);
+
+  const { data: appointments, loading: appointmentsLoading } = useSubscription<Appointment>(firestore, 'appointments', appointmentsQuery);
+
+  // Fetch related data (engineers and clients) once
   useEffect(() => {
     if (!firestore) return;
 
-    const fetchAppointments = async () => {
-        setLoading(true);
-        try {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+    const fetchRelatedData = async () => {
+      setRelatedDataLoading(true);
+      try {
+        const [engineersSnapshot, clientsSnapshot] = await Promise.all([
+          getDocs(collection(firestore, 'employees')),
+          getDocs(collection(firestore, 'clients'))
+        ]);
 
-            // 1. Fetch appointments
-            const appointmentsQuery = query(
-                collection(firestore, 'appointments'),
-                where('appointmentDate', '>=', Timestamp.fromDate(today)),
-                orderBy('appointmentDate', 'asc'),
-                limit(5)
-            );
-            const appointmentsSnapshot = await getDocs(appointmentsQuery);
-            const fetchedAppointments: Appointment[] = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+        const newEngineersMap = new Map<string, string>();
+        engineersSnapshot.forEach(doc => newEngineersMap.set(doc.id, doc.data().fullName));
+        setEngineersMap(newEngineersMap);
 
-            if (fetchedAppointments.length === 0) {
-                setAppointments([]);
-                setLoading(false);
-                return;
-            }
+        const newClientsMap = new Map<string, string>();
+        clientsSnapshot.forEach(doc => newClientsMap.set(doc.id, doc.data().nameAr));
+        setClientsMap(newClientsMap);
 
-            // 2. Fetch related clients and engineers
-            const clientIds = [...new Set(fetchedAppointments.map(a => a.clientId).filter(Boolean) as string[])];
-            const engineerIds = [...new Set(fetchedAppointments.map(a => a.engineerId).filter(Boolean))];
-
-            const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', clientIds));
-            const engineersQuery = query(collection(firestore, 'employees'), where('__name__', 'in', engineerIds));
-
-            const [clientsSnapshot, engineersSnapshot] = await Promise.all([
-                 clientIds.length > 0 ? getDocs(clientsQuery) : { docs: [] },
-                 engineerIds.length > 0 ? getDocs(engineersQuery) : { docs: [] },
-            ]);
-            
-            const clientsMap = new Map(clientsSnapshot.docs.map(doc => [doc.id, doc.data() as Client]));
-            const engineersMap = new Map(engineersSnapshot.docs.map(doc => [doc.id, doc.data() as Employee]));
-
-            // 3. Augment appointments with names
-            const augmentedAppointments = fetchedAppointments.map(appt => ({
-                ...appt,
-                clientName: appt.clientId ? (clientsMap.get(appt.clientId)?.nameAr || 'عميل غير معروف') : appt.clientName,
-                engineerName: appt.engineerId ? (engineersMap.get(appt.engineerId)?.fullName || 'مهندس غير معروف') : 'غير مسند',
-            }));
-            
-            setAppointments(augmentedAppointments);
-        } catch (error) {
-            console.error("Error fetching upcoming appointments: ", error);
-        } finally {
-            setLoading(false);
-        }
+      } catch (error) {
+        console.error("Error fetching related data for appointments:", error);
+      } finally {
+        setRelatedDataLoading(false);
+      }
     };
-
-    fetchAppointments();
+    
+    fetchRelatedData();
   }, [firestore]);
+  
+  const augmentedAppointments = useMemo(() => {
+      return appointments.map(appt => ({
+          ...appt,
+          clientName: appt.clientId ? clientsMap.get(appt.clientId) || '...' : appt.clientName,
+          engineerName: appt.engineerId ? engineersMap.get(appt.engineerId) || '...' : '...',
+      }));
+  }, [appointments, clientsMap, engineersMap]);
     
   const t = (language === 'ar') ? 
     { title: 'المواعيد القادمة', description: 'زياراتك الميدانية واجتماعاتك المجدولة التالية.', viewAll: 'عرض الكل', client: 'العميل', engineer: 'المهندس', dateTime: 'التاريخ والوقت', purpose: 'الغرض', noAppointments: 'لا توجد مواعيد قادمة.' } : 
@@ -103,6 +98,7 @@ export function UpcomingAppointments() {
     return format(date, "EEE, dd MMM yyyy 'at' h:mm a");
   }
 
+  const loading = appointmentsLoading || relatedDataLoading;
 
   return (
     <Card dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -139,12 +135,12 @@ export function UpcomingAppointments() {
                     <TableCell className="text-right"><Skeleton className="h-5 w-28 ml-auto" /></TableCell>
                 </TableRow>
             ))}
-            {!loading && appointments.length === 0 && (
+            {!loading && augmentedAppointments.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={4} className="text-center h-24">{t.noAppointments}</TableCell>
                 </TableRow>
             )}
-            {!loading && appointments.map((appt) => {
+            {!loading && augmentedAppointments.map((appt) => {
               return (
                 <TableRow key={appt.id}>
                   <TableCell>

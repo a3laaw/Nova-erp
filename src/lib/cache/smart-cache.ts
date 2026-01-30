@@ -171,7 +171,8 @@ export function useSubscription<T extends { id?: string }>(
     const cacheKey = `${collectionPath}:${JSON.stringify(constraints)}`;
 
     useEffect(() => {
-        if (!firestore) {
+        if (!firestore || !collectionPath) {
+            setData([]);
             setLoading(false);
             return;
         }
@@ -183,8 +184,6 @@ export function useSubscription<T extends { id?: string }>(
         localforage.getItem<CachedData<T[]>>(cacheKey).then(cached => {
             if (isMounted && cached?.data) {
                 setData(cached.data);
-                // We have data to show, so the "initial" load is done in a sense.
-                // The real loading state will be set to false by the onSnapshot listener.
                 console.log(`CACHE HIT (stale): ${cacheKey}`);
             }
         });

@@ -1,49 +1,40 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { where, orderBy } from 'firebase/firestore';
+import { useSubscription } from '@/lib/cache/smart-cache';
 import type { Notification } from '@/lib/types';
 
 /**
- * A custom hook to fetch and manage notifications for the current user.
- * It handles fetching, loading states, and sorting by creation date.
+ * A custom hook to fetch and manage notifications for the current user in real-time.
+ * It uses a subscription to Firestore for live updates.
  */
 export function useNotifications() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
 
-    // Memoize the Firestore query to prevent re-running on every render
-    const notificationsQuery = useMemo(() => {
-        if (!firestore || !user?.id) return null;
-        // Query for notifications for the current user, ordered by creation date
-        return query(
-            collection(firestore, 'notifications'),
-            where('userId', '==', user.id)
-        );
-    }, [firestore, user?.id]);
-
-    // useCollection is a custom hook that listens to Firestore snapshot changes
-    const [snapshot, loading, error] = useCollection(notificationsQuery);
-
-    // Memoize the notifications array to prevent unnecessary re-renders
-    const notifications = useMemo(() => {
-        if (!snapshot) return [];
-        
-        // Map snapshot documents to Notification type
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        
-        // Sort notifications client-side to avoid complex Firestore indexes
-        // Newest notifications will appear first.
-        data.sort((a, b) => {
-            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-            return timeB - timeA;
-        });
-
-        return data;
-    }, [snapshot]);
+    // Memoize the query constraints array to prevent re-running the subscription unnecessarily.
+    const queryConstraints = useMemo(() => {
+        if (!user?.id) return null;
+        // Query for notifications for the current user, ordered by creation date descending.
+        return [
+            where('userId', '==', user.id),
+            orderBy('createdAt', 'desc')
+        ];
+    }, [user?.id]);
+    
+    // useSubscription handles caching, real-time updates, loading, and error states.
+    // The query will not run if constraints are null (i.e., no user).
+    const { data: notifications, loading, error } = useSubscription<Notification>(
+        firestore, 
+        queryConstraints ? 'notifications' : '', 
+        queryConstraints || []
+    );
+    
+    // The data from useSubscription is already sorted by the query.
+    // No need for additional client-side sorting.
     
     return { notifications, loading, error };
 }
