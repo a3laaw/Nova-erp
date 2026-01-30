@@ -142,15 +142,16 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
         const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
         const uniqueJobs = new Map<string, { value: string; label: string }>();
 
-        // More robust normalization function
         const normalize = (str: string) => {
             if (!str) return '';
+            // Chain of clean-up operations
             return str
-                .replace(/[أإآا]/g, 'ا') // Standardize all forms of Alef to a plain Alef
-                .replace(/ى/g, 'ي')     // Standardize Alef Maqsura to Yaa
-                .replace(/ة/g, 'ه')     // Standardize Teh Marbuta to Haa
-                .replace(/\s+/g, ' ')  // Collapse multiple whitespace chars into one space
-                .trim();               // Remove leading/trailing whitespace
+                .trim()
+                .replace(/[أإآ]/g, 'ا')    // Unify Alef forms to 'ا'
+                .replace(/ى/g, 'ي')      // Unify Alef Maqsura to 'ي'
+                .replace(/ة/g, 'ه')      // Unify Ta'a Marbuta to 'ه'
+                .replace(/\s+/g, ' ')  // Collapse multiple whitespace chars into one
+                .replace(/ا$/, '');      // Remove optional trailing Alif (e.g., 'ميكانيكا' -> 'ميكانيك')
         };
 
         jobsSnapshot.forEach(doc => {
@@ -159,9 +160,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                 const trimmedName = jobName.trim();
                 if (trimmedName) {
                     const normalizedName = normalize(trimmedName);
-                    // Use the normalized name as the key to prevent duplicates
                     if (normalizedName && !uniqueJobs.has(normalizedName)) {
-                        // Store the original (first-seen) name as the label
                         uniqueJobs.set(normalizedName, { value: trimmedName, label: trimmedName });
                     }
                 }
