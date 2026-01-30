@@ -41,7 +41,7 @@ import { cn } from '@/lib/utils';
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
     payeeType: z.string().min(1, 'نوع المستفيد مطلوب'),
-    amount: z.preprocess((a) => parseFloat(z.string().parse(a)), z.number().positive('المبلغ يجب أن يكون أكبر من صفر')),
+    amount: z.preprocess((a) => (String(a || '').trim() === '' ? 0 : parseFloat(String(a))), z.number().positive('المبلغ يجب أن يكون أكبر من صفر')),
     paymentDate: z.string().min(1, 'تاريخ الدفع مطلوب'),
     paymentMethod: z.string().min(1, 'طريقة الدفع مطلوبة'),
     description: z.string().min(1, 'الوصف مطلوب'),
@@ -86,7 +86,7 @@ export default function EditPaymentVoucherPage() {
         reset({
             payeeName: data.payeeName,
             payeeType: data.payeeType,
-            amount: data.amount,
+            amount: data.amount || '',
             paymentDate: data.paymentDate?.toDate ? formatDateFns(data.paymentDate.toDate(), 'yyyy-MM-dd') : '',
             paymentMethod: data.paymentMethod,
             description: data.description,
@@ -109,8 +109,9 @@ export default function EditPaymentVoucherPage() {
 
   const amountValue = watch('amount');
   const amountInWords = useMemo(() => {
-    if (amountValue && !isNaN(amountValue)) {
-        return numberToArabicWords(amountValue);
+    const numAmount = Number(amountValue);
+    if (numAmount && !isNaN(numAmount)) {
+        return numberToArabicWords(numAmount);
     }
     return '';
   }, [amountValue]);

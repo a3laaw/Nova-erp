@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -50,7 +51,7 @@ const itemSchema = z.object({
   id: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب"),
   quantity: z.preprocess(v => parseFloat(String(v)), z.number().min(0.01, "الكمية يجب أن تكون أكبر من صفر")),
-  unitPrice: z.preprocess(v => parseFloat(String(v)), z.number().min(0, "السعر يجب أن لا يكون سالبًا")),
+  unitPrice: z.preprocess(v => (String(v || '').trim() === '' ? 0 : parseFloat(String(v))), z.number().min(0, "السعر يجب أن لا يكون سالبًا")),
   condition: z.string().optional(),
 });
 
@@ -143,7 +144,7 @@ export default function NewQuotationPage() {
       clientId: clientIdFromUrl || '',
       date: new Date().toISOString().split('T')[0],
       validUntil: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
-      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }],
+      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' }],
       notes: '',
       departmentId: '',
       transactionTypeId: '',
@@ -214,7 +215,7 @@ export default function NewQuotationPage() {
   // Use a callback to populate form from a template
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
     // Reset fields first
-    replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' }]);
+    replace([{ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' }]);
     setScopeOfWork([]);
     setTerms([]);
     setOpenClauses([]);
@@ -490,10 +491,10 @@ export default function NewQuotationPage() {
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" {...register(`items.${index}.quantity`)} defaultValue={1} className="dir-ltr" />
+                                        <Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" {...register(`items.${index}.unitPrice`)} defaultValue={0} className="dir-ltr" />
+                                        <Input type="number" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
                                     </TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
                                     <TableCell>
@@ -513,7 +514,7 @@ export default function NewQuotationPage() {
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0, condition: '' })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' })}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة بند
                         </Button>

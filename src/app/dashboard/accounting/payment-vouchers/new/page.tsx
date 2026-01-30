@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils';
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
     payeeType: z.string().min(1, 'نوع المستفيد مطلوب'),
-    amount: z.preprocess((a) => parseFloat(z.string().parse(a)), z.number().positive('المبلغ يجب أن يكون أكبر من صفر')),
+    amount: z.preprocess((a) => (String(a || '').trim() === '' ? 0 : parseFloat(String(a))), z.number().positive('المبلغ يجب أن يكون أكبر من صفر')),
     paymentDate: z.string().min(1, 'تاريخ الدفع مطلوب'),
     paymentMethod: z.string().min(1, 'طريقة الدفع مطلوبة'),
     description: z.string().min(1, 'الوصف مطلوب'),
@@ -71,6 +71,7 @@ export default function NewPaymentVoucherPage() {
       resolver: zodResolver(paymentVoucherSchema),
       defaultValues: {
           paymentDate: new Date().toISOString().split('T')[0],
+          amount: '',
       }
   });
 
@@ -79,8 +80,9 @@ export default function NewPaymentVoucherPage() {
   const payeeType = watch('payeeType');
   const paymentMethod = watch('paymentMethod');
   const amountInWords = useMemo(() => {
-    if (amountValue && !isNaN(amountValue)) {
-        return numberToArabicWords(amountValue);
+    const numAmount = Number(amountValue);
+    if (numAmount && !isNaN(numAmount)) {
+        return numberToArabicWords(numAmount);
     }
     return '';
   }, [amountValue]);
@@ -113,7 +115,7 @@ export default function NewPaymentVoucherPage() {
             
             setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
             setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
-            setDepartments(deptSnap.docs.map(d => ({id: d.id, ...d.data()} as Department)));
+            setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
 
             const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
             const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));

@@ -322,7 +322,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
                 const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
 
-                [coaClientCounterDoc, journalEntryCounterDoc, parentAccountSnap, revenueAccountSnap, clientAccountSnap] = await Promise.all([
+                [coaClientCounterDoc, journalEntryCounterDoc, parentAccountSnap, revenueAccountSnap] = await Promise.all([
                     transaction_firestore.get(coaClientCounterRef),
                     transaction_firestore.get(journalEntryCounterRef),
                     getDocs(parentAccountQuery),
@@ -582,7 +582,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                                 </Select>
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" value={clause.amount} onChange={(e) => handleClauseChange(index, 'amount', Number(e.target.value))} className="dir-ltr text-left" />
+                                                <Input type="number" value={clause.amount || ''} onChange={(e) => handleClauseChange(index, 'amount', Number(e.target.value))} className="dir-ltr text-left" />
                                             </TableCell>
                                             <TableCell>
                                                 <Button variant="ghost" size="icon" onClick={() => removeClause(clause.id)}><Trash2 className="text-destructive h-4 w-4" /></Button>
@@ -649,5 +649,3 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     </Dialog>
   );
 }
-
-    
