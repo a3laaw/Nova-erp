@@ -36,6 +36,30 @@ import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { MultiSelect } from '../ui/multi-select';
+import { Skeleton } from '../ui/skeleton';
+
+// --- NEW StatCard Component ---
+function StatCard({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) {
+    const colorClasses: Record<string, string> = {
+        green: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
+        blue: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+        cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300',
+        red: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
+        purple: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
+    }
+
+    return (
+        <button onClick={onNavigate} className="p-4 rounded-lg border bg-card text-card-foreground shadow-sm hover:bg-accent transition-colors text-right">
+            <div className="flex justify-between items-start">
+                <div className={cn("p-2 rounded-lg", colorClasses[color] || colorClasses.blue)}>
+                    {icon}
+                </div>
+                {loading ? <Skeleton className="h-6 w-12" /> : <div className="text-2xl font-bold">{count}</div>}
+            </div>
+            <p className="text-sm font-semibold mt-2">{title}</p>
+        </button>
+    );
+}
 
 
 // Reusable component for the management UI (previously the whole component)
@@ -423,7 +447,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
 
 
 // --- Main Component (Router) ---
-export default function ReferenceDataManager() {
+export function ReferenceDataManager() {
     const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages'>('dashboard');
 
     const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0 });
