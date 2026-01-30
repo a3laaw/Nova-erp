@@ -65,7 +65,7 @@ export function PendingVisits() {
                 }
 
                 // Fetch client names for the pending visits
-                const clientIds = [...new Set(filteredPending.map(a => a.clientId))];
+                const clientIds = [...new Set(filteredPending.map(a => a.clientId).filter(Boolean) as string[])];
 
                 if (clientIds.length > 0) {
                     // Use a 'in' query which is efficient for up to 30 IDs.
@@ -75,12 +75,12 @@ export function PendingVisits() {
     
                     const augmentedPendingVisits = filteredPending.map(appt => ({
                         ...appt,
-                        clientName: clientsMap.get(appt.clientId)?.nameAr || 'عميل غير معروف'
+                        clientName: clientsMap.get(appt.clientId)?.nameAr || appt.clientName || 'عميل غير معروف'
                     }));
     
                     setPendingVisits(augmentedPendingVisits);
                 } else {
-                     setPendingVisits([]);
+                     setPendingVisits(filteredPending.map(appt => ({...appt, clientName: appt.clientName || 'عميل غير معروف'})));
                 }
 
 

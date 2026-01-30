@@ -58,7 +58,7 @@ export function UpcomingAppointments() {
             }
 
             // 2. Fetch related clients and engineers
-            const clientIds = [...new Set(fetchedAppointments.map(a => a.clientId))];
+            const clientIds = [...new Set(fetchedAppointments.map(a => a.clientId).filter(Boolean) as string[])];
             const engineerIds = [...new Set(fetchedAppointments.map(a => a.engineerId).filter(Boolean))];
 
             const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', clientIds));
@@ -75,7 +75,7 @@ export function UpcomingAppointments() {
             // 3. Augment appointments with names
             const augmentedAppointments = fetchedAppointments.map(appt => ({
                 ...appt,
-                clientName: clientsMap.get(appt.clientId)?.nameAr || 'عميل غير معروف',
+                clientName: appt.clientId ? (clientsMap.get(appt.clientId)?.nameAr || 'عميل غير معروف') : appt.clientName,
                 engineerName: appt.engineerId ? (engineersMap.get(appt.engineerId)?.fullName || 'مهندس غير معروف') : 'غير مسند',
             }));
             
