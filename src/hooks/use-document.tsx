@@ -1,60 +1,45 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { doc, onSnapshot, type Firestore, type DocumentSnapshot } from 'firebase/firestore';
-import { SmartCache } from '@/lib/cache/smart-cache';
+import { useState, useEffect, useMemo } from 'react';
+import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
-import localforage from 'localforage';
-
-interface CachedData<T> {
-  timestamp: number;
-  data: T;
-}
 
 export function useDocument<T extends { id?: string }>(
-  firestore: Firestore | null,
+  firestore: any, // No longer used
   docPath: string | null
 ): { data: T | null, loading: boolean, error: Error | null } {
   const [data, setData] = useState<T | null>(null);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { signalUpdate } = useSyncStatus();
 
-  const cacheKey = docPath;
+  const cacheKey = useMemo(() => docPath, [docPath]);
 
   useEffect(() => {
-    if (!firestore || !docPath) {
+    if (!cacheKey) {
       setData(null);
-      setIsInitialLoading(false);
+      setLoading(false);
       return;
     }
 
     let isMounted = true;
     let isFirstLoad = true;
-    setIsInitialLoading(true);
+    setLoading(true);
 
-    localforage.getItem<CachedData<T>>(cacheKey!).then(cached => {
+    cache.getFromStorage<T>(cacheKey).then(cached => {
       if (isMounted && cached?.data) {
         setData(cached.data);
       }
     });
 
-    const docRef = doc(firestore, docPath);
-
-    const unsubscribe = onSnapshot(docRef,
-      (snapshot) => {
+    const unsubscribe = cache.subscribeDoc<T>(
+      cacheKey,
+      (newData) => {
         if (isMounted) {
-          if (snapshot.exists()) {
-            const result = { id: snapshot.id, ...snapshot.data() } as T;
-            setData(result);
-            SmartCache.set(cacheKey!, result);
-          } else {
-            setData(null);
-            localforage.removeItem(cacheKey!).catch(err => console.error("Failed to remove item from cache", err));
-          }
+          setData(newData);
           setError(null);
-          
+          cache.set(cacheKey, newData); // Update cache
           if (isFirstLoad) {
-            setIsInitialLoading(false);
+            setLoading(false);
             isFirstLoad = false;
           } else {
             signalUpdate();
@@ -62,20 +47,15 @@ export function useDocument<T extends { id?: string }>(
         }
       },
       (err) => {
-        console.error(`Error subscribing to document ${docPath}:`, err);
         if (isMounted) {
           setError(err);
-          setIsInitialLoading(false);
+          setLoading(false);
         }
       }
     );
 
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, docPath, cacheKey, signalUpdate]);
+    return () => { isMounted = false; unsubscribe(); };
+  }, [cacheKey, signalUpdate]);
 
-  return { data, loading: isInitialLoading, error };
+  return { data, loading, error };
 }

@@ -1,79 +1,66 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, type Firestore, type QueryConstraint } from 'firebase/firestore';
-import { SmartCache } from '@/lib/cache/smart-cache';
+import { useState, useEffect, useMemo } from 'react';
+import { type QueryConstraint } from 'firebase/firestore';
+import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
-import localforage from 'localforage';
-
-interface CachedData<T> {
-  timestamp: number;
-  data: T;
-}
 
 export function useSubscription<T extends { id?: string }>(
-  firestore: Firestore | null, 
+  firestore: any, // No longer used, but kept for API compatibility for now
   collectionPath: string, 
   constraints: QueryConstraint[] = []
 ): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
     const [data, setData] = useState<T[]>([]);
-    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
     const { signalUpdate } = useSyncStatus();
 
-    const cacheKey = `${collectionPath}:${JSON.stringify(constraints)}`;
+    const cacheKey = useMemo(() => `${collectionPath}:${JSON.stringify(constraints)}`, [collectionPath, constraints]);
 
     useEffect(() => {
-        if (!firestore || !collectionPath) {
+        if (!collectionPath) {
             setData([]);
-            setIsInitialLoading(false);
+            setLoading(false);
             return;
         }
 
         let isMounted = true;
         let isFirstLoad = true;
-        setIsInitialLoading(true);
+        setLoading(true);
         
-        localforage.getItem<CachedData<T[]>>(cacheKey).then(cached => {
+        // Load initial data from cache
+        cache.getFromStorage<T[]>(cacheKey).then(cached => {
             if (isMounted && cached?.data) {
                 setData(cached.data);
             }
         });
 
-        const q = query(collection(firestore, collectionPath), ...constraints);
-        
-        const unsubscribe = onSnapshot(q, 
-            (snapshot) => {
-                const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+        const unsubscribe = cache.subscribe<T>(
+            collectionPath,
+            (newData) => {
                 if (isMounted) {
-                    setData(results);
+                    setData(newData);
                     setError(null);
-                    
+                    cache.set(cacheKey, newData); // Update cache on new data
                     if (isFirstLoad) {
-                        setIsInitialLoading(false);
+                        setLoading(false);
                         isFirstLoad = false;
                     } else {
-                        signalUpdate(); 
+                        signalUpdate();
                     }
-                    
-                    SmartCache.set(cacheKey, results);
                 }
             },
             (err) => {
-                console.error(`Error subscribing to ${collectionPath}:`, err);
                 if (isMounted) {
                     setError(err);
-                    setIsInitialLoading(false);
+                    setLoading(false);
                 }
-            }
+            },
+            constraints
         );
+        
+        return () => { isMounted = false; unsubscribe(); };
+    }, [collectionPath, cacheKey, signalUpdate, constraints]);
 
-        return () => {
-            isMounted = false;
-            unsubscribe();
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [firestore, collectionPath, JSON.stringify(constraints), signalUpdate]);
-
-    return { data, setData, loading: isInitialLoading, error };
+    return { data, setData, loading, error };
 }
