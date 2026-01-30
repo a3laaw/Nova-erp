@@ -57,7 +57,7 @@ export default function DashboardLayout({
           <MainNav currentUser={user} onLogout={handleLogout} />
         </Sidebar>
         <SidebarInset>
-          <Header currentUser={user} onLogout={onLogout} className="no-print" />
+          <Header currentUser={user} onLogout={handleLogout} className="no-print" />
           <main className="flex-1 p-4 md:p-6 lg:p-8">
             {children}
           </main>
