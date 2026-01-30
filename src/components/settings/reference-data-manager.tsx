@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -111,8 +109,8 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
-
-  const primaryQueryConstraints = useMemo(() => [], []);
+  
+  const primaryQueryConstraints = useMemo(() => [orderBy('name')], []);
   const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
   
    useEffect(() => {
@@ -121,18 +119,58 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
         toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: primaryError.message });
     }
     if (primaryData) {
-      let items = [...primaryData];
-      items.sort((a, b) => {
-          const orderA = (a as any).order;
-          const orderB = (b as any).order;
-          if (orderA !== undefined && orderB !== undefined) {
-              return orderA - orderB;
-          }
-          return a.name.localeCompare(b.name, 'ar');
-      });
-      setPrimaryItems(items);
+      setPrimaryItems(primaryData);
     }
   }, [primaryData, primaryLoading, primaryError, primaryTitle, toast]);
+
+  const handleSelectPrimary = useCallback((item: T) => {
+    setSelectedPrimary(item);
+  }, []);
+
+  // Effect to select the first item by default
+  useEffect(() => {
+    const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
+    if (!primaryExists && primaryItems.length > 0) {
+      setSelectedPrimary(primaryItems[0]);
+    } else if (primaryItems.length === 0) {
+      setSelectedPrimary(null);
+    }
+  }, [primaryItems, selectedPrimary]);
+
+  // Effect to fetch secondary items when a primary item is selected
+  useEffect(() => {
+    if (!selectedPrimary) {
+      setSecondaryItems([]);
+      return;
+    }
+    
+    if (!firestore || !secondaryCollectionName) return;
+
+    setLoadingSecondary(true);
+    const fetchSecondary = async () => {
+        try {
+            const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`));
+            const secondarySnapshot = await getDocs(secondaryQuery);
+            let fetchedItems = secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
+            
+            fetchedItems.sort((a: any, b: any) => {
+                if (a.order !== undefined && b.order !== undefined) {
+                    return a.order - b.order;
+                }
+                return a.name.localeCompare(b.name, 'ar');
+            });
+            
+            setSecondaryItems(fetchedItems);
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
+        } finally {
+            setLoadingSecondary(false);
+        }
+    };
+    
+    fetchSecondary();
+  }, [selectedPrimary, firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
 
 
   const fetchAllJobs = useCallback(async () => {
@@ -144,14 +182,13 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
 
         const normalize = (str: string) => {
             if (!str) return '';
-            // Chain of clean-up operations
             return str
                 .trim()
-                .replace(/[أإآ]/g, 'ا')    // Unify Alef forms to 'ا'
-                .replace(/ى/g, 'ي')      // Unify Alef Maqsura to 'ي'
-                .replace(/ة/g, 'ه')      // Unify Ta'a Marbuta to 'ه'
-                .replace(/\s+/g, ' ')  // Collapse multiple whitespace chars into one
-                .replace(/ا$/, '');      // Remove optional trailing Alif (e.g., 'ميكانيكا' -> 'ميكانيك')
+                .replace(/[أإآ]/g, 'ا')
+                .replace(/ى/g, 'ي')
+                .replace(/ة/g, 'ه')
+                .replace(/\s+/g, ' ')
+                .replace(/ا$/, '');
         };
 
         jobsSnapshot.forEach(doc => {
@@ -182,45 +219,6 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
       fetchAllJobs();
     }
   }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchAllJobs]);
-
-
-  const handleSelectPrimary = useCallback(async (item: T) => {
-    setSelectedPrimary(item);
-    if (!firestore || !secondaryCollectionName) return;
-    setLoadingSecondary(true);
-    setSecondaryItems([]);
-    try {
-      const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${item.id}/${secondaryCollectionName}`));
-      const secondarySnapshot = await getDocs(secondaryQuery);
-      let fetchedItems = secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
-      
-      fetchedItems.sort((a: any, b: any) => {
-          if (a.order !== undefined && b.order !== undefined) {
-              return a.order - b.order;
-          }
-          return a.name.localeCompare(b.name, 'ar');
-      });
-
-      setSecondaryItems(fetchedItems);
-    } catch (e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
-    } finally {
-      setLoadingSecondary(false);
-    }
-  }, [firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
-  
-  useEffect(() => {
-    const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
-    if (!primaryExists && primaryItems.length > 0) {
-        handleSelectPrimary(primaryItems[0]);
-    } else if (selectedPrimary && primaryExists) {
-        handleSelectPrimary(selectedPrimary);
-    } else if (primaryItems.length === 0) {
-        setSelectedPrimary(null);
-        setSecondaryItems([]);
-    }
-  }, [primaryItems, selectedPrimary, handleSelectPrimary]);
 
 
   const openDialog = (type: 'primary' | 'secondary', item: any | null = null) => {
