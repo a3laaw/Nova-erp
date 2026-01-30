@@ -7,13 +7,8 @@
 'use client';
 
 import * as React from 'react';
-import { X, ChevronsUpDown } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
+import Select, { type MultiValue, type StylesConfig } from 'react-select';
 import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
 
 export interface MultiSelectOption {
   value: string;
@@ -23,108 +18,115 @@ export interface MultiSelectOption {
 interface MultiSelectProps {
   options: MultiSelectOption[];
   selected: string[];
-  onChange: React.Dispatch<React.SetStateAction<string[]>>;
+  onChange: (selected: string[]) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
 }
 
-export function MultiSelect({ options, selected, onChange, placeholder = 'Select options...', className, disabled = false }: MultiSelectProps) {
-  const [open, setOpen] = React.useState(false);
+export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
+  
+  const handleChange = (newSelected: MultiValue<MultiSelectOption>) => {
+    const values = newSelected ? newSelected.map(opt => opt.value) : [];
+    onChange(values);
+  };
 
-  const handleUnselect = (item: string) => {
-    onChange(selected.filter((i) => i !== item));
+  const selectedOptions = options.filter(opt => selected.includes(opt.value));
+  
+  const customStyles: StylesConfig<MultiSelectOption, true> = {
+    control: (base, state) => ({
+      ...base,
+      backgroundColor: 'hsl(var(--card))',
+      borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--border))',
+      minHeight: '40px',
+      boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
+      '&:hover': {
+        borderColor: 'hsl(var(--ring))',
+      },
+    }),
+    placeholder: (base) => ({
+        ...base,
+        color: 'hsl(var(--muted-foreground))',
+    }),
+    input: (base) => ({
+        ...base,
+        color: 'hsl(var(--foreground))',
+    }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: 'hsl(var(--card))',
+      zIndex: 20,
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+      color: state.isSelected ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))',
+      '&:active': {
+        backgroundColor: 'hsl(var(--primary))',
+      },
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: 'hsl(var(--secondary))',
+      borderRadius: '9999px',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: 'hsl(var(--secondary-foreground))',
+      paddingRight: '6px',
+      fontSize: '0.875rem'
+    }),
+    multiValueRemove: (base, state) => ({
+      ...base,
+      color: 'hsl(var(--secondary-foreground))',
+      '&:hover': {
+        backgroundColor: 'hsl(var(--destructive) / 0.8)',
+        color: 'hsl(var(--destructive-foreground))',
+      },
+    }),
+    noOptionsMessage: (base) => ({
+      ...base,
+      color: 'hsl(var(--muted-foreground))',
+    }),
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-full justify-between font-normal h-auto min-h-10", className)}
-          onClick={() => setOpen(!open)}
-          disabled={disabled}
-        >
-          <div className="flex gap-1 flex-wrap">
-            {selected.length > 0 ? (
-              selected.map((item) => {
-                const option = options.find((opt) => opt.value === item);
-                return (
-                  <Badge
-                    variant="secondary"
-                    key={item}
-                    className="mr-1 mb-1"
-                  >
-                    {option?.label || item}
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Remove ${option?.label || item}`}
-                      className="ml-1 cursor-pointer ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleUnselect(item);
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUnselect(item);
-                      }}
-                    >
-                      <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </span>
-                  </Badge>
-                );
-              })
-            ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
-            )}
-          </div>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder="Search..." />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  onSelect={() => {
-                    onChange(
-                      selected.includes(option.value)
-                        ? selected.filter((item) => item !== option.value)
-                        : [...selected, option.value]
-                    );
-                    setOpen(true);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
-                      selected.includes(option.value) ? 'bg-primary text-primary-foreground' : 'opacity-50 [&_svg]:invisible'
-                    )}
-                  >
-                    <Check className={cn('h-4 w-4')} />
-                  </div>
-                  {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Select
+      isMulti
+      options={options}
+      value={selectedOptions}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={cn("w-full", className)}
+      isDisabled={disabled}
+      isSearchable={true}
+      noOptionsMessage={() => "لا توجد نتائج"}
+      styles={customStyles}
+      theme={(theme) => ({
+        ...theme,
+        borderRadius: 6,
+        colors: {
+            ...theme.colors,
+            primary: 'hsl(var(--primary))',
+            primary75: 'hsl(var(--primary) / 0.75)',
+            primary50: 'hsl(var(--primary) / 0.5)',
+            primary25: 'hsl(var(--primary) / 0.25)',
+            danger: 'hsl(var(--destructive))',
+            dangerLight: 'hsl(var(--destructive) / 0.25)',
+            neutral0: 'hsl(var(--card))',
+            neutral5: 'hsl(var(--border))',
+            neutral10: 'hsl(var(--secondary))',
+            neutral20: 'hsl(var(--border))',
+            neutral30: 'hsl(var(--border))',
+            neutral40: 'hsl(var(--muted-foreground))',
+            neutral50: 'hsl(var(--muted-foreground))',
+            neutral60: 'hsl(var(--foreground))',
+            neutral70: 'hsl(var(--foreground))',
+            neutral80: 'hsl(var(--foreground))',
+            neutral90: 'hsl(var(--foreground))',
+        }
+      })}
+    />
   );
 }
 ```
