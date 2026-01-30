@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { where, orderBy } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import { useSubscription } from '@/lib/cache/smart-cache';
 import type { Notification } from '@/lib/types';
 
@@ -18,23 +18,29 @@ export function useNotifications() {
     // Memoize the query constraints array to prevent re-running the subscription unnecessarily.
     const queryConstraints = useMemo(() => {
         if (!user?.id) return null;
-        // Query for notifications for the current user, ordered by creation date descending.
+        // Query for notifications for the current user. Sorting is handled client-side.
         return [
-            where('userId', '==', user.id),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', user.id)
         ];
     }, [user?.id]);
     
     // useSubscription handles caching, real-time updates, loading, and error states.
     // The query will not run if constraints are null (i.e., no user).
-    const { data: notifications, loading, error } = useSubscription<Notification>(
+    const { data, loading, error } = useSubscription<Notification>(
         firestore, 
         queryConstraints ? 'notifications' : '', 
         queryConstraints || []
     );
     
-    // The data from useSubscription is already sorted by the query.
-    // No need for additional client-side sorting.
+    // Client-side sorting to avoid composite index
+    const sortedNotifications = useMemo(() => {
+        if (!data) return [];
+        return [...data].sort((a, b) => {
+            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+            return timeB - timeA; // Sort descending
+        });
+    }, [data]);
     
-    return { notifications, loading, error };
+    return { notifications: sortedNotifications, loading, error };
 }
