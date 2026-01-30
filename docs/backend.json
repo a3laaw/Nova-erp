@@ -167,6 +167,10 @@
             "reContracted"
           ]
         },
+        "transactionCounter": {
+            "type": "number",
+            "description": "A counter for the number of transactions created for this client, used to generate sequential transaction numbers."
+        },
         "assignedEngineer": {
           "type": "string",
           "description": "The ID of the engineer assigned to this client."
@@ -197,6 +201,10 @@
         "description": "Represents an internal service or transaction for a client, like a design submission.",
         "type": "object",
         "properties": {
+            "transactionNumber": {
+              "type": "string",
+              "description": "A unique, human-readable, sequential transaction number for the client (e.g., CL123-TX01)."
+            },
             "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
@@ -255,7 +263,7 @@
                 "required": ["clauses", "totalAmount"]
             }
         },
-        "required": ["clientId", "transactionType", "departmentId", "status", "createdAt"]
+        "required": ["transactionNumber", "clientId", "transactionType", "departmentId", "status", "createdAt"]
     },
     "TransactionTimelineEvent": {
       "title": "Transaction Timeline Event",
@@ -841,14 +849,6 @@
           "type": "string",
           "description": "The name of the account."
         },
-        "partnerId": {
-          "type": "string",
-          "description": "Optional ID of the partner (client, vendor)."
-        },
-        "partnerName": {
-          "type": "string",
-          "description": "Optional name of the partner."
-        },
         "debit": {
           "type": "number",
           "description": "The debit amount."
@@ -860,6 +860,26 @@
         "notes": {
           "type": "string",
           "description": "Optional notes for this line."
+        },
+        "clientId": {
+            "type": "string",
+            "description": "The ID of the client related to this line."
+        },
+        "transactionId": {
+            "type": "string",
+            "description": "The ID of the client transaction related to this line."
+        },
+        "auto_profit_center": {
+          "type": "string",
+          "description": "Auto-tagged client/project ID for profit analysis."
+        },
+        "auto_resource_id": {
+            "type": "string",
+            "description": "Auto-tagged employee ID for resource analysis."
+        },
+        "auto_dept_id": {
+            "type": "string",
+            "description": "Auto-tagged department ID for departmental analysis."
         }
       },
       "required": ["accountId", "accountName", "debit", "credit"]
@@ -907,11 +927,11 @@
         },
         "clientId": {
             "type": "string",
-            "description": "The ID of the client related to this entry, if applicable."
+            "description": "The ID of the client related to this entry."
         },
         "transactionId": {
             "type": "string",
-            "description": "The ID of the client transaction related to this entry, if applicable."
+            "description": "The ID of the client transaction related to this entry."
         },
         "createdAt": {
           "type": "string",
@@ -937,7 +957,7 @@
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
-        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer"] },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "EmployeeCustody"] },
         "description": { "type": "string" },
         "reference": { "type": "string", "description": "e.g., Cheque number or transfer reference" },
         "debitAccountId": { "type": "string" },
@@ -946,7 +966,9 @@
         "creditAccountName": { "type": "string" },
         "status": { "type": "string", "enum": ["draft", "paid", "cancelled"] },
         "journalEntryId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "clientId": { "type": "string", "description": "Client ID if this payment is for a project"},
+        "transactionId": { "type": "string", "description": "Transaction ID if this payment is for a project"}
       },
       "required": ["voucherNumber", "payeeName", "amount", "paymentDate", "paymentMethod", "debitAccountId", "creditAccountId", "status"]
     },
@@ -1226,3 +1248,4 @@
     }
   }
 }
+

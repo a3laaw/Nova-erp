@@ -231,6 +231,7 @@ export default function NewClientPage() {
                     fileNumber: nextFileNumber,
                     fileYear: parseInt(currentYear, 10),
                     status: 'new' as const,
+                    transactionCounter: 0,
                     assignedEngineer: assignedEngineerId || null,
                     createdAt: serverTimestamp(),
                     isActive: true,

@@ -51,6 +51,7 @@ export type Client = {
   fileNumber: number;
   fileYear: number;
   status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
+  transactionCounter?: number;
   assignedEngineer?: string;
   createdAt: any;
   isActive: boolean;
@@ -619,4 +620,3 @@ export interface PurchaseOrder {
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
 
-    

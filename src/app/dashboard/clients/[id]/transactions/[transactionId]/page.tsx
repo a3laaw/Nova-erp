@@ -539,39 +539,43 @@ export default function TransactionDetailPage() {
         <Card>
             <CardHeader>
                 <div className='flex justify-between items-start'>
-                    <div className='flex items-center gap-4'>
-                        <CardTitle className='text-2xl'>{transaction.transactionType}</CardTitle>
-                        {transaction.contract ? (
-                           <>
-                                <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
-                                    <Pencil className="ml-2 h-4 w-4" />
-                                    تعديل بنود العقد
-                                </Button>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/dashboard/clients/${clientId}/transactions/${transactionId}/contract`}>
-                                        <Printer className="ml-2 h-4 w-4" />
-                                        عرض وطباعة العقد
-                                    </Link>
-                                </Button>
-                           </>
-                        ) : (
-                            <Button variant="default" size="sm" onClick={() => setIsContractFormOpen(true)}>
-                                إنشاء عقد
-                            </Button>
-                        )}
+                    <div className='space-y-1'>
+                        <CardTitle className='text-2xl flex items-center gap-3'>
+                            {transaction.transactionType}
+                            {transaction.transactionNumber && (
+                                <Badge variant="secondary" className="font-mono">{transaction.transactionNumber}</Badge>
+                            )}
+                        </CardTitle>
+                        <CardDescription>
+                            معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{(client as any).nameAr}</Link>
+                        </CardDescription>
                     </div>
-                    <div className='text-right'>
+                     <div className='text-right'>
                         <Badge variant="outline" className={transactionStatusColors[transaction.status]}>
                             {transactionStatusTranslations[transaction.status]}
                         </Badge>
-                         {transaction.transactionNumber && (
-                            <div className="font-mono text-sm text-muted-foreground mt-1">{transaction.transactionNumber}</div>
-                        )}
-                    </div>
+                     </div>
                 </div>
-                 <CardDescription>
-                    معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{(client as any).nameAr}</Link>
-                </CardDescription>
+                <div className='flex items-center gap-2 pt-4'>
+                    {transaction.contract ? (
+                        <>
+                            <Button variant="outline" size="sm" onClick={() => setIsContractFormOpen(true)}>
+                                <Pencil className="ml-2 h-4 w-4" />
+                                تعديل بنود العقد
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={`/dashboard/clients/${clientId}/transactions/${transactionId}/contract`}>
+                                    <Printer className="ml-2 h-4 w-4" />
+                                    عرض وطباعة العقد
+                                </Link>
+                            </Button>
+                        </>
+                    ) : (
+                        <Button variant="default" size="sm" onClick={() => setIsContractFormOpen(true)}>
+                            إنشاء عقد
+                        </Button>
+                    )}
+                </div>
             </CardHeader>
             <CardContent>
                 <div className='grid md:grid-cols-2 gap-6'>

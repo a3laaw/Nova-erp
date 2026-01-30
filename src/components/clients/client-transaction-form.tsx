@@ -60,7 +60,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         const fetchEngineers = async () => {
             setEngineersLoading(true);
             try {
-                const q = query(collection(firestore, 'employees'), where('jobTitle', '!=', ''));
+                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEngineers: Employee[] = [];
                 querySnapshot.forEach((doc) => {
@@ -141,102 +141,91 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         }
 
         setIsSaving(true);
+        let newTransactionRefId = '';
 
         try {
-            const batch = writeBatch(firestore);
+            await runTransaction(firestore, async (transaction_firestore) => {
+                const clientRef = doc(firestore, 'clients', clientId);
+                const clientSnap = await transaction_firestore.get(clientRef);
+                if (!clientSnap.exists()) {
+                    throw new Error("لم يتم العثور على ملف العميل لإنشاء رقم المعاملة.");
+                }
+                const clientData = clientSnap.data() as Client;
 
-            // --- Generate Transaction Number ---
-            const clientRef = doc(firestore, 'clients', clientId);
-            const clientSnap = await getDoc(clientRef);
-            if (!clientSnap.exists()) {
-                throw new Error("لم يتم العثور على ملف العميل لإنشاء رقم المعاملة.");
-            }
-            const clientData = clientSnap.data() as Client;
-            
-            const transactionsQuery = query(collection(firestore, `clients/${clientId}/transactions`));
-            const transactionsSnapshot = await getDocs(transactionsQuery);
-            const transactionCount = transactionsSnapshot.size;
-            const newTransactionSequence = transactionCount + 1;
-            const transactionNumber = `CL${clientData.fileNumber}-TX${String(newTransactionSequence).padStart(2, '0')}`;
-            // --- End Generation ---
+                const currentCounter = clientData.transactionCounter || 0;
+                const newCounter = currentCounter + 1;
+                const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
+                
+                transaction_firestore.update(clientRef, { transactionCounter: newCounter });
 
-            const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
-            const newTransactionRefId = newTransactionRef.id;
+                const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
+                newTransactionRefId = newTransactionRef.id;
 
-            let engineerForTransactionId: string | null = assignedEngineerId || null;
+                let engineerForTransactionId: string | null = assignedEngineerId || null;
 
-            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
+                const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
 
-            // Special logic for "بلدية سكن خاص"
-            if (transactionTypeName.includes('بلدية') && transactionTypeName.includes('سكن خاص')) {
-                const clientRefDoc = doc(firestore, 'clients', clientId);
-                const clientSnapDoc = await getDoc(clientRefDoc);
-                if (clientSnapDoc.exists()) {
-                    const clientDataForEng = clientSnapDoc.data() as Client;
-                    if (clientDataForEng.assignedEngineer) {
-                        engineerForTransactionId = clientDataForEng.assignedEngineer;
+                if (transactionTypeName.includes('بلدية') && transactionTypeName.includes('سكن خاص')) {
+                    if (clientData.assignedEngineer) {
+                        engineerForTransactionId = clientData.assignedEngineer;
                     } else {
-                         toast({ variant: 'destructive', title: 'خطأ', description: 'يجب إسناد مهندس مسؤول للعميل أولاً قبل إنشاء معاملة سكن خاص.' });
-                         setIsSaving(false);
-                         return;
+                         throw new Error('يجب إسناد مهندس مسؤول للعميل أولاً قبل إنشاء معاملة سكن خاص.');
                     }
                 }
-            }
 
-            const engineer = engineers.find(e => e.id === engineerForTransactionId);
+                const engineer = engineers.find(e => e.id === engineerForTransactionId);
 
-            const newTransactionData: Omit<ClientTransaction, 'id'> = {
-                transactionNumber,
-                clientId,
-                transactionType: transactionTypeName,
-                description,
-                departmentId: selectedType?.parentDeptId,
-                transactionTypeId: selectedType?.id,
-                assignedEngineerId: engineerForTransactionId,
-                status: 'new',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-            };
+                const newTransactionData: Omit<ClientTransaction, 'id'> = {
+                    transactionNumber,
+                    clientId,
+                    transactionType: transactionTypeName,
+                    description,
+                    departmentId: selectedType?.parentDeptId,
+                    transactionTypeId: selectedType?.id,
+                    assignedEngineerId: engineerForTransactionId,
+                    status: 'new',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                };
 
-            batch.set(newTransactionRef, newTransactionData);
+                transaction_firestore.set(newTransactionRef, newTransactionData);
 
-            let logContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
-            if (engineer) {
-                logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
-            }
-            
-            if (fromAppointmentId) {
-                const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
-                batch.update(appointmentRef, { transactionId: newTransactionRefId });
-                logContent += ` (مرتبطة بالموعد ${fromAppointmentId.substring(0, 5)}...).`;
-            }
-            
-            const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
-            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
-            const logEventData = {
-                type: 'log',
-                content: logContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            };
-            batch.set(doc(timelineCollectionRef), logEventData);
-            batch.set(doc(historyCollectionRef), logEventData);
-
-
-            await batch.commit();
+                let logContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
+                if (engineer) {
+                    logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
+                }
+                
+                if (fromAppointmentId) {
+                    const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
+                    transaction_firestore.update(appointmentRef, { transactionId: newTransactionRefId });
+                    logContent += ` (مرتبطة بالموعد ${fromAppointmentId.substring(0, 5)}...).`;
+                }
+                
+                const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
+                const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+                const logEventData = {
+                    type: 'log' as const,
+                    content: logContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                };
+                transaction_firestore.set(doc(timelineCollectionRef), logEventData);
+                transaction_firestore.set(doc(historyCollectionRef), logEventData);
+            });
             
             toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
             
             // --- Notification Logic ---
+            const engineer = engineers.find(e => e.id === (assignedEngineerId || client.assignedEngineer));
             const engineerName = engineer ? engineer.fullName : 'غير مسند';
             const recipients = new Set<string>();
 
             if (currentUser.id) recipients.add(currentUser.id);
 
-            if (engineerForTransactionId) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, engineerForTransactionId);
+            if (assignedEngineerId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, assignedEngineerId);
                 if (targetUserId) recipients.add(targetUserId);
             }
             
@@ -332,5 +321,3 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
-
-    
