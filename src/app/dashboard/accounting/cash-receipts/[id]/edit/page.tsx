@@ -309,6 +309,8 @@ export default function EditCashReceiptPage() {
                 const department = departments.find(d => d.name === engineer?.department);
                 
                 autoTags = {
+                    clientId: freshOriginalReceipt.clientId,
+                    transactionId: selectedProjectId,
                     auto_profit_center: selectedProjectId,
                     auto_resource_id: selectedProject.assignedEngineerId,
                     ...(department && { auto_dept_id: department.id }),
@@ -327,6 +329,7 @@ export default function EditCashReceiptPage() {
                 totalCredit: parseFloat(amount),
                 narration: description || `تحديث سند قبض رقم ${freshOriginalReceipt.voucherNumber}`,
                 transactionId: selectedProjectId || null,
+                clientId: freshOriginalReceipt.clientId,
             };
 
             if (freshOriginalReceipt.journalEntryId) {
@@ -340,7 +343,6 @@ export default function EditCashReceiptPage() {
                     status: 'posted',
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
-                    clientId: freshOriginalReceipt.clientId,
                     entryNumber: `CRV-JE-${freshOriginalReceipt.voucherNumber}`,
                 });
                 transaction_fs.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });

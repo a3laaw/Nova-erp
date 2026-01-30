@@ -29,7 +29,7 @@ import type { Client, Company, ClientTransaction, Account, Employee, Department 
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { numberToArabicWords, formatCurrency } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
@@ -58,8 +58,6 @@ export default function NewCashReceiptPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
-  const [company, setCompany] = useState<Company | null>(null);
-  const [companyLoading, setCompanyLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   
@@ -124,22 +122,15 @@ export default function NewCashReceiptPage() {
     if (!firestore) return;
 
     const fetchInitialData = async () => {
-        setCompanyLoading(true);
         setClientsLoading(true);
         setAccountsLoading(true);
         try {
-            const [companySnap, clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'companies'), limit(1))),
+            const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
                 getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
                 getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
                 getDocs(query(collection(firestore, 'employees'))),
                 getDocs(query(collection(firestore, 'departments')))
             ]);
-
-            if (!companySnap.empty) {
-                const companyData = companySnap.docs[0].data() as Company;
-                setCompany({ id: companySnap.docs[0].id, ...companyData });
-            }
 
             const fetchedClients = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
             fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
@@ -153,7 +144,6 @@ export default function NewCashReceiptPage() {
             console.error("Error fetching initial data:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات الأساسية.' });
         } finally {
-            setCompanyLoading(false);
             setClientsLoading(false);
             setAccountsLoading(false);
         }
@@ -237,7 +227,7 @@ export default function NewCashReceiptPage() {
                 }
                 remainingAmountFromCurrentPayment -= paymentForThisClause;
             }
-            allocatedPaid += clauseAmount;
+            allocatedPaid += clause.amount;
         }
 
         if (remainingAmountFromCurrentPayment > 0) {
@@ -327,6 +317,8 @@ export default function NewCashReceiptPage() {
                 const department = departments.find(d => d.name === engineer?.department);
                 
                 autoTags = {
+                    clientId: selectedClientId,
+                    transactionId: selectedProjectId,
                     auto_profit_center: selectedProjectId,
                     auto_resource_id: selectedProject.assignedEngineerId,
                     ...(department && { auto_dept_id: department.id }),
