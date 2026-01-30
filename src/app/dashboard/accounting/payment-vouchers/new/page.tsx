@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,7 +28,7 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy, collectionGroup } from 'firebase/firestore';
-import type { Account, ClientTransaction, Employee } from '@/lib/types';
+import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,6 +64,7 @@ export default function NewPaymentVoucherPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
 
   const { register, handleSubmit, control, watch, formState: { errors } } = useForm<PaymentVoucherFormValues>({
@@ -94,12 +95,13 @@ export default function NewPaymentVoucherPage() {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'paymentVouchers');
             
-            const [counterDoc, accSnap, empSnap, projSnap, clientSnap] = await Promise.all([
+            const [counterDoc, accSnap, empSnap, projSnap, clientSnap, deptSnap] = await Promise.all([
                 getDoc(counterRef),
                 getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
                 getDocs(query(collection(firestore, 'employees'), orderBy('fullName'))),
                 getDocs(query(collectionGroup(firestore, 'transactions'))),
                 getDocs(collection(firestore, 'clients')),
+                getDocs(query(collection(firestore, 'departments'))),
             ]);
 
             let nextNumber = 1;
@@ -111,6 +113,7 @@ export default function NewPaymentVoucherPage() {
             
             setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
             setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
+            setDepartments(deptSnap.docs.map(d => ({id: d.id, ...d.data()} as Department)));
 
             const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
             const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
@@ -180,8 +183,21 @@ export default function NewPaymentVoucherPage() {
             const debitLine: any = { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 };
             
             if (showProjectLink && data.projectLink) {
-                debitLine.clientId = data.projectLink.split('/')[0];
-                debitLine.transactionId = data.projectLink.split('/')[1];
+                const [clientId, transactionId] = data.projectLink.split('/');
+                debitLine.clientId = clientId;
+                debitLine.transactionId = transactionId;
+                
+                const project = projects.find(p => p.id === transactionId);
+                if (project && project.assignedEngineerId) {
+                    const engineer = employees.find(e => e.id === project.assignedEngineerId);
+                    const department = departments.find(d => d.name === engineer?.department);
+
+                    debitLine.auto_profit_center = transactionId;
+                    debitLine.auto_resource_id = project.assignedEngineerId;
+                    if (department) {
+                        debitLine.auto_dept_id = department.id;
+                    }
+                }
             }
 
             const journalEntryData = {

@@ -25,7 +25,7 @@ import {
 import { Save, X, Loader2, AlertCircle, Info } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
 import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where, runTransaction, Timestamp, orderBy } from 'firebase/firestore';
-import type { CashReceipt, Client, ClientTransaction, Account } from '@/lib/types';
+import type { CashReceipt, Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,6 +61,8 @@ export default function EditCashReceiptPage() {
   const [originalReceipt, setOriginalReceipt] = useState<CashReceipt | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
   
   const [accountsLoading, setAccountsLoading] = useState(true);
@@ -114,12 +116,16 @@ export default function EditCashReceiptPage() {
     const fetchRelatedData = async () => {
         setAccountsLoading(true);
         try {
-            const [clientsSnap, accountsSnap] = await Promise.all([
+            const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
                 getDocs(query(collection(firestore, 'clients'))),
-                getDocs(query(collection(firestore, 'chartOfAccounts')))
+                getDocs(query(collection(firestore, 'chartOfAccounts'))),
+                getDocs(query(collection(firestore, 'employees'))),
+                getDocs(query(collection(firestore, 'departments')))
             ]);
             setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
             setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            setEmployees(empSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+            setDepartments(deptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
         } finally {
@@ -296,9 +302,22 @@ export default function EditCashReceiptPage() {
             };
             transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
 
+            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+            let autoTags = {};
+            if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
+                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
+                const department = departments.find(d => d.name === engineer?.department);
+                
+                autoTags = {
+                    auto_profit_center: selectedProjectId,
+                    auto_resource_id: selectedProject.assignedEngineerId,
+                    ...(department && { auto_dept_id: department.id }),
+                };
+            }
+
             const newLines = [
                 { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
-                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
+                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
             ];
 
             const jeUpdatePayload = {

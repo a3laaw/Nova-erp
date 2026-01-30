@@ -25,7 +25,7 @@ import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy } from 'firebase/firestore';
-import type { Client, Company, ClientTransaction, Account } from '@/lib/types';
+import type { Client, Company, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,6 +55,8 @@ export default function NewCashReceiptPage() {
 
   const [date, setDate] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [company, setCompany] = useState<Company | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
@@ -126,10 +128,12 @@ export default function NewCashReceiptPage() {
         setClientsLoading(true);
         setAccountsLoading(true);
         try {
-            const [companySnap, clientsSnap, accountsSnap] = await Promise.all([
+            const [companySnap, clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
                 getDocs(query(collection(firestore, 'companies'), limit(1))),
                 getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code')))
+                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                getDocs(query(collection(firestore, 'employees'))),
+                getDocs(query(collection(firestore, 'departments')))
             ]);
 
             if (!companySnap.empty) {
@@ -140,8 +144,10 @@ export default function NewCashReceiptPage() {
             const fetchedClients = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
             fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
             setClients(fetchedClients);
-
+            
             setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            setEmployees(empSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+            setDepartments(deptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
@@ -314,6 +320,18 @@ export default function NewCashReceiptPage() {
             if (!debitAccount) {
                 throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
             }
+            
+            let autoTags = {};
+            if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
+                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
+                const department = departments.find(d => d.name === engineer?.department);
+                
+                autoTags = {
+                    auto_profit_center: selectedProjectId,
+                    auto_resource_id: selectedProject.assignedEngineerId,
+                    ...(department && { auto_dept_id: department.id }),
+                };
+            }
 
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
@@ -350,7 +368,7 @@ export default function NewCashReceiptPage() {
                 status: 'posted' as const,
                 lines: [
                     { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
-                    { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount) }
+                    { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
                 ],
                 clientId: selectedClientId,
                 transactionId: selectedProjectId || null,

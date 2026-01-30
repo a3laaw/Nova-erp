@@ -7,6 +7,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -261,6 +262,7 @@ export type Employee = {
     emergencyLeaveUsed?: number;
     maxEmergencyLeave?: number;
     lastLeaveResetDate?: any; // ISO String
+    annualLeaveBalance?: number;
     createdAt?: any; 
     // Fields below are calculated/reconstructed and not stored in DB
     auditLogs?: AuditLog[];
@@ -544,6 +546,8 @@ export interface JournalEntry {
   totalCredit: number;
   status: 'draft' | 'posted';
   lines: JournalEntryLine[];
+  clientId?: string;
+  transactionId?: string;
   createdAt: any; // Timestamp
   createdBy?: string;
 }

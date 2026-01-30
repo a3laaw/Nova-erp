@@ -860,6 +860,18 @@
         "transactionId": {
             "type": "string",
             "description": "The ID of the client transaction related to this line."
+        },
+        "auto_profit_center": {
+          "type": "string",
+          "description": "Auto-tagged client/project ID for profit analysis."
+        },
+        "auto_resource_id": {
+            "type": "string",
+            "description": "Auto-tagged employee ID for resource analysis."
+        },
+        "auto_dept_id": {
+            "type": "string",
+            "description": "Auto-tagged department ID for departmental analysis."
         }
       },
       "required": ["accountId", "accountName", "debit", "credit"]
@@ -904,6 +916,14 @@
           "items": {
             "$ref": "#/entities/JournalEntryLine"
           }
+        },
+        "clientId": {
+            "type": "string",
+            "description": "The ID of the client related to this entry."
+        },
+        "transactionId": {
+            "type": "string",
+            "description": "The ID of the client transaction related to this entry."
         },
         "createdAt": {
           "type": "string",

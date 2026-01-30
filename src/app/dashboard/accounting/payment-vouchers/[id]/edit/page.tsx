@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,8 +27,8 @@ import {
 } from '@/components/ui/select';
 import { Save, X, Loader2, Info } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
-import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, orderBy, runTransaction, Timestamp } from 'firebase/firestore';
-import type { Account, PaymentVoucher } from '@/lib/types';
+import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, orderBy, runTransaction, Timestamp, collectionGroup } from 'firebase/firestore';
+import type { Account, PaymentVoucher, Employee, ClientTransaction, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,6 +36,7 @@ import { numberToArabicWords, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { format as formatDateFns } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
@@ -47,6 +48,7 @@ const paymentVoucherSchema = z.object({
     reference: z.string().optional(),
     debitAccountId: z.string().min(1, 'حساب المدين مطلوب'),
     creditAccountId: z.string().min(1, 'حساب الدائن مطلوب'),
+    projectLink: z.string().optional(),
 });
 
 type PaymentVoucherFormValues = z.infer<typeof paymentVoucherSchema>;
@@ -61,9 +63,11 @@ export default function EditPaymentVoucherPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [refDataLoading, setRefDataLoading] = useState(true);
   const [journalEntryIsPosted, setJournalEntryIsPosted] = useState(false);
-
 
   const voucherRef = useMemo(() => {
     if (!firestore || !id) return null;
@@ -89,6 +93,7 @@ export default function EditPaymentVoucherPage() {
             reference: data.reference || '',
             debitAccountId: data.debitAccountId,
             creditAccountId: data.creditAccountId,
+            projectLink: data.clientId && data.transactionId ? `${data.clientId}/${data.transactionId}` : ''
         });
 
         if (data.journalEntryId && firestore) {
@@ -102,7 +107,6 @@ export default function EditPaymentVoucherPage() {
     }
   }, [voucherSnap, reset, firestore]);
 
-
   const amountValue = watch('amount');
   const amountInWords = useMemo(() => {
     if (amountValue && !isNaN(amountValue)) {
@@ -111,27 +115,45 @@ export default function EditPaymentVoucherPage() {
     return '';
   }, [amountValue]);
 
-  // Fetch Accounts
+  const debitAccountIdValue = watch('debitAccountId');
+  const selectedAccount = useMemo(() => accounts.find(a => a.id === debitAccountIdValue), [accounts, debitAccountIdValue]);
+  const showProjectLink = useMemo(() => selectedAccount && selectedAccount.code.startsWith('51'), [selectedAccount]);
+
+  // Fetch Reference Data
   useEffect(() => {
     if (!firestore) return;
-    const fetchAccounts = async () => {
-        setAccountsLoading(true);
+    const fetchRefData = async () => {
+        setRefDataLoading(true);
         try {
-            const q = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
-            const snapshot = await getDocs(q);
-            setAccounts(snapshot.docs.map(d => ({id: d.id, ...d.data()} as Account)));
+            const [accSnap, empSnap, projSnap, clientSnap, deptSnap] = await Promise.all([
+                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                getDocs(query(collection(firestore, 'employees'), orderBy('fullName'))),
+                getDocs(query(collectionGroup(firestore, 'transactions'))),
+                getDocs(collection(firestore, 'clients')),
+                getDocs(query(collection(firestore, 'departments'))),
+            ]);
+            
+            setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
+            setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
+            setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
+
+            const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
+            const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
+            setProjects(fetchedProjects.filter(p => p.clientName));
         } catch(e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب شجرة الحسابات.' });
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
         } finally {
-            setAccountsLoading(false);
+            setRefDataLoading(false);
         }
     };
-    fetchAccounts();
+    fetchRefData();
   }, [firestore, toast]);
 
-  const creditAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق'))).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
-  
-  const debitAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'expense' || (acc.type === 'liability' && acc.name.includes('مورد'))).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
+  const creditAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'asset' && acc.isPayable).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
+  const debitAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'expense' || (acc.type === 'liability' && acc.isPayable)).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
+  const employeePayeeOptions = useMemo(() => employees.map(e => ({ value: e.fullName, label: e.fullName })), [employees]);
+  const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
 
 
   const onSubmit = async (data: PaymentVoucherFormValues) => {
@@ -149,7 +171,7 @@ export default function EditPaymentVoucherPage() {
                throw new Error("لم يتم العثور على حسابات المدين أو الدائن.");
            }
 
-           const updatePayload = {
+           const updatePayload: any = {
                ...data,
                amount: Number(data.amount),
                amountInWords: amountInWords,
@@ -157,11 +179,40 @@ export default function EditPaymentVoucherPage() {
                creditAccountName: creditAccount.name,
                paymentDate: new Date(data.paymentDate),
            };
+
+            if (showProjectLink && data.projectLink) {
+                const [clientId, transactionId] = data.projectLink.split('/');
+                updatePayload.clientId = clientId;
+                updatePayload.transactionId = transactionId;
+            } else {
+                updatePayload.clientId = null;
+                updatePayload.transactionId = null;
+            }
            
            transaction_fs.update(voucherRefDoc, cleanFirestoreData(updatePayload));
            
+           const debitLine: any = { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 };
+            
+           if (showProjectLink && data.projectLink) {
+                const [clientId, transactionId] = data.projectLink.split('/');
+                debitLine.clientId = clientId;
+                debitLine.transactionId = transactionId;
+                
+                const project = projects.find(p => p.id === transactionId);
+                if (project && project.assignedEngineerId) {
+                    const engineer = employees.find(e => e.id === project.assignedEngineerId);
+                    const department = departments.find(d => d.name === engineer?.department);
+
+                    debitLine.auto_profit_center = transactionId;
+                    debitLine.auto_resource_id = project.assignedEngineerId;
+                    if (department) {
+                        debitLine.auto_dept_id = department.id;
+                    }
+                }
+            }
+
            const newLines = [
-                { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 },
+                debitLine,
                 { accountId: data.creditAccountId, accountName: creditAccount.name, debit: 0, credit: data.amount }
            ];
 
@@ -201,7 +252,7 @@ export default function EditPaymentVoucherPage() {
     }
   };
   
-  if (voucherLoading) {
+  if (voucherLoading || refDataLoading) {
       return (
           <Card className="max-w-4xl mx-auto" dir="rtl">
               <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
@@ -239,11 +290,6 @@ export default function EditPaymentVoucherPage() {
             <CardContent className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
-                        <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
-                        <Input id="payeeName" {...register('payeeName')} disabled={isSaving} />
-                        {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
-                    </div>
-                    <div className="grid gap-2">
                         <Label htmlFor="payeeType">نوع المستفيد <span className="text-destructive">*</span></Label>
                         <Controller
                             name="payeeType"
@@ -260,6 +306,11 @@ export default function EditPaymentVoucherPage() {
                             )}
                         />
                         {errors.payeeType && <p className="text-xs text-destructive">{errors.payeeType.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
+                        <Input id="payeeName" {...register('payeeName')} disabled={isSaving} />
+                        {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
                     </div>
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -298,6 +349,7 @@ export default function EditPaymentVoucherPage() {
                                         <SelectItem value="Cash">نقداً</SelectItem>
                                         <SelectItem value="Cheque">شيك</SelectItem>
                                         <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
+                                        <SelectItem value="EmployeeCustody">عهدة موظف</SelectItem>
                                     </SelectContent>
                                 </Select>
                             )}
@@ -309,7 +361,7 @@ export default function EditPaymentVoucherPage() {
                         <Input id="reference" placeholder="رقم المرجع..." {...register('reference')} disabled={isSaving}/>
                     </div>
                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                 <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t", showProjectLink && "md:grid-cols-3")}>
                     <div className="grid gap-2">
                         <Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*</span></Label>
                         <Controller
@@ -320,8 +372,8 @@ export default function EditPaymentVoucherPage() {
                                     value={field.value}
                                     onSelect={field.onChange}
                                     options={debitAccountOptions}
-                                    placeholder={accountsLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."}
-                                    disabled={accountsLoading || isSaving}
+                                    placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."}
+                                    disabled={refDataLoading || isSaving}
                                 />
                             )}
                         />
@@ -337,13 +389,31 @@ export default function EditPaymentVoucherPage() {
                                     value={field.value}
                                     onSelect={field.onChange}
                                     options={creditAccountOptions}
-                                    placeholder={accountsLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."}
-                                    disabled={accountsLoading || isSaving}
+                                    placeholder={refDataLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."}
+                                    disabled={refDataLoading || isSaving}
                                 />
                             )}
                         />
                          {errors.creditAccountId && <p className="text-xs text-destructive">{errors.creditAccountId.message}</p>}
                     </div>
+                    {showProjectLink && (
+                        <div className="grid gap-2 md:col-span-1">
+                            <Label htmlFor="projectLink">ربط بمشروع (مركز تكلفة)</Label>
+                            <Controller
+                                name="projectLink"
+                                control={control}
+                                render={({ field }) => (
+                                    <InlineSearchList
+                                        value={field.value || ''}
+                                        onSelect={field.onChange}
+                                        options={projectOptions}
+                                        placeholder={refDataLoading ? "تحميل..." : "اختر مشروعًا..."}
+                                        disabled={refDataLoading || isSaving}
+                                    />
+                                )}
+                            />
+                        </div>
+                    )}
                  </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
