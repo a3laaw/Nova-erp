@@ -25,7 +25,7 @@ import { ar } from 'date-fns/locale';
 import { useLanguage } from '@/context/language-context';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
-import { useSubscription } from '@/lib/cache/smart-cache';
+import { useSubscription } from '@/hooks/use-subscription';
 
 export function UpcomingAppointments() {
   const { language } = useLanguage();
