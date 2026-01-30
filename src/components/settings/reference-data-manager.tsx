@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch, collectionGroup } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
@@ -82,11 +82,30 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
 
-
-  const primaryQuery = useMemo(() => firestore ? query(collection(firestore, primaryCollectionName)) : null, [firestore, primaryCollectionName]);
-  const [primarySnapshot, primaryLoading, primaryError] = useCollection(primaryQuery);
+  const primaryQueryConstraints = useMemo(() => [], []);
+  const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
   
    useEffect(() => {
+    setLoadingPrimary(primaryLoading);
+    if(primaryError) {
+        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: primaryError.message });
+    }
+    if (primaryData) {
+      let items = [...primaryData];
+      items.sort((a, b) => {
+          const orderA = (a as any).order;
+          const orderB = (b as any).order;
+          if (orderA !== undefined && orderB !== undefined) {
+              return orderA - orderB;
+          }
+          return a.name.localeCompare(b.name, 'ar');
+      });
+      setPrimaryItems(items);
+    }
+  }, [primaryData, primaryLoading, primaryError, primaryTitle, toast]);
+
+
+  useEffect(() => {
     if (!firestore) return;
 
     const fetchAllJobs = async () => {
@@ -106,26 +125,6 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     }
   }, [firestore, isWorkStageView]);
 
-
-  useEffect(() => {
-    setLoadingPrimary(primaryLoading);
-    if(primaryError) {
-        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: primaryError.message });
-    }
-    if (primarySnapshot) {
-      let items = primarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-      items.sort((a, b) => {
-          const orderA = (a as any).order;
-          const orderB = (b as any).order;
-          if (orderA !== undefined && orderB !== undefined) {
-              return orderA - orderB;
-          }
-          return a.name.localeCompare(b.name, 'ar');
-      });
-      setPrimaryItems(items);
-    }
-  }, [primarySnapshot, primaryLoading, primaryError, primaryTitle, toast]);
-  
 
   const handleSelectPrimary = useCallback(async (item: T) => {
     setSelectedPrimary(item);
@@ -423,47 +422,14 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
 }
 
 
-// --- Stat Card for Dashboard ---
-const StatCard = ({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) => {
-    const colors: {[key: string]: string} = {
-        yellow: 'bg-yellow-400',
-        red: 'bg-red-500',
-        cyan: 'bg-cyan-400',
-        blue: 'bg-blue-500',
-        green: 'bg-green-500',
-        purple: 'bg-purple-500',
-    };
-
-    return (
-        <div 
-            onClick={onNavigate}
-            className="bg-slate-50 dark:bg-slate-800/50 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 pt-12 relative cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
-        >
-            <div 
-                className={cn("absolute top-0 right-4 w-10 h-14 text-white flex items-center justify-center pt-2", colors[color])}
-                style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 85%, 0 100%)' }}
-            >
-                <span className="font-bold text-lg">{loading ? '...' : count}</span>
-            </div>
-            
-            <div className="flex flex-col items-center justify-center pb-6">
-                <div className="text-slate-500 dark:text-slate-400 h-16 w-16 p-2 flex items-center justify-center">{icon}</div>
-                <p className="font-semibold text-slate-800 dark:text-slate-200 mt-2 text-center">{title}</p>
-            </div>
-        </div>
-    );
-};
-
-
 // --- Main Component (Router) ---
-export function ReferenceDataManager() {
-    const { firestore } = useFirebase();
-    const { toast } = useToast();
-    const router = useRouter();
+export default function ReferenceDataManager() {
     const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages'>('dashboard');
 
     const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
 
     // Fetch counts for the dashboard
     useEffect(() => {
