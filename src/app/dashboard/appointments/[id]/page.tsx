@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot, updateDoc } from 'firebase/firestore';
 import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction, TransactionStage } from '@/lib/types';
@@ -63,7 +63,6 @@ export default function AppointmentDetailsPage() {
 
 
     // Data states
-    const [appointment, setAppointment] = useState<Appointment | null>(null);
     const [client, setClient] = useState<Client | null>(null);
     const [engineer, setEngineer] = useState<Employee | null>(null);
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
@@ -85,23 +84,19 @@ export default function AppointmentDetailsPage() {
 
 
     // Fetch main appointment data
-    const appointmentRef = useMemo(() => firestore && id ? doc(firestore, 'appointments', id) : null, [firestore, id]);
-    
-    const [appointmentSnap, appointmentLoading, appointmentError] = useDoc(appointmentRef);
+    const appointmentPath = useMemo(() => (id ? `appointments/${id}` : null), [id]);
+    const { data: appointment, loading: appointmentLoading, error: appointmentError } = useDocument<Appointment>(firestore, appointmentPath);
 
     useEffect(() => {
-        if (!id && !appointmentLoading) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'معرف الموعد غير موجود.' });
-            router.push('/dashboard/appointments');
-            return;
-        }
-        if (appointmentSnap?.exists()) {
-            setAppointment({ id: appointmentSnap.id, ...appointmentSnap.data() } as Appointment);
-        } else if (id && !appointmentLoading && !appointmentSnap?.exists()) {
+        if (!appointmentLoading && !appointment && id) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموعد المطلوب.' });
             router.push('/dashboard/appointments');
         }
-    }, [appointmentSnap, appointmentLoading, id, router, toast]);
+        if (appointmentError) {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل بيانات الموعد.' });
+             router.push('/dashboard/appointments');
+        }
+    }, [appointment, appointmentLoading, appointmentError, id, router, toast]);
 
     // Fetch related data once appointment is loaded
     useEffect(() => {
@@ -245,9 +240,6 @@ export default function AppointmentDetailsPage() {
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم ربط الموعد بالمعاملة.' });
             
-            // Optimistically update local state to refresh UI
-            setAppointment(prev => prev ? { ...prev, transactionId: selectedTransactionToLink } : null);
-
         } catch (error) {
             console.error("Error linking transaction:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل ربط المعاملة.' });
@@ -469,8 +461,7 @@ export default function AppointmentDetailsPage() {
                     }
                 }
             }
-
-            setAppointment(prev => prev ? { ...prev, workStageUpdated: true } : null);
+            
             setIsEditingStage(false);
     
         } catch (error) {
