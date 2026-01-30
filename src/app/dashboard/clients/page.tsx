@@ -36,8 +36,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, addDoc, collection, serverTimestamp, getDoc, runTransaction } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
 import { useSubscription, SmartCache } from '@/lib/cache/smart-cache';
@@ -47,6 +55,8 @@ import { useAuth } from '@/context/auth-context';
 import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { searchClients } from '@/lib/cache/fuse-search';
+import { ClientForm } from '@/components/clients/client-form';
+import { cn } from '@/lib/utils';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
@@ -77,8 +87,9 @@ export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
-  // --- NEW DATA FETCHING LOGIC ---
+  // --- Data Fetching Logic ---
   const { data: clients, setData: setClients, loading: clientsLoading, error: clientsError } = useSubscription<Client>(firestore, 'clients');
   const { data: employees, loading: employeesLoading, error: employeesError } = useSubscription<Employee>(firestore, 'employees');
   
@@ -99,13 +110,73 @@ export default function ClientsPage() {
     return clients.map(client => ({
         ...client,
         assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
-    }));
+    })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
   }, [clients, employeesMap]);
 
 
   const filteredClients = useMemo(() => {
     return searchClients(augmentedClients, searchQuery);
   }, [augmentedClients, searchQuery]);
+
+  const handleSaveClient = async (newClientData: Partial<Client>) => {
+    if (!firestore) return;
+    const tempId = `optimistic-${Date.now()}`;
+    const optimisticClient: Client = {
+      id: tempId,
+      ...newClientData,
+      nameAr: newClientData.nameAr || '',
+      mobile: newClientData.mobile || '',
+      fileId: '...',
+      fileNumber: 0,
+      fileYear: 0,
+      status: 'new',
+      createdAt: new Date(),
+      isActive: true,
+    };
+    
+    // 1. Optimistic UI update
+    setClients(prev => [optimisticClient, ...prev]);
+    setIsFormOpen(false); // Close dialog immediately
+
+    try {
+      // 2. Actual Firestore write
+       await runTransaction(firestore, async (transaction) => {
+            const currentYear = String(new Date().getFullYear());
+            const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
+            const clientFileCounterDoc = await transaction.get(clientFileCounterRef);
+            let nextFileNumber = 1;
+            if (clientFileCounterDoc.exists()) {
+                const counts = clientFileCounterDoc.data()?.counts || {};
+                nextFileNumber = (counts[currentYear] || 0) + 1;
+            }
+            transaction.set(clientFileCounterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
+            const newFileId = `${nextFileNumber}/${currentYear}`;
+
+            const finalClientData = {
+              ...newClientData,
+              fileId: newFileId,
+              fileNumber: nextFileNumber,
+              fileYear: parseInt(currentYear, 10),
+              status: 'new' as const,
+              transactionCounter: 0,
+              createdAt: serverTimestamp(),
+              isActive: true,
+            };
+
+            const newClientRef = doc(collection(firestore, 'clients'));
+            transaction.set(newClientRef, finalClientData);
+        });
+
+      // 3. UI update and cache invalidation are handled automatically by useSubscription's onSnapshot
+      toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
+    } catch (error) {
+      // 6. Rollback UI on error
+      const errorMessage = error instanceof Error ? error.message : 'فشل إضافة العميل.';
+      toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
+      setClients(prev => prev.filter(c => c.id !== tempId));
+    }
+  };
+
 
   const handleDeleteClient = async () => {
     if (!clientToDelete || !firestore) return;
@@ -118,7 +189,7 @@ export default function ClientsPage() {
     setClientToDelete(null);
 
     try {
-      await deleteDoc(doc(firestore, 'clients', clientToDelete.id));
+      await deleteDoc(doc(firestore, 'clients', clientToDelete.id!));
       // No need to call invalidate, onSnapshot handles the update.
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
     } catch (e) {
@@ -200,11 +271,9 @@ export default function ClientsPage() {
                  {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
                  تحديث
              </Button>
-             <Button asChild size="sm" className="gap-1">
-                <Link href="/dashboard/clients/new">
-                    <PlusCircle className="h-4 w-4" />
-                    {currentText.addClient}
-                </Link>
+             <Button onClick={() => setIsFormOpen(true)} size="sm" className="gap-1">
+                <PlusCircle className="h-4 w-4" />
+                {currentText.addClient}
             </Button>
           </div>
         </div>
@@ -245,9 +314,10 @@ export default function ClientsPage() {
               {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
               {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
               {filteredClients.map((client) => {
+                const isOptimistic = client.id.startsWith('optimistic-');
                 return (
-                    <TableRow key={client.id}>
-                        <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
+                    <TableRow key={client.id} className={cn(isOptimistic && 'opacity-50')}>
+                        <TableCell className="font-mono">{isOptimistic ? <Loader2 className="h-4 w-4 animate-spin"/> : client.fileId}</TableCell>
                         <TableCell className="font-medium"><Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link></TableCell>
                         <TableCell>{client.assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
                         <TableCell>{client.mobile}</TableCell>
@@ -259,7 +329,7 @@ export default function ClientsPage() {
                         <TableCell>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                    <Button aria-haspopup="true" size="icon" variant="ghost" disabled={isOptimistic}>
                                         <MoreHorizontal className="h-4 w-4" />
                                         <span className="sr-only">Toggle menu</span>
                                     </Button>
@@ -288,6 +358,20 @@ export default function ClientsPage() {
         </div>
       </CardContent>
     </Card>
+
+    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-2xl" dir="rtl">
+            <DialogHeader>
+                <DialogTitle>إضافة عميل جديد</DialogTitle>
+                <DialogDescription>قم بتعبئة بيانات العميل الجديد لإنشاء ملف له في النظام.</DialogDescription>
+            </DialogHeader>
+            <ClientForm 
+                onSave={handleSaveClient} 
+                onClose={() => setIsFormOpen(false)}
+            />
+        </DialogContent>
+    </Dialog>
+
 
     <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
         <AlertDialogContent dir="rtl">
