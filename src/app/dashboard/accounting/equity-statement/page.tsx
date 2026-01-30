@@ -175,10 +175,17 @@ export default function EquityStatementPage() {
             {!isLoading && equityStatementData && (
                 <Card 
                     id="printable-area" 
-                    className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent bg-no-repeat bg-top bg-cover p-8 md:p-12"
-                    style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
+                    className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent p-8 md:p-12"
                 >
                     <CardHeader className="p-0">
+                         {branding?.letterhead_image_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img 
+                                src={branding.letterhead_image_url} 
+                                alt="Letterhead"
+                                className="w-full h-auto object-contain mb-6"
+                            />
+                        )}
                         <div className="flex justify-between items-start pb-4">
                             <div className="text-left flex-shrink-0">
                                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة التغيرات في حقوق الملكية</h2>

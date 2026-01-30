@@ -76,10 +76,16 @@ export function TransactionContract({ client, transaction }: TransactionContract
     return (
         <div 
             id="contract-content" 
-            className="space-y-8 printable-content bg-no-repeat bg-top bg-cover p-8 md:p-12"
-            style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
+            className="space-y-8 printable-content p-8 md:p-12"
         >
             <header className="pb-4 border-b">
+                 {branding?.letterhead_image_url && (
+                    <img 
+                        src={branding.letterhead_image_url} 
+                        alt="Letterhead"
+                        className="w-full h-auto object-contain mb-6"
+                    />
+                )}
                  <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
                         <Logo className="h-20 w-20 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />

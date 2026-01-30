@@ -85,14 +85,23 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
 
   return (
     <div 
-      className="p-4 md:p-6 bg-background font-body print:p-0 printable-content bg-no-repeat bg-top bg-cover" 
+      className="p-4 md:p-6 bg-background font-body print:p-0 printable-content" 
       dir="rtl"
-      style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
     >
       <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2 print:bg-transparent">
           {/* Header */}
           <header className="flex justify-between items-start pb-4 border-b">
-                  <>
+                 {branding?.letterhead_image_url && (
+                    <div className="absolute top-0 left-0 right-0 h-40">
+                         {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                            src={branding.letterhead_image_url} 
+                            alt="Letterhead"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                 )}
+                  <div className="relative z-10 w-full">
                       <div className='flex items-center gap-4'>
                           <Logo className="h-16 w-16 !p-3 print:hidden" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                           <div>
@@ -100,14 +109,14 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                               <p className="text-muted-foreground print:text-sm">{branding?.letterhead_text || 'Nova ERP'}</p>
                           </div>
                       </div>
-                      <div className="text-left text-xs text-muted-foreground">
+                      <div className="text-left text-xs text-muted-foreground mt-4">
                           <p>تاريخ التقرير: {formatDate(reportDate)}</p>
                           {currentDate && <p className="print:hidden">تاريخ الطباعة: {formatDate(currentDate)}</p>}
                       </div>
-                  </>
+                  </div>
           </header>
 
-          <main className="space-y-4">
+          <main className="space-y-4 pt-8">
                <Section title="المعلومات الشخصية والأساسية" icon={<User />}>
                   <InfoItem label="الاسم بالعربية" value={employee.fullName} />
                   <InfoItem label="الاسم بالإنجليزية" value={employee.nameEn} />
@@ -127,27 +136,27 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
               </Section>
               
               <Section title="البيانات الوظيفية والعقد" icon={<Briefcase />}>
-                  <InfoItem label="القسم" value={employee.department} />
-                  <InfoItem label="المسمى الوظيفي" value={employee.jobTitle} />
-                  <InfoItem label="المنصب" value={employee.position} />
+                  <InfoItem label="القسم" value={reportData.department} />
+                  <InfoItem label="المسمى الوظيفي" value={reportData.jobTitle} />
+                  <InfoItem label="المنصب" value={reportData.position} />
                   <InfoItem label="تاريخ التعيين" value={formatDate(hireDate)} />
                   <InfoItem label="نوع العقد" value={employee.contractType} />
-                  <InfoItem label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />
+                  <InfoItem label="تاريخ انتهاء العقد" value={formatDate(toDate(reportData.contractExpiry))} />
                   <InfoItem label="الجنسية" value={employee.nationality} />
-                  {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
-                   {employee.status === 'terminated' && (
+                  {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(toDate(reportData.residencyExpiry))} />}
+                     {employee.status === 'terminated' && (
                       <>
-                       <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(employee.terminationDate)} />
+                       <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(toDate(employee.terminationDate))} />
                        <InfoItem label="سبب إنهاء الخدمة" value={employee.terminationReason === 'resignation' ? 'استقالة' : 'إنهاء من صاحب العمل'} />
                       </>
                    )}
               </Section>
 
               <Section title="البيانات المالية" icon={<Wallet />}>
-                   <InfoItem label="الراتب الأساسي" value={formatCurrency(employee.basicSalary || 0)} />
-                   <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
-                   <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
-                   <InfoItem label="الإجمالي" value={formatCurrency(totalSalary)} className="font-bold border-t pt-2" />
+                   <InfoItem label="الراتب الأساسي" value={formatCurrency(reportData.basicSalary || 0)} />
+                   <InfoItem label="بدل السكن" value={formatCurrency(reportData.housingAllowance || 0)} />
+                   <InfoItem label="بدل النقل" value={formatCurrency(reportData.transportAllowance || 0)} />
+                   <InfoItem label="الإجمالي" value={formatCurrency((reportData.basicSalary || 0) + (reportData.housingAllowance || 0) + (reportData.transportAllowance || 0))} className="font-bold border-t pt-2" />
                    <Separator className='md:col-span-2 my-1' />
                    <InfoItem label="طريقة دفع الراتب" value={employee.salaryPaymentType} />
                    {employee.salaryPaymentType === 'transfer' && (
@@ -163,7 +172,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                       <div className='md:col-span-2 space-y-2'>
                           {employee.auditLogs.map((log: any, index: number) => (
                               <div key={log.id || index} className="text-xs p-2 rounded-md bg-muted/50">
-                                  <span className="font-semibold text-primary">{formatDate(log.effectiveDate)}</span>: 
+                                  <span className="font-semibold text-primary">{formatDate(toDate(log.effectiveDate))}</span>: 
                                   تغيير في <span className='font-semibold'>"{log.field}"</span> من <span className='font-mono text-muted-foreground'>{log.oldValue !== null ? String(log.oldValue) : '-'}</span> إلى <span className='font-mono'>{log.newValue !== null ? String(log.newValue) : '-'}</span>
                                   {log.changeType === 'Creation' && <span>(إنشاء ملف)</span>}
                               </div>
@@ -183,7 +192,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                       <div className='md:col-span-2 border-t pt-4'>
                           <p className='font-semibold mb-2'>آخر عودة من إجازة:</p>
                            <InfoItem label="نوع الإجازة" value={(employee.lastLeave as any).leaveType} />
-                           <InfoItem label="تاريخ العودة الفعلي" value={formatDate((employee.lastLeave as any).actualReturnDate)} />
+                           <InfoItem label="تاريخ العودة الفعلي" value={formatDate(toDate((employee.lastLeave as any).actualReturnDate))} />
                       </div>
                   )}
               </Section>
