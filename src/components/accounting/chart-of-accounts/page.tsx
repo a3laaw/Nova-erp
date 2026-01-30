@@ -195,6 +195,7 @@ export default function ChartOfAccountsPage() {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const [isSeeding, setIsSeeding] = useState(false);
+    const [confirmSeedText, setConfirmSeedText] = useState('');
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -380,27 +381,26 @@ export default function ChartOfAccountsPage() {
 
     const handleSeedChartOfAccounts = async () => {
         if (!firestore) return;
-        setIsSeedAlertOpen(false);
         setIsSeeding(true);
         try {
             const batch = writeBatch(firestore);
             const accountsRef = collection(firestore, 'chartOfAccounts');
             
-            // 1. Delete all existing accounts
             const existingAccountsSnap = await getDocs(accountsRef);
             existingAccountsSnap.forEach(doc => {
                 batch.delete(doc.ref);
             });
 
-            // 2. Add the new default accounts
             defaultChartOfAccounts.forEach(account => {
-                const docRef = doc(accountsRef); // Create a new doc reference for each
+                const docRef = doc(accountsRef);
                 batch.set(docRef, account);
             });
 
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم مسح الشجرة القديمة وتنزيل شجرة الحسابات الأساسية بنجاح.' });
             await fetchAllData();
+            setConfirmSeedText('');
+            setIsSeedAlertOpen(false);
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنزيل شجرة الحسابات.' });
@@ -556,13 +556,21 @@ export default function ChartOfAccountsPage() {
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            تحذير: سيقوم هذا الإجراء **بمسح جميع الحسابات الحالية** في قاعدة البيانات واستبدالها بشجرة حسابات أساسية. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟
+                        <AlertDialogDescription className="space-y-4">
+                            <p className="font-bold text-destructive">تحذير: هذا الإجراء سيقوم بمسح جميع الحسابات الحالية واستبدالها بشجرة حسابات أساسية. لا يمكن التراجع عن هذا الإجراء.</p>
+                            <p>للتأكيد، يرجى كتابة كلمة <span className="font-mono font-bold text-destructive">مسح</span> في المربع أدناه.</p>
                         </AlertDialogDescription>
+                         <Input
+                            id="confirm-seed-text"
+                            value={confirmSeedText}
+                            onChange={(e) => setConfirmSeedText(e.target.value)}
+                            placeholder="اكتب 'مسح' هنا"
+                            className="mt-2"
+                        />
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding} className="bg-destructive hover:bg-destructive/90">
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding || confirmSeedText !== 'مسح'} className="bg-destructive hover:bg-destructive/90">
                             {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التنزيل...</> : 'نعم، قم بالمسح والتنزيل'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -571,3 +579,5 @@ export default function ChartOfAccountsPage() {
         </div>
     );
 }
+
+    
