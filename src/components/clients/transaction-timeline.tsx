@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore'; 
@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 
 interface TimelineEvent {
   id: string;
@@ -59,7 +59,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     loadingMore, 
     hasMore, 
     loaderRef 
-  } = useInfiniteScroll<TimelineEvent>(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`);
+  } = useInfiniteScroll<TimelineEvent>(`clients/${clientId}/transactions/${transactionId}/timelineEvents`);
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !currentUser || !firestore) return;

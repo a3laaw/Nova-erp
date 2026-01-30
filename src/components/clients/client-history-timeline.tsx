@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useFirebase } from '@/firebase';
-import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { History, Loader2 } from 'lucide-react';
@@ -32,15 +32,13 @@ const formatDate = (dateValue: any): string => {
 }
 
 export function ClientHistoryTimeline({ clientId }: ClientHistoryTimelineProps) {
-  const { firestore } = useFirebase();
-
   const {
     items: events,
     loading,
     loadingMore,
     hasMore,
     loaderRef
-  } = useInfiniteScroll<HistoryEvent>(firestore, `clients/${clientId}/history`);
+  } = useInfiniteScroll<HistoryEvent>(`clients/${clientId}/history`);
   
   return (
     <Card>
