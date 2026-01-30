@@ -37,15 +37,15 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
-import { doc, deleteDoc, writeBatch, serverTimestamp, getDocs, collection, query } from 'firebase/firestore';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription, SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
-import { SmartCache, useSubscription } from '@/lib/cache/smart-cache';
 import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
+import { searchClients } from '@/lib/cache/fuse-search';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
@@ -72,14 +72,13 @@ export default function ClientsPage() {
   const { language } = useLanguage();
   const { firestore } = useFirebase();
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- NEW: Use the real-time subscription hook ---
-  const { data: clients, loading: clientsLoading, error: clientsError } = useSubscription<Client>(firestore, 'clients');
+  // --- NEW DATA FETCHING LOGIC ---
+  const { data: clients, setData: setClients, loading: clientsLoading, error: clientsError } = useSubscription<Client>(firestore, 'clients');
   const { data: employees, loading: employeesLoading, error: employeesError } = useSubscription<Employee>(firestore, 'employees');
   
   const loading = clientsLoading || employeesLoading;
@@ -94,43 +93,48 @@ export default function ClientsPage() {
       return newMap;
   }, [employees]);
 
-  // --- NEW: Perform search locally ---
-  const filteredClients: ClientWithEmployee[] = useMemo(() => {
+  const augmentedClients = useMemo(() => {
     if (!clients) return [];
-    
-    const augmentedClients = clients.map(client => ({
+    return clients.map(client => ({
         ...client,
         assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
     }));
-    
-    if (!searchQuery) return augmentedClients;
-    
-    return SmartCache.search(augmentedClients, searchQuery, ['nameAr', 'nameEn', 'fileId', 'mobile']);
-  }, [clients, searchQuery, employeesMap]);
+  }, [clients, employeesMap]);
+
+
+  const filteredClients = useMemo(() => {
+    return searchClients(augmentedClients, searchQuery);
+  }, [augmentedClients, searchQuery]);
 
   const handleDeleteClient = async () => {
     if (!clientToDelete || !firestore) return;
+
     setIsDeleting(true);
+    const originalClients = [...clients];
+    
+    // Optimistic UI Update
+    setClients(prev => prev.filter(c => c.id !== clientToDelete.id));
+    setClientToDelete(null);
+
     try {
       await deleteDoc(doc(firestore, 'clients', clientToDelete.id));
-      await SmartCache.invalidate('clients-list'); // Invalidate cache on write
+      // No need to call invalidate, onSnapshot handles the update.
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
     } catch (e) {
+      // Rollback on failure
+      setClients(originalClients);
       console.error("Error deleting client: ", e);
-      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل.' });
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل. تم التراجع عن التغيير.' });
     } finally {
       setIsDeleting(false);
-      setClientToDelete(null);
     }
   };
   
   const refreshData = useCallback(async () => {
     toast({ title: 'تحديث البيانات...', description: 'جاري إعادة المزامنة من الخادم.' });
-    // In a subscription model, data is live. A hard refresh is an option, 
-    // but invalidating the cache ensures the *next* non-subscription `get` call is fresh.
-    await SmartCache.invalidate('clients-list');
-    await SmartCache.invalidate('employees-list');
-    // The useSubscription hook will handle updates automatically.
+    await SmartCache.invalidate('clients');
+    await SmartCache.invalidate('employees');
+    // useSubscription will automatically fetch new data
   }, []);
 
   const t = {
@@ -227,7 +231,7 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && Array.from({ length: 3 }).map((_, i) => (
+              {loading && filteredClients.length === 0 && Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-40" /></TableCell>

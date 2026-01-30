@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -22,8 +21,8 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, type DocumentData, doc, updateDoc } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/lib/cache/smart-cache';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     AlertDialog,
@@ -45,6 +44,8 @@ import { useLanguage } from '@/context/language-context';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { searchEmployees } from '@/lib/cache/fuse-search';
+
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -65,25 +66,12 @@ const terminationReasons: {value: string, label: string}[] = [
 ];
 
 export function EmployeesTable() {
-    const firestore = useFirestore();
+    const firestore = useFirebase();
     const { toast } = useToast();
     const { language } = useLanguage();
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const employeesQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'employees'), orderBy('createdAt', 'desc'));
-    }, [firestore]);
-
-    const [snapshot, loading, error] = useCollection(employeesQuery);
-
-    const employees = useMemo(() => {
-        if (!snapshot) return [];
-        const employeeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-        return employeeList.map(emp => ({
-            ...emp,
-            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
-        }));
-    }, [snapshot]);
+    const { data: employees, setData: setEmployees, loading, error } = useSubscription<Employee>(firestore, 'employees');
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
@@ -98,6 +86,19 @@ export function EmployeesTable() {
     const [rehireType, setRehireType] = useState<'continue' | 'new'>('continue');
     const [newHireDate, setNewHireDate] = useState('');
     const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
+
+    const processedEmployees = useMemo(() => {
+        if (!employees) return [];
+        const employeeList = employees.map(emp => ({
+            ...emp,
+            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
+        }));
+        return employeeList.sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    }, [employees]);
+
+    const filteredEmployees = useMemo(() => {
+        return searchEmployees(processedEmployees, searchQuery);
+    }, [processedEmployees, searchQuery]);
 
     useEffect(() => {
         if (isImmediate || !noticeStartDate) {
@@ -135,15 +136,15 @@ export function EmployeesTable() {
 
     const handleTerminationConfirm = async () => {
         if (!employeeToTerminate || !firestore || !terminationReason) {
-            toast({
-                variant: 'destructive',
-                title: 'خطأ',
-                description: 'الرجاء اختيار سبب إنهاء الخدمة.'
-            });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار سبب إنهاء الخدمة.' });
             return;
         }
 
         setIsTerminating(true);
+        const originalEmployees = [...employees];
+        setEmployees(prev => prev.map(emp => emp.id === employeeToTerminate.id ? {...emp, status: 'terminated'} : emp));
+        setEmployeeToTerminate(null);
+
         const employeeRef = doc(firestore, 'employees', employeeToTerminate.id);
 
         try {
@@ -154,23 +155,14 @@ export function EmployeesTable() {
                 terminationReason: terminationReason
             });
 
-            toast({
-                title: 'نجاح',
-                description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.`
-            });
+            toast({ title: 'نجاح', description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.` });
             
         } catch (err) {
+            setEmployees(originalEmployees);
             console.error(err);
-            toast({
-                variant: 'destructive',
-                title: 'خطأ في الحفظ',
-                description: 'لم يتم إنهاء خدمة الموظف. الرجاء المحاولة مرة أخرى.'
-            });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم إنهاء خدمة الموظف. تم التراجع.' });
         } finally {
             setIsTerminating(false);
-            setEmployeeToTerminate(null);
-            setTerminationReason('');
-            setIsImmediate(false);
         }
     };
     
@@ -178,6 +170,10 @@ export function EmployeesTable() {
         if (!employeeToRehire || !firestore) return;
 
         setIsRehiring(true);
+        const originalEmployees = [...employees];
+        setEmployees(prev => prev.map(emp => emp.id === employeeToRehire.id ? { ...emp, status: 'active' } : emp));
+        setEmployeeToRehire(null);
+
         const employeeRef = doc(firestore, 'employees', employeeToRehire.id);
         
         const updateData: DocumentData = {
@@ -205,25 +201,18 @@ export function EmployeesTable() {
 
         try {
             await updateDoc(employeeRef, updateData);
-             toast({
-                title: 'نجاح',
-                description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.`
-            });
+             toast({ title: 'نجاح', description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.` });
         } catch (err) {
-            console.error(err);
-             toast({
-                variant: 'destructive',
-                title: 'خطأ في الحفظ',
-                description: 'لم تتم إعادة خدمة الموظف. الرجاء المحاولة مرة أخرى.'
-            });
+             setEmployees(originalEmployees);
+             console.error(err);
+             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم تتم إعادة خدمة الموظف. تم التراجع.' });
         } finally {
             setIsRehiring(false);
-            setEmployeeToRehire(null);
         }
     };
 
     const formatDateCell = (dateValue: any): string => {
-        const dateString = fromFirestoreDate(dateValue); // This gives "yyyy-MM-dd" or ""
+        const dateString = fromFirestoreDate(dateValue);
         if (!dateString) return '-';
         
         try {
@@ -232,7 +221,7 @@ export function EmployeesTable() {
             return `${day}/${month}/${year}`;
         } catch(e) {
             console.error("Failed to format date in table:", e);
-            return dateString; // Fallback to yyyy-mm-dd
+            return dateString;
         }
     }
 
@@ -252,6 +241,13 @@ export function EmployeesTable() {
                         إضافة موظف
                     </Link>
                 </Button>
+            </div>
+            <div className="mb-4">
+                <Input
+                    placeholder="ابحث بالاسم، الرقم الوظيفي، أو الرقم المدني..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
             </div>
             <div className='border rounded-lg'>
                 <Table>
@@ -284,14 +280,14 @@ export function EmployeesTable() {
                             </TableCell>
                         </TableRow>
                     )}
-                    {!loading && employees.length === 0 && (
+                    {!loading && filteredEmployees.length === 0 && (
                         <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center">
-                                لا يوجد موظفون حالياً. قم بإضافة موظف جديد.
+                                {searchQuery ? 'لا توجد نتائج تطابق بحثك.' : 'لا يوجد موظفون حالياً. قم بإضافة موظف جديد.'}
                             </TableCell>
                         </TableRow>
                     )}
-                    {employees.map((employee) => (
+                    {filteredEmployees.map((employee) => (
                         <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
                         <TableCell className="font-medium">
                             {employee.fullName}
