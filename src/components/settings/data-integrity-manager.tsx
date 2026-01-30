@@ -7,7 +7,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, collectionGroup, getDocs, query, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, PaymentVoucher } from '@/lib/types';
-import { Loader2, ShieldCheck, Microscope, AlertTriangle } from 'lucide-react';
+import { Loader2, ShieldCheck, Microscope, AlertTriangle, Trash2 } from 'lucide-react';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
@@ -170,6 +170,10 @@ export function DataIntegrityManager() {
     const [voucherAccountAnalysisResults, setVoucherAccountAnalysisResults] = useState<VoucherDiscrepancy[] | null>(null);
     const [voucherAccountCorrections, setVoucherAccountCorrections] = useState<Record<string, string>>({});
     const [allAccountsOptions, setAllAccountsOptions] = useState<any[]>([]);
+
+    // State for deleting appointments
+    const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+    const [isAppointmentsConfirmOpen, setIsAppointmentsConfirmOpen] = useState(false);
 
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
@@ -380,6 +384,43 @@ export function DataIntegrityManager() {
         });
     }, [firestore]);
 
+    const handleDeleteAllAppointments = async () => {
+        if (!firestore) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+            return;
+        }
+        setIsLoadingAppointments(true);
+        try {
+            const batch = writeBatch(firestore);
+            
+            const appointmentsQuery = query(collection(firestore, 'appointments'));
+            const appointmentsSnapshot = await getDocs(appointmentsQuery);
+            appointmentsSnapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            const progressQuery = query(collection(firestore, 'work_stages_progress'));
+            const progressSnapshot = await getDocs(progressQuery);
+            progressSnapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+
+            toast({
+                title: 'نجاح!',
+                description: `تم حذف جميع المواعيد (${appointmentsSnapshot.size}) وسجلات التقدم (${progressSnapshot.size}) بنجاح.`,
+            });
+        } catch (error) {
+            console.error("Error deleting all appointments:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف المواعيد.' });
+        } finally {
+            setIsLoadingAppointments(false);
+            setIsAppointmentsConfirmOpen(false);
+        }
+    };
+
+
     return (
         <Card>
             <CardHeader>
@@ -466,9 +507,41 @@ export function DataIntegrityManager() {
                     )}
                 </div>
 
+                 <Separator />
+                
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold text-destructive">أدوات إعادة تعيين البيانات</h3>
+                            <p className="text-sm text-muted-foreground">تستخدم هذه الأدوات لحذف مجموعات من البيانات بشكل كامل لأغراض التجربة أو البدء من جديد. <strong className="text-destructive">لا يمكن التراجع عن هذه الإجراءات.</strong></p>
+                        </div>
+                    </div>
+                    <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-lg flex justify-between items-center">
+                        <p className="font-medium">حذف جميع المواعيد في النظام.</p>
+                        <Button onClick={() => setIsAppointmentsConfirmOpen(true)} disabled={isLoadingAppointments} variant="destructive">
+                            {isLoadingAppointments ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
+                            حذف المواعيد
+                        </Button>
+                    </div>
+                </div>
+
             </CardContent>
+            <AlertDialog open={isAppointmentsConfirmOpen} onOpenChange={setIsAppointmentsConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيتم حذف <strong className="text-destructive">جميع المواعيد</strong> في النظام بشكل دائم، بما في ذلك سجلات تحديث المراحل المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه وهو مخصص لأغراض الاختبار فقط.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isLoadingAppointments}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAllAppointments} disabled={isLoadingAppointments} className="bg-destructive hover:bg-destructive/90">
+                            {isLoadingAppointments ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف كل المواعيد'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }
-
-    
