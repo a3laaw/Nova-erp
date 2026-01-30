@@ -7,46 +7,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
-import { useFirebase, useStorage } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
-import { Progress } from '../ui/progress';
 import Image from 'next/image';
 import { Separator } from '../ui/separator';
 
 export function BrandingManager() {
     const { firestore } = useFirebase();
-    const storage = useStorage();
     const { branding, loading } = useBranding();
     const { toast } = useToast();
     
     const [formData, setFormData] = useState<Partial<BrandingSettings>>({});
     const [isSaving, setIsSaving] = useState(false);
-    
-    // Logo state
-    const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [logoUploadProgress, setLogoUploadProgress] = useState<number | null>(null);
-    const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
-    const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
-    
-    // Letterhead state
-    const [letterheadFile, setLetterheadFile] = useState<File | null>(null);
-    const [letterheadUploadProgress, setLetterheadUploadProgress] = useState<number | null>(null);
-    const [letterheadUploadError, setLetterheadUploadError] = useState<string | null>(null);
-    const [letterheadPreviewUrl, setLetterheadPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (branding) {
             setFormData(branding);
-            if (branding.logo_url) {
-                setLogoPreviewUrl(branding.logo_url);
-            }
-             if (branding.letterhead_image_url) {
-                setLetterheadPreviewUrl(branding.letterhead_image_url);
-            }
         }
     }, [branding]);
 
@@ -55,64 +34,6 @@ export function BrandingManager() {
         setFormData(prev => ({...prev, [id]: value}));
     };
     
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'letterhead') => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const isLogo = type === 'logo';
-        const setError = isLogo ? setLogoUploadError : setLetterheadUploadError;
-        const setFile = isLogo ? setLogoFile : setLetterheadFile;
-        const setPreview = isLogo ? setLogoPreviewUrl : setLetterheadPreviewUrl;
-        
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-        if (!allowedTypes.includes(file.type)) {
-            setError('نوع الملف غير صالح. الرجاء رفع صورة (jpg, png).');
-            return;
-        }
-        if (file.size > 1024 * 1024) { // 1MB limit
-            setError('حجم الصورة كبير جدًا. الحد الأقصى 1MB.');
-            return;
-        }
-        
-        setError(null);
-        setFile(file);
-        setPreview(URL.createObjectURL(file));
-    };
-
-    const uploadFile = (file: File, type: 'logo' | 'letterhead'): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            if (!storage) {
-                return reject(new Error("Firebase Storage is not available."));
-            }
-            const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
-            setProgress(0);
-            const timestamp = Date.now();
-            const storageRef = ref(storage, `company_assets/${type}_${timestamp}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setProgress(progress);
-                },
-                (error) => {
-                    console.error(`${type} upload failed:`, error);
-                    setProgress(null);
-                    reject(error);
-                },
-                async () => {
-                    try {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        setProgress(null);
-                        resolve(downloadURL);
-                    } catch (e) {
-                         reject(e);
-                    }
-                }
-            );
-        });
-    };
-
     const handleSave = async () => {
         if (!firestore) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بالخدمات السحابية.'});
@@ -124,40 +45,11 @@ export function BrandingManager() {
         }
 
         setIsSaving(true);
-        setLogoUploadError(null);
-        setLetterheadUploadError(null);
         
         try {
-            const uploadPromises: Promise<{type: 'logo' | 'letterhead', url: string}>[] = [];
-
-            if (logoFile) {
-                uploadPromises.push(
-                    uploadFile(logoFile, 'logo').then(url => ({ type: 'logo' as const, url }))
-                );
-            }
-            if (letterheadFile) {
-                uploadPromises.push(
-                    uploadFile(letterheadFile, 'letterhead').then(url => ({ type: 'letterhead' as const, url }))
-                );
-            }
-
-            const uploadedFiles = await Promise.all(uploadPromises);
-
-            const updates: Partial<BrandingSettings> = { ...formData };
-            uploadedFiles.forEach(file => {
-                if (file.type === 'logo') {
-                    updates.logo_url = file.url;
-                } else if (file.type === 'letterhead') {
-                    updates.letterhead_image_url = file.url;
-                }
-            });
-
             const settingsRef = doc(firestore, 'company_settings', 'main');
-            await setDoc(settingsRef, updates, { merge: true });
+            await setDoc(settingsRef, formData, { merge: true });
             
-            if (logoFile) setLogoFile(null);
-            if (letterheadFile) setLetterheadFile(null);
-
             toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية بنجاح.' });
 
         } catch (error: any) {
@@ -166,15 +58,10 @@ export function BrandingManager() {
             toast({ 
                 variant: 'destructive', 
                 title: 'فشل الحفظ', 
-                description: `حدث خطأ أثناء رفع الملفات أو حفظ البيانات. ${errorMessage}`
+                description: `حدث خطأ أثناء حفظ البيانات. ${errorMessage}`
             });
-            if (error.message.includes('logo')) setLogoUploadError(error.message);
-            if (error.message.includes('letterhead')) setLetterheadUploadError(error.message);
-
         } finally {
             setIsSaving(false);
-            setLogoUploadProgress(null);
-            setLetterheadUploadProgress(null);
         }
     };
 
@@ -209,30 +96,30 @@ export function BrandingManager() {
                 <div className="space-y-4 p-4 border rounded-lg">
                     <h3 className="font-semibold text-base">شعار الشركة (اللوجو)</h3>
                      <div className="grid gap-2">
+                        <Label htmlFor="logo_url">مسار الصورة من الإنترنت</Label>
                         <div className="flex items-center gap-4">
-                            {logoPreviewUrl && <Image src={logoPreviewUrl} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />}
+                            {formData.logo_url && (
+                                <Image src={formData.logo_url} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />
+                            )}
                              <div className="flex-1">
-                                <Input id="logo-upload" type="file" onChange={(e) => handleFileChange(e, 'logo')} accept="image/png, image/jpeg, image/jpg" />
-                                 <p className="text-xs text-muted-foreground mt-2">.jpg, .png | الحد الأقصى 1MB</p>
+                                <Input id="logo_url" value={formData.logo_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/logo.png" />
                             </div>
                         </div>
-                        {logoUploadProgress !== null && <Progress value={logoUploadProgress} className="w-full h-2" />}
-                        {logoUploadError && <p className="text-xs text-destructive">{logoUploadError}</p>}
                     </div>
                 </div>
 
                 <div className="space-y-4 p-4 border rounded-lg">
                     <h3 className="font-semibold text-base">ترويسة الشركة (Letterhead)</h3>
                      <div className="grid gap-2">
+                        <Label htmlFor="letterhead_image_url">مسار الصورة من الإنترنت</Label>
                         <div className="flex items-center gap-4">
-                            {letterheadPreviewUrl && <Image src={letterheadPreviewUrl} alt="Letterhead Preview" width={128} height={64} className="rounded-md border object-contain p-1" />}
+                             {formData.letterhead_image_url && (
+                                <Image src={formData.letterhead_image_url} alt="Letterhead Preview" width={128} height={64} className="rounded-md border object-contain p-1" />
+                            )}
                              <div className="flex-1">
-                                <Input id="letterhead-upload" type="file" onChange={(e) => handleFileChange(e, 'letterhead')} accept="image/png, image/jpeg, image/jpg" />
-                                 <p className="text-xs text-muted-foreground mt-2">.jpg, .png | الحد الأقصى 1MB. يفضل أن تكون الصورة أفقية (Landscape).</p>
+                                <Input id="letterhead_image_url" value={formData.letterhead_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/letterhead.png" />
                             </div>
                         </div>
-                        {letterheadUploadProgress !== null && <Progress value={letterheadUploadProgress} className="w-full h-2" />}
-                        {letterheadUploadError && <p className="text-xs text-destructive">{letterheadUploadError}</p>}
                     </div>
                 </div>
                 
