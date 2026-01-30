@@ -29,7 +29,7 @@ export function PendingVisits() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!firestore || !user?.employeeId) {
+        if (!firestore || !user) {
             setLoading(false);
             return;
         }
@@ -37,19 +37,34 @@ export function PendingVisits() {
         const fetchPendingVisits = async () => {
             setLoading(true);
             try {
-                // SIMPLE QUERY: Only filter by engineer.
-                // Sorting and other filters will be done client-side to avoid the composite index requirement.
-                const appointmentsQuery = query(
-                    collection(firestore, 'appointments'),
-                    where('engineerId', '==', user.employeeId)
-                );
+                let appointmentsQuery;
+                const appointmentsRef = collection(firestore, 'appointments');
+
+                // If user is Admin, fetch all pending visits. Otherwise, fetch only for the current user.
+                if (user.role === 'Admin') {
+                    // Admin sees all architectural appointments. Filtering for pending happens client-side.
+                    appointmentsQuery = query(
+                        appointmentsRef,
+                        where('type', '==', 'architectural')
+                    );
+                } else if (user.employeeId) {
+                    // Other users only see their own.
+                    appointmentsQuery = query(
+                        appointmentsRef,
+                        where('engineerId', '==', user.employeeId),
+                        where('type', '==', 'architectural')
+                    );
+                } else {
+                    setPendingVisits([]);
+                    setLoading(false);
+                    return;
+                }
 
                 const appointmentsSnapshot = await getDocs(appointmentsQuery);
                 const allUserAppointments = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
                 // CLIENT-SIDE FILTERING:
                 const filteredPending = allUserAppointments.filter(appt => 
-                    appt.type === 'architectural' &&
                     appt.appointmentDate && // Ensure date exists
                     isPast(appt.appointmentDate.toDate()) &&
                     !appt.workStageUpdated
