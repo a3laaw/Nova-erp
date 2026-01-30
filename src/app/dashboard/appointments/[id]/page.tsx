@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -28,6 +27,7 @@ import Link from 'next/link';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
     let total = 0;
@@ -555,6 +555,8 @@ export default function AppointmentDetailsPage() {
     
     if (!appointment) return null;
 
+    const safeAppointmentDate = toFirestoreDate(appointment.appointmentDate);
+
     return (
         <div className="max-w-2xl mx-auto space-y-6" dir="rtl">
             <Card>
@@ -592,8 +594,8 @@ export default function AppointmentDetailsPage() {
                         </div>
                     )}
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={engineer?.fullName} />
-                    <InfoRow icon={<Calendar />} label="تاريخ الموعد" value={format(appointment.appointmentDate.toDate(), "eeee, dd MMMM yyyy", { locale: ar })} />
-                    <InfoRow icon={<Clock />} label="وقت الموعد" value={format(appointment.appointmentDate.toDate(), "p", { locale: ar })} />
+                    <InfoRow icon={<Calendar />} label="تاريخ الموعد" value={safeAppointmentDate ? format(safeAppointmentDate, "eeee, dd MMMM yyyy", { locale: ar }) : ''} />
+                    <InfoRow icon={<Clock />} label="وقت الموعد" value={safeAppointmentDate ? format(safeAppointmentDate, "p", { locale: ar }) : ''} />
                 </CardContent>
             </Card>
 
@@ -735,3 +737,4 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
+    
