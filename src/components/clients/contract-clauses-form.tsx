@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -39,6 +38,7 @@ import { useRouter } from 'next/navigation';
 interface ContractClausesFormProps {
   isOpen: boolean;
   onClose: () => void;
+  onSaveSuccess: () => void;
   transaction: ClientTransaction | null | Partial<ClientTransaction>;
   clientId: string;
   clientName: string;
@@ -90,7 +90,7 @@ function TemplateSelectionView({
 }
 
 
-export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
+export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -194,7 +194,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             departmentsSnapshot,
         ] = await Promise.all([
             getDocs(allTemplatesQuery),
-            getDocs(employeesSnapshot),
+            getDocs(employeesQuery),
             getDocs(departmentsQuery),
         ]);
         
@@ -341,7 +341,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const [clientSnap, journalEntryCounterDoc, coaClientCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterRef)
+                transaction_firestore.get(coaClientCounterDoc)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -550,52 +550,58 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
                     <section className="space-y-4 p-4 border rounded-lg">
                         <h3 className="font-semibold">البنود المالية</h3>
-                         <div className="border rounded-lg">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[40%]">اسم الدفعة</TableHead>
-                                        <TableHead>شرط الاستحقاق</TableHead>
-                                        <TableHead className="text-left w-[120px]">المبلغ (د.ك)</TableHead>
-                                        <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {clauses.map((clause, index) => (
-                                        <TableRow key={clause.id}>
-                                            <TableCell>
-                                                <Input value={clause.name} onChange={(e) => handleClauseChange(index, 'name', e.target.value)} />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select value={clause.condition || '_NONE_'} onValueChange={(v) => handleClauseChange(index, 'condition', v === '_NONE_' ? '' : v)}>
-                                                    <SelectTrigger><SelectValue placeholder="اختر شرط..."/></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="_NONE_">- بدون شرط -</SelectItem>
-                                                        {referenceData.stages.map(stage => <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input type="number" value={clause.amount || ''} onChange={(e) => handleClauseChange(index, 'amount', Number(e.target.value))} className="dir-ltr text-left" />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" onClick={() => removeClause(clause.id)}><Trash2 className="text-destructive h-4 w-4" /></Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                <TableFooter>
-                                    <TableRow>
-                                        <TableCell colSpan={2} className="font-bold text-lg">الإجمالي</TableCell>
-                                        <TableCell className="font-bold text-lg text-left font-mono">{formatCurrency(totalAmount)}</TableCell>
-                                        <TableCell />
-                                    </TableRow>
-                                </TableFooter>
-                            </Table>
-                         </div>
-                         <div className="flex justify-end">
-                            <Button variant="outline" size="sm" type="button" onClick={addClause}><PlusCircle className="ml-2"/> إضافة دفعة</Button>
-                         </div>
+                         <div className="grid md:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label>نوع العقد المالي</Label>
+                                <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="fixed">قيمة ثابتة</SelectItem>
+                                        <SelectItem value="percentage">نسبة مئوية</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>إجمالي قيمة العقد (د.ك)</Label>
+                                <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="dir-ltr text-left" />
+                            </div>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between items-center">
+                             <h4 className="font-semibold">الدفعات المالية</h4>
+                             <Button variant="outline" size="sm" type="button" onClick={addMilestone}><PlusCircle className="ml-2"/> إضافة دفعة</Button>
+                        </div>
+                        <div className="space-y-2">
+                            {financials.milestones.map((m, i) => (
+                                 <div key={m.id} className="grid grid-cols-12 gap-2 items-center">
+                                    <Label className="col-span-3 font-semibold">{m.name}</Label>
+                                    <Select value={m.condition || '_NONE_'} onValueChange={v => updateMilestone(m.id, 'condition', v === '_NONE_' ? '' : v)}>
+                                        <SelectTrigger className="col-span-5">
+                                            <SelectValue placeholder="اختر مرحلة العمل كشرط..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="_NONE_">بدون شرط</SelectItem>
+                                            {referenceData.stages.map(stage => <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <div className="col-span-3 flex items-center gap-1">
+                                        <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
+                                        <span className="text-sm">{financials.type === 'fixed' ? 'د.ك' : '%'}</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" type="button" onClick={() => removeMilestone(m.id)} className="col-span-1"><Trash2 className="text-destructive h-4 w-4"/></Button>
+                                 </div>
+                            ))}
+                        </div>
+                         {financials.milestones.length > 0 && (
+                            <div className="border-t pt-2 mt-2 space-y-1">
+                                <div className="flex justify-between font-semibold">
+                                    <span>مجموع الدفعات:</span>
+                                    <span className="font-mono">{financials.type === 'fixed' ? formatCurrency(totalMilestoneValue) : `${totalMilestoneValue}%`}</span>
+                                </div>
+                                {financials.type === 'percentage' && totalMilestoneValue !== 100 && <p className="text-destructive text-xs text-center">تحذير: مجموع النسب لا يساوي 100%</p>}
+                                 {financials.type === 'fixed' && totalMilestoneValue !== financials.totalAmount && <p className="text-destructive text-xs text-center">تحذير: مجموع الدفعات لا يساوي إجمالي قيمة العقد</p>}
+                            </div>
+                         )}
                     </section>
                     
                      <section className="space-y-4 p-4 border rounded-lg">
@@ -628,6 +634,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                             ))}
                         </div>
                     </section>
+
                 </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t">
