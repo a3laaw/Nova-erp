@@ -1,6 +1,7 @@
 
 
 
+
       'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -559,9 +560,14 @@ export default function TransactionDetailPage() {
                             </Button>
                         )}
                     </div>
-                    <Badge variant="outline" className={transactionStatusColors[transaction.status]}>
-                        {transactionStatusTranslations[transaction.status]}
-                    </Badge>
+                    <div className='text-right'>
+                        <Badge variant="outline" className={transactionStatusColors[transaction.status]}>
+                            {transactionStatusTranslations[transaction.status]}
+                        </Badge>
+                         {transaction.transactionNumber && (
+                            <div className="font-mono text-sm text-muted-foreground mt-1">{transaction.transactionNumber}</div>
+                        )}
+                    </div>
                 </div>
                  <CardDescription>
                     معاملة خاصة بالعميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{(client as any).nameAr}</Link>
@@ -732,3 +738,6 @@ export default function TransactionDetailPage() {
 
 
 
+
+
+    

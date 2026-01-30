@@ -197,6 +197,10 @@
         "description": "Represents an internal service or transaction for a client, like a design submission.",
         "type": "object",
         "properties": {
+            "transactionNumber": {
+              "type": "string",
+              "description": "A unique, human-readable, sequential transaction number for the client (e.g., CL123-TX01)."
+            },
             "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
@@ -255,7 +259,7 @@
                 "required": ["clauses", "totalAmount"]
             }
         },
-        "required": ["clientId", "transactionType", "departmentId", "status", "createdAt"]
+        "required": ["transactionNumber", "clientId", "transactionType", "departmentId", "status", "createdAt"]
     },
     "TransactionTimelineEvent": {
       "title": "Transaction Timeline Event",
@@ -1240,3 +1244,5 @@
     }
   }
 }
+
+    

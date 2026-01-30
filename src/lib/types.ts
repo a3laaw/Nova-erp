@@ -48,6 +48,8 @@ export type Client = {
     houseNumber: string;
   };
   fileId: string;
+  fileNumber: number;
+  fileYear: number;
   status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
   assignedEngineer?: string;
   createdAt: any;
@@ -362,6 +364,7 @@ export interface TransactionStage {
       
 export type ClientTransaction = {
     id?: string;
+    transactionNumber?: string;
     clientId: string;
     transactionType: string;
     description?: string;
@@ -615,3 +618,5 @@ export interface PurchaseOrder {
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
+
+    

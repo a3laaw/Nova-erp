@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -163,8 +164,20 @@ export default function EditTransactionPage() {
     <Card className="max-w-2xl mx-auto" dir="rtl">
         <form onSubmit={handleSubmit}>
             <CardHeader>
-                <CardTitle>تعديل المعاملة</CardTitle>
-                <CardDescription>تعديل تفاصيل المعاملة الداخلية للعميل.</CardDescription>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>تعديل المعاملة</CardTitle>
+                        <CardDescription>تعديل تفاصيل المعاملة الداخلية للعميل.</CardDescription>
+                    </div>
+                     {originalData?.transactionNumber && (
+                        <div className="text-right">
+                            <Label>رقم المعاملة</Label>
+                            <div className="font-mono text-lg font-semibold h-7">
+                                {originalData.transactionNumber}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid gap-2">
@@ -210,3 +223,5 @@ export default function EditTransactionPage() {
     </Card>
   );
 }
+
+    

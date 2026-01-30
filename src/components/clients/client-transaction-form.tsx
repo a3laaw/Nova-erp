@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -143,6 +144,22 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
         try {
             const batch = writeBatch(firestore);
+
+            // --- Generate Transaction Number ---
+            const clientRef = doc(firestore, 'clients', clientId);
+            const clientSnap = await getDoc(clientRef);
+            if (!clientSnap.exists()) {
+                throw new Error("لم يتم العثور على ملف العميل لإنشاء رقم المعاملة.");
+            }
+            const clientData = clientSnap.data() as Client;
+            
+            const transactionsQuery = query(collection(firestore, `clients/${clientId}/transactions`));
+            const transactionsSnapshot = await getDocs(transactionsQuery);
+            const transactionCount = transactionsSnapshot.size;
+            const newTransactionSequence = transactionCount + 1;
+            const transactionNumber = `CL${clientData.fileNumber}-TX${String(newTransactionSequence).padStart(2, '0')}`;
+            // --- End Generation ---
+
             const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
             const newTransactionRefId = newTransactionRef.id;
 
@@ -152,12 +169,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             // Special logic for "بلدية سكن خاص"
             if (transactionTypeName.includes('بلدية') && transactionTypeName.includes('سكن خاص')) {
-                const clientRef = doc(firestore, 'clients', clientId);
-                const clientSnap = await getDoc(clientRef);
-                if (clientSnap.exists()) {
-                    const clientData = clientSnap.data() as Client;
-                    if (clientData.assignedEngineer) {
-                        engineerForTransactionId = clientData.assignedEngineer;
+                const clientRefDoc = doc(firestore, 'clients', clientId);
+                const clientSnapDoc = await getDoc(clientRefDoc);
+                if (clientSnapDoc.exists()) {
+                    const clientDataForEng = clientSnapDoc.data() as Client;
+                    if (clientDataForEng.assignedEngineer) {
+                        engineerForTransactionId = clientDataForEng.assignedEngineer;
                     } else {
                          toast({ variant: 'destructive', title: 'خطأ', description: 'يجب إسناد مهندس مسؤول للعميل أولاً قبل إنشاء معاملة سكن خاص.' });
                          setIsSaving(false);
@@ -169,6 +186,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const engineer = engineers.find(e => e.id === engineerForTransactionId);
 
             const newTransactionData: Omit<ClientTransaction, 'id'> = {
+                transactionNumber,
                 clientId,
                 transactionType: transactionTypeName,
                 description,
@@ -182,13 +200,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             batch.set(newTransactionRef, newTransactionData);
 
-            // Add creation log event to the transaction's timeline
-            let logContent = `أنشأ المعاملة "${transactionTypeName}".`;
+            let logContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
             if (engineer) {
                 logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
             }
             
-            // Link the appointment to this new transaction if it originated from one
             if (fromAppointmentId) {
                 const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
                 batch.update(appointmentRef, { transactionId: newTransactionRefId });
@@ -226,7 +242,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             
             for (const recipientId of recipients) {
                 const isCreator = recipientId === currentUser.id;
-                const title = isCreator ? 'تم إنشاء معاملة بنجاح' : 'تم إسناد معاملة جديدة لك';
+                const title = isCreator 
+                    ? 'تم إنشاء معاملة بنجاح' 
+                    : 'تم إسناد معاملة جديدة لك';
                 const body = isCreator 
                     ? `لقد أنشأت المعاملة "${transactionTypeName}" للعميل ${clientName} وأسندتها إلى ${engineerName}.`
                     : `أسند إليك ${currentUser.fullName} المعاملة "${transactionTypeName}" للعميل ${clientName}.`;
@@ -237,14 +255,14 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             resetForm();
             onClose();
 
-            // After everything is done, if we came from an appointment, go back to it.
             if (fromAppointmentId) {
                 router.push(`/dashboard/appointments/${fromAppointmentId}`);
             }
 
         } catch (error) {
             console.error("Error adding transaction:", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل في إضافة المعاملة.' });
+            const errorMessage = error instanceof Error ? error.message : 'فشل في إضافة المعاملة.';
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
         } finally {
             setIsSaving(false);
         }
@@ -314,3 +332,5 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -563,6 +564,7 @@ export default function ClientProfilePage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead>رقم المعاملة</TableHead>
                                         <TableHead>نوع المعاملة</TableHead>
                                         <TableHead>المهندس المسؤول</TableHead>
                                         <TableHead>الحالة</TableHead>
@@ -573,6 +575,7 @@ export default function ClientProfilePage() {
                                 <TableBody>
                                     {transactions.map(tx => (
                                         <TableRow key={tx.id}>
+                                            <TableCell className="font-mono">{tx.transactionNumber || '-'}</TableCell>
                                             <TableCell className="font-medium">
                                                 <Link href={`/dashboard/clients/${id}/transactions/${tx.id!}`} className="hover:underline">
                                                     {tx.transactionType}
@@ -666,4 +669,6 @@ export default function ClientProfilePage() {
     </>
   );
 }
+    
+
     
