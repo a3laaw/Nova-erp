@@ -12,7 +12,6 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
-import Image from 'next/image';
 import { Separator } from '../ui/separator';
 
 export function BrandingManager() {
@@ -99,7 +98,8 @@ export function BrandingManager() {
                         <Label htmlFor="logo_url">مسار الصورة من الإنترنت</Label>
                         <div className="flex items-center gap-4">
                             {formData.logo_url && (
-                                <Image src={formData.logo_url} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={formData.logo_url} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />
                             )}
                              <div className="flex-1">
                                 <Input id="logo_url" value={formData.logo_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/logo.png" />
@@ -114,7 +114,8 @@ export function BrandingManager() {
                         <Label htmlFor="letterhead_image_url">مسار الصورة من الإنترنت</Label>
                         <div className="flex items-center gap-4">
                              {formData.letterhead_image_url && (
-                                <Image src={formData.letterhead_image_url} alt="Letterhead Preview" width={128} height={64} className="rounded-md border object-contain p-1" />
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={formData.letterhead_image_url} alt="Letterhead Preview" width={128} height={64} className="rounded-md border object-contain p-1" />
                             )}
                              <div className="flex-1">
                                 <Input id="letterhead_image_url" value={formData.letterhead_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/letterhead.png" />
@@ -162,4 +163,3 @@ export function BrandingManager() {
             </CardFooter>
         </Card>
     );
-}
