@@ -1,3 +1,4 @@
+'use client';
 import localforage from 'localforage';
 import { collection, getDocs, query, onSnapshot, type Firestore, type QueryConstraint, type DocumentData, type Query } from 'firebase/firestore';
 import { useState, useEffect, useCallback } from 'react';
@@ -65,25 +66,52 @@ const saveStats = () => {
 
 class SmartCacheManager {
 
-  // Stale-while-revalidate fetcher
+  /**
+   * Implements a stale-while-revalidate caching strategy.
+   * - Returns cached data immediately if available and not expired.
+   * - If data is "nearly expired" (e.g., past 80% of TTL), it returns the stale data
+   *   and triggers a background fetch to update the cache for the next request.
+   * - If data is expired or not in cache, it fetches fresh data, caches it, and returns it.
+  */
   async get<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
     const ttl = TTLs[key] || 5 * 60 * 1000;
+    const backgroundRefreshThreshold = ttl * 0.8;
+
     const cached = await localforage.getItem<CachedData<T>>(key);
 
-    if (cached && (Date.now() - cached.timestamp < ttl)) {
-      cacheStats.hits++;
-      saveStats();
-      console.log(`CACHE HIT: ${key}`);
-      return cached.data;
+    if (cached?.data) {
+        const age = Date.now() - cached.timestamp;
+
+        if (age < ttl) {
+            cacheStats.hits++;
+            saveStats();
+            console.log(`CACHE HIT: ${key}`);
+
+            if (age > backgroundRefreshThreshold) {
+                console.log(`BACKGROUND REFRESH: ${key}`);
+                // Fire-and-forget background update
+                fetcher().then(freshData => {
+                    this.set(key, freshData);
+                }).catch(error => {
+                    console.error(`Background refresh for ${key} failed:`, error);
+                });
+            }
+            
+            return cached.data; // Return stale data immediately
+        } else {
+            console.log(`CACHE STALE: ${key}`);
+        }
+    } else {
+        console.log(`CACHE MISS: ${key}`);
     }
 
-    console.log(`CACHE MISS: ${key}`);
     cacheStats.misses++;
     saveStats();
     
-    const data = await fetcher();
-    await this.set(key, data);
-    return data;
+    // This part runs on a cache miss or if the cache is stale and blocks rendering
+    const freshData = await fetcher();
+    await this.set(key, freshData);
+    return freshData;
   }
 
   async set<T>(key: string, data: T): Promise<void> {
@@ -112,6 +140,18 @@ class SmartCacheManager {
     if (!query) return items;
     const fuse = new Fuse(items, { keys: keys as any, threshold, includeScore: true, minMatchCharLength: 2 });
     return fuse.search(query).map(result => result.item);
+  }
+  
+  async getFromStorage<T>(key: string): Promise<T | null> {
+    const cached = await localforage.getItem<CachedData<T>>(key);
+    return cached?.data || null;
+  }
+  
+  async isValid(key: string): Promise<boolean> {
+    const ttl = TTLs[key] || 5 * 60 * 1000;
+    const cached = await localforage.getItem<CachedData<any>>(key);
+    if (!cached) return false;
+    return (Date.now() - cached.timestamp) < ttl;
   }
 }
 
