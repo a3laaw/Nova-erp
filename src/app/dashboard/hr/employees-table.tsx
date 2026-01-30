@@ -28,12 +28,11 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
-import { useSubscription, SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -47,13 +46,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
-
+import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
+import { cn } from '@/lib/utils';
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
-
-interface ClientWithEmployee extends Client {
-  assignedEngineerName?: string;
-}
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -79,11 +75,17 @@ export function EmployeesTable() {
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // --- NEW DATA FETCHING LOGIC ---
-  const { data: employees, setData: setEmployees, loading, error } = useSubscription<Employee>(firestore, 'employees');
+  
+  const { 
+    items: employees, 
+    setItems: setEmployees, 
+    loading, 
+    error,
+    hasMore,
+    loaderRef,
+    loadingMore,
+    fetchItems: refreshData, // Use the fetchItems function for manual refresh
+  } = useInfiniteScroll<Employee>('employees');
   
   const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
   const [isTerminating, setIsTerminating] = useState(false);
@@ -91,7 +93,6 @@ export function EmployeesTable() {
   const [terminationDate, setTerminationDate] = useState('');
   const [terminationReason, setTerminationReason] = useState<string>('');
   const [isImmediate, setIsImmediate] = useState(false);
-
 
   const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
   const [isRehiring, setIsRehiring] = useState(false);
@@ -101,18 +102,11 @@ export function EmployeesTable() {
 
   const processedEmployees = useMemo(() => {
     if (!employees) return [];
-    const getSafeTimestamp = (date: any): number => {
-        if (!date) return 0;
-        if (typeof date.toMillis === 'function') return date.toMillis();
-        return new Date(date).getTime();
-    };
-    const employeeList = employees.map(emp => ({
+    return employees.map(emp => ({
         ...emp,
         annualLeaveBalance: calculateAnnualLeaveBalance(emp)
     }));
-    return employeeList.sort((a,b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
   }, [employees]);
-
 
   const filteredEmployees = useMemo(() => {
     return searchEmployees(processedEmployees, searchQuery);
@@ -159,8 +153,10 @@ export function EmployeesTable() {
     }
 
     setIsTerminating(true);
-    const originalEmployees = [...employees];
+    
+    // Optimistic UI Update
     setEmployees(prev => prev.map(emp => emp.id === employeeToTerminate.id ? {...emp, status: 'terminated'} : emp));
+    const originalEmployees = [...employees];
     setEmployeeToTerminate(null);
 
     const employeeRef = doc(firestore, 'employees', employeeToTerminate.id);
@@ -176,7 +172,7 @@ export function EmployeesTable() {
         toast({ title: 'نجاح', description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.` });
         
     } catch (err) {
-        setEmployees(originalEmployees);
+        setEmployees(originalEmployees); // Revert on failure
         console.error(err);
         toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم إنهاء خدمة الموظف. تم التراجع.' });
     } finally {
@@ -221,7 +217,7 @@ export function EmployeesTable() {
         await updateDoc(employeeRef, updateData);
          toast({ title: 'نجاح', description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.` });
     } catch (err) {
-         setEmployees(originalEmployees);
+         setEmployees(originalEmployees); // Revert on failure
          console.error(err);
          toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم تتم إعادة خدمة الموظف. تم التراجع.' });
     } finally {
@@ -243,56 +239,12 @@ export function EmployeesTable() {
       }
   }
 
-  const refreshData = useCallback(async () => {
-    toast({ title: 'تحديث البيانات...', description: 'جاري إعادة المزامنة من الخادم.' });
-    await SmartCache.invalidate('employees');
-    // useSubscription will automatically fetch new data
-  }, []);
-
   const t = {
     ar: {
-      title: 'إدارة الموظفين',
-      description: 'عرض وتحديث حالات ملفات الموظفين.',
-      addClient: 'إضافة موظف',
-      fileNumber: 'رقم الملف',
-      fullName: 'الاسم الكامل',
-      assignedEngineer: 'المهندس المسؤول',
-      mobile: 'رقم الجوال',
-      status: 'الحالة',
-      loading: 'جاري تحميل البيانات...',
-      error: 'حدث خطأ أثناء جلب البيانات.',
-      noClients: 'لا يوجد موظفون حالياً.',
-      actions: 'الإجراءات',
-      viewProfile: 'عرض الملف',
-      edit: 'تعديل',
-      delete: 'حذف',
-      deleteConfirmTitle: 'هل أنت متأكد؟',
-      deleteConfirmDesc: 'سيتم حذف ملف العميل بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
-      cancel: 'إلغاء',
-      confirmDelete: 'نعم، قم بالحذف',
       searchPlaceholder: 'ابحث بالاسم، الرقم الوظيفي، أو الرقم المدني...'
     },
     en: {
-      title: 'Employee Management',
-      description: 'View and update client file statuses.',
-      addClient: 'Add Employee',
-      fileNumber: 'File Number',
-      fullName: 'Full Name',
-      assignedEngineer: 'Assigned Engineer',
-      mobile: 'Mobile',
-      status: 'Status',
-      loading: 'Loading data...',
-      error: 'An error occurred while fetching data.',
-      noClients: 'No employees to display at the moment.',
-      actions: 'Actions',
-      viewProfile: 'View Profile',
-      edit: 'Edit',
-      delete: 'Delete',
-      deleteConfirmTitle: 'Are you sure?',
-      deleteConfirmDesc: 'This will permanently delete the employee file. This action cannot be undone.',
-      cancel: 'Cancel',
-      confirmDelete: 'Yes, delete',
-      searchPlaceholder: 'Search by name, file no., or mobile...'
+      searchPlaceholder: 'Search by name, employee no., or civil ID...'
     }
   }
   const currentText = t[language];
@@ -307,10 +259,6 @@ export function EmployeesTable() {
           </p>
         </div>
          <div className="flex gap-2">
-             <Button variant="outline" size="sm" onClick={refreshData} disabled={loading}>
-                 {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
-                 تحديث
-             </Button>
             <Button size="sm" className="gap-1" asChild>
                 <Link href="/dashboard/hr/employees/new">
                     <PlusCircle className="ml-2 h-4 w-4" />
@@ -341,13 +289,7 @@ export function EmployeesTable() {
               </TableRow>
           </TableHeader>
           <TableBody>
-              {loading && filteredEmployees.length === 0 && Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={`skel-${i}`}>
-                      <TableCell colSpan={6}>
-                          <Skeleton className="h-8 w-full" />
-                      </TableCell>
-                  </TableRow>
-              ))}
+              {loading && <TableRow><TableCell colSpan={6}><Skeleton className="h-40 w-full" /></TableCell></TableRow>}
               {error && (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-destructive">
@@ -362,60 +304,64 @@ export function EmployeesTable() {
                       </TableCell>
                   </TableRow>
               )}
-              {filteredEmployees.map((employee) => (
-                  <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
-                  <TableCell className="font-medium">
-                      {employee.fullName}
-                      <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
-                      <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
-                  </TableCell>
-                  <TableCell>{employee.department}</TableCell>
-                  <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
-                  <TableCell className='font-medium'>
-                      {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
-                  </TableCell>
-                  <TableCell>
-                      <Badge variant={'outline'} className={statusColors[employee.status]}>
-                          {statusTranslations[employee.status]}
-                      </Badge>
-                  </TableCell>
-                  <TableCell>
-                      <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                          <Button
-                          aria-haspopup="true"
-                          size="icon"
-                          variant="ghost"
-                          >
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Toggle menu</span>
-                          </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" dir="rtl">
-                          <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                          <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
-                          </DropdownMenuItem>
-                          {employee.status !== 'terminated' && (
+              {filteredEmployees.map((employee, index) => {
+                  const isLastItem = index === filteredEmployees.length - 1;
+                  return (
+                    <TableRow key={employee.id} ref={isLastItem ? loaderRef : null} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
+                        <TableCell className="font-medium">
+                            {employee.fullName}
+                            <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
+                            <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
+                        </TableCell>
+                        <TableCell>{employee.department}</TableCell>
+                        <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
+                        <TableCell className='font-medium'>
+                            {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant={'outline'} className={statusColors[employee.status]}>
+                                {statusTranslations[employee.status]}
+                            </Badge>
+                        </TableCell>
+                        <TableCell>
+                            <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                aria-haspopup="true"
+                                size="icon"
+                                variant="ghost"
+                                >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" dir="rtl">
+                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
-                              </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          {employee.status !== 'terminated' ? (
-                              <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
-                                  إنهاء الخدمة
-                              </DropdownMenuItem>
-                          ) : (
-                              <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
-                                  إعادة خدمة
-                              </DropdownMenuItem>
-                          )}
-                      </DropdownMenuContent>
-                      </DropdownMenu>
-                  </TableCell>
-                  </TableRow>
-              ))}
+                                    <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
+                                </DropdownMenuItem>
+                                {employee.status !== 'terminated' && (
+                                        <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
+                                    </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                {employee.status !== 'terminated' ? (
+                                    <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
+                                        إنهاء الخدمة
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
+                                        إعادة خدمة
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                  );
+              })}
+              {loadingMore && <TableRow><TableCell colSpan={6} className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>}
           </TableBody>
           </Table>
       </div>
@@ -525,5 +471,3 @@ export function EmployeesTable() {
         </>
     );
 }
-
-    

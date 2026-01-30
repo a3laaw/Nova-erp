@@ -44,7 +44,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { doc, deleteDoc, addDoc, collection, serverTimestamp, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, deleteDoc, addDoc, collection, serverTimestamp, getDoc, runTransaction, query, orderBy } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -56,6 +56,7 @@ import { Input } from '@/components/ui/input';
 import { searchClients } from '@/lib/cache/fuse-search';
 import { ClientForm } from '@/components/clients/client-form';
 import { cn } from '@/lib/utils';
+import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
@@ -87,11 +88,11 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
-
-  const { data: clients, setData: setClients, loading: clientsLoading, error: clientsError } = useSubscription<Client>(firestore, 'clients');
+  
+  const { items: clients, setItems: setClients, loading: clientsLoading, error: clientsError, hasMore, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
   const { data: employees, loading: employeesLoading, error: employeesError } = useSubscription<Employee>(firestore, 'employees');
   
-  const loading = clientsLoading || employeesLoading;
+  const loading = clientsLoading && clients.length === 0;
   const error = clientsError || employeesError;
 
   const employeesMap = useMemo(() => {
@@ -105,23 +106,10 @@ export default function ClientsPage() {
 
   const augmentedClients = useMemo(() => {
     if (!clients) return [];
-    
-    const getSafeTimestamp = (date: any): number => {
-      if (!date) return 0;
-      if (typeof date.toMillis === 'function') {
-        return date.toMillis();
-      }
-      // Handle optimistic update with local Date object
-      if (date instanceof Date) {
-        return date.getTime();
-      }
-      return 0;
-    };
-
     return clients.map(client => ({
         ...client,
         assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
-    })).sort((a, b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
+    }));
   }, [clients, employeesMap]);
 
 
@@ -189,20 +177,20 @@ export default function ClientsPage() {
     if (!clientToDelete || !firestore) return;
 
     setIsDeleting(true);
-    const originalClients = [...clients];
     
     setClients(prev => prev.filter(c => c.id !== clientToDelete.id));
-    setClientToDelete(null);
-
+    
     try {
       await deleteDoc(doc(firestore, 'clients', clientToDelete.id!));
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
     } catch (e) {
-      setClients(originalClients);
+      // Revert UI on failure
+      setClients(clients);
       console.error("Error deleting client: ", e);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل. تم التراجع عن التغيير.' });
     } finally {
       setIsDeleting(false);
+      setClientToDelete(null);
     }
   };
   
@@ -294,16 +282,7 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && filteredClients.length === 0 && Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
-                  </TableRow>
-              ))}
+              {loading && <TableRow><TableCell colSpan={6}><Skeleton className="h-20 w-full" /></TableCell></TableRow>}
               {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
               {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
               {filteredClients.map((client) => {
@@ -348,6 +327,9 @@ export default function ClientsPage() {
               })}
             </TableBody>
           </Table>
+          <div ref={loaderRef} className="flex justify-center p-4">
+            {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+          </div>
         </div>
       </CardContent>
     </Card>

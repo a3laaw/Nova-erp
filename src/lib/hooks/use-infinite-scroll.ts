@@ -26,7 +26,7 @@ export function useInfiniteScroll<T extends { id?: string }>(
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const loaderRef = useRef(null);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
   const fetchItems = useCallback(async (isLoadMore: boolean) => {
     if (!firestore || !collectionPath || (isLoadMore && !hasMore)) return;
