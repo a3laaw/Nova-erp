@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase, useStorage } from '@/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
@@ -82,8 +82,7 @@ export function BrandingManager() {
     const uploadFile = (file: File, type: 'logo' | 'letterhead'): Promise<string> => {
         return new Promise((resolve, reject) => {
             if (!storage) {
-                reject(new Error("Firebase Storage is not available."));
-                return;
+                return reject(new Error("Firebase Storage is not available."));
             }
             const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
             setProgress(0);
@@ -99,7 +98,7 @@ export function BrandingManager() {
                 (error) => {
                     console.error(`${type} upload failed:`, error);
                     setProgress(null);
-                    reject(new Error(`فشل رفع ${type}.`));
+                    reject(error);
                 },
                 async () => {
                     try {
@@ -107,7 +106,7 @@ export function BrandingManager() {
                         setProgress(null);
                         resolve(downloadURL);
                     } catch (e) {
-                         reject(new Error(`فشل الحصول على رابط التحميل لـ ${type}.`));
+                         reject(e);
                     }
                 }
             );
@@ -125,50 +124,57 @@ export function BrandingManager() {
         }
 
         setIsSaving(true);
+        setLogoUploadError(null);
+        setLetterheadUploadError(null);
         
-        const settingsRef = doc(firestore, 'company_settings', 'main');
-
         try {
-            // 1. Immediately save text fields, but exclude image URLs for now
-            const { logo_url, letterhead_image_url, ...textData } = formData;
-            await setDoc(settingsRef, textData, { merge: true });
-            
-            toast({ title: 'تم الحفظ', description: 'تم حفظ البيانات النصية. جاري رفع أي ملفات جديدة في الخلفية.' });
-            setIsSaving(false); // Unblock the UI
+            const uploadPromises: Promise<{type: 'logo' | 'letterhead', url: string}>[] = [];
 
-            // 2. Handle file uploads asynchronously without blocking the UI
             if (logoFile) {
-                uploadFile(logoFile, 'logo')
-                    .then(url => updateDoc(settingsRef, { logo_url: url }))
-                    .then(() => {
-                        setLogoFile(null); // Clear file state on success
-                        toast({ title: 'اكتمل رفع الشعار', description: 'تم تحديث الشعار بنجاح.' });
-                    })
-                    .catch(err => {
-                        console.error("Logo upload failed:", err);
-                        setLogoUploadError('فشل رفع الشعار.');
-                    });
+                uploadPromises.push(
+                    uploadFile(logoFile, 'logo').then(url => ({ type: 'logo' as const, url }))
+                );
             }
-            
             if (letterheadFile) {
-                 uploadFile(letterheadFile, 'letterhead')
-                    .then(url => updateDoc(settingsRef, { letterhead_image_url: url }))
-                    .then(() => {
-                        setLetterheadFile(null); // Clear file state on success
-                        toast({ title: 'اكتمل رفع الترويسة', description: 'تم تحديث الترويسة بنجاح.' });
-                    })
-                    .catch(err => {
-                        console.error("Letterhead upload failed:", err);
-                        setLetterheadUploadError('فشل رفع الترويسة.');
-                    });
+                uploadPromises.push(
+                    uploadFile(letterheadFile, 'letterhead').then(url => ({ type: 'letterhead' as const, url }))
+                );
             }
 
-        } catch (error) {
-            // This will only catch errors from the initial text data save
-            console.error("Error saving text data:", error);
-            const errorMessage = error instanceof Error ? error.message : 'فشل حفظ البيانات النصية.';
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
-            setIsSaving(false); // Ensure button is re-enabled on error
+            const uploadedFiles = await Promise.all(uploadPromises);
+
+            const updates: Partial<BrandingSettings> = { ...formData };
+            uploadedFiles.forEach(file => {
+                if (file.type === 'logo') {
+                    updates.logo_url = file.url;
+                } else if (file.type === 'letterhead') {
+                    updates.letterhead_image_url = file.url;
+                }
+            });
+
+            const settingsRef = doc(firestore, 'company_settings', 'main');
+            await setDoc(settingsRef, updates, { merge: true });
+            
+            if (logoFile) setLogoFile(null);
+            if (letterheadFile) setLetterheadFile(null);
+
+            toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية بنجاح.' });
+
+        } catch (error: any) {
+            console.error("Error saving branding settings:", error);
+            const errorMessage = error.code ? `رمز الخطأ: ${error.code}` : error.message;
+            toast({ 
+                variant: 'destructive', 
+                title: 'فشل الحفظ', 
+                description: `حدث خطأ أثناء رفع الملفات أو حفظ البيانات. ${errorMessage}`
+            });
+            if (error.message.includes('logo')) setLogoUploadError(error.message);
+            if (error.message.includes('letterhead')) setLetterheadUploadError(error.message);
+
+        } finally {
+            setIsSaving(false);
+            setLogoUploadProgress(null);
+            setLetterheadUploadProgress(null);
         }
     };
 
@@ -264,7 +270,7 @@ export function BrandingManager() {
             <CardFooter className="flex justify-end">
                 <Button onClick={handleSave} disabled={isSaving}>
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                    حفظ الإعدادات
+                    {isSaving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
                 </Button>
             </CardFooter>
         </Card>
