@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,8 +27,8 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase, useDoc } from '@/firebase';
-import { doc, updateDoc, getDocs, collection, query, orderBy } from 'firebase/firestore';
-import type { Account, JournalEntry } from '@/lib/types';
+import { doc, updateDoc, getDocs, collection, query, orderBy, collectionGroup } from 'firebase/firestore';
+import type { Account, JournalEntry, ClientTransaction, Employee, Department } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -36,13 +36,13 @@ import { InlineSearchList, type SearchOption } from '@/components/ui/inline-sear
 import { Skeleton } from '@/components/ui/skeleton';
 import { format as formatDateFns } from 'date-fns';
 
-
 const lineSchema = z.object({
   accountId: z.string().min(1, "الحساب مطلوب."),
-  accountName: z.string().optional(), // It will be added on submit
+  accountName: z.string().optional(),
   debit: z.any(),
   credit: z.any(),
   notes: z.string().optional(),
+  projectLink: z.string().optional(),
 });
 
 const journalEntrySchema = z.object({
@@ -72,7 +72,10 @@ export default function EditJournalEntryPage() {
   const { toast } = useToast();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [refDataLoading, setRefDataLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const entryRef = useMemo(() => {
@@ -109,7 +112,8 @@ export default function EditJournalEntryPage() {
             accountId: line.accountId,
             debit: line.debit || '',
             credit: line.credit || '',
-            notes: line.notes || ''
+            notes: line.notes || '',
+            projectLink: line.clientId && line.transactionId ? `${line.clientId}/${line.transactionId}` : ''
         }))
       });
     }
@@ -123,32 +127,42 @@ export default function EditJournalEntryPage() {
 
   useEffect(() => {
     if (!firestore) return;
-    const fetchAccounts = async () => {
-        setAccountsLoading(true);
+    const fetchRefData = async () => {
+        setRefDataLoading(true);
         try {
-            const q = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
-            const snapshot = await getDocs(q);
-            const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-            setAccounts(fetchedAccounts);
-        } catch (error) {
-            console.error("Error fetching chart of accounts: ", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب شجرة الحسابات.' });
+            const [accSnap, projSnap, clientSnap, empSnap, deptSnap] = await Promise.all([
+                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                getDocs(query(collectionGroup(firestore, 'transactions'))),
+                getDocs(collection(firestore, 'clients')),
+                getDocs(query(collection(firestore, 'employees'))),
+                getDocs(query(collection(firestore, 'departments'))),
+            ]);
+            setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
+            setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
+            setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
+            
+            const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
+            const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
+            setProjects(fetchedProjects.filter(p => p.clientName));
+        } catch(e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
         } finally {
-            setAccountsLoading(false);
+            setRefDataLoading(false);
         }
     };
-    fetchAccounts();
+    fetchRefData();
   }, [firestore, toast]);
   
   const accountOptions: SearchOption[] = useMemo(() => 
-    accounts
-      .filter(acc => !acc.code.endsWith('00') && !acc.code.endsWith('0'))
-      .map(acc => ({
-        value: acc.id!,
-        label: `${acc.name} (${acc.code})`,
-        searchKey: acc.code,
-      }))
+    accounts.filter(acc => acc.isPayable).map(acc => ({
+      value: acc.id!,
+      label: `${acc.name} (${acc.code})`,
+      searchKey: acc.code,
+    }))
   , [accounts]);
+
+  const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
 
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore || !entry) return;
@@ -162,32 +176,45 @@ export default function EditJournalEntryPage() {
     try {
         const entryRefDoc = doc(firestore, 'journalEntries', entry.id!);
         
-        const linesWithNames = data.lines
+        const linesWithDetails = data.lines
           .filter(line => line.accountId && (Number(line.debit) > 0 || Number(line.credit) > 0))
           .map(line => {
             const account = accounts.find(acc => acc.id === line.accountId);
-            return {
+            let newLine: any = {
                 accountId: line.accountId,
                 accountName: account?.name || 'Unknown Account',
                 debit: Number(line.debit) || 0,
                 credit: Number(line.credit) || 0,
                 notes: line.notes || ''
             };
+            if (line.projectLink) {
+                const [clientId, transactionId] = line.projectLink.split('/');
+                const project = projects.find(p => p.id === transactionId);
+                if (project && project.assignedEngineerId) {
+                    const engineer = employees.find(e => e.id === project.assignedEngineerId);
+                    const department = departments.find(d => d.name === engineer?.department);
+                    newLine.clientId = clientId;
+                    newLine.transactionId = transactionId;
+                    newLine.auto_profit_center = transactionId;
+                    newLine.auto_resource_id = project.assignedEngineerId;
+                    if (department) {
+                        newLine.auto_dept_id = department.id;
+                    }
+                }
+            }
+            return newLine;
         });
 
         const updatePayload = {
             date: new Date(data.date),
             narration: data.narration,
             reference: data.reference,
-            lines: linesWithNames,
+            lines: linesWithDetails,
             totalDebit,
             totalCredit,
         };
-        const safeUpdatePayload = cleanFirestoreData(updatePayload);
-        console.log("البيانات قبل التنظيف (Journal Entry Edit):", JSON.stringify(updatePayload, null, 2));
-        console.log("البيانات بعد التنظيف (Journal Entry Edit):", JSON.stringify(safeUpdatePayload, null, 2));
 
-        await updateDoc(entryRefDoc, safeUpdatePayload);
+        await updateDoc(entryRefDoc, cleanFirestoreData(updatePayload));
         
         toast({ title: 'نجاح', description: 'تم تحديث قيد اليومية بنجاح.' });
         router.push('/dashboard/accounting/journal-entries');
@@ -200,7 +227,7 @@ export default function EditJournalEntryPage() {
     }
   };
   
-  if (entryLoading || accountsLoading) {
+  if (entryLoading || refDataLoading) {
     return <Card className="max-w-4xl mx-auto" dir="rtl"><CardHeader><Skeleton className="h-8 w-48" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>
   }
   
@@ -223,7 +250,7 @@ export default function EditJournalEntryPage() {
   }
 
   return (
-    <Card className="max-w-4xl mx-auto" dir="rtl">
+    <Card className="max-w-5xl mx-auto" dir="rtl">
         <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader>
                 <div className="flex justify-between items-start">
@@ -257,74 +284,52 @@ export default function EditJournalEntryPage() {
                     </div>
                 </div>
                 
-                <div>
+                <div className="overflow-x-auto">
                      <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-2/5">الحساب</TableHead>
-                                <TableHead>مدين</TableHead>
-                                <TableHead>دائن</TableHead>
-                                <TableHead>ملاحظات</TableHead>
+                                <TableHead className="min-w-[250px]">الحساب</TableHead>
+                                <TableHead className="min-w-[200px]">ربط بمشروع</TableHead>
+                                <TableHead className="min-w-[120px]">مدين</TableHead>
+                                <TableHead className="min-w-[120px]">دائن</TableHead>
+                                <TableHead className="min-w-[200px]">ملاحظات</TableHead>
                                 <TableHead><span className="sr-only">ترتيب</span></TableHead>
                                 <TableHead><span className="sr-only">حذف</span></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {fields.map((field, index) => (
+                            {fields.map((field, index) => {
+                                const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
+                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('5');
+                                return (
                                 <TableRow key={field.id}>
                                     <TableCell>
-                                        <Controller
-                                            control={control}
-                                            name={`lines.${index}.accountId`}
-                                            render={({ field }) => (
-                                                <InlineSearchList
-                                                    value={field.value}
-                                                    onSelect={field.onChange}
-                                                    options={accountOptions}
-                                                    placeholder="اختر حساب..."
-                                                    disabled={accountsLoading}
-                                                />
-                                            )}
-                                        />
-                                        {errors.lines?.[index]?.accountId && <p className="text-xs text-destructive mt-1">{errors.lines[index]?.accountId?.message}</p>}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Controller
-                                            name={`lines.${index}.debit`}
-                                            control={control}
-                                            render={({ field }) => (
-                                                <Input
-                                                    type="number"
-                                                    step="0.001"
-                                                    className='dir-ltr'
-                                                    {...field}
-                                                    onChange={e => field.onChange(e.target.value)}
-                                                    value={field.value || ''}
-                                                />
+                                        <Controller control={control} name={`lines.${index}.accountId`} render={({ field }) => (
+                                                <InlineSearchList value={field.value} onSelect={field.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <Controller
-                                            name={`lines.${index}.credit`}
-                                            control={control}
-                                            render={({ field }) => (
-                                                <Input
-                                                    type="number"
-                                                    step="0.001"
-                                                    className='dir-ltr'
-                                                    {...field}
-                                                    onChange={e => field.onChange(e.target.value)}
-                                                    value={field.value || ''}
-                                                />
+                                        {showProjectLink && (
+                                            <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
+                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مشروع..." disabled={refDataLoading} />
+                                            )} />
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
+                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <Controller
-                                            name={`lines.${index}.notes`}
-                                            control={control}
-                                            render={({ field }) => (
+                                        <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
+                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                            )}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.notes`} control={control} render={({ field }) => (
                                                 <Input {...field} value={field.value || ''} />
                                             )}
                                         />
@@ -345,17 +350,17 @@ export default function EditJournalEntryPage() {
                                         </Button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                         <TableFooter>
                             <TableRow>
-                                <TableCell className="font-bold">الإجمالي</TableCell>
+                                <TableCell colSpan={2} className="font-bold">الإجمالي</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalCredit)}</TableCell>
                                 <TableCell colSpan={3}></TableCell>
                             </TableRow>
                             <TableRow>
-                                <TableCell className="font-bold">الفرق</TableCell>
+                                <TableCell colSpan={2} className="font-bold">الفرق</TableCell>
                                 <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrency(balance)}
                                 </TableCell>
@@ -364,7 +369,7 @@ export default function EditJournalEntryPage() {
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '' })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة سطر
                         </Button>

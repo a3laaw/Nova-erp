@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,19 +27,20 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import type { Account } from '@/lib/types';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
+import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
+import { useAuth } from '@/context/auth-context';
 
-// Zod Schema for validation
 const lineSchema = z.object({
   accountId: z.string().min(1, "الحساب مطلوب."),
   debit: z.any(),
   credit: z.any(),
   notes: z.string().optional(),
+  projectLink: z.string().optional(),
 });
 
 const journalEntrySchema = z.object({
@@ -53,7 +54,7 @@ const journalEntrySchema = z.object({
 
     const totalDebit = validLines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
     const totalCredit = validLines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
-    return Math.abs(totalDebit - totalCredit) < 0.001; // Use tolerance for float comparison
+    return Math.abs(totalDebit - totalCredit) < 0.001;
 }, {
     message: 'إجمالي المدين يجب أن يساوي إجمالي الدائن ويجب أن يكون هناك سطرين على الأقل.',
     path: ['lines'],
@@ -65,11 +66,16 @@ type JournalEntryFormValues = z.infer<typeof journalEntrySchema>;
 export default function NewJournalEntryPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [refDataLoading, setRefDataLoading] = useState(true);
   const [entryNumber, setEntryNumber] = useState('جاري التوليد...');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { register, handleSubmit, control, formState: { errors } } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
@@ -79,8 +85,8 @@ export default function NewJournalEntryPage() {
       narration: '',
       reference: '',
       lines: [
-        { accountId: '', debit: '', credit: '', notes: '' },
-        { accountId: '', debit: '', credit: '', notes: '' },
+        { accountId: '', debit: '', credit: '', notes: '', projectLink: '' },
+        { accountId: '', debit: '', credit: '', notes: '', projectLink: '' },
       ],
     },
   });
@@ -96,27 +102,35 @@ export default function NewJournalEntryPage() {
   const totalCredit = useMemo(() => (lines || []).reduce((sum, line) => sum + (Number(line.credit) || 0), 0), [lines]);
   const balance = totalDebit - totalCredit;
 
-  // Fetch accounts for combobox
   useEffect(() => {
     if (!firestore) return;
-    const fetchAccounts = async () => {
-        setAccountsLoading(true);
+    const fetchRefData = async () => {
+        setRefDataLoading(true);
         try {
-            const q = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
-            const snapshot = await getDocs(q);
-            const fetchedAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-            setAccounts(fetchedAccounts);
-        } catch (error) {
-            console.error("Error fetching chart of accounts: ", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب شجرة الحسابات.' });
+            const [accSnap, projSnap, clientSnap, empSnap, deptSnap] = await Promise.all([
+                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                getDocs(query(collectionGroup(firestore, 'transactions'))),
+                getDocs(collection(firestore, 'clients')),
+                getDocs(query(collection(firestore, 'employees'))),
+                getDocs(query(collection(firestore, 'departments'))),
+            ]);
+            setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
+            setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
+            setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
+            
+            const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
+            const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
+            setProjects(fetchedProjects.filter(p => p.clientName));
+        } catch(e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
         } finally {
-            setAccountsLoading(false);
+            setRefDataLoading(false);
         }
     };
-    fetchAccounts();
+    fetchRefData();
   }, [firestore, toast]);
   
-  // Generate Entry Number
   useEffect(() => {
     if (!firestore) return;
     const generateEntryNumber = async () => {
@@ -138,17 +152,18 @@ export default function NewJournalEntryPage() {
   }, [firestore]);
   
   const accountOptions: SearchOption[] = useMemo(() => 
-    accounts
-      .filter(acc => !acc.code.endsWith('00') && !acc.code.endsWith('0')) // Filter for only sub-accounts
-      .map(acc => ({
-        value: acc.id!,
-        label: `${acc.name} (${acc.code})`,
-        searchKey: acc.code,
-      }))
+    accounts.filter(acc => acc.isPayable).map(acc => ({
+      value: acc.id!,
+      label: `${acc.name} (${acc.code})`,
+      searchKey: acc.code,
+    }))
   , [accounts]);
 
+  const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
+
   const onSubmit = async (data: JournalEntryFormValues) => {
-    if (!firestore) return;
+    if (!firestore || !currentUser) return;
+    setIsSubmitting(true);
     try {
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
@@ -165,29 +180,47 @@ export default function NewJournalEntryPage() {
             
             const newEntryRef = doc(collection(firestore, 'journalEntries'));
             
-            const linesWithNames = data.lines
+            const linesWithDetails = data.lines
               .filter(line => line.accountId && (Number(line.debit) > 0 || Number(line.credit) > 0))
               .map(line => {
                 const account = accounts.find(acc => acc.id === line.accountId);
-                return {
-                    ...line,
+                let newLine: any = {
+                    accountId: line.accountId,
+                    accountName: account?.name || 'Unknown Account',
                     debit: Number(line.debit) || 0,
                     credit: Number(line.credit) || 0,
-                    accountName: account?.name || 'Unknown Account'
+                    notes: line.notes || ''
                 };
+                if (line.projectLink) {
+                    const [clientId, transactionId] = line.projectLink.split('/');
+                    const project = projects.find(p => p.id === transactionId);
+                    if (project && project.assignedEngineerId) {
+                        const engineer = employees.find(e => e.id === project.assignedEngineerId);
+                        const department = departments.find(d => d.name === engineer?.department);
+                        newLine.clientId = clientId;
+                        newLine.transactionId = transactionId;
+                        newLine.auto_profit_center = transactionId;
+                        newLine.auto_resource_id = project.assignedEngineerId;
+                        if (department) {
+                            newLine.auto_dept_id = department.id;
+                        }
+                    }
+                }
+                return newLine;
             });
 
-            transaction.set(newEntryRef, {
+            transaction.set(newEntryRef, cleanFirestoreData({
                 date: new Date(data.date),
                 narration: data.narration,
                 reference: data.reference,
-                lines: linesWithNames,
+                lines: linesWithDetails,
                 entryNumber: newEntryNumber,
                 totalDebit,
                 totalCredit,
                 status: 'draft',
                 createdAt: serverTimestamp(),
-            });
+                createdBy: currentUser.id
+            }));
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ قيد اليومية كمسودة.' });
@@ -196,11 +229,13 @@ export default function NewJournalEntryPage() {
     } catch (error) {
         console.error('Error saving journal entry:', error);
         toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ قيد اليومية.' });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
   return (
-    <Card className="max-w-4xl mx-auto" dir="rtl">
+    <Card className="max-w-5xl mx-auto" dir="rtl">
         <form onSubmit={handleSubmit}>
             <CardHeader>
                 <div className="flex justify-between items-start">
@@ -234,74 +269,52 @@ export default function NewJournalEntryPage() {
                     </div>
                 </div>
                 
-                <div>
+                <div className="overflow-x-auto">
                      <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-2/5">الحساب</TableHead>
-                                <TableHead className="w-1/5">مدين</TableHead>
-                                <TableHead className="w-1/5">دائن</TableHead>
-                                <TableHead className="w-1/5">ملاحظات</TableHead>
+                                <TableHead className="min-w-[250px]">الحساب</TableHead>
+                                <TableHead className="min-w-[200px]">ربط بمشروع</TableHead>
+                                <TableHead className="min-w-[120px]">مدين</TableHead>
+                                <TableHead className="min-w-[120px]">دائن</TableHead>
+                                <TableHead className="min-w-[200px]">ملاحظات</TableHead>
                                 <TableHead><span className="sr-only">ترتيب</span></TableHead>
                                 <TableHead><span className="sr-only">حذف</span></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {fields.map((field, index) => (
+                            {fields.map((field, index) => {
+                                const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
+                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('5');
+                                return (
                                 <TableRow key={field.id}>
                                     <TableCell>
-                                        <Controller
-                                            control={control}
-                                            name={`lines.${index}.accountId`}
-                                            render={({ field }) => (
-                                                <InlineSearchList
-                                                    value={field.value}
-                                                    onSelect={field.onChange}
-                                                    options={accountOptions}
-                                                    placeholder="اختر حساب..."
-                                                    disabled={accountsLoading}
-                                                />
-                                            )}
-                                        />
-                                        {errors.lines?.[index]?.accountId && <p className="text-xs text-destructive mt-1">{errors.lines[index]?.accountId?.message}</p>}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Controller
-                                            name={`lines.${index}.debit`}
-                                            control={control}
-                                            render={({ field }) => (
-                                                <Input
-                                                    type="number"
-                                                    step="0.001"
-                                                    className='dir-ltr'
-                                                    {...field}
-                                                    onChange={e => field.onChange(e.target.value)}
-                                                    value={field.value || ''}
-                                                />
+                                        <Controller control={control} name={`lines.${index}.accountId`} render={({ field }) => (
+                                                <InlineSearchList value={field.value} onSelect={field.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <Controller
-                                            name={`lines.${index}.credit`}
-                                            control={control}
-                                            render={({ field }) => (
-                                                <Input
-                                                    type="number"
-                                                    step="0.001"
-                                                    className='dir-ltr'
-                                                    {...field}
-                                                    onChange={e => field.onChange(e.target.value)}
-                                                    value={field.value || ''}
-                                                />
+                                        {showProjectLink && (
+                                            <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
+                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مشروع..." disabled={refDataLoading} />
+                                            )} />
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
+                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <Controller
-                                            name={`lines.${index}.notes`}
-                                            control={control}
-                                            render={({ field }) => (
+                                        <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
+                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                            )}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.notes`} control={control} render={({ field }) => (
                                                 <Input {...field} value={field.value || ''} />
                                             )}
                                         />
@@ -322,17 +335,17 @@ export default function NewJournalEntryPage() {
                                         </Button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                         <TableFooter>
                             <TableRow>
-                                <TableCell className="font-bold">الإجمالي</TableCell>
+                                <TableCell colSpan={2} className="font-bold">الإجمالي</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalCredit)}</TableCell>
                                 <TableCell colSpan={3}></TableCell>
                             </TableRow>
                             <TableRow>
-                                <TableCell className="font-bold">الفرق</TableCell>
+                                <TableCell colSpan={2} className="font-bold">الفرق</TableCell>
                                 <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrency(balance)}
                                 </TableCell>
@@ -341,7 +354,7 @@ export default function NewJournalEntryPage() {
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '' })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة سطر
                         </Button>
@@ -362,8 +375,9 @@ export default function NewJournalEntryPage() {
                 <Button type="button" variant="outline" onClick={() => router.back()}>
                     <X className="ml-2 h-4 w-4"/> إلغاء
                 </Button>
-                <Button type="submit">
-                    <Save className="ml-2 h-4 w-4"/> حفظ كمسودة
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                    {isSubmitting ? 'جاري الحفظ...' : 'حفظ كمسودة'}
                 </Button>
             </CardFooter>
         </form>
