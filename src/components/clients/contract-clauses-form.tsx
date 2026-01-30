@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -24,7 +25,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-re
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account } from '@/lib/types';
+import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account, ContractFinancialMilestone } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -38,7 +39,7 @@ import { useRouter } from 'next/navigation';
 interface ContractClausesFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveSuccess: () => void;
+  onSaveSuccess?: () => void;
   transaction: ClientTransaction | null | Partial<ClientTransaction>;
   clientId: string;
   clientName: string;
@@ -102,6 +103,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
   
+  const [financials, setFinancials] = useState<ContractTemplate['financials']>({
+    type: 'fixed',
+    totalAmount: 0,
+    discount: 0,
+    milestones: [],
+  });
+  
   // Control flow state
   const [isSaving, setIsSaving] = useState(false);
   const [step, setStep] = useState<'loading' | 'select' | 'edit'>('loading');
@@ -123,6 +131,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setStep('loading');
       setAvailableTemplates([]);
       setChosenTemplate(null);
+      setFinancials({ type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setReferenceData({ templates: [], stages: [], employees: [], departments: [] });
       setDepartmentWorkStages([]);
       setLoadingRefData(true);
@@ -134,17 +143,22 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     setScopeOfWork(JSON.parse(JSON.stringify(contract.scopeOfWork || [])));
     setTerms(JSON.parse(JSON.stringify(contract.termsAndConditions || [])));
     setOpenClauses(JSON.parse(JSON.stringify(contract.openClauses || [])));
-    setChosenTemplate({ // Create a mock template object for consistency
-      title: transaction?.transactionType || '',
-      financials: {
+    
+    setFinancials({
         type: contract.financialsType || 'fixed',
         totalAmount: contract.totalAmount || 0,
-        discount: 0,
-        milestones: [],
-      },
-      description: '', transactionTypes: [], scopeOfWork: [], termsAndConditions: [], openClauses: [],
+        discount: 0, // This model doesn't store discount on contract level yet
+        // Recreate milestones from clauses for editing UI consistency
+        milestones: (contract.clauses || []).map(c => ({
+            id: c.id,
+            name: c.name,
+            condition: c.condition || '',
+            value: contract.financialsType === 'percentage' ? c.percentage || 0 : c.amount,
+        }))
     });
-  }, [transaction]);
+
+    setChosenTemplate(null);
+  }, []);
 
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
       const totalContractAmount = template?.financials.totalAmount || 0;
@@ -163,6 +177,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(template?.scopeOfWork || []);
       setTerms(template?.termsAndConditions || []);
       setOpenClauses(template?.openClauses || []);
+      setFinancials(template?.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setChosenTemplate(template);
   }, []);
 
@@ -303,6 +318,25 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   };
 
   const totalAmount = useMemo(() => clauses.reduce((sum, clause) => sum + Number(clause.amount || 0), 0), [clauses]);
+  
+  const addMilestone = () => {
+    setFinancials(prev => {
+      const newIndex = prev.milestones.length;
+      const newName = `الدفعة ${milestoneNames[newIndex] || `(${newIndex + 1})`}`;
+      return {
+        ...prev,
+        milestones: [...prev.milestones, { id: generateId(), name: newName, condition: '', value: 0 }]
+      };
+    });
+  };
+  const updateMilestone = (id: string, field: keyof ContractFinancialMilestone, value: string | number) => {
+    setFinancials(prev => ({ ...prev, milestones: prev.milestones.map(m => m.id === id ? { ...m, [field]: value } : m) }));
+  };
+  const removeMilestone = (id: string) => {
+    setFinancials(prev => ({ ...prev, milestones: prev.milestones.filter(m => m.id !== id) }));
+  };
+
+  const totalMilestoneValue = useMemo(() => financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0), [financials.milestones]);
 
 
   const handleSubmit = async () => {
@@ -312,8 +346,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     let finalTransactionId = transaction.id;
 
     try {
-        // --- PRE-TRANSACTION READS (QUERIES) ---
-        // Queries are not allowed inside transactions, so we run them before the transaction starts.
         const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
@@ -331,9 +363,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
         }
 
-        // --- TRANSACTION ---
         await runTransaction(firestore, async (transaction_firestore) => {
-            // --- READ PHASE ---
             const clientRef = doc(firestore, 'clients', clientId);
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
@@ -346,7 +376,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
             
-            // --- LOGIC / PREPARATION PHASE ---
             const clientData = clientSnap.data();
             let clientAccountId: string;
 
@@ -363,7 +392,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 
                 const newAccountRef = doc(collection(firestore, 'chartOfAccounts'));
                 clientAccountId = newAccountRef.id;
-                // Defer the writes to the write phase
                 transaction_firestore.set(newAccountRef, newAccountData);
                 transaction_firestore.set(coaClientCounterRef, { lastNumber: nextClientCodeNumber }, { merge: true });
             } else {
@@ -373,8 +401,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const currentYear = new Date().getFullYear();
             const nextJournalEntryNumber = ((journalEntryCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
 
-            // --- WRITE PHASE ---
-            const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: chosenTemplate?.financials?.type || 'fixed' };
+            const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
             const updatedStages = [...(transaction.stages || [])];
             const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
             if (contractStageIndex > -1 && updatedStages[contractStageIndex].status !== 'completed') {
@@ -443,6 +470,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء القيد المحاسبي بنجاح.' });
         
         onClose();
+        if (onSaveSuccess) onSaveSuccess();
         if (finalTransactionId && !transaction.id) {
             router.push(`/dashboard/clients/${clientId}/transactions/${finalTransactionId}`);
         }
@@ -650,3 +678,5 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   )
 }
+
+    
