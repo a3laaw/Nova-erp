@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/tabs';
 
 import { useLanguage } from '@/context/language-context';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,18 +60,12 @@ function CreatedContractsList() {
   const { language } = useLanguage();
   const { firestore } = useFirebase();
 
-  const contractsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'contracts'), orderBy('createdAt', 'desc'));
-  }, [firestore]);
+  const contractsQueryConstraints = useMemo(() => {
+    return [orderBy('createdAt', 'desc')];
+  }, []);
 
-  const [snapshot, loading, error] = useCollection(contractsQuery);
+  const { data: contracts, loading, error } = useSubscription<Contract>(firestore, 'contracts', contractsQueryConstraints);
 
-  const contracts = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract));
-  }, [snapshot]);
-  
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
     try {
