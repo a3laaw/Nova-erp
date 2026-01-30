@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { searchQuotations } from '@/lib/cache/fuse-search';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<Quotation['status'], string> = {
     draft: 'مسودة',
@@ -65,11 +66,15 @@ export function QuotationsList() {
 
   const filteredQuotations = useMemo(() => {
     const dateFiltered = quotations.filter(quotation => {
-      const quotationDate = quotation.date?.toDate ? quotation.date.toDate() : null;
-      if (!quotationDate) return false;
-      const matchesDateFrom = !dateFrom || (quotationDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
-      const matchesDateTo = !dateTo || (quotationDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
-      return matchesDateFrom && matchesDateTo;
+        const quotationDate = toFirestoreDate(quotation.date);
+        
+        if (!dateFrom && !dateTo) return true;
+        if (!quotationDate) return false;
+      
+        const matchesDateFrom = !dateFrom || (quotationDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
+        const matchesDateTo = !dateTo || (quotationDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+        
+        return matchesDateFrom && matchesDateTo;
     });
     return searchQuotations(dateFiltered, searchQuery);
   }, [quotations, searchQuery, dateFrom, dateTo]);
@@ -257,5 +262,3 @@ export function QuotationsList() {
     </>
   );
 }
-
-    

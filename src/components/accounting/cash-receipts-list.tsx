@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { searchCashReceipts } from '@/lib/cache/fuse-search';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -68,9 +69,11 @@ export function CashReceiptsList() {
   
   const filteredReceipts = useMemo(() => {
     const dateFiltered = receipts.filter(receipt => {
-        const receiptDate = receipt.receiptDate?.toDate ? receipt.receiptDate.toDate() : null;
-        if (!receiptDate) return false;
+        const receiptDate = toFirestoreDate(receipt.receiptDate);
         
+        if (!dateFrom && !dateTo) return true;
+        if (!receiptDate) return false;
+
         const matchesDateFrom = !dateFrom || (receiptDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
         const matchesDateTo = !dateTo || (receiptDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
         

@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { searchPaymentVouchers } from '@/lib/cache/fuse-search';
+import { toFirestoreDate } from '@/services/date-converter';
 
 
 const statusColors: Record<string, string> = {
@@ -64,10 +65,14 @@ export function PaymentVouchersList() {
 
   const filteredVouchers = useMemo(() => {
     const dateFiltered = vouchers.filter(voucher => {
-      const voucherDate = voucher.paymentDate?.toDate ? voucher.paymentDate.toDate() : null;
+      const voucherDate = toFirestoreDate(voucher.paymentDate);
+
+      if (!dateFrom && !dateTo) return true;
       if (!voucherDate) return false;
+
       const matchesDateFrom = !dateFrom || (voucherDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
       const matchesDateTo = !dateTo || (voucherDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+      
       return matchesDateFrom && matchesDateTo;
     });
 
@@ -258,5 +263,3 @@ export function PaymentVouchersList() {
     </>
   );
 }
-
-    

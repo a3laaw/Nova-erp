@@ -28,6 +28,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import Link from 'next/link';
 import { searchJournalEntries } from '@/lib/cache/fuse-search';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -61,7 +62,9 @@ export function JournalEntriesList() {
 
   const filteredEntries = useMemo(() => {
     const dateFiltered = entries.filter(entry => {
-        const entryDate = entry.date?.toDate ? entry.date.toDate() : null;
+        const entryDate = toFirestoreDate(entry.date);
+        
+        if (!dateFrom && !dateTo) return true;
         if (!entryDate) return false;
         
         const matchesDateFrom = !dateFrom || (entryDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
@@ -361,5 +364,3 @@ export function JournalEntriesList() {
     </>
   );
 }
-
-    
