@@ -63,7 +63,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number}>({
+function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence', maxOccurrences?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence', maxOccurrences?: number}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -98,11 +98,15 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const [editingItem, setEditingItem] = useState<{ id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number } | null>(null);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
+  
   const [itemName, setItemName] = useState('');
   const [itemRoles, setItemRoles] = useState<string[]>([]);
+  const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence'>('duration');
   const [itemDuration, setItemDuration] = useState<number | ''>('');
+  const [itemMaxOccurrences, setItemMaxOccurrences] = useState<number | ''>('');
+
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
 
@@ -189,12 +193,14 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   }, [primaryItems, selectedPrimary, handleSelectPrimary]);
 
 
-  const openDialog = (type: 'primary' | 'secondary', item: {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number} | null = null) => {
+  const openDialog = (type: 'primary' | 'secondary', item: any | null = null) => {
     setEditingItem(item);
     setItemName(item?.name || '');
     if (isWorkStageView && type === 'secondary') {
         setItemRoles(item?.allowedRoles || []);
-        setItemDuration(item?.expectedDurationDays || '');
+        setItemTrackingType(item?.trackingType || 'duration');
+        setItemDuration(item?.expectedDurationDays ?? '');
+        setItemMaxOccurrences(item?.maxOccurrences ?? '');
     }
     if (type === 'primary') setIsPrimaryDialogOpen(true);
     else setIsSecondaryDialogOpen(true);
@@ -206,7 +212,9 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setEditingItem(null);
     setItemName('');
     setItemRoles([]);
+    setItemTrackingType('duration');
     setItemDuration('');
+    setItemMaxOccurrences('');
   }
   
   const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
@@ -248,10 +256,17 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
     try {
-      const dataToSave: { name: string, order?: number, allowedRoles?: string[], expectedDurationDays?: number } = { name: itemName };
+      const dataToSave: any = { name: itemName };
        if (isWorkStageView && type === 'secondary') {
           dataToSave.allowedRoles = itemRoles;
-          dataToSave.expectedDurationDays = Number(itemDuration) || 0;
+          dataToSave.trackingType = itemTrackingType;
+          if (itemTrackingType === 'duration') {
+              dataToSave.expectedDurationDays = Number(itemDuration) || 0;
+              dataToSave.maxOccurrences = null;
+          } else {
+              dataToSave.maxOccurrences = Number(itemMaxOccurrences) || 1;
+              dataToSave.expectedDurationDays = null;
+          }
       }
 
       if (editingItem) { // Update
@@ -356,7 +371,8 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span>{item.name}</span>
-                        {isWorkStageView && item.expectedDurationDays && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
+                        {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
+                        {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
                         {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
                             <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                         ))}
@@ -405,6 +421,28 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
             {isWorkStageView && !isPrimaryDialogOpen && (
                 <>
                     <div className="grid gap-2">
+                        <Label>نوع التتبع</Label>
+                        <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="duration">بالمدة الزمنية</SelectItem>
+                                <SelectItem value="occurrence">بعدَد مرات الحدوث</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {itemTrackingType === 'duration' ? (
+                        <div className="grid gap-2">
+                            <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
+                            <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
+                        </div>
+                    ) : (
+                        <div className="grid gap-2">
+                            <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
+                            <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
+                        </div>
+                    )}
+                    <div className="grid gap-2">
                         <Label htmlFor="item-role">الأدوار المسؤولة (المسميات الوظيفية)</Label>
                         <MultiSelect
                             options={jobs}
@@ -412,10 +450,6 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                             onChange={setItemRoles}
                             placeholder="اختر دورًا أو أكثر..."
                         />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
-                        <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(Number(e.target.value))} />
                     </div>
                 </>
             )}

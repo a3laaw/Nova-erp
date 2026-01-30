@@ -359,8 +359,11 @@ export interface TransactionStage {
   startDate: any | null;
   endDate: any | null;
   notes?: string;
-  order?: number; // For UI sorting, derived from template
+  order?: number;
   expectedEndDate?: any;
+  trackingType?: 'duration' | 'occurrence';
+  maxOccurrences?: number;
+  completedCount?: number;
 }
       
 export type ClientTransaction = {
@@ -424,7 +427,9 @@ export interface WorkStage {
   name: string;
   order?: number;
   allowedRoles?: string[];
+  trackingType: 'duration' | 'occurrence';
   expectedDurationDays?: number;
+  maxOccurrences?: number;
 }
 
 export type ContractClause = {

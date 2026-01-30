@@ -316,10 +316,11 @@
             "description": "The job titles responsible for this stage, copied from the WorkStage template.",
             "items": { "type": "string" }
         },
-        "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
-        "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
-        "expectedEndDate": { "type": "string", "format": "date-time", "description": "The expected completion date for countdowns." },
-        "notes": { "type": "string", "description": "Notes specific to this stage." }
+        "startDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage started." },
+        "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
+        "expectedEndDate": { "type": ["string", "null"], "format": "date-time", "description": "The expected completion date for countdowns." },
+        "notes": { "type": ["string", "null"], "description": "Notes specific to this stage." },
+        "completedCount": { "type": ["number", "null"], "description": "How many times this stage has been completed (if trackingType is 'occurrence')."}
       },
       "required": ["stageId", "name", "status"]
     },
@@ -602,12 +603,21 @@
             "description": "A list of job titles responsible for this stage.",
             "items": { "type": "string" }
         },
+        "trackingType": {
+            "type": "string",
+            "enum": ["duration", "occurrence"],
+            "description": "How to track progress: by time duration or by number of occurrences."
+        },
         "expectedDurationDays": {
-            "type": "number",
-            "description": "The expected duration in days for this stage."
+            "type": ["number", "null"],
+            "description": "The expected duration in days for this stage (if trackingType is 'duration')."
+        },
+        "maxOccurrences": {
+            "type": ["number", "null"],
+            "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')."
         }
       },
-      "required": ["name"]
+      "required": ["name", "order", "trackingType"]
     },
     "Appointment": {
       "title": "Appointment",
