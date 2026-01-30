@@ -45,7 +45,8 @@ import {
 } from '@/components/ui/tabs';
 
 import { useLanguage } from '@/context/language-context';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
+import { useSubscription } from '@/hooks/use-subscription';
 import { collection, query, orderBy, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';

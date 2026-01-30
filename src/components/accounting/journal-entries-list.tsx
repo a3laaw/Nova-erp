@@ -10,7 +10,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
+import { useSubscription } from '@/hooks/use-subscription';
 import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getDocs, getDoc, deleteField, serverTimestamp } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';

@@ -10,7 +10,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSubscription, useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
+import { useSubscription } from '@/hooks/use-subscription';
 import { collection, query, orderBy, doc, deleteDoc, writeBatch, getDoc, updateDoc, where, getDocs } from 'firebase/firestore';
 import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
@@ -302,5 +303,3 @@ export function CashReceiptsList() {
     </>
   );
 }
-
-    

@@ -112,7 +112,11 @@ export default function ClientsPage() {
       if (typeof date.toMillis === 'function') {
         return date.toMillis();
       }
-      return new Date(date).getTime();
+      // Handle optimistic update with local Date object
+      if (date instanceof Date) {
+        return date.getTime();
+      }
+      return 0;
     };
 
     return clients.map(client => ({

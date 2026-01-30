@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { where } from 'firebase/firestore';
-import { useSubscription } from '@/lib/cache/smart-cache';
+import { useSubscription } from '@/hooks/use-subscription';
 import type { Notification } from '@/lib/types';
 
 /**

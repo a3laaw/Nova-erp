@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -124,27 +124,27 @@ export default function LeaveRequestsPage() {
     }, [firestore, toast]);
 
 
-    const requestsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return query(
-            collection(firestore, 'leaveRequests'), 
-            where('status', '==', filter)
-        );
-    }, [firestore, filter]);
+    const requestsQueryConstraints = useMemo(() => {
+        return [where('status', '==', filter)];
+    }, [filter]);
 
-    const [snapshot, loading, error] = useCollection(requestsQuery);
+    const { data: requestsData, loading, error } = useSubscription<LeaveRequest>(
+        firestore, 
+        'leaveRequests', 
+        requestsQueryConstraints
+    );
 
     const requests = useMemo(() => {
-        if (!snapshot) return [];
+        if (!requestsData) return [];
         const getSafeTimestamp = (date: any): number => {
             if (!date) return 0;
             if (typeof date.toMillis === 'function') return date.toMillis();
             return new Date(date).getTime();
         };
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+        const data = [...requestsData]; // Create a mutable copy
         data.sort((a, b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
         return data;
-    }, [snapshot]);
+    }, [requestsData]);
 
 
     const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected', employeeId?: string, rejectionReason?: string) => {
