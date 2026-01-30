@@ -8,10 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase, useStorage } from '@/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Upload } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Progress } from '../ui/progress';
 import Image from 'next/image';
@@ -81,8 +81,8 @@ export function BrandingManager() {
 
 
     const handleSave = async () => {
-        if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.'});
+        if (!firestore || !storage) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بالخدمات السحابية.'});
             return;
         }
         if (!formData.company_name) {
@@ -92,73 +92,69 @@ export function BrandingManager() {
 
         setIsSaving(true);
         
-        // 1. Save text data immediately.
-        const settingsRef = doc(firestore, 'company_settings', 'main');
-        try {
-            const textData = { ...formData };
-            // Don't save URL if new file is being uploaded, it will be updated later
-            if (logoFile) delete textData.logo_url;
-            if (letterheadFile) delete textData.letterhead_image_url;
+        const uploadFile = (file: File, type: 'logo' | 'letterhead'): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
+                setProgress(0);
+                const timestamp = Date.now();
+                const storageRef = ref(storage, `company_assets/${type}_${timestamp}_${file.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, file);
 
-            await setDoc(settingsRef, textData, { merge: true });
-            
-            if (!logoFile && !letterheadFile) {
-                toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية.' });
-            } else {
-                 toast({ title: 'نجاح', description: 'تم حفظ البيانات النصية، جاري رفع الصور...' });
-            }
-
-        } catch (error) {
-            console.error("Error saving text data:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ البيانات النصية.' });
-            setIsSaving(false);
-            return; // Stop if text data fails to save
-        }
-
-        // 2. Handle file uploads asynchronously
-        const uploadFile = (file: File, type: 'logo' | 'letterhead') => {
-            if (!storage) return;
-            const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
-            const urlField = type === 'logo' ? 'logo_url' : 'letterhead_image_url';
-            
-            setProgress(0);
-            const timestamp = Date.now();
-            const storageRef = ref(storage, `company_assets/${type}_${timestamp}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setProgress(progress);
-                },
-                (error) => {
-                    console.error(`${type} upload failed:`, error);
-                    toast({ variant: 'destructive', title: 'خطأ في الرفع', description: `فشل رفع ${type}.` });
-                    setProgress(null);
-                },
-                async () => {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    await updateDoc(settingsRef, { [urlField]: downloadURL });
-                    toast({ title: 'نجاح', description: `تم رفع وتحديث ${type} بنجاح.` });
-                    
-                    setTimeout(() => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        setProgress(progress);
+                    },
+                    (error) => {
+                        console.error(`${type} upload failed:`, error);
                         setProgress(null);
-                        if (type === 'logo') setLogoFile(null);
-                        if (type === 'letterhead') setLetterheadFile(null);
-                    }, 1000);
-                }
-            );
+                        reject(new Error(`فشل رفع ${type}.`));
+                    },
+                    async () => {
+                        try {
+                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                            setProgress(null);
+                            resolve(downloadURL);
+                        } catch (e) {
+                             reject(new Error(`فشل الحصول على رابط التحميل لـ ${type}.`));
+                        }
+                    }
+                );
+            });
         };
 
-        if (logoFile) {
-            uploadFile(logoFile, 'logo');
-        }
+        try {
+            let logoUrlToSave = formData.logo_url;
+            let letterheadUrlToSave = formData.letterhead_image_url;
 
-        if (letterheadFile) {
-            uploadFile(letterheadFile, 'letterhead');
-        }
+            if (logoFile) {
+                logoUrlToSave = await uploadFile(logoFile, 'logo');
+            }
+            if (letterheadFile) {
+                letterheadUrlToSave = await uploadFile(letterheadFile, 'letterhead');
+            }
 
-        setIsSaving(false);
+            const dataToSave = {
+                ...formData,
+                logo_url: logoUrlToSave,
+                letterhead_image_url: letterheadUrlToSave,
+            };
+
+            const settingsRef = doc(firestore, 'company_settings', 'main');
+            await setDoc(settingsRef, dataToSave, { merge: true });
+
+            toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية بنجاح.' });
+            
+            setLogoFile(null);
+            setLetterheadFile(null);
+
+        } catch (error) {
+            console.error("Error saving branding settings:", error);
+            const errorMessage = error instanceof Error ? error.message : 'فشل حفظ الإعدادات.';
+            toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (loading) {
