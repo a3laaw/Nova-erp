@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirebase } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, writeBatch, getDoc, updateDoc, where, getDocs } from 'firebase/firestore';
 import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { searchCashReceipts } from '@/lib/cache/fuse-search';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -61,35 +62,20 @@ export function CashReceiptsList() {
   const [dateTo, setDateTo] = useState('');
 
 
-  const receiptsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'cashReceipts'), orderBy('receiptDate', 'desc'));
-  }, [firestore]);
-
-  const [snapshot, loading, error] = useCollection(receiptsQuery);
-
-  const receipts = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CashReceipt));
-  }, [snapshot]);
+  const receiptsQueryConstraints = useMemo(() => [orderBy('receiptDate', 'desc')], []);
+  const { data: receipts, loading, error } = useSubscription<CashReceipt>(firestore, 'cashReceipts', receiptsQueryConstraints);
   
   const filteredReceipts = useMemo(() => {
-    return receipts.filter(receipt => {
-        const searchLower = searchQuery.toLowerCase();
-        
+    const dateFiltered = receipts.filter(receipt => {
         const receiptDate = receipt.receiptDate?.toDate ? receipt.receiptDate.toDate() : null;
         if (!receiptDate) return false;
         
-        const matchesSearch = !searchQuery ||
-            (receipt.voucherNumber && receipt.voucherNumber.toLowerCase().includes(searchLower)) ||
-            (receipt.clientNameAr && receipt.clientNameAr.toLowerCase().includes(searchLower)) ||
-            String(receipt.amount).includes(searchQuery);
-
         const matchesDateFrom = !dateFrom || (receiptDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
         const matchesDateTo = !dateTo || (receiptDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
         
-        return matchesSearch && matchesDateFrom && matchesDateTo;
+        return matchesDateFrom && matchesDateTo;
     });
+    return searchCashReceipts(dateFiltered, searchQuery);
   }, [receipts, searchQuery, dateFrom, dateTo]);
 
 
@@ -316,3 +302,5 @@ export function CashReceiptsList() {
     </>
   );
 }
+
+    

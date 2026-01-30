@@ -36,3 +36,24 @@ export const searchAccounts = createFuseSearch(
     ['name', 'code'], 
     0.3
 );
+
+export const searchJournalEntries = createFuseSearch(
+    ['entryNumber', 'narration'],
+    0.4
+);
+
+export const searchCashReceipts = createFuseSearch(
+    ['voucherNumber', 'clientNameAr', 'amount'],
+    0.4
+);
+
+export const searchPaymentVouchers = createFuseSearch(
+    ['voucherNumber', 'payeeName', 'amount'],
+    0.4
+);
+
+export const searchQuotations = createFuseSearch(
+    ['quotationNumber', 'clientName', 'subject'],
+    0.4
+);
+    

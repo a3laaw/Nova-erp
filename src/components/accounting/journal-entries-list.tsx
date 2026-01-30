@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getDocs, getDoc, deleteField, serverTimestamp } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
@@ -26,6 +26,7 @@ import { useAuth } from '@/context/auth-context';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import Link from 'next/link';
+import { searchJournalEntries } from '@/lib/cache/fuse-search';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -54,34 +55,21 @@ export function JournalEntriesList() {
   const [dateTo, setDateTo] = useState('');
 
 
-  const entriesQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'journalEntries'), orderBy('date', 'desc'));
-  }, [firestore]);
-
-  const [snapshot, loading, error] = useCollection(entriesQuery);
-
-  const entries = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry));
-  }, [snapshot]);
+  const entriesQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
+  const { data: entries, loading, error } = useSubscription<JournalEntry>(firestore, 'journalEntries', entriesQueryConstraints);
 
   const filteredEntries = useMemo(() => {
-    return entries.filter(entry => {
-        const searchLower = searchQuery.toLowerCase();
-        
+    const dateFiltered = entries.filter(entry => {
         const entryDate = entry.date?.toDate ? entry.date.toDate() : null;
         if (!entryDate) return false;
-
-        const matchesSearch = !searchQuery ||
-            (entry.entryNumber && entry.entryNumber.toLowerCase().includes(searchLower)) ||
-            (entry.narration && entry.narration.toLowerCase().includes(searchLower));
         
         const matchesDateFrom = !dateFrom || (entryDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
         const matchesDateTo = !dateTo || (entryDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
         
-        return matchesSearch && matchesDateFrom && matchesDateTo;
+        return matchesDateFrom && matchesDateTo;
     });
+
+    return searchJournalEntries(dateFiltered, searchQuery);
   }, [entries, searchQuery, dateFrom, dateTo]);
 
   const formatDate = (dateValue: any) => {
@@ -372,3 +360,5 @@ export function JournalEntriesList() {
     </>
   );
 }
+
+    

@@ -10,12 +10,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirebase } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { PaymentVoucher } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -23,6 +23,23 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { searchPaymentVouchers } from '@/lib/cache/fuse-search';
+
+
+const statusColors: Record<string, string> = {
+    draft: 'bg-yellow-100 text-yellow-800',
+    paid: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+};
+
+const statusTranslations: Record<string, string> = {
+    draft: 'مسودة',
+    paid: 'مدفوع',
+    cancelled: 'ملغي',
+};
+
 
 export function PaymentVouchersList() {
   const { firestore } = useFirebase();
@@ -31,6 +48,10 @@ export function PaymentVouchersList() {
   
   const [voucherToDelete, setVoucherToDelete] = useState<PaymentVoucher | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
 
   const vouchersQuery = useMemo(() => {
@@ -38,12 +59,20 @@ export function PaymentVouchersList() {
     return query(collection(firestore, 'paymentVouchers'), orderBy('paymentDate', 'desc'));
   }, [firestore]);
 
-  const [snapshot, loading, error] = useCollection(vouchersQuery);
+  const { data: vouchers, loading, error } = useSubscription<PaymentVoucher>(firestore, 'paymentVouchers', vouchersQuery ? [orderBy('paymentDate', 'desc')] : []);
 
-  const vouchers = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentVoucher));
-  }, [snapshot]);
+  const filteredVouchers = useMemo(() => {
+    const dateFiltered = vouchers.filter(voucher => {
+      const voucherDate = voucher.paymentDate?.toDate ? voucher.paymentDate.toDate() : null;
+      if (!voucherDate) return false;
+      const matchesDateFrom = !dateFrom || (voucherDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
+      const matchesDateTo = !dateTo || (voucherDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+      return matchesDateFrom && matchesDateTo;
+    });
+
+    return searchPaymentVouchers(dateFiltered, searchQuery);
+  }, [vouchers, searchQuery, dateFrom, dateTo]);
+
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
@@ -99,20 +128,44 @@ export function PaymentVouchersList() {
       return <div className="text-center py-10 text-destructive">فشل تحميل قائمة السندات.</div>;
   }
 
-  if (vouchers.length === 0) {
-    return (
-        <div className="p-8 text-center border-2 border-dashed rounded-lg">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-medium">لا توجد سندات صرف</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-                ابدأ بإنشاء سند صرف جديد ليظهر هنا.
-            </p>
-        </div>
-    );
-  }
-
   return (
     <>
+        <div className="bg-muted/50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid gap-2 md:col-span-1">
+                    <Label htmlFor="search">بحث ذكي</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            id="search"
+                            placeholder="رقم السند, اسم المستفيد, المبلغ..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                    <Input 
+                        id="dateFrom"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                    <Input 
+                        id="dateTo"
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                    />
+                </div>
+            </div>
+        </div>
+
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -126,41 +179,61 @@ export function PaymentVouchersList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vouchers.map((voucher) => (
-                <TableRow key={voucher.id}>
-                  <TableCell className="font-mono">
-                    <Link href={`/dashboard/accounting/payment-vouchers/${voucher.id}`} className="hover:underline text-primary">
-                      {voucher.voucherNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{voucher.payeeName}</TableCell>
-                  <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
-                  <TableCell className="font-mono">{formatCurrency(voucher.amount)}</TableCell>
-                  <TableCell>
-                      <Badge variant="outline">{voucher.status}</Badge>
-                  </TableCell>
-                   <TableCell>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" dir="rtl">
-                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}`)}>
-                                    <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}/edit`)}>
-                                    <Pencil className="ml-2 h-4 w-4" /> تعديل
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setVoucherToDelete(voucher)} className="text-destructive focus:text-destructive">
-                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                   </TableCell>
+              {vouchers.length === 0 ? (
+                 <TableRow>
+                    <TableCell colSpan={6}>
+                        <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <h3 className="mt-4 text-lg font-medium">لا توجد سندات صرف</h3>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                ابدأ بإنشاء سند صرف جديد ليظهر هنا.
+                            </p>
+                        </div>
+                    </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredVouchers.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                        لا توجد نتائج تطابق بحثك.
+                    </TableCell>
+                </TableRow>
+              ) : (
+                    filteredVouchers.map((voucher) => (
+                        <TableRow key={voucher.id}>
+                        <TableCell className="font-mono">
+                            <Link href={`/dashboard/accounting/payment-vouchers/${voucher.id}`} className="hover:underline text-primary">
+                            {voucher.voucherNumber}
+                            </Link>
+                        </TableCell>
+                        <TableCell>{voucher.payeeName}</TableCell>
+                        <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
+                        <TableCell className="font-mono">{formatCurrency(voucher.amount)}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline" className={statusColors[voucher.status]}>{statusTranslations[voucher.status]}</Badge>
+                        </TableCell>
+                        <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" dir="rtl">
+                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}`)}>
+                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}/edit`)}>
+                                            <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => setVoucherToDelete(voucher)} className="text-destructive focus:text-destructive">
+                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                        </TableCell>
+                        </TableRow>
+                    ))
+              )}
             </TableBody>
           </Table>
         </div>
@@ -184,3 +257,5 @@ export function PaymentVouchersList() {
     </>
   );
 }
+
+    

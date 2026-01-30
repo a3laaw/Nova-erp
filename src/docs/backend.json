@@ -167,6 +167,10 @@
             "reContracted"
           ]
         },
+        "transactionCounter": {
+            "type": "number",
+            "description": "A counter for the number of transactions created for this client, used to generate sequential transaction numbers."
+        },
         "assignedEngineer": {
           "type": "string",
           "description": "The ID of the engineer assigned to this client."

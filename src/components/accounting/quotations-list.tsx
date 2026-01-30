@@ -10,12 +10,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirebase } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -23,6 +23,9 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { searchQuotations } from '@/lib/cache/fuse-search';
 
 const statusTranslations: Record<Quotation['status'], string> = {
     draft: 'مسودة',
@@ -48,17 +51,27 @@ export function QuotationsList() {
   const [itemToDelete, setItemToDelete] = useState<Quotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const quotationsQuery = useMemo(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'quotations'), orderBy('date', 'desc'));
   }, [firestore]);
 
-  const [snapshot, loading, error] = useCollection(quotationsQuery);
+  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, 'quotations', quotationsQuery ? [orderBy('date', 'desc')] : []);
 
-  const quotations = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
-  }, [snapshot]);
+  const filteredQuotations = useMemo(() => {
+    const dateFiltered = quotations.filter(quotation => {
+      const quotationDate = quotation.date?.toDate ? quotation.date.toDate() : null;
+      if (!quotationDate) return false;
+      const matchesDateFrom = !dateFrom || (quotationDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
+      const matchesDateTo = !dateTo || (quotationDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+      return matchesDateFrom && matchesDateTo;
+    });
+    return searchQuotations(dateFiltered, searchQuery);
+  }, [quotations, searchQuery, dateFrom, dateTo]);
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
@@ -116,6 +129,42 @@ export function QuotationsList() {
 
   return (
     <>
+        <div className="bg-muted/50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid gap-2 md:col-span-1">
+                    <Label htmlFor="search">بحث ذكي</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            id="search"
+                            placeholder="رقم العرض, اسم العميل, الموضوع..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                    <Input 
+                        id="dateFrom"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                    <Input 
+                        id="dateTo"
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                    />
+                </div>
+            </div>
+        </div>
+
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -141,8 +190,14 @@ export function QuotationsList() {
                             </div>
                         </TableCell>
                     </TableRow>
+                ) : filteredQuotations.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center">
+                            لا توجد نتائج تطابق بحثك.
+                        </TableCell>
+                    </TableRow>
                 ) : (
-                    quotations.map((quotation) => (
+                    filteredQuotations.map((quotation) => (
                         <TableRow key={quotation.id}>
                         <TableCell className="font-mono">{quotation.quotationNumber}</TableCell>
                         <TableCell>
@@ -201,3 +256,5 @@ export function QuotationsList() {
     </>
   );
 }
+
+    
