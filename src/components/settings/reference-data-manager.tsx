@@ -30,7 +30,7 @@ import {
 import { ScrollArea } from '../ui/scroll-area';
 import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Department, Job, Governorate, Area, TransactionType, UserRole } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
@@ -110,6 +110,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
 
   const primaryQueryConstraints = useMemo(() => [], []);
   const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
@@ -134,25 +135,36 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   }, [primaryData, primaryLoading, primaryError, primaryTitle, toast]);
 
 
-  useEffect(() => {
+  const fetchAllJobs = useCallback(async () => {
     if (!firestore) return;
+    setJobsLoading(true);
+    try {
+        const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
+        const uniqueJobs = new Map<string, { value: string, label: string }>();
+        jobsSnapshot.forEach(doc => {
+            const jobName = doc.data().name;
+            if (jobName && typeof jobName === 'string') {
+                const trimmedName = jobName.trim();
+                if (trimmedName) {
+                    uniqueJobs.set(trimmedName, { value: trimmedName, label: trimmedName });
+                }
+            }
+        });
+        const sortedJobs = Array.from(uniqueJobs.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar'));
+        setJobs(sortedJobs);
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الوظائف.' });
+    } finally {
+        setJobsLoading(false);
+    }
+  }, [firestore, toast]);
 
-    const fetchAllJobs = async () => {
-      const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
-      const uniqueJobs = new Map<string, { value: string, label: string }>();
-      jobsSnapshot.forEach(doc => {
-        const jobName = doc.data().name;
-        if (jobName && !uniqueJobs.has(jobName)) {
-          uniqueJobs.set(jobName, { value: jobName, label: jobName });
-        }
-      });
-      setJobs(Array.from(uniqueJobs.values()));
-    };
 
-    if (isWorkStageView) {
+  useEffect(() => {
+    if (isWorkStageView && isOpen) {
       fetchAllJobs();
     }
-  }, [firestore, isWorkStageView]);
+  }, [isWorkStageView, isOpen, fetchAllJobs]);
 
 
   const handleSelectPrimary = useCallback(async (item: T) => {
@@ -375,7 +387,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span>{item.name}</span>
-                        {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
+                        {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
                         {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
                         {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
                         {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
@@ -456,6 +468,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                             selected={itemRoles}
                             onChange={setItemRoles}
                             placeholder="اختر دورًا أو أكثر..."
+                            disabled={jobsLoading}
                         />
                     </div>
                 </>
