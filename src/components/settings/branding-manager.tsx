@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase, useStorage } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
@@ -79,9 +79,43 @@ export function BrandingManager() {
         setPreview(URL.createObjectURL(file));
     };
 
+    const uploadFile = (file: File, type: 'logo' | 'letterhead'): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            if (!storage) {
+                reject(new Error("Firebase Storage is not available."));
+                return;
+            }
+            const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
+            setProgress(0);
+            const timestamp = Date.now();
+            const storageRef = ref(storage, `company_assets/${type}_${timestamp}_${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setProgress(progress);
+                },
+                (error) => {
+                    console.error(`${type} upload failed:`, error);
+                    setProgress(null);
+                    reject(new Error(`فشل رفع ${type}.`));
+                },
+                async () => {
+                    try {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        setProgress(null);
+                        resolve(downloadURL);
+                    } catch (e) {
+                         reject(new Error(`فشل الحصول على رابط التحميل لـ ${type}.`));
+                    }
+                }
+            );
+        });
+    };
 
     const handleSave = async () => {
-        if (!firestore || !storage) {
+        if (!firestore) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بالخدمات السحابية.'});
             return;
         }
@@ -92,73 +126,49 @@ export function BrandingManager() {
 
         setIsSaving(true);
         
-        const uploadFile = (file: File, type: 'logo' | 'letterhead'): Promise<string> => {
-            return new Promise((resolve, reject) => {
-                const setProgress = type === 'logo' ? setLogoUploadProgress : setLetterheadUploadProgress;
-                setProgress(0);
-                const timestamp = Date.now();
-                const storageRef = ref(storage, `company_assets/${type}_${timestamp}_${file.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, file);
-
-                uploadTask.on('state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        setProgress(progress);
-                    },
-                    (error) => {
-                        console.error(`${type} upload failed:`, error);
-                        setProgress(null);
-                        reject(new Error(`فشل رفع ${type}.`));
-                    },
-                    async () => {
-                        try {
-                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                            setProgress(null);
-                            resolve(downloadURL);
-                        } catch (e) {
-                             reject(new Error(`فشل الحصول على رابط التحميل لـ ${type}.`));
-                        }
-                    }
-                );
-            });
-        };
+        const settingsRef = doc(firestore, 'company_settings', 'main');
 
         try {
-            const uploadPromises: Promise<any>[] = [];
-            let newLogoUrl: string | undefined = undefined;
-            let newLetterheadUrl: string | undefined = undefined;
+            // 1. Immediately save text fields, but exclude image URLs for now
+            const { logo_url, letterhead_image_url, ...textData } = formData;
+            await setDoc(settingsRef, textData, { merge: true });
             
+            toast({ title: 'تم الحفظ', description: 'تم حفظ البيانات النصية. جاري رفع أي ملفات جديدة في الخلفية.' });
+            setIsSaving(false); // Unblock the UI
+
+            // 2. Handle file uploads asynchronously without blocking the UI
             if (logoFile) {
-                uploadPromises.push(uploadFile(logoFile, 'logo').then(url => { newLogoUrl = url; }));
+                uploadFile(logoFile, 'logo')
+                    .then(url => updateDoc(settingsRef, { logo_url: url }))
+                    .then(() => {
+                        setLogoFile(null); // Clear file state on success
+                        toast({ title: 'اكتمل رفع الشعار', description: 'تم تحديث الشعار بنجاح.' });
+                    })
+                    .catch(err => {
+                        console.error("Logo upload failed:", err);
+                        setLogoUploadError('فشل رفع الشعار.');
+                    });
             }
+            
             if (letterheadFile) {
-                uploadPromises.push(uploadFile(letterheadFile, 'letterhead').then(url => { newLetterheadUrl = url; }));
+                 uploadFile(letterheadFile, 'letterhead')
+                    .then(url => updateDoc(settingsRef, { letterhead_image_url: url }))
+                    .then(() => {
+                        setLetterheadFile(null); // Clear file state on success
+                        toast({ title: 'اكتمل رفع الترويسة', description: 'تم تحديث الترويسة بنجاح.' });
+                    })
+                    .catch(err => {
+                        console.error("Letterhead upload failed:", err);
+                        setLetterheadUploadError('فشل رفع الترويسة.');
+                    });
             }
-
-            if(uploadPromises.length > 0) {
-                 await Promise.all(uploadPromises);
-            }
-            
-            const dataToSave = {
-                ...formData,
-                logo_url: newLogoUrl !== undefined ? newLogoUrl : formData.logo_url,
-                letterhead_image_url: newLetterheadUrl !== undefined ? newLetterheadUrl : formData.letterhead_image_url,
-            };
-
-            const settingsRef = doc(firestore, 'company_settings', 'main');
-            await setDoc(settingsRef, dataToSave, { merge: true });
-
-            toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية بنجاح.' });
-            
-            setLogoFile(null);
-            setLetterheadFile(null);
 
         } catch (error) {
-            console.error("Error saving branding settings:", error);
-            const errorMessage = error instanceof Error ? error.message : 'فشل حفظ الإعدادات.';
-            toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
-        } finally {
-            setIsSaving(false);
+            // This will only catch errors from the initial text data save
+            console.error("Error saving text data:", error);
+            const errorMessage = error instanceof Error ? error.message : 'فشل حفظ البيانات النصية.';
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: errorMessage });
+            setIsSaving(false); // Ensure button is re-enabled on error
         }
     };
 
