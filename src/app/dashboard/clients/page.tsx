@@ -39,7 +39,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirebase, useSubscription, SmartCache } from '@/lib/cache/smart-cache';
+import { useFirebase } from '@/firebase';
+import { useSubscription, SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';

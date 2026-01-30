@@ -32,7 +32,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirebase, useSubscription, SmartCache } from '@/lib/cache/smart-cache';
+import { useFirebase } from '@/firebase';
+import { useSubscription, SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -420,22 +421,22 @@ export function EmployeesTable() {
               <AlertDialogHeader>
                   <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
                   <AlertDialogDescription>
-                      اختر سبب وتاريخ إنهاء الخدمة للموظف: {employeeToTerminate?.fullName}.
+                           اختر سبب وتاريخ إنهاء الخدمة للموظف: {employeeToTerminate?.fullName}.
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="space-y-4 py-4">
                   <div className="grid gap-2">
-                        <Label>سبب إنهاء الخدمة</Label>
-                        <InlineSearchList 
-                          value={terminationReason}
-                          onSelect={setTerminationReason}
-                          options={terminationReasons}
-                          placeholder="اختر السبب..."
-                        />
+                         <Label>سبب إنهاء الخدمة</Label>
+                         <InlineSearchList 
+                            value={terminationReason}
+                            onSelect={setTerminationReason}
+                            options={terminationReasons}
+                            placeholder="اختر السبب..."
+                         />
                   </div>
                   <div className="flex items-center space-x-2">
-                      <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
-                      <Label htmlFor="immediate">إنهاء فوري بدون فترة إنذار</Label>
+                           <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
+                           <Label htmlFor="immediate">إنهاء فوري بدون فترة إنذار</Label>
                   </div>
                   <div className="grid gap-2">
                       <Label htmlFor="noticeStartDate" className={isImmediate ? 'text-muted-foreground' : ''}>تاريخ تقديم الاستقالة / بدء الإنذار</Label>
