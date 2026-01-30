@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, Printer, Pencil } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
 import type { PaymentVoucher, Company } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,15 +56,7 @@ export default function ViewPaymentVoucherPage() {
     return doc(firestore, 'paymentVouchers', id);
   }, [firestore, id]);
 
-  const [voucherSnap, voucherLoading, voucherError] = useDoc(voucherRef);
-
-  const voucher = useMemo(() => {
-    if (voucherSnap?.exists()) {
-      return { id: voucherSnap.id, ...voucherSnap.data() } as PaymentVoucher;
-    }
-    return null;
-  }, [voucherSnap]);
-
+  const { data: voucher, loading: voucherLoading, error: voucherError } = useDocument<PaymentVoucher>(firestore, voucherRef ? voucherRef.path : null);
   
   const handlePrint = () => {
     window.print();
@@ -216,3 +208,5 @@ export default function ViewPaymentVoucherPage() {
     </div>
   );
 }
+
+    

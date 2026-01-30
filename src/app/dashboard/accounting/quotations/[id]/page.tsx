@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
 import type { Quotation, Company, ClientTransaction } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,15 +49,8 @@ export default function ViewQuotationPage() {
     return doc(firestore, 'quotations', id);
   }, [firestore, id]);
 
-  const [quotationSnap, quotationLoading, quotationError] = useDoc(quotationRef);
+  const { data: quotation, loading: quotationLoading, error: quotationError } = useDocument<Quotation>(firestore, quotationRef ? quotationRef.path : null);
 
-  const quotation = useMemo(() => {
-    if (quotationSnap?.exists()) {
-      return { id: quotationSnap.id, ...quotationSnap.data() } as Quotation;
-    }
-    return null;
-  }, [quotationSnap]);
-  
   const prefilledTransaction = useMemo((): Partial<ClientTransaction> | null => {
     if (!quotation) return null;
     return {
@@ -261,3 +254,5 @@ export default function ViewQuotationPage() {
     </>
   );
 }
+
+    

@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Save, X, Loader2, AlertCircle, Info } from 'lucide-react';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where, runTransaction, Timestamp, orderBy } from 'firebase/firestore';
 import type { CashReceipt, Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -84,10 +84,11 @@ export default function EditCashReceiptPage() {
     return doc(firestore, 'cashReceipts', id);
   }, [firestore, id]);
 
-  const [receiptSnap, receiptLoading] = useDoc(receiptRef);
+  const { data: receiptData, loading: receiptLoading } = useDocument<CashReceipt>(firestore, receiptRef ? receiptRef.path : null);
+
 
   useEffect(() => {
-    if (!receiptSnap?.exists()) {
+    if (!receiptData) {
       if (!receiptLoading) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على سند القبض.' });
         router.push('/dashboard/accounting/cash-receipts');
@@ -95,20 +96,19 @@ export default function EditCashReceiptPage() {
       return;
     }
     
-    const data = { id: receiptSnap.id, ...receiptSnap.data() } as CashReceipt;
-    setReceipt(data);
-    setOriginalReceipt(data);
+    setReceipt(receiptData);
+    setOriginalReceipt(receiptData);
 
     // Populate form
-    setDate(data.receiptDate?.toDate ? format(data.receiptDate.toDate(), 'yyyy-MM-dd') : '');
-    setSelectedProjectId(data.projectId || '');
-    setAmount(String(data.amount));
-    setAmountInWords(data.amountInWords);
-    setDescription(data.description);
-    setPaymentMethod(data.paymentMethod);
-    setReference(data.reference || '');
+    setDate(receiptData.receiptDate?.toDate ? format(receiptData.receiptDate.toDate(), 'yyyy-MM-dd') : '');
+    setSelectedProjectId(receiptData.projectId || '');
+    setAmount(String(receiptData.amount));
+    setAmountInWords(receiptData.amountInWords);
+    setDescription(receiptData.description);
+    setPaymentMethod(receiptData.paymentMethod);
+    setReference(receiptData.reference || '');
     
-  }, [receiptSnap, receiptLoading, toast, router]);
+  }, [receiptData, receiptLoading, toast, router]);
   
   // Fetch related data
   useEffect(() => {
@@ -512,5 +512,7 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
+
+    
 
     

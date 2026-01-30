@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Save, X, Loader2, Info } from 'lucide-react';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, orderBy, runTransaction, Timestamp, collectionGroup } from 'firebase/firestore';
 import type { Account, PaymentVoucher, Employee, ClientTransaction, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -74,15 +74,15 @@ export default function EditPaymentVoucherPage() {
     return doc(firestore, 'paymentVouchers', id);
   }, [firestore, id]);
 
-  const [voucherSnap, voucherLoading] = useDoc(voucherRef);
+  const { data: voucherSnap, loading: voucherLoading } = useDocument<PaymentVoucher>(firestore, voucherRef ? voucherRef.path : null);
 
   const { register, handleSubmit, control, watch, formState: { errors }, reset } = useForm<PaymentVoucherFormValues>({
       resolver: zodResolver(paymentVoucherSchema),
   });
 
   useEffect(() => {
-    if (voucherSnap?.exists()) {
-        const data = voucherSnap.data() as PaymentVoucher;
+    if (voucherSnap) {
+        const data = voucherSnap;
         reset({
             payeeName: data.payeeName,
             payeeType: data.payeeType,
@@ -158,13 +158,13 @@ export default function EditPaymentVoucherPage() {
 
 
   const onSubmit = async (data: PaymentVoucherFormValues) => {
-    if (!firestore || !currentUser || !id || !voucherSnap?.exists()) return;
+    if (!firestore || !currentUser || !id || !voucherSnap) return;
     
     setIsSaving(true);
     try {
        await runTransaction(firestore, async (transaction_fs) => {
            const voucherRefDoc = doc(firestore, 'paymentVouchers', id);
-           const originalVoucherData = voucherSnap.data() as PaymentVoucher;
+           const originalVoucherData = voucherSnap;
            
            const debitAccount = accounts.find(a => a.id === data.debitAccountId);
            const creditAccount = accounts.find(a => a.id === data.creditAccountId);
@@ -274,7 +274,7 @@ export default function EditPaymentVoucherPage() {
                     <div>
                         <CardTitle>تعديل سند صرف</CardTitle>
                         <CardDescription>
-                            تعديل بيانات سند الصرف رقم: {voucherSnap?.data()?.voucherNumber}
+                            تعديل بيانات سند الصرف رقم: {voucherSnap?.voucherNumber}
                         </CardDescription>
                     </div>
                 </div>
@@ -431,3 +431,5 @@ export default function EditPaymentVoucherPage() {
     </Card>
   );
 }
+
+    

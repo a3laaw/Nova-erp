@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Printer, Pencil, CheckCircle, Undo2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, getDocs, collection, query, limit, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import type { JournalEntry, Company } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,14 +44,7 @@ export default function ViewJournalEntryPage() {
     return doc(firestore, 'journalEntries', id);
   }, [firestore, id]);
 
-  const [entrySnap, entryLoading, entryError] = useDoc(entryRef);
-
-  const entry = useMemo(() => {
-    if (entrySnap?.exists()) {
-      return { id: entrySnap.id, ...entrySnap.data() } as JournalEntry;
-    }
-    return null;
-  }, [entrySnap]);
+  const { data: entry, loading: entryLoading, error: entryError } = useDocument<JournalEntry>(firestore, entryRef ? entryRef.path : null);
   
   const handlePrint = () => {
     window.print();
@@ -268,3 +261,5 @@ export default function ViewJournalEntryPage() {
     </div>
   );
 }
+
+    

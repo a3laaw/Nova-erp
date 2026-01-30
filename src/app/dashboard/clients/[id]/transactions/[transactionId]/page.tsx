@@ -3,11 +3,12 @@
 
 
 
+
       'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirestore, useDoc } from '@/firebase';
+import { useFirestore, useDocument, useSubscription } from '@/firebase';
 import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy, where } from 'firebase/firestore';
 import {
   Card,
@@ -23,7 +24,7 @@ import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Lo
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole, Client } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -155,8 +156,8 @@ export default function TransactionDetailPage() {
     return doc(firestore, 'clients', clientId);
   }, [firestore, clientId]);
 
-  const [transactionSnapshot, transactionLoading, transactionError] = useDoc(transactionRef);
-  const [clientSnapshot, clientLoading, clientError] = useDoc(clientRef);
+  const { data: transaction, loading: transactionLoading, error: transactionError } = useDocument<ClientTransaction>(firestore, transactionRef ? transactionRef.path : null);
+  const { data: client, loading: clientLoading, error: clientError } = useDocument<Client>(firestore, clientRef ? clientRef.path : null);
   
   useEffect(() => {
     if (!firestore) return;
@@ -172,14 +173,6 @@ export default function TransactionDetailPage() {
     };
     fetchEmployees();
   }, [firestore]);
-
-
-  const transaction = useMemo(() => {
-    if (transactionSnapshot?.exists()) {
-        return { id: transactionSnapshot.id, ...transactionSnapshot.data() } as ClientTransaction;
-    }
-    return null;
-  }, [transactionSnapshot]);
   
   useEffect(() => {
     if (!transaction || !firestore) {
@@ -234,13 +227,6 @@ export default function TransactionDetailPage() {
     setNewEngineerId(transaction.assignedEngineerId || '');
     
   }, [transaction, firestore, toast]);
-
-  const client = useMemo(() => {
-    if (clientSnapshot?.exists()) {
-        return { id: clientSnapshot.id, ...clientSnapshot.data() };
-    }
-    return null;
-  }, [clientSnapshot]);
 
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
@@ -481,7 +467,7 @@ export default function TransactionDetailPage() {
   if (transactionError || clientError || !transaction || !client) {
     return (
       <div className="text-center py-10" dir="rtl">
-        <p className="text-destructive">{transactionError || clientError ? 'فشل تحميل البيانات.' : 'لم يتم العثور على المعاملة أو العميل.'}</p>
+        <p className="text-destructive">{transactionError?.message || clientError?.message || 'لم يتم العثور على المعاملة أو العميل.'}</p>
       </div>
     );
   }

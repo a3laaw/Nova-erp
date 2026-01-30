@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, Printer, Pencil } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
 import type { CashReceipt, Company } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,14 +43,7 @@ export default function ViewCashReceiptPage() {
     return doc(firestore, 'cashReceipts', id);
   }, [firestore, id]);
 
-  const [receiptSnap, receiptLoading, receiptError] = useDoc(receiptRef);
-
-  const receipt = useMemo(() => {
-    if (receiptSnap?.exists()) {
-      return { id: receiptSnap.id, ...receiptSnap.data() } as CashReceipt;
-    }
-    return null;
-  }, [receiptSnap]);
+  const { data: receipt, loading: receiptLoading, error: receiptError } = useDocument<CashReceipt>(firestore, receiptRef ? receiptRef.path : null);
   
   const handlePrint = () => {
     window.print();
@@ -194,3 +187,5 @@ export default function ViewCashReceiptPage() {
     </div>
   );
 }
+
+    

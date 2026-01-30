@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -26,7 +27,7 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, getDocs, collection, query, orderBy, collectionGroup } from 'firebase/firestore';
 import type { Account, JournalEntry, ClientTransaction, Employee, Department } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -83,14 +84,7 @@ export default function EditJournalEntryPage() {
     return doc(firestore, 'journalEntries', id);
   }, [firestore, id]);
 
-  const [entrySnapshot, entryLoading, entryError] = useDoc(entryRef);
-
-  const entry = useMemo(() => {
-    if (entrySnapshot?.exists()) {
-      return { id: entrySnapshot.id, ...entrySnapshot.data() } as JournalEntry;
-    }
-    return null;
-  }, [entrySnapshot]);
+  const { data: entry, loading: entryLoading, error: entryError } = useDocument<JournalEntry>(firestore, entryRef ? entryRef.path : null);
 
   const { register, handleSubmit, control, formState: { errors, isDirty }, reset } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
@@ -399,3 +393,5 @@ export default function EditJournalEntryPage() {
     </Card>
   );
 }
+
+    

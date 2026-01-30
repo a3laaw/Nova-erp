@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, X } from 'lucide-react';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, getDocs, collection, query, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
 import type { Employee, ClientTransaction, Department, TransactionType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +52,8 @@ export default function EditTransactionPage() {
     if (!firestore || !clientId || !transactionId) return null;
     return doc(firestore, 'clients', clientId, 'transactions', transactionId);
   }, [firestore, clientId, transactionId]);
-  const [transactionSnap, transactionLoading, transactionError] = useDoc(transactionRef);
+
+  const { data: transaction, loading: transactionLoading, error: transactionError } = useDocument<ClientTransaction>(firestore, transactionRef ? transactionRef.path : null);
   
   // --- Fetch Reference Data ---
   useEffect(() => {
@@ -77,16 +78,15 @@ export default function EditTransactionPage() {
   
   // --- Populate Form with existing data ---
   useEffect(() => {
-      if (transactionSnap?.exists()) {
-          const data = transactionSnap.data() as ClientTransaction;
-          setOriginalData(data);
+      if (transaction) {
+          setOriginalData(transaction);
           setFormData({
-              transactionType: data.transactionType || '',
-              description: data.description || '',
-              assignedEngineerId: data.assignedEngineerId || ''
+              transactionType: transaction.transactionType || '',
+              description: transaction.description || '',
+              assignedEngineerId: transaction.assignedEngineerId || ''
           });
       }
-  }, [transactionSnap]);
+  }, [transaction]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -223,5 +223,7 @@ export default function EditTransactionPage() {
     </Card>
   );
 }
+
+    
 
     
