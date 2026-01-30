@@ -47,6 +47,7 @@ interface StatementLine {
     debit: number;
     credit: number;
     balance: number;
+    entryId: string;
 }
 
 export default function ClientStatementPage() {
@@ -258,97 +259,95 @@ export default function ClientStatementPage() {
 
             <Card 
                 id="printable-area" 
-                className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent bg-no-repeat bg-top bg-cover"
+                className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent bg-no-repeat bg-top bg-cover p-8 md:p-12"
                 style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
             >
-                <div className="pt-48">
-                    <CardHeader className="p-8 md:p-12">
-                        <div className="flex justify-between items-start pb-4">
-                            <div className="text-left flex-shrink-0">
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">كشف حساب عميل</h2>
-                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Statement of Account</p>
-                                <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                               <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                <div>
-                                   <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                   <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                   <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                                </div>
+                <CardHeader className="p-0">
+                    <div className="flex justify-between items-start pb-4">
+                        <div className="text-left flex-shrink-0">
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">كشف حساب عميل</h2>
+                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Statement of Account</p>
+                            <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                           <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                            <div>
+                               <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
+                               <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
+                               <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
                             </div>
                         </div>
-                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">العميل:</span> {client.nameAr}</p>
-                            <p><span className="font-semibold w-24 inline-block">رقم الملف:</span> {client.fileId}</p>
-                         </div>
-                    </CardHeader>
-                    <CardContent className="px-8 md:px-12">
-                        <Table>
-                            <TableHeader>
+                    </div>
+                     <div className="mt-6 text-sm">
+                        <p><span className="font-semibold w-24 inline-block">العميل:</span> {client.nameAr}</p>
+                        <p><span className="font-semibold w-24 inline-block">رقم الملف:</span> {client.fileId}</p>
+                     </div>
+                </CardHeader>
+                <CardContent className="px-0 pt-6">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[100px]">التاريخ</TableHead>
+                                <TableHead className="w-[120px]">نوع السند</TableHead>
+                                <TableHead className="w-[120px]">رقم السند</TableHead>
+                                <TableHead>البيان</TableHead>
+                                <TableHead className="text-left w-[110px]">مدين</TableHead>
+                                <TableHead className="text-left w-[110px]">دائن</TableHead>
+                                <TableHead className="text-left w-[120px]">الرصيد</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell colSpan={6} className="font-semibold">الرصيد السابق</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
+                            </TableRow>
+                            {statementData.lines.map((line, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>{line.voucherType}</TableCell>
+                                    <TableCell className="font-mono">
+                                        <Link href={`/dashboard/accounting/journal-entries/${line.id}`} className="hover:underline text-primary">
+                                            {line.refNumber}
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell>{line.description}</TableCell>
+                                    <TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
+                                    <TableCell className="text-left font-mono">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
+                                    <TableCell className="text-left font-mono">{formatCurrency(line.balance)}</TableCell>
+                                </TableRow>
+                            ))}
+                             {statementData.lines.length === 0 && (
                                 <TableRow>
-                                    <TableHead className="w-[100px]">التاريخ</TableHead>
-                                    <TableHead className="w-[120px]">نوع السند</TableHead>
-                                    <TableHead className="w-[120px]">رقم السند</TableHead>
-                                    <TableHead>البيان</TableHead>
-                                    <TableHead className="text-left w-[110px]">مدين</TableHead>
-                                    <TableHead className="text-left w-[110px]">دائن</TableHead>
-                                    <TableHead className="text-left w-[120px]">الرصيد</TableHead>
+                                    <TableCell colSpan={7} className="h-24 text-center">
+                                        لا توجد حركات تطابق الفلاتر المحددة.
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell colSpan={6} className="font-semibold">الرصيد السابق</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
-                                </TableRow>
-                                {statementData.lines.map((line, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell>{line.voucherType}</TableCell>
-                                        <TableCell className="font-mono">
-                                            <Link href={`/dashboard/accounting/journal-entries/${line.id}`} className="hover:underline text-primary">
-                                                {line.refNumber}
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell>{line.description}</TableCell>
-                                        <TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
-                                        <TableCell className="text-left font-mono">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
-                                        <TableCell className="text-left font-mono">{formatCurrency(line.balance)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                 {statementData.lines.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">
-                                            لا توجد حركات تطابق الفلاتر المحددة.
-                                        </TableCell>
-                                    </TableRow>
-                                 )}
-                            </TableBody>
-                            <TableFooter>
-                                 <TableRow className="font-bold bg-muted/50">
-                                    <TableCell colSpan={4}>إجمالي الحركات المعروضة</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                    <TableCell></TableCell>
-                                </TableRow>
-                                <TableRow className="font-bold text-lg bg-muted">
-                                    <TableCell colSpan={6}>الرصيد النهائي</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </CardContent>
-                    <CardFooter className="p-8 md:p-12 flex justify-between items-center no-print">
-                         <Button variant="outline" onClick={() => router.back()}>
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                            العودة
-                        </Button>
-                        <Button onClick={handlePrint}>
-                            <Printer className="ml-2 h-4 w-4" />
-                            طباعة
-                        </Button>
-                    </CardFooter>
-                </div>
+                             )}
+                        </TableBody>
+                        <TableFooter>
+                             <TableRow className="font-bold bg-muted/50">
+                                <TableCell colSpan={4}>إجمالي الحركات المعروضة</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold text-lg bg-muted">
+                                <TableCell colSpan={6}>الرصيد النهائي</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </CardContent>
+                <CardFooter className="p-0 pt-8 flex justify-between items-center no-print">
+                     <Button variant="outline" onClick={() => router.back()}>
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                        العودة
+                    </Button>
+                    <Button onClick={handlePrint}>
+                        <Printer className="ml-2 h-4 w-4" />
+                        طباعة
+                    </Button>
+                </CardFooter>
             </Card>
         </div>
     );
