@@ -124,20 +124,25 @@ export function BrandingManager() {
         };
 
         try {
-            let logoUrlToSave = formData.logo_url;
-            let letterheadUrlToSave = formData.letterhead_image_url;
-
+            const uploadPromises: Promise<any>[] = [];
+            let newLogoUrl: string | undefined = undefined;
+            let newLetterheadUrl: string | undefined = undefined;
+            
             if (logoFile) {
-                logoUrlToSave = await uploadFile(logoFile, 'logo');
+                uploadPromises.push(uploadFile(logoFile, 'logo').then(url => { newLogoUrl = url; }));
             }
             if (letterheadFile) {
-                letterheadUrlToSave = await uploadFile(letterheadFile, 'letterhead');
+                uploadPromises.push(uploadFile(letterheadFile, 'letterhead').then(url => { newLetterheadUrl = url; }));
             }
 
+            if(uploadPromises.length > 0) {
+                 await Promise.all(uploadPromises);
+            }
+            
             const dataToSave = {
                 ...formData,
-                logo_url: logoUrlToSave,
-                letterhead_image_url: letterheadUrlToSave,
+                logo_url: newLogoUrl !== undefined ? newLogoUrl : formData.logo_url,
+                letterhead_image_url: newLetterheadUrl !== undefined ? newLetterheadUrl : formData.letterhead_image_url,
             };
 
             const settingsRef = doc(firestore, 'company_settings', 'main');
