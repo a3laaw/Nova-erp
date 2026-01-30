@@ -18,7 +18,7 @@ interface ResourceStats {
 }
 
 export function ResourceAnalysisReport() {
-  const { journalEntries, employees, accounts, loading } = useAnalyticalData();
+  const { journalEntries, employees, accounts, transactions, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
 
@@ -30,6 +30,7 @@ export function ResourceAnalysisReport() {
     endDate.setHours(23, 59, 59, 999);
     const monthsInPeriod = Math.max(1, differenceInMonths(endDate, startDate) + 1);
 
+    const transactionMap = new Map(transactions.map(t => [t.id, t]));
     const engineerStats = new Map<string, ResourceStats>();
     const projectsPerEngineer = new Map<string, Set<string>>();
 
@@ -52,27 +53,31 @@ export function ResourceAnalysisReport() {
       const entryDate = entry.date?.toDate();
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
 
+      const transactionId = entry.transactionId;
+      if (!transactionId) return;
+
+      const transaction = transactionMap.get(transactionId);
+      const resourceId = transaction?.assignedEngineerId;
+      if (!resourceId || !engineerStats.has(resourceId)) return;
+
+      const stats = engineerStats.get(resourceId)!;
+
       entry.lines.forEach(line => {
-        if (!line.auto_resource_id || !engineerStats.has(line.auto_resource_id)) return;
-        
-        const stats = engineerStats.get(line.auto_resource_id)!;
         const account = accounts.find(a => a.id === line.accountId);
         if(!account) return;
 
         let profitChange = 0;
-        if (account.code.startsWith('4')) {
-          profitChange = line.credit - line.debit;
-        } else if (account.code.startsWith('51')) {
-          profitChange = -(line.debit - line.credit);
+        if (account.code.startsWith('4')) { // Revenue
+          profitChange = (line.credit || 0) - (line.debit || 0);
+        } else if (account.code.startsWith('51')) { // Direct Costs
+          profitChange = -((line.debit || 0) - (line.credit || 0));
         }
         
         if (profitChange !== 0) {
             stats.totalProfit += profitChange;
         }
-        if(line.auto_profit_center){
-            projectsPerEngineer.get(line.auto_resource_id)?.add(line.auto_profit_center);
-        }
       });
+      projectsPerEngineer.get(resourceId)?.add(transactionId);
     });
 
     const results: ResourceStats[] = [];
@@ -85,7 +90,7 @@ export function ResourceAnalysisReport() {
     });
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, employees, accounts, loading, dateFrom, dateTo]);
+  }, [journalEntries, employees, accounts, transactions, loading, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4">

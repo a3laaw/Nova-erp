@@ -34,23 +34,30 @@ export function OverheadReport() {
       const entryDate = entry.date?.toDate();
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
       
+      // If the entry is linked to a project, it's not overhead.
+      if (entry.transactionId) {
+        return;
+      }
+
       entry.lines.forEach(line => {
         const account = accounts.find(a => a.id === line.accountId);
-        // Is it an admin expense (starts with 52) AND NOT linked to a project?
-        if (account?.code.startsWith('52') && !line.transactionId) {
+        // Is it an administrative/general expense (starts with 52, 53, etc.)?
+        if (account?.code.startsWith('5') && !account.code.startsWith('51')) {
           const item = overheadMap.get(line.accountId) || { 
             accountId: line.accountId, 
             accountName: account.name,
             accountCode: account.code,
             totalAmount: 0 
           };
-          item.totalAmount += line.debit - line.credit;
+          item.totalAmount += (line.debit || 0) - (line.credit || 0);
           overheadMap.set(line.accountId, item);
         }
       });
     });
 
-    return Array.from(overheadMap.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+    return Array.from(overheadMap.values())
+        .filter(item => item.totalAmount > 0)
+        .sort((a, b) => b.totalAmount - a.totalAmount);
   }, [journalEntries, accounts, loading, dateFrom, dateTo]);
   
   const totalOverhead = useMemo(() => reportData.reduce((sum, item) => sum + item.totalAmount, 0), [reportData]);

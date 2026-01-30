@@ -44,31 +44,34 @@ export function ProjectsPnlReport() {
       const entryDate = entry.date?.toDate();
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
 
-      entry.lines.forEach(line => {
-        if (!line.auto_profit_center) return;
+      const profitCenterId = entry.transactionId;
+      if (!profitCenterId) return;
 
-        const pnl = pnlMap.get(line.auto_profit_center) || { revenue: 0, directCosts: 0, profit: 0, margin: 0, clientId: '' };
+      const pnl = pnlMap.get(profitCenterId) || { revenue: 0, directCosts: 0, profit: 0, margin: 0, clientId: '' };
         
-        if (!pnl.clientId) {
-            const txInfo = transactionMap.get(line.auto_profit_center);
-            if(txInfo) pnl.clientId = txInfo.clientId;
-        }
-        
+      if (!pnl.clientId) {
+          const txInfo = transactionMap.get(profitCenterId);
+          if(txInfo) pnl.clientId = txInfo.clientId;
+      }
+
+      entry.lines.forEach(line => {
         const account = accounts.find(a => a.id === line.accountId);
         if(!account) return;
 
         if (account.code.startsWith('4')) { // Revenue accounts
-          pnl.revenue += line.credit - line.debit;
+          pnl.revenue += (line.credit || 0) - (line.debit || 0);
         } else if (account.code.startsWith('51')) { // Direct Cost accounts
-          pnl.directCosts += line.debit - line.credit;
+          pnl.directCosts += (line.debit || 0) - (line.credit || 0);
         }
-        
-        pnlMap.set(line.auto_profit_center!, pnl);
       });
+        
+      pnlMap.set(profitCenterId, pnl);
     });
 
     const results: ProjectPnl[] = [];
     pnlMap.forEach((data, transactionId) => {
+      if (data.revenue === 0 && data.directCosts === 0) return;
+
       const profit = data.revenue - data.directCosts;
       const margin = data.revenue > 0 ? (profit / data.revenue) * 100 : 0;
       const txInfo = transactionMap.get(transactionId);
