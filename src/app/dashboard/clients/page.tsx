@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,24 +37,23 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
-import { collection, doc, updateDoc, query, orderBy, type DocumentData, deleteDoc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, deleteDoc, writeBatch, serverTimestamp, getDocs, collection, query } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
+import { SmartCache } from '@/lib/cache/smart-cache';
+import { searchClients } from '@/lib/cache/fuse-search';
+import { useCachedData } from '@/hooks/use-cached-data';
+import type { Client, Employee } from '@/lib/types';
+import { Input } from '@/components/ui/input';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
 
-interface Client extends DocumentData {
-  id: string;
-  fileId: string;
-  nameAr: string;
-  nameEn?: string;
-  mobile: string;
-  status: ClientStatus;
-  assignedEngineer?: string;
+interface ClientWithEmployee extends Client {
+  assignedEngineerName?: string;
 }
 
 const statusTranslations: Record<ClientStatus, string> = {
@@ -73,55 +72,56 @@ const statusColors: Record<ClientStatus, string> = {
 
 export default function ClientsPage() {
   const { language } = useLanguage();
-  const firestore = useFirestore();
+  const { firestore } = useFirebase();
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-
-  const clientsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'clients'), orderBy('createdAt', 'desc'));
-  }, [firestore]);
-
-  const [snapshot, loading, error] = useCollection(clientsQuery);
+  
+  const [searchQuery, setSearchQuery] = useState('');
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
-  const [employeesLoading, setEmployeesLoading] = useState(true);
 
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchEmployees = async () => {
-        setEmployeesLoading(true);
-        try {
-            const q = query(collection(firestore, 'employees'));
-            const querySnapshot = await getDocs(q);
-            const newMap = new Map<string, string>();
-            querySnapshot.forEach(doc => {
-                const emp = doc.data() as { fullName: string };
-                newMap.set(doc.id, emp.fullName);
-            });
-            setEmployeesMap(newMap);
-        } catch (e) {
-            console.error("Error fetching employees map: ", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين.' });
-        } finally {
-            setEmployeesLoading(false);
-        }
-    };
-    fetchEmployees();
-  }, [firestore, toast]);
+  // --- NEW: Use the caching hook ---
+  const { data: clients, loading, error, refreshData } = useCachedData(
+    'clients-list',
+    SmartCache.getClientsList
+  );
+
+  const { data: employees, loading: employeesLoading } = useCachedData(
+      'employees-list',
+      SmartCache.getEmployeesList
+  );
   
-  const clients = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-  }, [snapshot]);
-  
+  const employeesMap = useMemo(() => {
+      if (!employees) return new Map<string, string>();
+      const newMap = new Map<string, string>();
+      (employees as Employee[]).forEach(emp => {
+          newMap.set(emp.id!, emp.fullName);
+      });
+      return newMap;
+  }, [employees]);
+
+  // --- NEW: Perform search locally ---
+  const filteredClients: ClientWithEmployee[] = useMemo(() => {
+    if (!clients) return [];
+    
+    const augmentedClients = (clients as Client[]).map(client => ({
+        ...client,
+        assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
+    }));
+    
+    if (!searchQuery) return augmentedClients;
+    
+    return searchClients(searchQuery, augmentedClients);
+  }, [clients, searchQuery, employeesMap]);
+
   const handleDeleteClient = async () => {
     if (!clientToDelete || !firestore) return;
     setIsDeleting(true);
     try {
       await deleteDoc(doc(firestore, 'clients', clientToDelete.id));
+      await SmartCache.invalidate('clients-list'); // Invalidate cache
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
+      refreshData(); // Force refresh
     } catch (e) {
       console.error("Error deleting client: ", e);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل.' });
@@ -152,6 +152,7 @@ export default function ClientsPage() {
       deleteConfirmDesc: 'سيتم حذف ملف العميل بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
       cancel: 'إلغاء',
       confirmDelete: 'نعم، قم بالحذف',
+      searchPlaceholder: 'ابحث بالاسم، رقم الملف، أو الجوال...'
     },
     en: {
       title: 'Client Management',
@@ -173,12 +174,12 @@ export default function ClientsPage() {
       deleteConfirmDesc: 'This will permanently delete the client file. This action cannot be undone.',
       cancel: 'Cancel',
       confirmDelete: 'Yes, delete',
+      searchPlaceholder: 'Search by name, file no., or mobile...'
     }
   }
   const currentText = t[language];
 
   const isLoading = loading || employeesLoading;
-
 
   return (
     <>
@@ -190,6 +191,10 @@ export default function ClientsPage() {
             <CardDescription>{currentText.description}</CardDescription>
           </div>
           <div className="flex gap-2">
+             <Button variant="outline" size="sm" onClick={refreshData} disabled={loading}>
+                 {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
+                 تحديث
+             </Button>
              <Button asChild size="sm" className="gap-1">
                 <Link href="/dashboard/clients/new">
                     <PlusCircle className="h-4 w-4" />
@@ -200,6 +205,13 @@ export default function ClientsPage() {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4">
+            <Input
+                placeholder={currentText.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -226,14 +238,13 @@ export default function ClientsPage() {
                   </TableRow>
               ))}
               {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
-              {!isLoading && clients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{currentText.noClients}</TableCell></TableRow>}
-              {clients.map((client) => {
-                const assignedEngineerName = client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : null;
+              {!isLoading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
+              {filteredClients.map((client) => {
                 return (
                     <TableRow key={client.id}>
                         <TableCell className="font-mono">{client.fileId || client.id.substring(0, 8)}</TableCell>
                         <TableCell className="font-medium"><Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link></TableCell>
-                        <TableCell>{assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
+                        <TableCell>{client.assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
                         <TableCell>{client.mobile}</TableCell>
                         <TableCell>
                             <Badge variant="outline" className={statusColors[client.status]}>
