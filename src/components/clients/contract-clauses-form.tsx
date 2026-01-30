@@ -1,7 +1,7 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, writeBatch, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account, ContractFinancialMilestone } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { useRouter } from 'next/navigation';
+import { Separator } from '@/components/ui/separator';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -47,8 +47,8 @@ interface ContractClausesFormProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
+const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 
 // --- Sub-component for Template Selection ---
@@ -117,7 +117,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
 
   const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[], employees: Employee[], departments: Department[] }>({ stages: [], templates: [], employees: [], departments: [] });
-  const [departmentWorkStages, setDepartmentWorkStages] = useState<WorkStage[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
 
   // This effect resets the entire component's state when the dialog is closed.
@@ -133,7 +132,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setChosenTemplate(null);
       setFinancials({ type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setReferenceData({ templates: [], stages: [], employees: [], departments: [] });
-      setDepartmentWorkStages([]);
       setLoadingRefData(true);
     }
   }, [isOpen]);
@@ -161,24 +159,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   }, []);
 
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
-      const totalContractAmount = template?.financials.totalAmount || 0;
-      const isPercentage = template?.financials.type === 'percentage';
-
-      const calculatedClauses = (template?.financials.milestones || []).map(m => ({
-          id: m.id || generateId(),
-          name: m.name,
-          amount: isPercentage ? ((m.value || 0) / 100) * totalContractAmount : (m.value || 0),
-          status: 'غير مستحقة' as const,
-          percentage: isPercentage ? m.value : undefined,
-          condition: m.condition || ''
-      }));
-
-      setClauses(calculatedClauses);
       setScopeOfWork(template?.scopeOfWork || []);
       setTerms(template?.termsAndConditions || []);
       setOpenClauses(template?.openClauses || []);
       setFinancials(template?.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setChosenTemplate(template);
+      // Clauses are derived from financials, so this will be handled in a later effect
   }, []);
 
   // Effect 1: Fetch all reference data (templates, stages, employees, departments) once when the dialog opens.
@@ -194,13 +180,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         const departmentsQuery = query(collection(firestore, 'departments'));
         
         let stages: MultiSelectOption[] = [];
-        let fetchedDeptStages: WorkStage[] = [];
 
         if(transaction.departmentId) {
             const departmentStagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`), orderBy('order', 'asc'));
             const departmentStagesSnapshot = await getDocs(departmentStagesQuery);
-            fetchedDeptStages = departmentStagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage));
-            stages = fetchedDeptStages.map(stage => ({ value: stage.name, label: stage.name }));
+            stages = departmentStagesSnapshot.docs.map(doc => ({ value: doc.data().name, label: doc.data().name }));
         }
 
         const [
@@ -217,7 +201,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
         const departments = departmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
         
-        setDepartmentWorkStages(fetchedDeptStages);
         setReferenceData({ templates, stages, employees, departments });
 
       } catch (error) {
@@ -253,6 +236,35 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       }
     }
   }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract]);
+  
+  // Effect 3: Derive clauses from financials state
+  useEffect(() => {
+    // Only derive if we are NOT editing an existing contract.
+    // If we are editing, clauses are populated from the contract data directly.
+    if(transaction?.contract) return;
+    
+    if (financials.type === 'fixed') {
+        const calculatedClauses = (financials.milestones || []).map(m => ({
+            id: m.id || generateId(),
+            name: m.name,
+            amount: m.value || 0,
+            status: 'غير مستحقة' as const,
+            condition: m.condition || ''
+        }));
+        setClauses(calculatedClauses);
+    } else if (financials.type === 'percentage') {
+        const totalAmount = financials.totalAmount || 0;
+        const calculatedClauses = (financials.milestones || []).map(m => ({
+            id: m.id || generateId(),
+            name: m.name,
+            amount: ((m.value || 0) / 100) * totalAmount,
+            status: 'غير مستحقة' as const,
+            percentage: m.value || 0,
+            condition: m.condition || ''
+        }));
+        setClauses(calculatedClauses);
+    }
+  }, [financials, transaction?.contract]);
 
 
   // --- State Handlers ---
@@ -296,29 +308,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     setOpenClauses(newClauses);
   };
   
-  const addClause = () => {
-    setClauses(prev => {
-        const newIndex = prev.length;
-        const newName = `الدفعة ${milestoneNames[newIndex] || `(${newIndex + 1})`}`;
-        return [...prev, { id: generateId(), name: newName, amount: 0, status: 'غير مستحقة', condition: '' }];
-    });
-  };
-
-  const handleClauseChange = (index: number, field: keyof ContractClause, value: string | number) => {
-    setClauses(prev => {
-        const newClauses = [...prev];
-        const updatedClause = { ...newClauses[index], [field]: value };
-        newClauses[index] = updatedClause;
-        return newClauses;
-    });
-  };
-  
-  const removeClause = (id: string) => {
-    setClauses(prev => prev.filter(c => c.id !== id));
-  };
-
-  const totalAmount = useMemo(() => clauses.reduce((sum, clause) => sum + Number(clause.amount || 0), 0), [clauses]);
-  
   const addMilestone = () => {
     setFinancials(prev => {
       const newIndex = prev.milestones.length;
@@ -336,6 +325,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     setFinancials(prev => ({ ...prev, milestones: prev.milestones.filter(m => m.id !== id) }));
   };
 
+  const totalAmount = useMemo(() => {
+    if (financials.type === 'fixed') {
+        return financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0);
+    }
+    return financials.totalAmount;
+  }, [financials]);
+
   const totalMilestoneValue = useMemo(() => financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0), [financials.milestones]);
 
 
@@ -346,10 +342,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     let finalTransactionId = transaction.id;
 
     try {
+        // We now fetch data outside the transaction to comply with Firestore rules.
         const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
-
+        
         const [clientAccountSnap, revenueAccountSnap, parentAccountSnap] = await Promise.all([
             getDocs(clientAccountQuery),
             getDocs(revenueAccountQuery),
@@ -487,7 +484,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-3xl h-[90vh]" 
+        className="max-w-4xl h-[90vh]" 
         dir="rtl"
         onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
@@ -678,5 +675,3 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   )
 }
-
-    
