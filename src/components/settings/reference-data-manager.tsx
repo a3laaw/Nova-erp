@@ -36,7 +36,7 @@ import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { MultiSelect } from '../ui/multi-select';
+import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Skeleton } from '../ui/skeleton';
 
 // --- NEW StatCard Component ---
@@ -64,7 +64,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number}>({
+function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -140,16 +140,25 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setJobsLoading(true);
     try {
         const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
-        const uniqueJobs = new Map<string, { value: string, label: string }>();
+        const uniqueJobs = new Map<string, { value: string; label: string }>();
+
+        // Normalization function to handle variations like 'إ' vs 'ا'
+        const normalize = (str: string) => str.replace(/[أإآ]/g, 'ا').trim();
+
         jobsSnapshot.forEach(doc => {
             const jobName = doc.data().name;
             if (jobName && typeof jobName === 'string') {
                 const trimmedName = jobName.trim();
                 if (trimmedName) {
-                    uniqueJobs.set(trimmedName, { value: trimmedName, label: trimmedName });
+                    const normalizedName = normalize(trimmedName);
+                    // If we haven't seen this normalized name before, add it.
+                    if (!uniqueJobs.has(normalizedName)) {
+                        uniqueJobs.set(normalizedName, { value: trimmedName, label: trimmedName });
+                    }
                 }
             }
         });
+        
         const sortedJobs = Array.from(uniqueJobs.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar'));
         setJobs(sortedJobs);
     } catch (e) {
@@ -161,10 +170,10 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
 
 
   useEffect(() => {
-    if (isWorkStageView && isOpen) {
+    if (isWorkStageView && (isSecondaryDialogOpen || isPrimaryDialogOpen)) {
       fetchAllJobs();
     }
-  }, [isWorkStageView, isOpen, fetchAllJobs]);
+  }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchAllJobs]);
 
 
   const handleSelectPrimary = useCallback(async (item: T) => {
@@ -667,5 +676,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
-    
