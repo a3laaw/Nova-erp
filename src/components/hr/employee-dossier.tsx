@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -83,18 +84,15 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
 
 
   return (
-    <div className="p-4 md:p-6 bg-background font-body print:p-0 printable-content" dir="rtl">
-        <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2">
+    <div 
+      className="p-4 md:p-6 bg-background font-body print:p-0 printable-content bg-no-repeat bg-top bg-cover" 
+      dir="rtl"
+      style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
+    >
+      <div className="pt-48">
+        <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2 print:bg-transparent">
             {/* Header */}
             <header className="flex justify-between items-start pb-4 border-b">
-                 {branding?.letterhead_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                        src={branding.letterhead_image_url} 
-                        alt={`${branding.company_name || ''} Letterhead`}
-                        className="w-full h-auto object-contain max-h-[150px]"
-                    />
-                ) : (
                     <>
                         <div className='flex items-center gap-4'>
                             <Logo className="h-16 w-16 !p-3 print:hidden" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
@@ -108,7 +106,6 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                             {currentDate && <p className="print:hidden">تاريخ الطباعة: {formatDate(currentDate)}</p>}
                         </div>
                     </>
-                )}
             </header>
 
             <main className="space-y-4">
@@ -134,18 +131,24 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="القسم" value={employee.department} />
                     <InfoItem label="المسمى الوظيفي" value={employee.jobTitle} />
                     <InfoItem label="المنصب" value={employee.position} />
-                    <InfoItem label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
+                    <InfoItem label="تاريخ التعيين" value={formatDate(hireDate)} />
                     <InfoItem label="نوع العقد" value={employee.contractType} />
                     <InfoItem label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />
                     <InfoItem label="الجنسية" value={employee.nationality} />
                     {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
+                     {employee.status === 'terminated' && (
+                        <>
+                         <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(employee.terminationDate)} />
+                         <InfoItem label="سبب إنهاء الخدمة" value={employee.terminationReason === 'resignation' ? 'استقالة' : 'إنهاء من صاحب العمل'} />
+                        </>
+                     )}
                 </Section>
 
                 <Section title="البيانات المالية" icon={<Wallet />}>
                     <InfoItem label="الراتب الأساسي" value={formatCurrency(employee.basicSalary || 0)} />
                     <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
                     <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
-                    <InfoItem label="إجمالي الراتب" value={formatCurrency(totalSalary)} className="font-bold border-t pt-2" />
+                    <InfoItem label="الإجمالي" value={formatCurrency(totalSalary)} className="font-bold border-t pt-2" />
                     <Separator className='md:col-span-2 my-1' />
                     <InfoItem label="طريقة دفع الراتب" value={employee.salaryPaymentType} />
                     <InfoItem label="اسم البنك" value={employee.bankName} />
@@ -205,6 +208,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                 </p>
             </footer>
         </div>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -73,18 +74,14 @@ export function TransactionContract({ client, transaction }: TransactionContract
     }
 
     return (
-        <div id="contract-content" className="space-y-8 printable-content">
-            <header className="pb-4 border-b">
-                 {branding?.letterhead_image_url ? (
-                    // Using a standard img tag for better PDF rendering
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                        src={branding.letterhead_image_url} 
-                        alt={`${branding.company_name || ''} Letterhead`}
-                        className="w-full h-auto object-contain max-h-[150px]"
-                    />
-                ) : (
-                    <div className="flex justify-between items-center">
+        <div 
+            id="contract-content" 
+            className="space-y-8 printable-content bg-no-repeat bg-top bg-cover"
+            style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
+        >
+            <div className="pt-48">
+                <header className="pb-4 border-b">
+                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <Logo className="h-20 w-20 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                             <div>
@@ -104,119 +101,119 @@ export function TransactionContract({ client, transaction }: TransactionContract
                             <p className="font-mono text-xs text-gray-500">{contractNumber}</p>
                         </div>
                     </div>
+                </header>
+
+                <section>
+                    <h3 className="font-bold mb-2">أطراف الاتفاقية</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
+                        <div>
+                            <p className="font-semibold">الطرف الأول:</p>
+                            <p>{branding?.company_name || 'Nova ERP'}.</p>
+                        </div>
+                        <div>
+                            <p className="font-semibold">الطرف الثاني:</p>
+                            <p>السيد/ {client.nameAr}</p>
+                            <p>الرقم المدني: {client.civilId}</p>
+                            <p>العنوان: {clientAddress}</p>
+                        </div>
+                    </div>
+                </section>
+                
+                {scopeOfWork.length > 0 && (
+                    <section>
+                        <h3 className="font-bold mb-2">نطاق العمل</h3>
+                        <div className="space-y-2 text-sm p-4 border rounded-lg">
+                            {scopeOfWork.map((item, index) => (
+                                <div key={item.id} className="pb-2">
+                                    <p className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`} {item.title}</p>
+                                    <p className="text-muted-foreground pr-4">{item.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
                 )}
-            </header>
 
-            <section>
-                <h3 className="font-bold mb-2">أطراف الاتفاقية</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
-                    <div>
-                        <p className="font-semibold">الطرف الأول:</p>
-                        <p>{branding?.company_name || 'Nova ERP'}.</p>
-                    </div>
-                    <div>
-                        <p className="font-semibold">الطرف الثاني:</p>
-                        <p>السيد/ {client.nameAr}</p>
-                        <p>الرقم المدني: {client.civilId}</p>
-                        <p>العنوان: {clientAddress}</p>
-                    </div>
-                </div>
-            </section>
-            
-            {scopeOfWork.length > 0 && (
                 <section>
-                    <h3 className="font-bold mb-2">نطاق العمل</h3>
+                    <h3 className="font-bold mb-2">الشروط والأحكام</h3>
                     <div className="space-y-2 text-sm p-4 border rounded-lg">
-                        {scopeOfWork.map((item, index) => (
-                            <div key={item.id} className="pb-2">
-                                <p className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`} {item.title}</p>
-                                <p className="text-muted-foreground pr-4">{item.description}</p>
-                            </div>
-                        ))}
+                        {terms.length > 0 ? (
+                            terms.map((term, index) => (
+                                <div key={term.id} className="flex gap-2">
+                                    <span className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                                    <p>{term.text}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground">لا توجد شروط وأحكام خاصة.</p>
+                        )}
                     </div>
                 </section>
-            )}
-
-            <section>
-                <h3 className="font-bold mb-2">الشروط والأحكام</h3>
-                <div className="space-y-2 text-sm p-4 border rounded-lg">
-                    {terms.length > 0 ? (
-                        terms.map((term, index) => (
-                            <div key={term.id} className="flex gap-2">
-                                <span className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
-                                <p>{term.text}</p>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-muted-foreground">لا توجد شروط وأحكام خاصة.</p>
-                    )}
-                </div>
-            </section>
-            
-            <section>
-                <h3 className="font-bold mb-2">البنود المالية</h3>
-                <div className="border rounded-lg">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th className="p-2 text-right font-semibold">البند</th>
-                                <th className="p-2 text-left font-semibold">المبلغ (د.ك)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {clauses.map((clause, index) => (
-                            <tr key={clause.id} className="border-t">
-                                <td className="p-2">
-                                    {index + 1}. {clause.name}
-                                    {financialsType === 'percentage' && clause.percentage != null && (
-                                        <span className="text-xs text-gray-500"> (وهي تمثل {clause.percentage}% من قيمة العقد)</span>
-                                    )}
-                                </td>
-                                <td className="p-2 text-left font-mono">
-                                    {formatCurrency(clause.amount)}
-                                </td>
-                            </tr>
-                        ))}
-                        </tbody>
-                        <tfoot>
-                            <tr className="border-t-2 font-bold bg-gray-50 dark:bg-gray-700/50">
-                                <td className="p-2 text-right">الإجمالي</td>
-                                <td className="p-2 text-left font-mono">{formatCurrency(totalAmount)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </section>
-
-            {openClauses.length > 0 && (
+                
                 <section>
-                    <h3 className="font-bold mb-2">بنود إضافية</h3>
-                    <div className="space-y-2 text-sm p-4 border rounded-lg">
-                        {openClauses.map((clause, index) => (
-                            <div key={clause.id} className="flex gap-2">
-                                <span className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
-                                <p>{clause.text}</p>
-                            </div>
-                        ))}
+                    <h3 className="font-bold mb-2">البنود المالية</h3>
+                    <div className="border rounded-lg">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    <th className="p-2 text-right font-semibold">البند</th>
+                                    <th className="p-2 text-left font-semibold">المبلغ (د.ك)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {clauses.map((clause, index) => (
+                                <tr key={clause.id} className="border-t">
+                                    <td className="p-2">
+                                        {index + 1}. {clause.name}
+                                        {financialsType === 'percentage' && clause.percentage != null && (
+                                            <span className="text-xs text-gray-500"> (وهي تمثل {clause.percentage}% من قيمة العقد)</span>
+                                        )}
+                                    </td>
+                                    <td className="p-2 text-left font-mono">
+                                        {formatCurrency(clause.amount)}
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 font-bold bg-gray-50 dark:bg-gray-700/50">
+                                    <td className="p-2 text-right">الإجمالي</td>
+                                    <td className="p-2 text-left font-mono">{formatCurrency(totalAmount)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </section>
-            )}
-            
-            <section className="pt-16">
-                <div className="grid grid-cols-2 gap-8 text-center text-sm">
-                    <div>
-                        <p className="font-bold">الطرف الأول (المهندس)</p>
-                        <div className="mt-12 border-t pt-2">التوقيع</div>
+
+                {openClauses.length > 0 && (
+                    <section>
+                        <h3 className="font-bold mb-2">بنود إضافية</h3>
+                        <div className="space-y-2 text-sm p-4 border rounded-lg">
+                            {openClauses.map((clause, index) => (
+                                <div key={clause.id} className="flex gap-2">
+                                    <span className="font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                                    <p>{clause.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+                
+                <section className="pt-16">
+                    <div className="grid grid-cols-2 gap-8 text-center text-sm">
+                        <div>
+                            <p className="font-bold">الطرف الأول (المهندس)</p>
+                            <div className="mt-12 border-t pt-2">التوقيع</div>
+                        </div>
+                        <div>
+                            <p className="font-bold">الطرف الثاني (المالك)</p>
+                            <div className="mt-12 border-t pt-2">التوقيع</div>
+                        </div>
                     </div>
-                    <div>
-                        <p className="font-bold">الطرف الثاني (المالك)</p>
-                        <div className="mt-12 border-t pt-2">التوقيع</div>
+                     <div className="mt-8 text-center">
+                        <p className="font-bold text-lg">ختم الشركة</p>
                     </div>
-                </div>
-                 <div className="mt-8 text-center">
-                    <p className="font-bold text-lg">ختم الشركة</p>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
     );
 }

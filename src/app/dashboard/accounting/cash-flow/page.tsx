@@ -194,12 +194,14 @@ export default function CashFlowStatementPage() {
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
             {!isLoading && cashFlowData && (
-                 <Card id="printable-area" className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
-                    <CardHeader className="p-8 md:p-12">
-                        {branding?.letterhead_image_url ? (
-                             <img src={branding.letterhead_image_url} alt={`${branding.company_name || ''} Letterhead`} className="w-full h-auto object-contain max-h-[150px] mb-4"/>
-                        ) : (
-                             <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                 <Card 
+                    id="printable-area" 
+                    className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent bg-no-repeat bg-top bg-cover"
+                    style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
+                >
+                    <div className="pt-48">
+                        <CardHeader className="p-8 md:p-12">
+                             <div className="flex justify-between items-start pb-4">
                                 <div className="text-left flex-shrink-0">
                                     <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة التدفقات النقدية</h2>
                                     <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Statement of Cash Flows</p>
@@ -214,59 +216,57 @@ export default function CashFlowStatementPage() {
                                     </div>
                                 </div>
                             </div>
-                        )}
-                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
-                         </div>
-                    </CardHeader>
-                    <CardContent className="px-8 md:px-12 space-y-6">
-                        {/* Operating Activities */}
-                        <div className="space-y-2">
-                            <h3 className="font-bold text-lg">التدفقات النقدية من الأنشطة التشغيلية</h3>
-                            <StatementLine label="صافي الربح" value={cashFlowData.netIncome} />
-                            <p className="text-sm font-semibold text-muted-foreground pt-2">تعديلات الأنشطة التشغيلية:</p>
-                            <StatementLine label="التغير في الذمم المدينة" value={cashFlowData.changeInAR} isSubItem />
-                            <StatementLine label="التغير في الذمم الدائنة" value={cashFlowData.changeInAP} isSubItem />
-                             <StatementLine label="صافي التدفقات النقدية من الأنشطة التشغيلية" value={cashFlowData.cashFromOps} isSubtotal />
-                        </div>
-                        
-                        {/* Investing Activities */}
-                         <div className="space-y-2">
-                            <h3 className="font-bold text-lg">التدفقات النقدية من الأنشطة الاستثمارية</h3>
-                            <div className="text-center text-muted-foreground p-4 border-dashed border rounded-md">
-                                لا توجد بيانات للأنشطة الاستثمارية
+                             <div className="mt-6 text-sm">
+                                <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
+                             </div>
+                        </CardHeader>
+                        <CardContent className="px-8 md:px-12 space-y-6">
+                            {/* Operating Activities */}
+                            <div className="space-y-2">
+                                <h3 className="font-bold text-lg">التدفقات النقدية من الأنشطة التشغيلية</h3>
+                                <StatementLine label="صافي الربح" value={cashFlowData.netIncome} />
+                                <p className="text-sm font-semibold text-muted-foreground pt-2">تعديلات الأنشطة التشغيلية:</p>
+                                <StatementLine label="التغير في الذمم المدينة" value={cashFlowData.changeInAR} isSubItem />
+                                <StatementLine label="التغير في الذمم الدائنة" value={cashFlowData.changeInAP} isSubItem />
+                                 <StatementLine label="صافي التدفقات النقدية من الأنشطة التشغيلية" value={cashFlowData.cashFromOps} isSubtotal />
                             </div>
-                             <StatementLine label="صافي التدفقات النقدية من الأنشطة الاستثمارية" value={0} isSubtotal />
-                        </div>
+                            
+                            {/* Investing Activities */}
+                             <div className="space-y-2">
+                                <h3 className="font-bold text-lg">التدفقات النقدية من الأنشطة الاستثمارية</h3>
+                                <div className="text-center text-muted-foreground p-4 border-dashed border rounded-md">
+                                    لا توجد بيانات للأنشطة الاستثمارية
+                                </div>
+                                 <StatementLine label="صافي التدفقات النقدية من الأنشطة الاستثمارية" value={0} isSubtotal />
+                            </div>
 
-                        {/* Financing Activities */}
-                         <div className="space-y-2">
-                            <h3 className="font-bold text-lg">التدفقات النقدية من الأنشطة التمويلية</h3>
-                             <div className="text-center text-muted-foreground p-4 border-dashed border rounded-md">
-                                لا توجد بيانات للأنشطة التمويلية
+                            {/* Financing Activities */}
+                             <div className="space-y-2">
+                                <h3 className="font-bold text-lg">التدفقات النقدية من الأنشطة التمويلية</h3>
+                                 <div className="text-center text-muted-foreground p-4 border-dashed border rounded-md">
+                                    لا توجد بيانات للأنشطة التمويلية
+                                </div>
+                                 <StatementLine label="صافي التدفقات النقدية من الأنشطة التمويلية" value={0} isSubtotal />
                             </div>
-                             <StatementLine label="صافي التدفقات النقدية من الأنشطة التمويلية" value={0} isSubtotal />
-                        </div>
-                        
-                        <Separator className="my-4"/>
-                        
-                        {/* Summary */}
-                        <div className="space-y-2">
-                            <StatementLine label="صافي التغير في النقد" value={cashFlowData.netCashChange} />
-                            <StatementLine label="النقد في بداية الفترة" value={cashFlowData.cashAtStart} />
-                            <StatementLine label="النقد في نهاية الفترة" value={cashFlowData.cashAtEnd} isTotal />
-                        </div>
-                    </CardContent>
-                     <CardFooter className="p-8 md:p-12 flex justify-end items-center no-print">
-                        <Button onClick={handlePrint}>
-                            <Printer className="ml-2 h-4 w-4" />
-                            طباعة / تصدير PDF
-                        </Button>
-                    </CardFooter>
+                            
+                            <Separator className="my-4"/>
+                            
+                            {/* Summary */}
+                            <div className="space-y-2">
+                                <StatementLine label="صافي التغير في النقد" value={cashFlowData.netCashChange} />
+                                <StatementLine label="النقد في بداية الفترة" value={cashFlowData.cashAtStart} />
+                                <StatementLine label="النقد في نهاية الفترة" value={cashFlowData.cashAtEnd} isTotal />
+                            </div>
+                        </CardContent>
+                         <CardFooter className="p-8 md:p-12 flex justify-end items-center no-print">
+                            <Button onClick={handlePrint}>
+                                <Printer className="ml-2 h-4 w-4" />
+                                طباعة / تصدير PDF
+                            </Button>
+                        </CardFooter>
+                    </div>
                  </Card>
             )}
         </div>
     );
 }
-
-    
