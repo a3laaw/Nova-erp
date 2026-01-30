@@ -316,6 +316,11 @@
             "description": "The job titles responsible for this stage, copied from the WorkStage template.",
             "items": { "type": "string" }
         },
+        "trackingType": {
+          "type": "string",
+          "enum": ["duration", "occurrence", "none"],
+          "description": "The tracking type of the stage, copied from the template."
+        },
         "startDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
         "expectedEndDate": { "type": ["string", "null"], "format": "date-time", "description": "The expected completion date for countdowns." },
@@ -605,8 +610,8 @@
         },
         "trackingType": {
             "type": "string",
-            "enum": ["duration", "occurrence"],
-            "description": "How to track progress: by time duration or by number of occurrences."
+            "enum": ["duration", "occurrence", "none"],
+            "description": "How to track progress: by time, occurrences, or as a single event."
         },
         "expectedDurationDays": {
             "type": ["number", "null"],

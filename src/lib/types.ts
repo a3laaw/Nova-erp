@@ -1,3 +1,4 @@
+
 export interface Company {
     id?: string;
     name: string;
@@ -356,12 +357,12 @@ export interface TransactionStage {
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
   allowedRoles?: string[];
+  trackingType?: 'duration' | 'occurrence' | 'none';
   startDate: any | null;
   endDate: any | null;
   notes?: string;
   order?: number;
   expectedEndDate?: any;
-  trackingType?: 'duration' | 'occurrence';
   maxOccurrences?: number;
   completedCount?: number;
 }
@@ -427,7 +428,7 @@ export interface WorkStage {
   name: string;
   order?: number;
   allowedRoles?: string[];
-  trackingType: 'duration' | 'occurrence';
+  trackingType: 'duration' | 'occurrence' | 'none';
   expectedDurationDays?: number;
   maxOccurrences?: number;
 }
@@ -624,4 +625,5 @@ export interface PurchaseOrder {
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
+
     

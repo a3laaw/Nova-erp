@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -63,7 +64,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence', maxOccurrences?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence', maxOccurrences?: number}>({
+function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -103,7 +104,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   
   const [itemName, setItemName] = useState('');
   const [itemRoles, setItemRoles] = useState<string[]>([]);
-  const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence'>('duration');
+  const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
   const [itemDuration, setItemDuration] = useState<number | ''>('');
   const [itemMaxOccurrences, setItemMaxOccurrences] = useState<number | ''>('');
 
@@ -263,9 +264,12 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
           if (itemTrackingType === 'duration') {
               dataToSave.expectedDurationDays = Number(itemDuration) || 0;
               dataToSave.maxOccurrences = null;
-          } else {
+          } else if (itemTrackingType === 'occurrence') {
               dataToSave.maxOccurrences = Number(itemMaxOccurrences) || 1;
               dataToSave.expectedDurationDays = null;
+          } else { // for 'none'
+              dataToSave.expectedDurationDays = null;
+              dataToSave.maxOccurrences = null;
           }
       }
 
@@ -373,6 +377,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                         <span>{item.name}</span>
                         {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
                         {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
+                        {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
                         {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
                             <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                         ))}
@@ -427,16 +432,18 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                             <SelectContent>
                                 <SelectItem value="duration">بالمدة الزمنية</SelectItem>
                                 <SelectItem value="occurrence">بعدَد مرات الحدوث</SelectItem>
+                                <SelectItem value="none">لا شيء (حدث واحد)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
-                    {itemTrackingType === 'duration' ? (
+                    {itemTrackingType === 'duration' && (
                         <div className="grid gap-2">
                             <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
                             <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
                         </div>
-                    ) : (
+                    )}
+                    {itemTrackingType === 'occurrence' && (
                         <div className="grid gap-2">
                             <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
                             <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
@@ -647,3 +654,5 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
+
+    
