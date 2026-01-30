@@ -163,3 +163,4 @@ export function BrandingManager() {
             </CardFooter>
         </Card>
     );
+}
