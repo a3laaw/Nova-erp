@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -34,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { Separator } from '@/components/ui/separator';
+import { Separator } from '../ui/separator';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -324,7 +325,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const removeMilestone = (id: string) => {
     setFinancials(prev => ({ ...prev, milestones: prev.milestones.filter(m => m.id !== id) }));
   };
-
+  
   const totalAmount = useMemo(() => {
     if (financials.type === 'fixed') {
         return financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0);
@@ -368,7 +369,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, journalEntryCounterDoc, coaClientCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterDoc)
+                transaction_firestore.get(coaClientCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
