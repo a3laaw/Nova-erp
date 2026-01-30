@@ -88,6 +88,7 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSavingClient, setIsSavingClient] = useState(false);
   
   const { items: clients, setItems: setClients, loading: clientsLoading, error: clientsError, hasMore, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
   const { data: employees, loading: employeesLoading, error: employeesError } = useSubscription<Employee>(firestore, 'employees');
@@ -119,23 +120,8 @@ export default function ClientsPage() {
 
   const handleSaveClient = async (newClientData: Partial<Client>) => {
     if (!firestore) return;
-    const tempId = `optimistic-${Date.now()}`;
-    const optimisticClient: Client = {
-      id: tempId,
-      ...newClientData,
-      nameAr: newClientData.nameAr || '',
-      mobile: newClientData.mobile || '',
-      fileId: '...',
-      fileNumber: 0,
-      fileYear: 0,
-      status: 'new',
-      createdAt: new Date(),
-      isActive: true,
-    };
+    setIsSavingClient(true);
     
-    setClients(prev => [optimisticClient, ...prev]);
-    setIsFormOpen(false);
-
     try {
        await runTransaction(firestore, async (transaction) => {
             const currentYear = String(new Date().getFullYear());
@@ -165,10 +151,12 @@ export default function ClientsPage() {
         });
 
       toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
+      setIsFormOpen(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'فشل إضافة العميل.';
       toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
-      setClients(prev => prev.filter(c => c.id !== tempId));
+    } finally {
+        setIsSavingClient(false);
     }
   };
 
@@ -178,19 +166,19 @@ export default function ClientsPage() {
 
     setIsDeleting(true);
     
+    const originalClients = [...clients];
     setClients(prev => prev.filter(c => c.id !== clientToDelete.id));
+    setClientToDelete(null);
     
     try {
       await deleteDoc(doc(firestore, 'clients', clientToDelete.id!));
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
     } catch (e) {
-      // Revert UI on failure
-      setClients(clients);
+      setClients(originalClients);
       console.error("Error deleting client: ", e);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل. تم التراجع عن التغيير.' });
     } finally {
       setIsDeleting(false);
-      setClientToDelete(null);
     }
   };
   
@@ -285,7 +273,7 @@ export default function ClientsPage() {
               {loading && <TableRow><TableCell colSpan={6}><Skeleton className="h-20 w-full" /></TableCell></TableRow>}
               {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
               {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
-              {filteredClients.map((client) => {
+              {filteredClients.map((client, index) => {
                 const isOptimistic = client.id.startsWith('optimistic-');
                 return (
                     <TableRow key={client.id} className={cn(isOptimistic && 'opacity-50')}>
@@ -343,6 +331,7 @@ export default function ClientsPage() {
             <ClientForm 
                 onSave={handleSaveClient} 
                 onClose={() => setIsFormOpen(false)}
+                isSaving={isSavingClient}
             />
         </DialogContent>
     </Dialog>

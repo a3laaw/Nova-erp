@@ -20,13 +20,13 @@ interface ClientFormProps {
     onSave: (data: Partial<Client>) => Promise<void>;
     onClose: () => void;
     initialData?: Partial<Client> | null;
+    isSaving?: boolean;
 }
 
-export function ClientForm({ onSave, onClose, initialData = null }: ClientFormProps) {
+export function ClientForm({ onSave, onClose, initialData = null, isSaving = false }: ClientFormProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [isSaving, setIsSaving] = useState(false);
     const [formData, setFormData] = useState({
         nameAr: '', nameEn: '', mobile: '', governorateId: '', area: '',
         block: '', street: '', houseNumber: '',
@@ -135,7 +135,6 @@ export function ClientForm({ onSave, onClose, initialData = null }: ClientFormPr
             return;
         }
         
-        setIsSaving(true);
         const selectedGov = governorates.find(g => g.id === formData.governorateId);
 
         const dataToSave = {
@@ -153,7 +152,6 @@ export function ClientForm({ onSave, onClose, initialData = null }: ClientFormPr
         };
         
         await onSave(dataToSave);
-        setIsSaving(false);
     };
 
     return (
