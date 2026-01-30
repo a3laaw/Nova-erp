@@ -6,5 +6,5 @@
 
 export * from './provider';
 export { useUser } from './auth/use-user';
-export { useCollection } from './firestore/use-collection';
-export { useDoc } from './firestore/use-doc';
+export { useSubscription } from './firestore/use-subscription';
+export { useDocument } from './firestore/use-document';

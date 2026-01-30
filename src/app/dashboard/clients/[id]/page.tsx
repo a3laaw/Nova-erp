@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useFirebase, useDoc, useCollection } from '@/firebase';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
   Card,
@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import type { ClientTransaction, Employee, Quotation } from '@/lib/types';
+import type { Client, ClientTransaction, Employee, Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 import {
@@ -52,7 +52,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
@@ -109,22 +109,17 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
 
   const quotationsQuery = useMemo(() => {
     if (!firestore || !clientId) return null;
-    return query(collection(firestore, 'quotations'), where('clientId', '==', clientId));
+    return [where('clientId', '==', clientId)];
   }, [firestore, clientId]);
 
-  const [snapshot, loading, error] = useCollection(quotationsQuery);
-
-  const quotations = useMemo(() => {
-    if (!snapshot) return [];
-    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quotation));
-    docs.sort((a, b) => {
-        const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
-        const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
-        return dateB - dateA;
-    });
-    return docs;
-  }, [snapshot]);
+  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, quotationsQuery ? 'quotations' : '', quotationsQuery || []);
   
+  const sortedQuotations = useMemo(() => {
+    if (!quotations) return [];
+    return [...quotations].sort((a,b) => (b.date?.toMillis() || 0) - (a.date?.toMillis() || 0));
+  }, [quotations]);
+
+
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
     try {
@@ -166,7 +161,7 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
       </CardHeader>
       <CardContent>
         {loading && <Skeleton className="h-24 w-full" />}
-        {!loading && quotations.length === 0 && (
+        {!loading && sortedQuotations.length === 0 && (
           <div className="p-8 text-center border-2 border-dashed rounded-lg">
             <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-medium">لا توجد عروض أسعار بعد</h3>
@@ -175,7 +170,7 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
             </p>
           </div>
         )}
-        {!loading && quotations.length > 0 && (
+        {!loading && sortedQuotations.length > 0 && (
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
@@ -189,7 +184,7 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotations.map(q => (
+                {sortedQuotations.map(q => (
                   <TableRow key={q.id}>
                     <TableCell className="font-mono">{q.quotationNumber}</TableCell>
                     <TableCell>{q.subject}</TableCell>
@@ -234,30 +229,15 @@ export default function ClientProfilePage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // --- Data Fetching ---
-  const clientRef = useMemo(() => {
-    if (!firestore || !id) return null;
-    return doc(firestore, 'clients', id);
-  }, [id, firestore]);
-  
+  const clientPath = useMemo(() => (firestore && id ? `clients/${id}` : null), [firestore, id]);
+  const { data: client, loading: clientLoading, error: clientError } = useDocument<Client>(firestore, clientPath);
+
   const transactionsQuery = useMemo(() => {
     if (!firestore || !id) return null;
-    return query(collection(firestore, 'clients', id, 'transactions'), orderBy('createdAt', 'desc'));
+    return [orderBy('createdAt', 'desc')];
   }, [firestore, id]);
 
-  const [clientSnapshot, clientLoading, clientError] = useDoc(clientRef);
-  const [transactionsSnapshot, transactionsLoading, transactionsError] = useCollection(transactionsQuery);
-
-  const client = useMemo(() => {
-    if (clientSnapshot?.exists()) {
-        return { id: clientSnapshot.id, ...clientSnapshot.data() };
-    }
-    return null;
-  }, [clientSnapshot]);
-
-  const transactions = useMemo(() => {
-      if (!transactionsSnapshot) return [];
-      return transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-  }, [transactionsSnapshot]);
+  const { data: transactions, loading: transactionsLoading, error: transactionsError } = useSubscription<ClientTransaction>(firestore, `clients/${id}/transactions`, transactionsQuery || []);
   
   useEffect(() => {
     if (!firestore) return;
@@ -495,15 +475,15 @@ export default function ClientProfilePage() {
                     <User className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <div className='space-y-1'>
-                    <CardTitle className='text-3xl'>{(client as any).nameAr}</CardTitle>
-                    <CardDescription className='text-md'>{(client as any).nameEn}</CardDescription>
+                    <CardTitle className='text-3xl'>{client.nameAr}</CardTitle>
+                    <CardDescription className='text-md'>{client.nameEn}</CardDescription>
                     <div className='flex items-center gap-4 pt-1'>
                         <div className='flex items-center gap-2 text-sm text-muted-foreground font-mono'>
                             <Hash className='h-4 w-4'/>
-                            <span>{(client as any).fileId}</span>
+                            <span>{client.fileId}</span>
                         </div>
-                        <Badge variant="outline" className={clientStatusColors[(client as any).status]}>
-                            {clientStatusTranslations[(client as any).status]}
+                        <Badge variant="outline" className={clientStatusColors[client.status]}>
+                            {clientStatusTranslations[client.status]}
                         </Badge>
                     </div>
                 </div>
@@ -523,9 +503,9 @@ export default function ClientProfilePage() {
                 </CardHeader>
                 <CardContent className='space-y-4'>
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
-                    <InfoRow icon={<Phone />} label="رقم الجوال" value={(client as any).mobile} />
+                    <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
                     <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                    <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate((client as any).createdAt)} />
+                    <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
                 </CardContent>
             </Card>
 
@@ -627,7 +607,7 @@ export default function ClientProfilePage() {
             </Card>
           </TabsContent>
            <TabsContent value="quotations" className="mt-6">
-                <ClientQuotationsList clientId={id} clientName={(client as any).nameAr} />
+                <ClientQuotationsList clientId={id} clientName={client.nameAr} />
            </TabsContent>
           <TabsContent value="history" className="mt-6">
             <ClientHistoryTimeline clientId={id} />

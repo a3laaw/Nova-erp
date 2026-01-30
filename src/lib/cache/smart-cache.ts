@@ -1,6 +1,6 @@
 'use client';
 import localforage from 'localforage';
-import { collection, getDocs, query, onSnapshot, type Firestore, type QueryConstraint, type DocumentData, type Query } from 'firebase/firestore';
+import { collection, getDocs, query, onSnapshot, type Firestore, type QueryConstraint, type DocumentData, type Query, doc, type DocumentReference, type DocumentSnapshot, FirestoreError } from 'firebase/firestore';
 import { useState, useEffect, useCallback } from 'react';
 import Fuse from 'fuse.js';
 import { useSyncStatus } from '@/context/sync-context';
@@ -136,12 +136,6 @@ class SmartCacheManager {
     await Promise.all(moduleKeys.map(k => this.invalidate(k)));
     console.log(`CACHE MODULE INVALIDATED: ${moduleName}`);
   }
-
-  search<T>(items: T[], query: string, keys: (string | Fuse.FuseOptionKey<T>)[], threshold: number = 0.3): T[] {
-    if (!query) return items;
-    const fuse = new Fuse(items, { keys: keys as any, threshold, includeScore: true, minMatchCharLength: 2 });
-    return fuse.search(query).map(result => result.item);
-  }
   
   async getFromStorage<T>(key: string): Promise<T | null> {
     const cached = await localforage.getItem<CachedData<T>>(key);
@@ -230,4 +224,75 @@ export function useSubscription<T extends { id?: string }>(
     }, [firestore, collectionPath, JSON.stringify(constraints), signalUpdate]);
 
     return { data, setData, loading: isInitialLoading, error };
+}
+
+
+export function useDocument<T extends { id?: string }>(
+  firestore: Firestore | null,
+  docPath: string | null
+): { data: T | null, loading: boolean, error: Error | null } {
+  const [data, setData] = useState<T | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const { signalUpdate } = useSyncStatus();
+
+  const cacheKey = docPath;
+
+  useEffect(() => {
+    if (!firestore || !docPath) {
+      setData(null);
+      setIsInitialLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    let isFirstLoad = true;
+    setIsInitialLoading(true);
+
+    localforage.getItem<CachedData<T>>(cacheKey!).then(cached => {
+      if (isMounted && cached?.data) {
+        setData(cached.data);
+      }
+    });
+
+    const docRef = doc(firestore, docPath);
+
+    const unsubscribe = onSnapshot(docRef,
+      (snapshot) => {
+        if (isMounted) {
+          if (snapshot.exists()) {
+            const result = { id: snapshot.id, ...snapshot.data() } as T;
+            setData(result);
+            SmartCache.set(cacheKey!, result);
+          } else {
+            setData(null);
+            localforage.removeItem(cacheKey!);
+          }
+          setError(null);
+          
+          if (isFirstLoad) {
+            setIsInitialLoading(false);
+            isFirstLoad = false;
+          } else {
+            signalUpdate();
+          }
+        }
+      },
+      (err) => {
+        console.error(`Error subscribing to document ${docPath}:`, err);
+        if (isMounted) {
+          setError(err);
+          setIsInitialLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firestore, docPath, cacheKey, signalUpdate]);
+
+  return { data, loading: isInitialLoading, error };
 }
