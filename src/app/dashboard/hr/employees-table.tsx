@@ -101,11 +101,16 @@ export function EmployeesTable() {
 
   const processedEmployees = useMemo(() => {
     if (!employees) return [];
+    const getSafeTimestamp = (date: any): number => {
+        if (!date) return 0;
+        if (typeof date.toMillis === 'function') return date.toMillis();
+        return new Date(date).getTime();
+    };
     const employeeList = employees.map(emp => ({
         ...emp,
         annualLeaveBalance: calculateAnnualLeaveBalance(emp)
     }));
-    return employeeList.sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    return employeeList.sort((a,b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
   }, [employees]);
 
 
@@ -481,42 +486,44 @@ export function EmployeesTable() {
                   <div className="grid gap-2">
                       <Label>نوع إعادة الخدمة</Label>
                       <RadioGroup value={rehireType} onValueChange={(v) => setRehireType(v as any)} className='flex gap-4'>
-                          <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="continue" id="continue" />
-                              <Label htmlFor="continue">استمرار الخدمة السابقة</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="new" id="new" />
-                              <Label htmlFor="new">اعتباره تعيين جديد</Label>
-                          </div>
-                      </RadioGroup>
-                  </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="continue" id="continue" />
+                                    <Label htmlFor="continue">استمرار الخدمة السابقة</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="new" id="new" />
+                                    <Label htmlFor="new">اعتباره تعيين جديد</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
 
-                  {rehireType === 'new' && (
-                      <div className="grid gap-2">
-                          <Label htmlFor="newHireDate">تاريخ التعيين الجديد</Label>
-                          <Input
-                              id="newHireDate"
-                              type="date"
-                              value={newHireDate}
-                              onChange={(e) => setNewHireDate(e.target.value)}
-                          />
-                      </div>
-                  )}
-                  
-                  <div className="flex items-center space-x-2">
-                      <Checkbox id="resetLeave" checked={resetLeaveBalance} onCheckedChange={(checked) => setResetLeaveBalance(checked as boolean)} />
-                      <Label htmlFor="resetLeave">تصفير رصيد الإجازات السابق</Label>
-                  </div>
-              </div>
-              <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isRehiring}>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
-                      {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
-                  </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+                        {rehireType === 'new' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="newHireDate">تاريخ التعيين الجديد</Label>
+                                <Input
+                                    id="newHireDate"
+                                    type="date"
+                                    value={newHireDate}
+                                    onChange={(e) => setNewHireDate(e.target.value)}
+                                />
+                            </div>
+                        )}
+                        
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="resetLeave" checked={resetLeaveBalance} onCheckedChange={(checked) => setResetLeaveBalance(checked as boolean)} />
+                            <Label htmlFor="resetLeave">تصفير رصيد الإجازات السابق</Label>
+                        </div>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isRehiring}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
+                            {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    );
 }
+
+    

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -31,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirebase, useCollection } from '@/firebase';
 import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -70,7 +69,7 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
 
 
 export default function LeaveRequestsPage() {
-    const firestore = useFirestore();
+    const firestore = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -127,8 +126,6 @@ export default function LeaveRequestsPage() {
 
     const requestsQuery = useMemo(() => {
         if (!firestore) return null;
-        // The orderBy clause was removed because it requires a composite index in Firestore.
-        // Sorting will be handled on the client-side instead.
         return query(
             collection(firestore, 'leaveRequests'), 
             where('status', '==', filter)
@@ -139,13 +136,13 @@ export default function LeaveRequestsPage() {
 
     const requests = useMemo(() => {
         if (!snapshot) return [];
+        const getSafeTimestamp = (date: any): number => {
+            if (!date) return 0;
+            if (typeof date.toMillis === 'function') return date.toMillis();
+            return new Date(date).getTime();
+        };
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-        // Sort client-side to avoid needing a composite index in Firestore
-        data.sort((a, b) => {
-            const timeA = a.createdAt?.toMillis() || 0;
-            const timeB = b.createdAt?.toMillis() || 0;
-            return timeB - timeA;
-        });
+        data.sort((a, b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
         return data;
     }, [snapshot]);
 
@@ -458,6 +455,4 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
-    
-
     

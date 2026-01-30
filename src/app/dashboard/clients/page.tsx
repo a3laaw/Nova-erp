@@ -106,10 +106,21 @@ export default function ClientsPage() {
 
   const augmentedClients = useMemo(() => {
     if (!clients) return [];
+    
+    const getSafeTimestamp = (date: any): number => {
+      if (!date) return 0;
+      // Firestore Timestamp
+      if (typeof date.toMillis === 'function') {
+        return date.toMillis();
+      }
+      // Javascript Date or string
+      return new Date(date).getTime();
+    };
+
     return clients.map(client => ({
         ...client,
         assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
-    })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    })).sort((a, b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
   }, [clients, employeesMap]);
 
 
