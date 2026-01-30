@@ -15,7 +15,13 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { signalUpdate } = useSyncStatus();
 
-    const cacheKey = useMemo(() => `${collectionPath}:${JSON.stringify(constraints)}`, [collectionPath, constraints]);
+    // This is the key change. By stringifying the constraints first,
+    // we get a stable primitive value that React's dependency arrays can correctly compare.
+    const stringifiedConstraints = JSON.stringify(constraints);
+
+    const cacheKey = useMemo(() => {
+        return `${collectionPath}:${stringifiedConstraints}`;
+    }, [collectionPath, stringifiedConstraints]);
 
     useEffect(() => {
         if (!collectionPath) {
@@ -56,11 +62,14 @@ export function useSubscription<T extends { id?: string }>(
                     setLoading(false);
                 }
             },
+            // The original `constraints` object is still needed here.
+            // It's safe to use because this effect only re-runs when the stringified version changes.
             constraints
         );
         
         return () => { isMounted = false; unsubscribe(); };
-    }, [collectionPath, cacheKey, signalUpdate, constraints]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [collectionPath, cacheKey, signalUpdate, stringifiedConstraints]);
 
     return { data, setData, loading, error };
 }
