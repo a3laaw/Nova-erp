@@ -6,6 +6,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -192,12 +193,10 @@ export interface PaymentVoucher {
   voucherYear: number;
   payeeName: string;
   payeeType: 'vendor' | 'employee' | 'other';
-  clientId?: string;
-  projectId?: string;
   amount: number;
   amountInWords: string;
   paymentDate: any; // Timestamp
-  paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer';
+  paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'EmployeeCustody';
   description: string;
   reference?: string;
   debitAccountId: string;
@@ -207,6 +206,8 @@ export interface PaymentVoucher {
   status: 'draft' | 'paid' | 'cancelled';
   journalEntryId?: string;
   createdAt: any; // Timestamp
+  clientId?: string;
+  transactionId?: string;
 }
 
 export type Transaction = {
@@ -217,15 +218,6 @@ export type Transaction = {
   type: 'Income' | 'Expense';
   category: string;
   invoiceId?: string;
-};
-
-export type InventoryItem = {
-  id: string;
-  name: MultilingualString;
-  quantity: number;
-  unit: MultilingualString;
-  lowStockThreshold: number;
-  supplier: MultilingualString;
 };
 
 export type Employee = {
@@ -532,11 +524,14 @@ export interface JournalEntryLine {
   id?: string;
   accountId: string;
   accountName: string;
-  partnerId?: string;
-  partnerName?: string;
   debit: number;
   credit: number;
   notes?: string;
+  clientId?: string;
+  transactionId?: string;
+  auto_profit_center?: string;
+  auto_resource_id?: string;
+  auto_dept_id?: string;
 }
 
 export interface JournalEntry {
@@ -551,11 +546,6 @@ export interface JournalEntry {
   lines: JournalEntryLine[];
   createdAt: any; // Timestamp
   createdBy?: string;
-  clientId?: string;
-  transactionId?: string;
-  auto_profit_center?: string; // For client/project
-  auto_resource_id?: string; // For employee
-  auto_dept_id?: string; // For department
 }
 
 export interface WorkStageProgress {

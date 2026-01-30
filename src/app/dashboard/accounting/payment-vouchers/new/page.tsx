@@ -27,13 +27,14 @@ import {
 } from '@/components/ui/select';
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy } from 'firebase/firestore';
-import type { Account, Company } from '@/lib/types';
+import { collection, query, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy, collectionGroup } from 'firebase/firestore';
+import type { Account, ClientTransaction, Employee } from '@/lib/types';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
+import { cn } from '@/lib/utils';
 
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
@@ -45,6 +46,7 @@ const paymentVoucherSchema = z.object({
     reference: z.string().optional(),
     debitAccountId: z.string().min(1, 'حساب المدين مطلوب'),
     creditAccountId: z.string().min(1, 'حساب الدائن مطلوب'),
+    projectLink: z.string().optional(), // clientId/transactionId
 });
 
 type PaymentVoucherFormValues = z.infer<typeof paymentVoucherSchema>;
@@ -60,7 +62,9 @@ export default function NewPaymentVoucherPage() {
   const [isGeneratingVoucher, setIsGeneratingVoucher] = useState(true);
   
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
+  const [refDataLoading, setRefDataLoading] = useState(true);
 
   const { register, handleSubmit, control, watch, formState: { errors } } = useForm<PaymentVoucherFormValues>({
       resolver: zodResolver(paymentVoucherSchema),
@@ -70,6 +74,9 @@ export default function NewPaymentVoucherPage() {
   });
 
   const amountValue = watch('amount');
+  const selectedDebitAccountId = watch('debitAccountId');
+  const payeeType = watch('payeeType');
+  const paymentMethod = watch('paymentMethod');
   const amountInWords = useMemo(() => {
     if (amountValue && !isNaN(amountValue)) {
         return numberToArabicWords(amountValue);
@@ -77,61 +84,59 @@ export default function NewPaymentVoucherPage() {
     return '';
   }, [amountValue]);
 
-  // Generate Voucher Number
+  // Generate Voucher Number & Fetch Ref Data
   useEffect(() => {
     if (!firestore) return;
-    const generateVoucherNumber = async () => {
+    const fetchInitialData = async () => {
         setIsGeneratingVoucher(true);
+        setRefDataLoading(true);
         try {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'paymentVouchers');
-            const counterDoc = await getDoc(counterRef);
+            
+            const [counterDoc, accSnap, empSnap, projSnap, clientSnap] = await Promise.all([
+                getDoc(counterRef),
+                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                getDocs(query(collection(firestore, 'employees'), orderBy('fullName'))),
+                getDocs(query(collectionGroup(firestore, 'transactions'))),
+                getDocs(collection(firestore, 'clients')),
+            ]);
+
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
             setVoucherNumber(`PV-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+            
+            setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
+            setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
+
+            const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
+            const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
+            setProjects(fetchedProjects.filter(p => p.clientName));
+
         } catch (error) {
-            console.error("Error generating voucher number:", error);
-            setVoucherNumber('خطأ');
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل توليد رقم سند تلقائي.' });
+            console.error(error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات الأساسية.' });
         } finally {
             setIsGeneratingVoucher(false);
+            setRefDataLoading(false);
         }
     };
-    generateVoucherNumber();
+    fetchInitialData();
   }, [firestore, toast]);
   
-  // Fetch Accounts
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchAccounts = async () => {
-        setAccountsLoading(true);
-        try {
-            const q = query(collection(firestore, 'chartOfAccounts'), orderBy('code'));
-            const snapshot = await getDocs(q);
-            setAccounts(snapshot.docs.map(d => ({id: d.id, ...d.data()} as Account)));
-        } catch(e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب شجرة الحسابات.' });
-        } finally {
-            setAccountsLoading(false);
-        }
-    };
-    fetchAccounts();
-  }, [firestore, toast]);
+  const debitAccount = useMemo(() => accounts.find(a => a.id === selectedDebitAccountId), [accounts, selectedDebitAccountId]);
+  const showProjectLink = useMemo(() => debitAccount && debitAccount.code.startsWith('51'), [debitAccount]);
 
-  const creditAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق'))).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
-  
-  const debitAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'expense' || (acc.type === 'liability' && acc.name.includes('مورد'))).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
-
+  const creditAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'asset' && acc.isPayable).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
+  const debitAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'expense' || (acc.type === 'liability' && acc.isPayable)).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
+  const employeePayeeOptions = useMemo(() => employees.map(e => ({ value: e.fullName, label: e.fullName })), [employees]);
+  const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
 
   const onSubmit = async (data: PaymentVoucherFormValues) => {
-    if (!firestore || !currentUser) return;
-    if (isGeneratingVoucher) {
-        toast({ variant: 'destructive', title: 'الرجاء الانتظار', description: 'جاري توليد رقم السند.' });
-        return;
-    }
+    if (!firestore || !currentUser || isGeneratingVoucher) return;
     
     setIsSaving(true);
     let newVoucherId = '';
@@ -153,50 +158,38 @@ export default function NewPaymentVoucherPage() {
             const debitAccount = accounts.find(a => a.id === data.debitAccountId);
             const creditAccount = accounts.find(a => a.id === data.creditAccountId);
 
-            if (!debitAccount || !creditAccount) {
-                throw new Error("لم يتم العثور على حسابات المدين أو الدائن.");
-            }
+            if (!debitAccount || !creditAccount) throw new Error("لم يتم العثور على حسابات المدين أو الدائن.");
             
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-
+            
             const newVoucherData = {
-                voucherNumber: newVoucherNumber,
-                voucherSequence: nextNumber,
-                voucherYear: currentYear,
-                payeeName: data.payeeName,
-                payeeType: data.payeeType,
-                amount: data.amount,
-                amountInWords: amountInWords,
-                paymentDate: Timestamp.fromDate(new Date(data.paymentDate)),
-                paymentMethod: data.paymentMethod,
-                description: data.description,
-                reference: data.reference,
-                debitAccountId: data.debitAccountId,
-                debitAccountName: debitAccount.name,
-                creditAccountId: data.creditAccountId,
-                creditAccountName: creditAccount.name,
-                status: 'draft' as const,
-                createdAt: serverTimestamp(),
-                journalEntryId: newJournalEntryRef.id,
+                voucherNumber: newVoucherNumber, voucherSequence: nextNumber, voucherYear: currentYear,
+                payeeName: data.payeeName, payeeType: data.payeeType, amount: data.amount, amountInWords,
+                paymentDate: Timestamp.fromDate(new Date(data.paymentDate)), paymentMethod: data.paymentMethod,
+                description: data.description, reference: data.reference,
+                debitAccountId: data.debitAccountId, debitAccountName: debitAccount.name,
+                creditAccountId: data.creditAccountId, creditAccountName: creditAccount.name,
+                status: 'draft' as const, createdAt: serverTimestamp(), journalEntryId: newJournalEntryRef.id,
+                ...(showProjectLink && data.projectLink ? { clientId: data.projectLink.split('/')[0], transactionId: data.projectLink.split('/')[1] } : {})
             };
 
             const newVoucherRef = doc(collection(firestore, 'paymentVouchers'));
             newVoucherId = newVoucherRef.id;
             transaction.set(newVoucherRef, cleanFirestoreData(newVoucherData));
 
+            const debitLine: any = { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 };
+            
+            if (showProjectLink && data.projectLink) {
+                debitLine.clientId = data.projectLink.split('/')[0];
+                debitLine.transactionId = data.projectLink.split('/')[1];
+            }
+
             const journalEntryData = {
-                entryNumber: `PV-JE-${newVoucherNumber}`,
-                date: newVoucherData.paymentDate,
-                narration: `سند صرف رقم ${newVoucherNumber} إلى ${data.payeeName}`,
-                totalDebit: data.amount,
-                totalCredit: data.amount,
-                status: 'posted' as const, // Payment Vouchers are final once created for now
-                lines: [
-                    { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 },
-                    { accountId: data.creditAccountId, accountName: creditAccount.name, debit: 0, credit: data.amount }
-                ],
-                createdAt: serverTimestamp(),
-                createdBy: currentUser.id,
+                entryNumber: `PV-JE-${newVoucherNumber}`, date: newVoucherData.paymentDate,
+                narration: `${data.description} (سند صرف رقم ${newVoucherNumber})`,
+                totalDebit: data.amount, totalCredit: data.amount, status: 'posted' as const,
+                lines: [ debitLine, { accountId: data.creditAccountId, accountName: creditAccount.name, debit: 0, credit: data.amount } ],
+                createdAt: serverTimestamp(), createdBy: currentUser.id,
             };
             transaction.set(newJournalEntryRef, journalEntryData);
         });
@@ -227,27 +220,25 @@ export default function NewPaymentVoucherPage() {
             <CardContent className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
-                        <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
-                        <Input id="payeeName" {...register('payeeName')} />
-                        {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
-                    </div>
-                    <div className="grid gap-2">
                         <Label htmlFor="payeeType">نوع المستفيد <span className="text-destructive">*</span></Label>
-                        <Controller
-                            name="payeeType"
-                            control={control}
-                            render={({ field }) => (
-                                <Select dir='rtl' onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger id="payeeType"><SelectValue placeholder="اختر نوع المستفيد..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="vendor">مورد</SelectItem>
-                                        <SelectItem value="employee">موظف</SelectItem>
-                                        <SelectItem value="other">أخرى</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        />
+                        <Controller name="payeeType" control={control} render={({ field }) => (
+                            <Select dir='rtl' onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger id="payeeType"><SelectValue placeholder="اختر نوع المستفيد..." /></SelectTrigger>
+                                <SelectContent><SelectItem value="vendor">مورد</SelectItem><SelectItem value="employee">موظف</SelectItem><SelectItem value="other">أخرى</SelectItem></SelectContent>
+                            </Select>
+                        )} />
                         {errors.payeeType && <p className="text-xs text-destructive">{errors.payeeType.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
+                         {payeeType === 'employee' ? (
+                              <Controller name="payeeName" control={control} render={({ field }) => (
+                                <InlineSearchList value={field.value} onSelect={field.onChange} options={employeePayeeOptions} placeholder={refDataLoading ? "تحميل..." : "اختر موظفًا..."} disabled={refDataLoading} />
+                              )} />
+                         ) : (
+                            <Input id="payeeName" {...register('payeeName')} />
+                         )}
+                        {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
                     </div>
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -276,20 +267,17 @@ export default function NewPaymentVoucherPage() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
-                        <Controller
-                            name="paymentMethod"
-                            control={control}
-                            render={({ field }) => (
-                                <Select dir='rtl' onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger id="paymentMethod"><SelectValue placeholder="اختر طريقة الدفع" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Cash">نقداً</SelectItem>
-                                        <SelectItem value="Cheque">شيك</SelectItem>
-                                        <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        />
+                        <Controller name="paymentMethod" control={control} render={({ field }) => (
+                            <Select dir='rtl' onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger id="paymentMethod"><SelectValue placeholder="اختر طريقة الدفع" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Cash">نقداً</SelectItem>
+                                    <SelectItem value="Cheque">شيك</SelectItem>
+                                    <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
+                                    <SelectItem value="EmployeeCustody">عهدة موظف</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )} />
                          {errors.paymentMethod && <p className="text-xs text-destructive">{errors.paymentMethod.message}</p>}
                     </div>
                     <div className="grid gap-2">
@@ -297,41 +285,29 @@ export default function NewPaymentVoucherPage() {
                         <Input id="reference" placeholder="رقم المرجع..." {...register('reference')} />
                     </div>
                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                 <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t", showProjectLink && "md:grid-cols-3")}>
                     <div className="grid gap-2">
                         <Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*</span></Label>
-                        <Controller
-                            name="debitAccountId"
-                            control={control}
-                            render={({ field }) => (
-                                <InlineSearchList 
-                                    value={field.value}
-                                    onSelect={field.onChange}
-                                    options={debitAccountOptions}
-                                    placeholder={accountsLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."}
-                                    disabled={accountsLoading}
-                                />
-                            )}
-                        />
+                        <Controller name="debitAccountId" control={control} render={({ field }) => (
+                            <InlineSearchList value={field.value} onSelect={field.onChange} options={debitAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."} disabled={refDataLoading} />
+                        )} />
                          {errors.debitAccountId && <p className="text-xs text-destructive">{errors.debitAccountId.message}</p>}
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="creditAccountId">الحساب الدائن (الصندوق/البنك) <span className="text-destructive">*</span></Label>
-                         <Controller
-                            name="creditAccountId"
-                            control={control}
-                            render={({ field }) => (
-                                <InlineSearchList 
-                                    value={field.value}
-                                    onSelect={field.onChange}
-                                    options={creditAccountOptions}
-                                    placeholder={accountsLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."}
-                                    disabled={accountsLoading}
-                                />
-                            )}
-                        />
+                        <Label htmlFor="creditAccountId">الحساب الدائن <span className="text-destructive">*</span></Label>
+                         <Controller name="creditAccountId" control={control} render={({ field }) => (
+                            <InlineSearchList value={field.value} onSelect={field.onChange} options={creditAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."} disabled={refDataLoading || paymentMethod === 'EmployeeCustody'} />
+                        )} />
                          {errors.creditAccountId && <p className="text-xs text-destructive">{errors.creditAccountId.message}</p>}
                     </div>
+                    {showProjectLink && (
+                        <div className="grid gap-2">
+                            <Label htmlFor="projectLink">ربط بمشروع (مركز تكلفة)</Label>
+                            <Controller name="projectLink" control={control} render={({ field }) => (
+                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder={refDataLoading ? "تحميل..." : "اختر مشروعًا..."} disabled={refDataLoading} />
+                            )} />
+                        </div>
+                    )}
                  </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">

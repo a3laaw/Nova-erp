@@ -841,14 +841,6 @@
           "type": "string",
           "description": "The name of the account."
         },
-        "partnerId": {
-          "type": "string",
-          "description": "Optional ID of the partner (client, vendor)."
-        },
-        "partnerName": {
-          "type": "string",
-          "description": "Optional name of the partner."
-        },
         "debit": {
           "type": "number",
           "description": "The debit amount."
@@ -860,6 +852,14 @@
         "notes": {
           "type": "string",
           "description": "Optional notes for this line."
+        },
+        "clientId": {
+            "type": "string",
+            "description": "The ID of the client related to this line."
+        },
+        "transactionId": {
+            "type": "string",
+            "description": "The ID of the client transaction related to this line."
         }
       },
       "required": ["accountId", "accountName", "debit", "credit"]
@@ -905,14 +905,6 @@
             "$ref": "#/entities/JournalEntryLine"
           }
         },
-        "clientId": {
-            "type": "string",
-            "description": "The ID of the client related to this entry, if applicable."
-        },
-        "transactionId": {
-            "type": "string",
-            "description": "The ID of the client transaction related to this entry, if applicable."
-        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -920,18 +912,6 @@
         "createdBy": {
           "type": "string",
           "description": "The ID of the user who created the entry."
-        },
-        "auto_profit_center": {
-          "type": "string",
-          "description": "ID of the client/project linked to this entry."
-        },
-        "auto_resource_id": {
-          "type": "string",
-          "description": "ID of the employee responsible for this entry's cost/revenue."
-        },
-        "auto_dept_id": {
-          "type": "string",
-          "description": "ID of the department this entry's cost/revenue belongs to."
         }
       },
       "required": ["entryNumber", "date", "narration", "totalDebit", "totalCredit", "status", "lines", "createdAt"]
@@ -946,12 +926,10 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
-        "clientId": { "type": "string" },
-        "projectId": { "type": "string" },
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
-        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer"] },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "EmployeeCustody"] },
         "description": { "type": "string" },
         "reference": { "type": "string", "description": "e.g., Cheque number or transfer reference" },
         "debitAccountId": { "type": "string" },
@@ -960,7 +938,9 @@
         "creditAccountName": { "type": "string" },
         "status": { "type": "string", "enum": ["draft", "paid", "cancelled"] },
         "journalEntryId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "clientId": { "type": "string", "description": "Client ID if this payment is for a project"},
+        "transactionId": { "type": "string", "description": "Transaction ID if this payment is for a project"}
       },
       "required": ["voucherNumber", "payeeName", "amount", "paymentDate", "paymentMethod", "debitAccountId", "creditAccountId", "status"]
     },
