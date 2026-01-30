@@ -142,8 +142,16 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
         const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
         const uniqueJobs = new Map<string, { value: string; label: string }>();
 
-        // Normalization function to handle variations like 'إ' vs 'ا'
-        const normalize = (str: string) => str.replace(/[أإآ]/g, 'ا').trim();
+        // More robust normalization function
+        const normalize = (str: string) => {
+            if (!str) return '';
+            return str
+                .replace(/[أإآ]/g, 'ا') // Standardize Alif
+                .replace(/ى/g, 'ي')     // Standardize Yaa
+                .replace(/ة/g, 'ه')     // Standardize Teh Marbuta
+                .replace(/\s+/g, ' ')  // Collapse multiple spaces
+                .trim();
+        };
 
         jobsSnapshot.forEach(doc => {
             const jobName = doc.data().name;
@@ -151,8 +159,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                 const trimmedName = jobName.trim();
                 if (trimmedName) {
                     const normalizedName = normalize(trimmedName);
-                    // If we haven't seen this normalized name before, add it.
-                    if (!uniqueJobs.has(normalizedName)) {
+                    if (normalizedName && !uniqueJobs.has(normalizedName)) {
                         uniqueJobs.set(normalizedName, { value: trimmedName, label: trimmedName });
                     }
                 }
@@ -283,10 +290,10 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
           dataToSave.allowedRoles = itemRoles;
           dataToSave.trackingType = itemTrackingType;
           if (itemTrackingType === 'duration') {
-              dataToSave.expectedDurationDays = Number(itemDuration) || 0;
+              dataToSave.expectedDurationDays = Number(itemDuration) || null;
               dataToSave.maxOccurrences = null;
           } else if (itemTrackingType === 'occurrence') {
-              dataToSave.maxOccurrences = Number(itemMaxOccurrences) || 1;
+              dataToSave.maxOccurrences = Number(itemMaxOccurrences) || null;
               dataToSave.expectedDurationDays = null;
           } else { // for 'none'
               dataToSave.expectedDurationDays = null;
