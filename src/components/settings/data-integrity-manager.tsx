@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, collectionGroup, getDocs, query, writeBatch, doc } from 'firebase/firestore';
-import type { Employee } from '@/lib/types';
+import type { Employee, PaymentVoucher } from '@/lib/types';
 import { Loader2, ShieldCheck, Microscope, AlertTriangle } from 'lucide-react';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
@@ -17,6 +17,16 @@ interface Discrepancy {
     count: number;
     docIds: string[];
 }
+
+interface VoucherDiscrepancy {
+    nonStandardName: string;
+    count: number;
+    occurrences: {
+        docId: string;
+        fieldName: 'debitAccountName' | 'creditAccountName';
+    }[];
+}
+
 
 // Reusable Analysis Section Component
 function AnalysisSection({
@@ -123,7 +133,7 @@ function AnalysisSection({
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تطبيق التصحيحات؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيتم تحديث البيانات للموظفين المتأثرين بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
+                            سيتم تحديث البيانات للسجلات المتأثرة بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -155,6 +165,12 @@ export function DataIntegrityManager() {
     const [deptCorrections, setDeptCorrections] = useState<Record<string, string>>({});
     const [allDeptsOptions, setAllDeptsOptions] = useState<any[]>([]);
 
+    // State for Voucher Account Analysis
+    const [isLoadingVoucherAccounts, setIsLoadingVoucherAccounts] = useState(false);
+    const [voucherAccountAnalysisResults, setVoucherAccountAnalysisResults] = useState<VoucherDiscrepancy[] | null>(null);
+    const [voucherAccountCorrections, setVoucherAccountCorrections] = useState<Record<string, string>>({});
+    const [allAccountsOptions, setAllAccountsOptions] = useState<any[]>([]);
+
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
         setResults: (results: Discrepancy[] | null) => void,
@@ -179,7 +195,7 @@ export function DataIntegrityManager() {
             const discrepanciesMap = new Map<string, Discrepancy>();
 
             targetSnapshot.forEach(doc => {
-                const item = { id: doc.id, ...doc.data() } as Employee; // Assuming Employee for now
+                const item = { id: doc.id, ...doc.data() } as Employee;
                 const value = item[targetFieldName] as string;
 
                 if (value && !canonicalNames.has(value)) {
@@ -244,7 +260,6 @@ export function DataIntegrityManager() {
         await batch.commit();
         toast({ title: 'نجاح!', description: `تم تصحيح ${correctionsCount} سجل بنجاح. قم بإعادة الفحص للتأكيد.` });
         
-        // Reset state after applying
         if(targetFieldName === 'jobTitle') {
              setJobAnalysisResults(null);
              setJobCorrections({});
@@ -253,8 +268,91 @@ export function DataIntegrityManager() {
             setDeptCorrections({});
         }
     };
+    
+    // --- Specific Handlers for Voucher Accounts ---
+    const handleAnalyzeVoucherAccounts = async () => {
+        if (!firestore) return;
+        setIsLoadingVoucherAccounts(true);
+        setVoucherAccountAnalysisResults(null);
+        setVoucherAccountCorrections({});
 
-    // --- Specific Handlers ---
+        try {
+            const accountsSnapshot = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+            const canonicalNames = new Set(accountsSnapshot.docs.map(doc => doc.data().name as string));
+            
+            const vouchersSnapshot = await getDocs(collection(firestore, 'paymentVouchers'));
+            
+            const discrepanciesMap = new Map<string, VoucherDiscrepancy>();
+
+            vouchersSnapshot.forEach(doc => {
+                const item = { id: doc.id, ...doc.data() } as PaymentVoucher;
+
+                const checkField = (fieldName: 'debitAccountName' | 'creditAccountName') => {
+                    const value = item[fieldName];
+                    if (value && !canonicalNames.has(value)) {
+                        const existing = discrepanciesMap.get(value) || {
+                            nonStandardName: value,
+                            count: 0,
+                            occurrences: [],
+                        };
+                        existing.count++;
+                        existing.occurrences.push({ docId: item.id!, fieldName });
+                        discrepanciesMap.set(value, existing);
+                    }
+                };
+
+                checkField('debitAccountName');
+                checkField('creditAccountName');
+            });
+
+            const results = Array.from(discrepanciesMap.values());
+            setVoucherAccountAnalysisResults(results);
+            if (results.length === 0) {
+                toast({ title: 'فحص مكتمل', description: 'لم يتم العثور على أي أسماء حسابات غير متطابقة في سندات الصرف.' });
+            }
+
+        } catch (error) {
+            console.error("Error analyzing voucher accounts:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل فحص حسابات السندات.' });
+        } finally {
+            setIsLoadingVoucherAccounts(false);
+        }
+    };
+
+    const handleApplyVoucherAccountCorrections = async () => {
+        if (!firestore || !voucherAccountAnalysisResults) return;
+
+        const batch = writeBatch(firestore);
+        let correctionsCount = 0;
+
+        for (const nonStandardName in voucherAccountCorrections) {
+            const correctValue = voucherAccountCorrections[nonStandardName];
+            if (correctValue) {
+                const discrepancy = voucherAccountAnalysisResults.find(r => r.nonStandardName === nonStandardName);
+                if (discrepancy) {
+                    discrepancy.occurrences.forEach(({ docId, fieldName }) => {
+                        const docRef = doc(firestore, 'paymentVouchers', docId);
+                        batch.update(docRef, { [fieldName]: correctValue });
+                        correctionsCount++;
+                    });
+                }
+            }
+        }
+        
+        if (correctionsCount === 0) {
+            toast({ variant: 'default', title: 'لا توجد تعديلات', description: 'الرجاء اختيار قيم التصحيح أولاً.' });
+            return;
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح!', description: `تم تصحيح ${correctionsCount} سجل بنجاح. قم بإعادة الفحص للتأكيد.` });
+        
+        setVoucherAccountAnalysisResults(null);
+        setVoucherAccountCorrections({});
+    };
+
+
+    // --- Generic Handlers ---
     const handleAnalyzeJobTitles = () => handleAnalyzeGeneric(setIsLoadingJobs, setJobAnalysisResults, setJobCorrections, 'jobs', 'employees', 'jobTitle', true);
     const handleApplyJobCorrections = () => handleApplyCorrectionsGeneric(jobCorrections, jobAnalysisResults, 'employees', 'jobTitle');
     
@@ -265,17 +363,20 @@ export function DataIntegrityManager() {
     // Fetch options for dropdowns
     useEffect(() => {
         if(!firestore) return;
-        const jobsQuery = query(collectionGroup(firestore, 'jobs'));
-        getDocs(jobsQuery).then(snap => {
+        getDocs(query(collectionGroup(firestore, 'jobs'))).then(snap => {
             const jobs = new Set<string>();
             snap.forEach(doc => jobs.add(doc.data().name));
             setAllJobsOptions(Array.from(jobs).sort().map(j => ({value: j, label: j})));
         });
 
-        const deptsQuery = query(collection(firestore, 'departments'));
-        getDocs(deptsQuery).then(snap => {
+        getDocs(query(collection(firestore, 'departments'))).then(snap => {
             const depts = snap.docs.map(d => d.data().name as string).sort();
             setAllDeptsOptions(depts.map(d => ({value: d, label: d})));
+        });
+
+        getDocs(query(collection(firestore, 'chartOfAccounts'))).then(snap => {
+            const accounts = snap.docs.map(d => d.data().name as string).sort();
+            setAllAccountsOptions(accounts.map(a => ({value: a, label: a})));
         });
     }, [firestore]);
 
@@ -289,9 +390,9 @@ export function DataIntegrityManager() {
             </CardHeader>
             <CardContent className="space-y-8">
                 <AnalysisSection
-                    title="فحص المسميات الوظيفية"
-                    description="يفحص هذا الإجراء المسميات الوظيفية للموظفين ويقارنها بقائمة الوظائف المرجعية."
-                    buttonText="فحص المسميات الوظيفية"
+                    title="فحص المسميات الوظيفية للموظفين"
+                    description="يفحص المسميات الوظيفية للموظفين ويقارنها بقائمة الوظائف المرجعية."
+                    buttonText="فحص المسميات"
                     onAnalyze={handleAnalyzeJobTitles}
                     isLoading={isLoadingJobs}
                     analysisResults={jobAnalysisResults}
@@ -306,8 +407,8 @@ export function DataIntegrityManager() {
 
                 <AnalysisSection
                     title="فحص أقسام الموظفين"
-                    description="يفحص هذا الإجراء أسماء الأقسام المسجلة للموظفين ويقارنها بقائمة الأقسام المرجعية."
-                    buttonText="فحص أقسام الموظفين"
+                    description="يفحص أسماء الأقسام المسجلة للموظفين ويقارنها بقائمة الأقسام المرجعية."
+                    buttonText="فحص الأقسام"
                     onAnalyze={handleAnalyzeDepartments}
                     isLoading={isLoadingDepts}
                     analysisResults={deptAnalysisResults}
@@ -317,7 +418,57 @@ export function DataIntegrityManager() {
                     onApplyCorrections={handleApplyDepartmentCorrections}
                     itemCountLabel="موظفين"
                 />
+
+                <Separator />
+
+                 <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold">فحص الحسابات في سندات الصرف</h3>
+                            <p className="text-sm text-muted-foreground">فحص أسماء الحسابات المستخدمة في سندات الصرف ومقارنتها بشجرة الحسابات.</p>
+                        </div>
+                        <Button onClick={handleAnalyzeVoucherAccounts} disabled={isLoadingVoucherAccounts} variant="outline" size="sm">
+                            {isLoadingVoucherAccounts ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Microscope className="ml-2 h-4 w-4" />}
+                            فحص حسابات السندات
+                        </Button>
+                    </div>
+                    {isLoadingVoucherAccounts && (
+                        <div className="text-center p-8 text-muted-foreground"><Loader2 className="mx-auto h-8 w-8 animate-spin" /><p className="mt-2">جاري فحص السندات...</p></div>
+                    )}
+                    {voucherAccountAnalysisResults && !isLoadingVoucherAccounts && (
+                        <div>
+                            {voucherAccountAnalysisResults.length === 0 ? (
+                                <div className="text-center p-8 text-green-600 bg-green-50 rounded-lg border border-green-200">
+                                    <ShieldCheck className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">البيانات سليمة</h3><p className="mt-2 text-sm">لم يتم العثور على أي بيانات غير متطابقة.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg"><h3 className="font-semibold text-yellow-800 flex items-center gap-2"><AlertTriangle />تم العثور على {voucherAccountAnalysisResults.length} أسماء حسابات غير متطابقة</h3></div>
+                                    <div className="space-y-2">
+                                        {voucherAccountAnalysisResults.map(res => (
+                                            <div key={res.nonStandardName} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-2 border-b">
+                                                <div className="md:col-span-1"><p className="font-semibold text-destructive">{res.nonStandardName}</p><p className="text-xs text-muted-foreground">{res.count} سجلات</p></div>
+                                                <div className="md:col-span-2">
+                                                    <InlineSearchList
+                                                        placeholder="اختر الحساب الصحيح..."
+                                                        options={allAccountsOptions}
+                                                        value={voucherAccountCorrections[res.nonStandardName] || ''}
+                                                        onSelect={(value) => setVoucherAccountCorrections(prev => ({ ...prev, [res.nonStandardName]: value }))}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end pt-4"><Button onClick={handleApplyVoucherAccountCorrections}>تطبيق التصحيحات</Button></div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
             </CardContent>
         </Card>
     );
 }
+
+    
