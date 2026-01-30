@@ -1,32 +1,29 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarCheck } from 'lucide-react';
-import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { where, Timestamp } from 'firebase/firestore';
 import type { Appointment } from '@/lib/types';
 
 export function UpcomingAppointmentsCard() {
     const { firestore } = useFirebase();
 
     const appointmentsQuery = useMemo(() => {
-        if (!firestore) return null;
-        
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Start of today
 
-        return query(
-            collection(firestore, 'appointments'), 
+        return [
             where('appointmentDate', '>=', Timestamp.fromDate(today))
-        );
-    }, [firestore]);
+        ];
+    }, []);
 
-    const [snapshot, loading] = useCollection(appointmentsQuery);
+    const { data: appointments, loading } = useSubscription<Appointment>(firestore, 'appointments', appointmentsQuery);
 
     const count = useMemo(() => {
-        if (loading || !snapshot) return 0;
-        return snapshot.docs.length;
-    }, [snapshot, loading]);
+        if (loading || !appointments) return 0;
+        return appointments.length;
+    }, [appointments, loading]);
 
     return (
         <Card>
