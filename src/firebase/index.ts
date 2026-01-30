@@ -6,5 +6,5 @@
 
 export * from './provider';
 export { useUser } from './auth/use-user';
-export { useSubscription } from './firestore/use-subscription';
-export { useDocument } from './firestore/use-document';
+export { useSubscription } from '@/hooks/use-subscription';
+export { useDocument } from '@/hooks/use-document';

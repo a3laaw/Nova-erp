@@ -46,7 +46,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { doc, deleteDoc, addDoc, collection, serverTimestamp, getDoc, runTransaction } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
+import { useSubscription } from '@/hooks/use-subscription';
 import { SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,7 +89,6 @@ export default function ClientsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  // --- Data Fetching Logic ---
   const { data: clients, setData: setClients, loading: clientsLoading, error: clientsError } = useSubscription<Client>(firestore, 'clients');
   const { data: employees, loading: employeesLoading, error: employeesError } = useSubscription<Employee>(firestore, 'employees');
   
@@ -109,11 +109,9 @@ export default function ClientsPage() {
     
     const getSafeTimestamp = (date: any): number => {
       if (!date) return 0;
-      // Firestore Timestamp
       if (typeof date.toMillis === 'function') {
         return date.toMillis();
       }
-      // Javascript Date or string
       return new Date(date).getTime();
     };
 
@@ -144,12 +142,10 @@ export default function ClientsPage() {
       isActive: true,
     };
     
-    // 1. Optimistic UI update
     setClients(prev => [optimisticClient, ...prev]);
-    setIsFormOpen(false); // Close dialog immediately
+    setIsFormOpen(false);
 
     try {
-      // 2. Actual Firestore write
        await runTransaction(firestore, async (transaction) => {
             const currentYear = String(new Date().getFullYear());
             const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
@@ -177,10 +173,8 @@ export default function ClientsPage() {
             transaction.set(newClientRef, finalClientData);
         });
 
-      // 3. UI update and cache invalidation are handled automatically by useSubscription's onSnapshot
       toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
     } catch (error) {
-      // 6. Rollback UI on error
       const errorMessage = error instanceof Error ? error.message : 'فشل إضافة العميل.';
       toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
       setClients(prev => prev.filter(c => c.id !== tempId));
@@ -194,16 +188,13 @@ export default function ClientsPage() {
     setIsDeleting(true);
     const originalClients = [...clients];
     
-    // Optimistic UI Update
     setClients(prev => prev.filter(c => c.id !== clientToDelete.id));
     setClientToDelete(null);
 
     try {
       await deleteDoc(doc(firestore, 'clients', clientToDelete.id!));
-      // No need to call invalidate, onSnapshot handles the update.
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
     } catch (e) {
-      // Rollback on failure
       setClients(originalClients);
       console.error("Error deleting client: ", e);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل. تم التراجع عن التغيير.' });
@@ -216,7 +207,6 @@ export default function ClientsPage() {
     toast({ title: 'تحديث البيانات...', description: 'جاري إعادة المزامنة من الخادم.' });
     await SmartCache.invalidate('clients');
     await SmartCache.invalidate('employees');
-    // useSubscription will automatically fetch new data
   }, []);
 
   const t = {
