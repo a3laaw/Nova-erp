@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -43,9 +43,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
-import { SmartCache } from '@/lib/cache/smart-cache';
-import { searchClients } from '@/lib/cache/fuse-search';
-import { useCachedData } from '@/hooks/use-cached-data';
+import { SmartCache, useSubscription } from '@/lib/cache/smart-cache';
 import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 
@@ -80,21 +78,17 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- NEW: Use the caching hook ---
-  const { data: clients, loading, error, refreshData } = useCachedData(
-    'clients-list',
-    SmartCache.getClientsList
-  );
-
-  const { data: employees, loading: employeesLoading } = useCachedData(
-      'employees-list',
-      SmartCache.getEmployeesList
-  );
+  // --- NEW: Use the real-time subscription hook ---
+  const { data: clients, loading: clientsLoading, error: clientsError } = useSubscription<Client>(firestore, 'clients');
+  const { data: employees, loading: employeesLoading, error: employeesError } = useSubscription<Employee>(firestore, 'employees');
   
+  const loading = clientsLoading || employeesLoading;
+  const error = clientsError || employeesError;
+
   const employeesMap = useMemo(() => {
       if (!employees) return new Map<string, string>();
       const newMap = new Map<string, string>();
-      (employees as Employee[]).forEach(emp => {
+      employees.forEach(emp => {
           newMap.set(emp.id!, emp.fullName);
       });
       return newMap;
@@ -104,14 +98,14 @@ export default function ClientsPage() {
   const filteredClients: ClientWithEmployee[] = useMemo(() => {
     if (!clients) return [];
     
-    const augmentedClients = (clients as Client[]).map(client => ({
+    const augmentedClients = clients.map(client => ({
         ...client,
         assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
     }));
     
     if (!searchQuery) return augmentedClients;
     
-    return searchClients(searchQuery, augmentedClients);
+    return SmartCache.search(augmentedClients, searchQuery, ['nameAr', 'nameEn', 'fileId', 'mobile']);
   }, [clients, searchQuery, employeesMap]);
 
   const handleDeleteClient = async () => {
@@ -119,9 +113,8 @@ export default function ClientsPage() {
     setIsDeleting(true);
     try {
       await deleteDoc(doc(firestore, 'clients', clientToDelete.id));
-      await SmartCache.invalidate('clients-list'); // Invalidate cache
+      await SmartCache.invalidate('clients-list'); // Invalidate cache on write
       toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
-      refreshData(); // Force refresh
     } catch (e) {
       console.error("Error deleting client: ", e);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل.' });
@@ -131,6 +124,15 @@ export default function ClientsPage() {
     }
   };
   
+  const refreshData = useCallback(async () => {
+    toast({ title: 'تحديث البيانات...', description: 'جاري إعادة المزامنة من الخادم.' });
+    // In a subscription model, data is live. A hard refresh is an option, 
+    // but invalidating the cache ensures the *next* non-subscription `get` call is fresh.
+    await SmartCache.invalidate('clients-list');
+    await SmartCache.invalidate('employees-list');
+    // The useSubscription hook will handle updates automatically.
+  }, []);
+
   const t = {
     ar: {
       title: 'إدارة العملاء',
@@ -179,8 +181,6 @@ export default function ClientsPage() {
   }
   const currentText = t[language];
 
-  const isLoading = loading || employeesLoading;
-
   return (
     <>
     <Card dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -227,7 +227,7 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && Array.from({ length: 3 }).map((_, i) => (
+              {loading && Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-40" /></TableCell>
@@ -237,8 +237,8 @@ export default function ClientsPage() {
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                   </TableRow>
               ))}
-              {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{currentText.error}</TableCell></TableRow>}
-              {!isLoading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
+              {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
+              {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
               {filteredClients.map((client) => {
                 return (
                     <TableRow key={client.id}>

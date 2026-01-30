@@ -41,7 +41,7 @@ const accountSearchOptions = {
  * @param clients The array of clients to search through.
  * @returns A filtered and sorted array of clients.
  */
-export function searchClients(query: string, clients: Client[]): Client[] {
+export function searchClients(query: string, clients: any[]): any[] {
   if (!query) {
     return clients;
   }
@@ -55,7 +55,7 @@ export function searchClients(query: string, clients: Client[]): Client[] {
  * @param employees The array of employees to search through.
  * @returns A filtered and sorted array of employees.
  */
-export function searchEmployees(query: string, employees: Employee[]): Employee[] {
+export function searchEmployees(query: string, employees: any[]): any[] {
     if (!query) {
       return employees;
     }
@@ -69,7 +69,7 @@ export function searchEmployees(query: string, employees: Employee[]): Employee[
  * @param accounts The array of accounts to search through.
  * @returns A filtered and sorted array of accounts.
  */
-export function searchAccounts(query: string, accounts: Account[]): Account[] {
+export function searchAccounts(query: string, accounts: any[]): any[] {
     if (!query) {
         return accounts;
     }
