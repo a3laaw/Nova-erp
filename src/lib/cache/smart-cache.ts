@@ -3,6 +3,7 @@ import localforage from 'localforage';
 import { collection, getDocs, query, onSnapshot, type Firestore, type QueryConstraint, type DocumentData, type Query } from 'firebase/firestore';
 import { useState, useEffect, useCallback } from 'react';
 import Fuse from 'fuse.js';
+import { useSyncStatus } from '@/context/sync-context';
 
 interface CachedData<T> {
   timestamp: number;
@@ -74,7 +75,7 @@ class SmartCacheManager {
    * - If data is expired or not in cache, it fetches fresh data, caches it, and returns it.
   */
   async get<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-    const ttl = TTLs[key] || 5 * 60 * 1000;
+    const ttl = TTLs[key] || 5 * 60 * 1000; // Default 5 minutes
     const backgroundRefreshThreshold = ttl * 0.8;
 
     const cached = await localforage.getItem<CachedData<T>>(key);
@@ -108,7 +109,7 @@ class SmartCacheManager {
     cacheStats.misses++;
     saveStats();
     
-    // This part runs on a cache miss or if the cache is stale and blocks rendering
+    // This part runs on a cache miss or if the cache is stale
     const freshData = await fetcher();
     await this.set(key, freshData);
     return freshData;
@@ -158,33 +159,35 @@ class SmartCacheManager {
 export const SmartCache = new SmartCacheManager();
 
 
-// The new hook that combines stale-while-revalidate with real-time subscriptions
+// A real-time hook that provides stale-while-revalidate and optimistic updates
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null, 
   collectionPath: string, 
   constraints: QueryConstraint[] = []
 ): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
     const [data, setData] = useState<T[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    const { signalUpdate } = useSyncStatus();
 
     const cacheKey = `${collectionPath}:${JSON.stringify(constraints)}`;
 
     useEffect(() => {
         if (!firestore || !collectionPath) {
             setData([]);
-            setLoading(false);
+            setIsInitialLoading(false);
             return;
         }
 
         let isMounted = true;
-        setLoading(true);
+        let isFirstLoad = true;
+        setIsInitialLoading(true);
         
-        // 1. Load stale data from cache first
+        // 1. Load stale data from cache first for instant UI
         localforage.getItem<CachedData<T[]>>(cacheKey).then(cached => {
             if (isMounted && cached?.data) {
                 setData(cached.data);
-                console.log(`CACHE HIT (stale): ${cacheKey}`);
+                console.log(`CACHE HIT (stale for subscription): ${cacheKey}`);
             }
         });
 
@@ -196,8 +199,16 @@ export function useSubscription<T extends { id?: string }>(
                 const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
                 if (isMounted) {
                     setData(results); // Update with fresh data
-                    setLoading(false); // Fresh data arrived, loading is complete.
                     setError(null);
+                    
+                    if (isFirstLoad) {
+                        setIsInitialLoading(false); // Mark initial loading as complete
+                        isFirstLoad = false;
+                    } else {
+                        // Only signal an update if the data has actually changed
+                        signalUpdate(); 
+                    }
+                    
                     // 3. Update the cache
                     SmartCache.set(cacheKey, results);
                 }
@@ -206,7 +217,7 @@ export function useSubscription<T extends { id?: string }>(
                 console.error(`Error subscribing to ${collectionPath}:`, err);
                 if (isMounted) {
                     setError(err);
-                    setLoading(false);
+                    setIsInitialLoading(false);
                 }
             }
         );
@@ -216,7 +227,7 @@ export function useSubscription<T extends { id?: string }>(
             unsubscribe();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [firestore, collectionPath, JSON.stringify(constraints)]);
+    }, [firestore, collectionPath, JSON.stringify(constraints), signalUpdate]);
 
-    return { data, setData, loading, error };
+    return { data, setData, loading: isInitialLoading, error };
 }

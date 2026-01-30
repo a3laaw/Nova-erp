@@ -9,6 +9,7 @@ import { Loader, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
+import { OfflineIndicator } from '@/context/sync-context';
 
 export default function DashboardLayout({
   children,
@@ -56,10 +57,11 @@ export default function DashboardLayout({
           <MainNav currentUser={user} onLogout={handleLogout} />
         </Sidebar>
         <SidebarInset>
-          <Header currentUser={user} onLogout={handleLogout} className="no-print" />
+          <Header currentUser={user} onLogout={onLogout} className="no-print" />
           <main className="flex-1 p-4 md:p-6 lg:p-8">
             {children}
           </main>
+          <OfflineIndicator />
         </SidebarInset>
       </div>
     </SidebarProvider>

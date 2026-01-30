@@ -14,6 +14,7 @@ import { Breadcrumbs } from './breadcrumbs';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from './logo';
 import { Skeleton } from '../ui/skeleton';
+import { UpdateIndicator } from '@/context/sync-context';
 
 interface HeaderProps {
     currentUser: AuthenticatedUser;
@@ -37,9 +38,10 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="h-8 w-8 !p-1.5" />
                     )}
                 </div>
-                {/* Desktop-only Breadcrumbs */}
-                <div className="hidden md:block">
+                {/* Desktop-only Breadcrumbs and Update Indicator */}
+                <div className="hidden md:flex items-center gap-4">
                     <Breadcrumbs />
+                    <UpdateIndicator />
                 </div>
             </div>
 
