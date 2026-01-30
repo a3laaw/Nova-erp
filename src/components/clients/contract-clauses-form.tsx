@@ -25,7 +25,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-re
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage } from '@/lib/types';
+import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -108,7 +108,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
 
-  const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[] }>({ stages: [], templates: [] });
+  const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[], employees: Employee[], departments: Department[] }>({ stages: [], templates: [], employees: [], departments: [] });
   const [departmentWorkStages, setDepartmentWorkStages] = useState<WorkStage[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
 
@@ -123,7 +123,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setStep('loading');
       setAvailableTemplates([]);
       setChosenTemplate(null);
-      setReferenceData({ templates: [], stages: [] });
+      setReferenceData({ templates: [], stages: [], employees: [], departments: [] });
       setDepartmentWorkStages([]);
       setLoadingRefData(true);
     }
@@ -166,7 +166,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setChosenTemplate(template);
   }, []);
 
-  // Effect 1: Fetch all reference data (templates, stages) once when the dialog opens.
+  // Effect 1: Fetch all reference data (templates, stages, employees, departments) once when the dialog opens.
   useEffect(() => {
     if (!isOpen || !firestore || !transaction) return;
 
@@ -175,6 +175,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
       setStep('loading');
       try {
         const allTemplatesQuery = query(collection(firestore, 'contractTemplates'));
+        const employeesQuery = query(collection(firestore, 'employees'));
+        const departmentsQuery = query(collection(firestore, 'departments'));
         
         let stages: MultiSelectOption[] = [];
         let fetchedDeptStages: WorkStage[] = [];
@@ -188,19 +190,25 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
         const [
             allTemplatesSnapshot,
+            employeesSnapshot,
+            departmentsSnapshot,
         ] = await Promise.all([
             getDocs(allTemplatesQuery),
+            getDocs(employeesQuery),
+            getDocs(departmentsQuery),
         ]);
         
         const templates = allTemplatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate));
+        const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+        const departments = departmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
         
         setDepartmentWorkStages(fetchedDeptStages);
-        setReferenceData({ templates, stages });
+        setReferenceData({ templates, stages, employees, departments });
 
       } catch (error) {
         console.error("Error fetching reference data:", error);
         toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب البيانات المرجعية." });
-        setReferenceData({ templates: [], stages: [] });
+        setReferenceData({ templates: [], stages: [], employees: [], departments: [] });
       } finally {
         setLoadingRefData(false);
       }
@@ -376,7 +384,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             transaction_firestore.set(doc(transactionTimelineRef), commentData);
             transaction_firestore.set(doc(historyCollectionRef), commentData);
             
-            if (clientData.status === 'new' && parentAccountSnap && revenueAccountSnap) {
+            if (clientData.status === 'new' && parentAccountSnap && revenueAccountSnap && referenceData.employees && referenceData.departments) {
                 transaction_firestore.update(clientRef, { status: 'contracted' });
 
                 let clientAccountId: string;
@@ -408,12 +416,23 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 const currentYear = new Date().getFullYear();
                 const nextJournalEntryNumber = ((journalEntryCounterDoc?.data()?.counts || {})[currentYear] || 0) + 1;
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
+
+                const engineer = referenceData.employees.find(e => e.id === transaction.assignedEngineerId);
+                const department = referenceData.departments.find(d => d.name === engineer?.department);
+                const autoTags = {
+                    clientId,
+                    transactionId: finalTransactionId,
+                    auto_profit_center: finalTransactionId,
+                    auto_resource_id: transaction.assignedEngineerId || null,
+                    ...(department && { auto_dept_id: department.id }),
+                };
+
                 transaction_firestore.set(newJournalEntryRef, {
                     entryNumber: `JV-${currentYear}-${String(nextJournalEntryNumber).padStart(4, '0')}`, date: serverTimestamp(), narration: `إثبات مديونية ${clientName} عن عقد "${transaction.transactionType}"`,
                     totalDebit: totalAmount, totalCredit: totalAmount, status: 'draft',
                     lines: [
-                        { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0 },
-                        { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: totalAmount }
+                        { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0, ...autoTags },
+                        { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: totalAmount, ...autoTags }
                     ],
                     createdAt: serverTimestamp(), createdBy: currentUser!.id, clientId, transactionId: finalTransactionId,
                 });

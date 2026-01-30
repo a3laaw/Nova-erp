@@ -18,7 +18,7 @@ interface DepartmentStats {
 }
 
 export function DepartmentPerformanceReport() {
-  const { journalEntries, employees, transactions, departments, loading } = useAnalyticalData();
+  const { journalEntries, employees, accounts, departments, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
 
@@ -30,58 +30,62 @@ export function DepartmentPerformanceReport() {
     endDate.setHours(23, 59, 59, 999);
     const monthsInPeriod = Math.max(1, differenceInMonths(endDate, startDate) + 1);
 
-    const projectProfits = new Map<string, number>();
-    journalEntries.forEach(entry => {
-      const entryDate = entry.date?.toDate();
-      if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
-
-      entry.lines.forEach(line => {
-        if (!line.transactionId) return;
-        let profitChange = 0;
-        if (line.accountName.startsWith('إيراد')) profitChange = line.credit - line.debit;
-        else if (line.accountName.startsWith('تكاليف')) profitChange = -(line.debit - line.credit);
-        projectProfits.set(line.transactionId, (projectProfits.get(line.transactionId) || 0) + profitChange);
-      });
-    });
-
     const deptStats = new Map<string, DepartmentStats>();
+    const projectsPerDept = new Map<string, Set<string>>();
+
     departments.forEach(dept => {
       deptStats.set(dept.id, { id: dept.id, name: dept.name, totalProfit: 0, totalSalaries: 0, netContribution: 0, projectCount: 0 });
+      projectsPerDept.set(dept.id, new Set());
     });
     
-    const employeeToDeptMap = new Map<string, string>();
     employees.forEach(emp => {
       const dept = departments.find(d => d.name === emp.department);
-      if (emp.id && dept) {
-        employeeToDeptMap.set(emp.id, dept.id);
+      if (dept) {
         const stats = deptStats.get(dept.id)!;
         const monthlySalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
         stats.totalSalaries += monthlySalary * monthsInPeriod;
       }
     });
 
-    transactions.forEach(tx => {
-      if (tx.assignedEngineerId) {
-        const deptId = employeeToDeptMap.get(tx.assignedEngineerId);
-        if (deptId && deptStats.has(deptId)) {
-          const profit = projectProfits.get(tx.id!) || 0;
-          const stats = deptStats.get(deptId)!;
-          stats.totalProfit += profit;
-          stats.projectCount += 1;
+    journalEntries.forEach(entry => {
+      const entryDate = entry.date?.toDate();
+      if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
+
+      entry.lines.forEach(line => {
+        if (!line.auto_dept_id || !deptStats.has(line.auto_dept_id)) return;
+        
+        const stats = deptStats.get(line.auto_dept_id)!;
+        const account = accounts.find(a => a.id === line.accountId);
+        if(!account) return;
+
+        let profitChange = 0;
+        if (account.code.startsWith('4')) {
+          profitChange = line.credit - line.debit;
+        } else if (account.code.startsWith('51')) {
+          profitChange = -(line.debit - line.credit);
         }
-      }
+        
+        if (profitChange !== 0) {
+            stats.totalProfit += profitChange;
+        }
+
+        if (line.auto_profit_center) {
+            projectsPerDept.get(line.auto_dept_id)?.add(line.auto_profit_center);
+        }
+      });
     });
     
     const results: DepartmentStats[] = [];
     deptStats.forEach(stats => {
       stats.netContribution = stats.totalProfit - stats.totalSalaries;
+      stats.projectCount = projectsPerDept.get(stats.id)?.size || 0;
       if (stats.projectCount > 0 || stats.totalSalaries > 0) {
         results.push(stats);
       }
     });
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, employees, transactions, departments, loading, dateFrom, dateTo]);
+  }, [journalEntries, employees, accounts, departments, loading, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4">

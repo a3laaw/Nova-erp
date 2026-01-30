@@ -24,7 +24,7 @@ interface ProjectPnl {
 }
 
 export function ProjectsPnlReport() {
-  const { journalEntries, clients, transactions, loading } = useAnalyticalData();
+  const { journalEntries, clients, transactions, accounts, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
 
@@ -45,19 +45,25 @@ export function ProjectsPnlReport() {
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
 
       entry.lines.forEach(line => {
-        if (!line.transactionId) return;
+        if (!line.auto_profit_center) return;
 
-        const pnl = pnlMap.get(line.transactionId) || { revenue: 0, directCosts: 0, profit: 0, margin: 0, clientId: '' };
-        const txInfo = transactionMap.get(line.transactionId);
-        if(txInfo) pnl.clientId = txInfo.clientId;
+        const pnl = pnlMap.get(line.auto_profit_center) || { revenue: 0, directCosts: 0, profit: 0, margin: 0, clientId: '' };
+        
+        if (!pnl.clientId) {
+            const txInfo = transactionMap.get(line.auto_profit_center);
+            if(txInfo) pnl.clientId = txInfo.clientId;
+        }
+        
+        const account = accounts.find(a => a.id === line.accountId);
+        if(!account) return;
 
-        if (line.accountName.startsWith('إيراد')) { // simplified check
+        if (account.code.startsWith('4')) { // Revenue accounts
           pnl.revenue += line.credit - line.debit;
-        } else if (line.accountName.startsWith('تكاليف')) { // simplified check
+        } else if (account.code.startsWith('51')) { // Direct Cost accounts
           pnl.directCosts += line.debit - line.credit;
         }
         
-        pnlMap.set(line.transactionId!, pnl);
+        pnlMap.set(line.auto_profit_center!, pnl);
       });
     });
 
@@ -79,7 +85,7 @@ export function ProjectsPnlReport() {
     });
 
     return results.sort((a,b) => b.profit - a.profit);
-  }, [journalEntries, clients, transactions, loading, dateFrom, dateTo]);
+  }, [journalEntries, clients, transactions, accounts, loading, dateFrom, dateTo]);
 
   const totals = useMemo(() => ({
     revenue: reportData.reduce((sum, item) => sum + item.revenue, 0),
