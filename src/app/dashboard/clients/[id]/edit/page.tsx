@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
-import { useFirebase, useSubscription } from '@/lib/cache/smart-cache';
+import { useFirebase } from '@/firebase';
 import { doc, getDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy, limit, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +22,7 @@ import { useAuth } from '@/context/auth-context';
 import type { Employee, Client } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
 import { ClientForm } from '@/components/clients/client-form';
+import { Separator } from '@/components/ui/separator';
 
 export default function EditClientPage() {
     const router = useRouter();
@@ -178,5 +179,3 @@ export default function EditClientPage() {
         </Card>
     );
 }
-
-    
