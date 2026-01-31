@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -112,7 +111,7 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
     return [where('clientId', '==', clientId)];
   }, [firestore, clientId]);
 
-  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, quotationsQuery ? 'quotations' : '', quotationsQuery || []);
+  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, quotationsQuery ? 'quotations' : null, quotationsQuery || []);
   
   const sortedQuotations = useMemo(() => {
     if (!quotations) return [];
@@ -402,9 +401,9 @@ export default function ClientProfilePage() {
             <div className='flex justify-end items-center no-print'>
             </div>
              <Card>
-                <CardHeader className='flex-row items-center gap-4'>
+                <CardHeader className='flex-row items-center gap-6'>
                     <Skeleton className="h-16 w-16 rounded-full" />
-                    <div className='space-y-2'>
+                    <div className='space-y-1'>
                         <Skeleton className="h-8 w-48" />
                         <Skeleton className="h-5 w-32" />
                     </div>
@@ -649,6 +648,3 @@ export default function ClientProfilePage() {
     </>
   );
 }
-    
-
-    

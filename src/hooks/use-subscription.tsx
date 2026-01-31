@@ -16,26 +16,36 @@ export function useSubscription<T extends { id?: string }>(
     const { signalUpdate } = useSyncStatus();
 
     // Create a stable and unique key from the constraints array.
-    // JSON.stringify doesn't work on complex objects like Firestore constraints.
-    // This manual serialization is safer and ensures query uniqueness for caching.
     const serializedConstraints = useMemo(() => {
         if (!constraints || constraints.length === 0) return 'all';
         return constraints.map(c => {
             const internal = c as any;
             try {
                 if (internal._type === 'where') {
-                    // Example: "where:clientId:==:someClientId"
-                    const value = internal._getFilters()[0].value.stringValue || internal._getFilters()[0].value.integerValue || 'unknown';
-                    return `where:${internal._getFilters()[0].field.segments.join('.')}:${internal._getFilters()[0].op}:${value}`;
+                    const filter = internal._getFilters()[0];
+                    const op = filter.op;
+                    const fieldPath = filter.field.segments.join('.');
+                    
+                    // A more robust way to get the value without being too specific
+                    const valueObject = filter.value;
+                    let value = 'unknown';
+
+                    if (valueObject.stringValue !== undefined) value = valueObject.stringValue;
+                    else if (valueObject.integerValue !== undefined) value = valueObject.integerValue;
+                    else if (valueObject.doubleValue !== undefined) value = valueObject.doubleValue;
+                    else if (valueObject.booleanValue !== undefined) value = String(valueObject.booleanValue);
+                    else if (valueObject.geoPointValue !== undefined) value = `${valueObject.geoPointValue.latitude},${valueObject.geoPointValue.longitude}`;
+                    else if (valueObject.timestampValue !== undefined) value = `${valueObject.timestampValue.seconds}_${valueObject.timestampValue.nanoseconds}`;
+                    else if (valueObject.nullValue !== undefined) value = 'null';
+                    
+                    return `where:${fieldPath}:${op}:${value}`;
                 }
                 if (internal._type === 'orderBy') {
-                    // Example: "orderBy:date:desc"
                     const field = internal._query.orderBy[0].field.segments.join('.');
                     const dir = internal._query.orderBy[0].dir;
                     return `orderBy:${field}:${dir}`;
                 }
             } catch {
-                // Fallback for safety
                 return 'unknown_constraint';
             }
             return 'unknown_constraint';
