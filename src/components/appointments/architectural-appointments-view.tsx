@@ -55,7 +55,7 @@ export function ArchitecturalAppointmentsView() {
     const { toast } = useToast();
     
     const [date, setDate] = useState<Date | undefined>(undefined);
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
@@ -110,36 +110,36 @@ export function ArchitecturalAppointmentsView() {
             const apptSnap = await getDocs(query(
                 collection(firestore, 'appointments'),
                 where('appointmentDate', '>=', dayStart),
-                where('appointmentDate', '<=', dayEnd)
+                where('appointmentDate', '<=', dayEnd),
+                where('type', '==', 'architectural')
             ));
             
-            const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-
-            const augmentedAppointments = allAppointmentsForDay
-                .filter(appt => appt.type === 'architectural')
-                .map(appt => {
-                    return {
-                        ...appt,
-                        clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-                    }
-                });
-            
-            setAppointments(augmentedAppointments);
+            const appts = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            setRawAppointments(appts);
         } catch (error) {
             console.error("Error fetching appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast, clients]);
+    }, [firestore, toast]);
 
     useEffect(() => {
-        if (date && (clients.length > 0 || engineers.length > 0)) { // Fetch appointments once static data is available
-            fetchAppointments(date);
-        } else if (date && !loading) { // Handle case where there are no clients/engineers
+        if (date) {
             fetchAppointments(date);
         }
-    }, [date, clients, engineers, fetchAppointments, loading]);
+    }, [date, fetchAppointments]);
+
+    const appointments = useMemo(() => {
+      if (!rawAppointments) return [];
+      // If clients haven't loaded yet, return raw data to avoid losing appointments from view
+      if (clients.length === 0) return rawAppointments.map(appt => ({ ...appt, clientName: appt.clientName || '...' }));
+
+      return rawAppointments.map(appt => ({
+          ...appt,
+          clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
+      }));
+    }, [rawAppointments, clients]);
 
 
     const bookingsGrid = useMemo(() => {
