@@ -93,7 +93,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                     
                     let isAvailable = false;
                     const openDepts = ['الإنشائي', 'السكرتارية', 'المحاسبة'];
-                    if (openDepts.includes(dept.name) || currentUser?.role === 'Admin') {
+                    if (openDepts.includes(dept.name)) {
                         isAvailable = true;
                     } else {
                         const requiredTransactionType = transactionTypesMap.get(dept.id);
@@ -243,7 +243,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                 </TableHeader>
                                 <TableBody>
                                     {assignments.map(a => (
-                                        <TableRow key={a.departmentId} className={!a.isAvailable ? 'bg-muted/30 text-muted-foreground' : ''}>
+                                        <TableRow key={a.departmentId} className={!a.isAvailable && currentUser?.role !== 'Admin' ? 'bg-muted/30 text-muted-foreground' : ''}>
                                             <TableCell>
                                                 <TooltipProvider>
                                                     <Tooltip>
@@ -252,7 +252,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                                                 <Checkbox
                                                                     checked={a.selected}
                                                                     onCheckedChange={(checked) => handleAssignmentChange(a.departmentId, 'selected', !!checked)}
-                                                                    disabled={!a.isAvailable}
+                                                                    disabled={!a.isAvailable && currentUser?.role !== 'Admin'}
                                                                 />
                                                                  {currentUser?.role === 'Admin' && !a.isAvailable && <Shield className="h-4 w-4 text-blue-500" />}
                                                             </span>
@@ -277,7 +277,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                                     onSelect={(value) => handleAssignmentChange(a.departmentId, 'engineerId', value)}
                                                     options={getEngineersForDept(a.departmentName)}
                                                     placeholder="اختر موظف..."
-                                                    disabled={!a.selected || !a.isAvailable}
+                                                    disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
                                                 />
                                             </TableCell>
                                             <TableCell>
@@ -285,7 +285,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                                     value={a.notes}
                                                     onChange={(e) => handleAssignmentChange(a.departmentId, 'notes', e.target.value)}
                                                     placeholder="ملاحظات للقسم..."
-                                                    disabled={!a.selected || !a.isAvailable}
+                                                    disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
                                                 />
                                             </TableCell>
                                         </TableRow>
