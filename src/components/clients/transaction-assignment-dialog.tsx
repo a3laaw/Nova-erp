@@ -14,6 +14,17 @@ import { Loader2, Save, Shield } from 'lucide-react';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { Input } from '../ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '../ui/alert-dialog';
+
 
 interface AssignmentState {
   departmentId: string;
@@ -41,6 +52,10 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
+    const [isBypassConfirmOpen, setIsBypassConfirmOpen] = useState(false);
+    const [assignmentsToCommit, setAssignmentsToCommit] = useState<AssignmentState[]>([]);
+
 
     useEffect(() => {
         if (!firestore || !isOpen) return;
@@ -143,82 +158,102 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
             .map(e => ({ value: e.id!, label: e.fullName }));
     };
 
-    const handleSave = async () => {
+    const performSave = async (assignmentsToProcess: AssignmentState[]) => {
         if (!firestore || !currentUser || !transaction.id) return;
-        
         setIsSaving(true);
         const batch = writeBatch(firestore);
         const assignmentsRef = collection(firestore, 'transaction_assignments');
-
+    
         const notificationsToSend: any[] = [];
-
-        for (const assignment of assignments) {
-            if (assignment.selected) {
-                if (!assignment.engineerId) {
-                    toast({ variant: 'destructive', title: 'حقل ناقص', description: `الرجاء اختيار موظف لقسم: ${assignment.departmentName}` });
-                    setIsSaving(false);
-                    return;
-                }
-                const data = {
-                    transactionId: transaction.id,
-                    clientId: transaction.clientId,
-                    departmentId: assignment.departmentId,
-                    departmentName: assignment.departmentName,
-                    engineerId: assignment.engineerId,
-                    notes: assignment.notes,
-                    status: 'pending',
-                    createdBy: currentUser.id,
-                    createdAt: serverTimestamp(),
-                };
-
-                const engineer = engineers.find(e => e.id === assignment.engineerId);
-
-                if (assignment.existingAssignmentId) {
-                    const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
-                    batch.update(docRef, { engineerId: data.engineerId, notes: data.notes });
-                } else {
-                    const docRef = doc(assignmentsRef);
-                    batch.set(docRef, data);
-                     if (engineer) {
-                        notificationsToSend.push({
-                            engineerId: engineer.id,
-                            title: 'تم إسناد معاملة جديدة لك',
-                            body: `قام ${currentUser.fullName} بإسناد معاملة "${transaction.transactionType}" الخاصة بالعميل ${clientName} إليك للمتابعة.`
-                        });
-                    }
-                }
-            } else if (assignment.existingAssignmentId) {
-                const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
-                batch.delete(docRef);
+    
+        for (const assignment of assignmentsToProcess) {
+          if (assignment.selected) {
+            if (!assignment.engineerId) {
+              toast({ variant: 'destructive', title: 'حقل ناقص', description: `الرجاء اختيار موظف لقسم: ${assignment.departmentName}` });
+              setIsSaving(false);
+              return;
             }
+            const data = {
+              transactionId: transaction.id,
+              clientId: transaction.clientId,
+              departmentId: assignment.departmentId,
+              departmentName: assignment.departmentName,
+              engineerId: assignment.engineerId,
+              notes: assignment.notes,
+              status: 'pending',
+              createdBy: currentUser.id,
+              createdAt: serverTimestamp(),
+            };
+    
+            const engineer = engineers.find(e => e.id === assignment.engineerId);
+    
+            if (assignment.existingAssignmentId) {
+              const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
+              batch.update(docRef, { engineerId: data.engineerId, notes: data.notes });
+            } else {
+              const docRef = doc(assignmentsRef);
+              batch.set(docRef, data);
+              if (engineer) {
+                notificationsToSend.push({
+                  engineerId: engineer.id,
+                  title: 'تم إسناد معاملة جديدة لك',
+                  body: `قام ${currentUser.fullName} بإسناد معاملة "${transaction.transactionType}" الخاصة بالعميل ${clientName} إليك للمتابعة.`
+                });
+              }
+            }
+          } else if (assignment.existingAssignmentId) {
+            const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
+            batch.delete(docRef);
+          }
         }
-        
+    
         try {
-            await batch.commit();
-
-            for (const notif of notificationsToSend) {
-                 const targetUserId = await findUserIdByEmployeeId(firestore, notif.engineerId);
-                 if(targetUserId) {
-                     await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: notif.title,
-                        body: notif.body,
-                        link: `/dashboard/clients/${transaction.clientId}/transactions/${transaction.id}`
-                    });
-                 }
+          await batch.commit();
+    
+          for (const notif of notificationsToSend) {
+            const targetUserId = await findUserIdByEmployeeId(firestore, notif.engineerId);
+            if (targetUserId) {
+              await createNotification(firestore, {
+                userId: targetUserId,
+                title: notif.title,
+                body: notif.body,
+                link: `/dashboard/clients/${transaction.clientId}/transactions/${transaction.id}`
+              });
             }
-
-            toast({ title: 'نجاح', description: 'تم حفظ تحويلات المعاملة بنجاح.' });
-            onClose();
+          }
+    
+          toast({ title: 'نجاح', description: 'تم حفظ تحويلات المعاملة بنجاح.' });
+          onClose();
         } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات.' });
+          console.error(error);
+          toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات.' });
         } finally {
-            setIsSaving(false);
+          setIsSaving(false);
         }
     };
 
+    const handleSave = async () => {
+        const bypassedAssignments = assignments.filter(
+            a => a.selected && !a.isAvailable && currentUser?.role === 'Admin'
+        );
+
+        if (bypassedAssignments.length > 0) {
+            setAssignmentsToCommit(assignments);
+            setIsBypassConfirmOpen(true);
+        } else {
+            await performSave(assignments);
+        }
+    };
+    
+    const handleConfirmAndSave = async () => {
+        setIsBypassConfirmOpen(false);
+        await performSave(assignmentsToCommit);
+        setAssignmentsToCommit([]);
+    };
+
+
     return (
+        <>
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-4xl" dir="rtl">
                 <DialogHeader>
@@ -262,7 +297,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                                                 <p>يجب وجود معاملة سابقة مدفوعة لهذا القسم.</p>
                                                             </TooltipContent>
                                                         )}
-                                                        {!a.isAvailable && currentUser?.role === 'Admin' && (
+                                                        {currentUser?.role === 'Admin' && !a.isAvailable && (
                                                             <TooltipContent>
                                                                 <p>صلاحية المدير تتجاوز هذا الشرط.</p>
                                                             </TooltipContent>
@@ -304,5 +339,26 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        <AlertDialog open={isBypassConfirmOpen} onOpenChange={setIsBypassConfirmOpen}>
+            <AlertDialogContent dir="rtl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>تأكيد تجاوز الصلاحية</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        أنت على وشك إسناد هذه المعاملة إلى قسم واحد أو أكثر يتطلب معاملة سابقة مدفوعة.
+                        <br />
+                        باستخدام صلاحياتك كمدير، سيتم تجاوز هذا الشرط. هل تود المتابعة؟
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setAssignmentsToCommit([])} disabled={isSaving}>
+                        تراجع
+                    </AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmAndSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700">
+                        {isSaving ? 'جاري الحفظ...' : 'نعم، قم بالإسناد'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }
