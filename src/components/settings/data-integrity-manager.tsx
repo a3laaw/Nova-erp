@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, collectionGroup, getDocs, query, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, query, writeBatch, doc, serverTimestamp, where } from 'firebase/firestore';
 import type { Employee, PaymentVoucher, ClientTransaction } from '@/lib/types';
 import { Loader2, ShieldCheck, Microscope, AlertTriangle, Trash2 } from 'lucide-react';
 import { InlineSearchList } from '../ui/inline-search-list';
