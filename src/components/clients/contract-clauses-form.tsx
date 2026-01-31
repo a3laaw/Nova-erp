@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -317,7 +316,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
 
   useEffect(() => {
-    if(transaction?.contract) return;
+    // If we are editing an existing transaction that already has contract data,
+    // don't re-calculate clauses from financials. They are set directly.
+    if (transaction?.id && transaction?.contract) {
+        return;
+    }
     
     if (financials.type === 'fixed') {
         const calculatedClauses = (financials.milestones || []).map(m => ({
@@ -340,7 +343,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         }));
         setClauses(calculatedClauses);
     }
-  }, [financials, transaction?.contract]);
+  }, [financials, transaction?.id, transaction?.contract]);
 
 
   const handleSelectTransaction = (txId: string) => {
@@ -805,5 +808,3 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   )
 }
-
-    
