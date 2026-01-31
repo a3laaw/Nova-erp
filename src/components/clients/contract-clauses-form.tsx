@@ -292,7 +292,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 const txQuery = query(collection(firestore, 'clients', clientId, 'transactions'));
                 const txSnap = await getDocs(txQuery);
                 const allTx = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-                const availableTx = allTx.filter(tx => !tx.contract || !tx.contract.clauses || tx.contract.clauses.length === 0);
+                // **ROBUST FILTERING**
+                const availableTx = allTx.filter(tx => !tx.contract || !Array.isArray(tx.contract.clauses) || tx.contract.clauses.length === 0);
                 
                 setClientTransactions(availableTx);
                 populateFormFromQuotation();
@@ -363,17 +364,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
+  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
-    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+    setTerms(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
-  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
+  const removeTerm = (id: string) => setTerms(prev => prev.filter(term => term.id !== id));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
-    const newTerms = [...termsAndConditions];
+    const newTerms = [...terms];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newTerms.length) return;
     [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-    setTermsAndConditions(newTerms);
+    setTerms(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
