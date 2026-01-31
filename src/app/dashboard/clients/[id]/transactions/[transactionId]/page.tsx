@@ -19,7 +19,7 @@ import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Lo
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole, Client } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole, Client, Department } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -37,6 +37,7 @@ import { format, differenceInDays, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { toFirestoreDate } from '@/services/date-converter';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
     let total = 0;
@@ -131,9 +132,11 @@ export default function TransactionDetailPage() {
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   
-  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [newStatus, setNewStatus] = useState('');
   const [newEngineerId, setNewEngineerId] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
   const [stages, setStages] = useState<TransactionStage[]>([]);
@@ -156,18 +159,22 @@ export default function TransactionDetailPage() {
   
   useEffect(() => {
     if (!firestore) return;
-    const fetchEmployees = async () => {
-        const q = query(collection(firestore, 'employees'));
-        const querySnapshot = await getDocs(q);
-        const newMap = new Map<string, string>();
-        querySnapshot.forEach(doc => {
-            const emp = doc.data() as Employee;
-            newMap.set(doc.id, emp.fullName);
-        });
-        setEmployeesMap(newMap);
+    const fetchRefData = async () => {
+      try {
+        const [empSnap, deptSnap] = await Promise.all([
+          getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+          getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
+        ]);
+
+        setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
+        setDepartments(deptSnap.docs.map(d => ({id: d.id, ...d.data()} as Department)));
+      } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب بيانات الأقسام والموظفين.' });
+      }
     };
-    fetchEmployees();
-  }, [firestore]);
+    fetchRefData();
+  }, [firestore, toast]);
   
   useEffect(() => {
     if (!transaction || !firestore) {
@@ -223,6 +230,23 @@ export default function TransactionDetailPage() {
     
   }, [transaction, firestore, toast]);
 
+    useEffect(() => {
+        if (transaction?.assignedEngineerId && employees.length > 0 && departments.length > 0) {
+            const engineer = employees.find(e => e.id === transaction.assignedEngineerId);
+            const department = departments.find(d => d.name === engineer?.department);
+            if (department) {
+                setSelectedDepartment(department.id);
+            }
+        }
+    }, [transaction, employees, departments]);
+
+    const filteredEngineers = useMemo(() => {
+        if (!selectedDepartment || selectedDepartment === 'all') return employees;
+        const departmentName = departments.find(d => d.id === selectedDepartment)?.name;
+        if (!departmentName) return employees;
+        return employees.filter(e => e.department === departmentName);
+    }, [selectedDepartment, employees, departments]);
+
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
       const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
@@ -264,8 +288,8 @@ export default function TransactionDetailPage() {
 
     if (engineerChanged) {
         updateData.assignedEngineerId = newEngineerId;
-        const oldEngineerName = transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) || 'غير مسند' : 'غير مسند';
-        const newEngineerName = newEngineerId ? employeesMap.get(newEngineerId) || 'غير مسند' : 'غير مسند';
+        const oldEngineerName = transaction.assignedEngineerId ? employees.find(e => e.id === transaction.assignedEngineerId)?.fullName || 'غير مسند' : 'غير مسند';
+        const newEngineerName = newEngineerId ? employees.find(e => e.id === newEngineerId)?.fullName || 'غير مسند' : 'غير مسند';
         const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
         batch.set(doc(timelineRef), {
             type: 'log',
@@ -283,8 +307,6 @@ export default function TransactionDetailPage() {
     }
 
     const safeUpdateData = cleanFirestoreData(updateData);
-    console.log("البيانات قبل التنظيف:", JSON.stringify(updateData, null, 2));
-    console.log("البيانات بعد التنظيف:", JSON.stringify(safeUpdateData, null, 2));
     batch.update(transactionRefDoc, safeUpdateData);
     
     try {
@@ -304,7 +326,6 @@ export default function TransactionDetailPage() {
     const originalProgress = [...(transaction.stages || [])];
     const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
     
-    // Get info about the stage we're trying to change
     const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
     const templateStageInfo = stages[currentIndexInUI];
     if (!templateStageInfo) {
@@ -312,7 +333,6 @@ export default function TransactionDetailPage() {
         return;
     }
     
-    // --- NEW DEPENDENCY LOGIC ---
     if (newStatus === 'in-progress') {
         const contractSigningStage = stages.find(s => s.name === 'توقيع العقد');
         const sendSoilTestStage = stages.find(s => s.name === 'ارسال فحص التربه');
@@ -333,10 +353,9 @@ export default function TransactionDetailPage() {
             }
         }
         else if (templateStageInfo?.name === 'توقيع العقد') {
-             prerequisiteMet = true; // No prerequisites for signing the contract
+             prerequisiteMet = true;
         }
         else if (currentIndexInUI > 0) {
-            // Fallback for all other stages: linear dependency
             const previousStageInUI = stages[currentIndexInUI - 1];
             if (previousStageInUI.status !== 'completed') {
                 prerequisiteMet = false;
@@ -352,7 +371,6 @@ export default function TransactionDetailPage() {
             return;
         }
     }
-    // --- END NEW DEPENDENCY LOGIC ---
 
     let updatedProgress: Partial<TransactionStage>;
 
@@ -363,7 +381,6 @@ export default function TransactionDetailPage() {
             stageId: stageId,
             name: templateStageInfo.name,
             allowedRoles: templateStageInfo.allowedRoles,
-            expectedDurationDays: templateStageInfo.expectedDurationDays,
         };
     }
     
@@ -383,7 +400,7 @@ export default function TransactionDetailPage() {
     } else if (newStatus === 'completed') {
         if (!updatedProgress.startDate) updatedProgress.startDate = now;
         updatedProgress.endDate = now;
-    } else { // pending or awaiting-review
+    } else { 
         updatedProgress.startDate = updatedProgress.startDate || null;
         updatedProgress.endDate = null;
         updatedProgress.expectedEndDate = null;
@@ -405,7 +422,6 @@ export default function TransactionDetailPage() {
         
         const completedStage = newStatus === 'completed' ? stages.find(s => s.stageId === stageId) : null;
         
-        // --- SMART AUTO-START LOGIC ---
         let shouldStartNextStage = false;
         let nextStageInTemplate: WorkStage | undefined = undefined;
 
@@ -439,14 +455,13 @@ export default function TransactionDetailPage() {
                     }
                 } else {
                     newProgressForFirestore.push({
-                        stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
+                        stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now as any, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
                     });
                     shouldStartNextStage = true;
                 }
             }
         }
         
-        // --- LOGGING & NOTIFICATIONS ---
         let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         if (shouldStartNextStage && nextStageInTemplate) {
             logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
@@ -454,7 +469,6 @@ export default function TransactionDetailPage() {
 
         let commentContent = `تم تغيير حالة المرحلة: ${updatedProgress.name} إلى ${stageStatusTranslations[newStatus]}.`;
 
-        // --- SMART PAYMENT DUE LOGIC ---
         const completedStageNames = new Set(
             newProgressForFirestore.filter(s => s.status === 'completed').map(s => s.name)
         );
@@ -480,7 +494,6 @@ export default function TransactionDetailPage() {
             commentContent += paymentNotificationText;
         }
 
-        // --- Write Log and Comment to Batch ---
         batch.set(doc(timelineCollectionRef), {
             type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
         });
@@ -590,7 +603,7 @@ export default function TransactionDetailPage() {
             </CardHeader>
             <CardContent>
                 <div className='grid md:grid-cols-2 gap-6'>
-                    <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? (employeesMap.get(transaction.assignedEngineerId) || '...') : <span className='text-muted-foreground'>لم يحدد</span>} />
+                    <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? (employees.find(e => e.id === transaction.assignedEngineerId)?.fullName || '...') : <span className='text-muted-foreground'>لم يحدد</span>} />
                     <InfoRow icon={<Calendar />} label="تاريخ الإنشاء" value={formatDate(transaction.createdAt)} />
                 </div>
                 {transaction.description && (
@@ -606,7 +619,7 @@ export default function TransactionDetailPage() {
             <CardHeader>
                 <CardTitle>إدارة المعاملة</CardTitle>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-6">
+            <CardContent className="grid md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="status">تغيير الحالة</Label>
                     <Select dir="rtl" value={newStatus} onValueChange={setNewStatus}>
@@ -619,22 +632,30 @@ export default function TransactionDetailPage() {
                     </Select>
                 </div>
                 {transaction.transactionType !== 'بلدية سكن خاص' ? (
-                    <div className="grid gap-2">
-                        <Label htmlFor="engineer">تغيير المهندس المسؤول</Label>
-                        <Select dir="rtl" value={newEngineerId} onValueChange={setNewEngineerId}>
-                            <SelectTrigger id="engineer"><SelectValue placeholder="اختر مهندسا..." /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="unassign">إزالة الإسناد</SelectItem>
-                                {Array.from(employeesMap.entries()).map(([id, name]) => (
-                                    <SelectItem key={id} value={id}>{name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                     <>
+                        <div className="grid gap-2">
+                            <Label htmlFor="department-select">القسم</Label>
+                            <InlineSearchList 
+                                value={selectedDepartment}
+                                onSelect={(val) => { setSelectedDepartment(val); setNewEngineerId(''); }}
+                                options={departments.map(d => ({ value: d.id, label: d.name }))}
+                                placeholder="فلترة حسب القسم..."
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="engineer-select">إسناد إلى موظف</Label>
+                             <InlineSearchList 
+                                value={newEngineerId}
+                                onSelect={setNewEngineerId}
+                                options={filteredEngineers.map(e => ({ value: e.id!, label: e.fullName }))}
+                                placeholder="اختر موظفًا..."
+                            />
+                        </div>
+                    </>
                 ) : (
-                    <div className="grid gap-2">
+                    <div className="grid gap-2 md:col-span-2">
                         <Label>المهندس المسؤول</Label>
-                        <Input value={employeesMap.get(newEngineerId) || 'غير مسند'} readOnly disabled />
+                        <Input value={employees.find(e => e.id === newEngineerId)?.fullName || 'غير مسند'} readOnly disabled />
                         <p className="text-xs text-muted-foreground">يتم التحكم في المهندس من ملف العميل لهذه المعاملة.</p>
                     </div>
                 )}
@@ -749,3 +770,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
