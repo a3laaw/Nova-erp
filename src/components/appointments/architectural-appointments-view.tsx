@@ -75,29 +75,43 @@ export function ArchitecturalAppointmentsView() {
     }, [date]);
 
 
-    const fetchData = useCallback(async (d: Date | undefined) => {
-        if (!firestore || !d) return;
+    // Fetch static data (engineers and clients) once on mount
+    useEffect(() => {
+        if (!firestore) return;
+        const fetchStaticData = async () => {
+            try {
+                const [engSnap, clientSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
+                ]);
+
+                const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName));
+                setEngineers(archEngineers);
+                
+                const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+                setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+            } catch (error) {
+                 console.error("Error fetching static appointment data:", error);
+                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين والعملاء.' });
+            }
+        }
+        fetchStaticData();
+    }, [firestore, toast]);
+    
+    // Fetch only appointments when date changes
+    const fetchAppointments = useCallback(async (d: Date) => {
+        if (!firestore) return;
         setLoading(true);
         try {
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
             
-            const [engSnap, clientSnap, apptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
-                getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                getDocs(query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
-                ))
-            ]);
-
-            const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-            const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.name));
-            setEngineers(archEngineers);
-            
-            const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-            setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+            const apptSnap = await getDocs(query(
+                collection(firestore, 'appointments'),
+                where('appointmentDate', '>=', dayStart),
+                where('appointmentDate', '<=', dayEnd)
+            ));
             
             const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
@@ -106,26 +120,26 @@ export function ArchitecturalAppointmentsView() {
                 .map(appt => {
                     return {
                         ...appt,
-                        // For existing clients, find their name from the clients list
-                        clientName: appt.clientId ? allClients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
+                        clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
                     }
                 });
             
             setAppointments(augmentedAppointments);
-
         } catch (error) {
             console.error("Error fetching appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب المواعيد.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast]);
-    
+    }, [firestore, toast, clients]);
+
     useEffect(() => {
-        if (date) {
-            fetchData(date);
+        if (date && (clients.length > 0 || engineers.length > 0)) { // Fetch appointments once static data is available
+            fetchAppointments(date);
+        } else if (date && !loading) { // Handle case where there are no clients/engineers
+            fetchAppointments(date);
         }
-    }, [date, fetchData]);
+    }, [date, clients, engineers, fetchAppointments, loading]);
 
 
     const bookingsGrid = useMemo(() => {
@@ -230,7 +244,7 @@ export function ArchitecturalAppointmentsView() {
             await batch.commit();
 
             toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث الجدول.' });
-            if(date) await fetchData(date);
+            if(date) await fetchAppointments(date);
 
         } catch (error) {
             console.error("Error deleting appointment:", error);
@@ -244,7 +258,7 @@ export function ArchitecturalAppointmentsView() {
 
     const handleSave = async () => {
         if (date) { // Re-fetch data for the current date
-            await fetchData(date);
+            await fetchAppointments(date);
         }
     };
     

@@ -85,55 +85,68 @@ export function RoomBookingCalendar() {
         }
     }, [date]);
 
-    const fetchData = useCallback(async (d: Date | undefined) => {
-        if (!firestore || !d) return;
+    // Fetch static data (clients and engineers) once
+    useEffect(() => {
+        if (!firestore) return;
+        const fetchStaticData = async () => {
+            try {
+                const [clientSnap, engSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
+                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+                ]);
+                
+                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+                setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+                
+                const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+                setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+            } catch (error) {
+                console.error("Error fetching static booking data:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
+            }
+        };
+        fetchStaticData();
+    }, [firestore, toast]);
+    
+    // Fetch appointments when date or static data changes
+    const fetchAppointments = useCallback(async (d: Date) => {
+        if (!firestore) return;
         setLoading(true);
         try {
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
 
-            const [clientSnap, engSnap, apptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
-                getDocs(query(
-                    collection(firestore, 'appointments'),
-                    where('appointmentDate', '>=', dayStart),
-                    where('appointmentDate', '<=', dayEnd)
-                ))
-            ]);
-            
-            const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-            setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
-            
-            const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-            setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+            const apptSnap = await getDocs(query(
+                collection(firestore, 'appointments'),
+                where('appointmentDate', '>=', dayStart),
+                where('appointmentDate', '<=', dayEnd)
+            ));
             
             const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
             const augmentedAppointments = allAppointmentsForDay
                 .filter(appt => appt.type === 'room')
-                .map(appt => {
-                    return {
-                        ...appt,
-                        clientName: appt.clientId ? fetchedClients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-                        engineerName: appt.engineerId ? fetchedEngineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
-                    }
-                });
-
+                .map(appt => ({
+                    ...appt,
+                    clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
+                    engineerName: appt.engineerId ? engineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
+                }));
             setAppointments(augmentedAppointments);
         } catch (error) {
-            console.error("Error fetching appointments:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث قائمة المواعيد.' });
+            console.error("Error fetching room appointments:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث قائمة الحجوزات.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast]);
-    
+    }, [firestore, toast, clients, engineers]);
+
     useEffect(() => {
-        if(date) {
-            fetchData(date);
+        if(date && (clients.length > 0 || engineers.length > 0)) {
+            fetchAppointments(date);
+        } else if (date && !loading) {
+            fetchAppointments(date);
         }
-    }, [date, fetchData]);
+    }, [date, clients, engineers, fetchAppointments, loading]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -196,7 +209,7 @@ export function RoomBookingCalendar() {
 
     const handleSaveBooking = async () => {
         if (date) {
-            await fetchData(date);
+            await fetchAppointments(date);
         }
     };
     
