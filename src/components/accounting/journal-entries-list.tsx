@@ -12,7 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getDocs, getDoc, deleteField, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -116,59 +116,14 @@ export function JournalEntriesList() {
   };
 
   const handleDelete = async () => {
-    if (!entryToDelete || !firestore || !currentUser) return;
+    if (!entryToDelete || !firestore) return;
     setIsDeleting(true);
     try {
-        const batch = writeBatch(firestore);
-        const entryRef = doc(firestore, 'journalEntries', entryToDelete.id!);
-
-        // Check if this is an auto-generated contract entry
-        if (entryToDelete.clientId && entryToDelete.transactionId) {
-            const transactionRef = doc(firestore, 'clients', entryToDelete.clientId, 'transactions', entryToDelete.transactionId);
-            const transactionSnap = await getDoc(transactionRef); // Read before writing
-
-            // Only update the transaction if it actually exists
-            if (transactionSnap.exists()) {
-                batch.update(transactionRef, { contract: deleteField() });
-            }
-            
-            // Log this action in the client's main history
-            const historyCollectionRef = collection(firestore, `clients/${entryToDelete.clientId}/history`);
-            const logContent = `تم إلغاء عقد المعاملة المرتبط بالقيد المحاسبي "${entryToDelete.entryNumber}" الذي تم حذفه.`;
-            batch.set(doc(historyCollectionRef), {
-                type: 'log',
-                content: logContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            });
-        }
-
-        // Delete the journal entry itself
-        batch.delete(entryRef);
-        
-        await batch.commit();
-
-        // Perform post-commit actions (not atomic, but safer)
-        if (entryToDelete.clientId) {
-            const clientTransactionsQuery = query(collection(firestore, 'clients', entryToDelete.clientId, 'transactions'));
-            const clientTransactionsSnap = await getDocs(clientTransactionsQuery);
-            const hasOtherContracts = clientTransactionsSnap.docs.some(d => d.data().contract);
-            if (!hasOtherContracts) {
-                const clientRef = doc(firestore, 'clients', entryToDelete.clientId);
-                const clientSnap = await getDoc(clientRef);
-                if (clientSnap.exists() && clientSnap.data().status === 'contracted') {
-                    await updateDoc(clientRef, { status: 'new' });
-                }
-            }
-        }
-
-        toast({ title: 'نجاح', description: 'تم حذف قيد اليومية وإلغاء العقد المرتبط بنجاح.' });
+        await deleteDoc(doc(firestore, 'journalEntries', entryToDelete.id!));
+        toast({ title: 'نجاح', description: 'تم حذف قيد اليومية بنجاح.' });
     } catch (error) {
-        console.error('Error deleting journal entry and contract:', error);
-        const errorMessage = error instanceof Error ? error.message : 'فشل حذف قيد اليومية.';
-        toast({ variant: 'destructive', title: 'خطأ', description: errorMessage });
+        console.error('Error deleting journal entry:', error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف قيد اليومية.' });
     } finally {
         setIsDeleting(false);
         setEntryToDelete(null);
@@ -339,7 +294,7 @@ export function JournalEntriesList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم. إذا كان هذا القيد مرتبطًا بعقد، فسيتم إلغاء العقد أيضًا. لا يمكن التراجع عن هذا الإجراء.
+                        سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
