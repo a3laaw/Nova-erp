@@ -103,7 +103,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
-  const [assignedEngineerId, setAssignedEngineerId] = useState('');
   
   const [financials, setFinancials] = useState<ContractTemplate['financials']>({
     type: 'fixed',
@@ -128,7 +127,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setClauses([]);
       setTerms([]);
       setOpenClauses([]);
-      setAssignedEngineerId('');
       setIsSaving(false);
       setStep('loading');
       setAvailableTemplates([]);
@@ -225,20 +223,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
     if (transaction.contract) {
         populateFormFromExistingContract(transaction.contract);
-        setAssignedEngineerId(transaction.assignedEngineerId || '');
         setStep('edit');
     } else {
-        const fetchClientData = async () => {
-            if (firestore && clientId) {
-                const clientDoc = await getDoc(doc(firestore, 'clients', clientId));
-                if (clientDoc.exists()) {
-                    const clientData = clientDoc.data() as Client;
-                    setAssignedEngineerId(clientData.assignedEngineer || '');
-                }
-            }
-        };
-        fetchClientData();
-
         const matchingTemplates = referenceData.templates.filter(t => t.transactionTypes?.includes(transaction.transactionType || ''));
         
         if (matchingTemplates.length > 1) {
@@ -250,7 +236,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             setStep('edit');
         }
     }
-  }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract, firestore, clientId]);
+  }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract]);
   
   // Effect 3: Derive clauses from financials state
   useEffect(() => {
@@ -353,6 +339,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
     setIsSaving(true);
     let finalTransactionId = transaction.id;
+    let assignedEngineerId: string | null = null;
 
     try {
         const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
@@ -387,6 +374,16 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             
             const clientData = clientSnap.data();
             let clientAccountId: string;
+            
+            // Assign engineer automatically
+            assignedEngineerId = clientData.assignedEngineer || transaction.assignedEngineerId || null;
+            if (transaction.transactionType?.includes('بلدية') && transaction.transactionType?.includes('سكن خاص')) {
+                if (!clientData.assignedEngineer) {
+                    throw new Error('يجب إسناد مهندس مسؤول للعميل أولاً قبل إنشاء معاملة سكن خاص.');
+                }
+                assignedEngineerId = clientData.assignedEngineer;
+            }
+
 
             if (clientAccountSnap.empty) {
                 const parentData = parentAccountSnap.docs[0].data();
@@ -426,7 +423,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 const transactionPayload = {
                     ...transaction,
                     transactionNumber,
-                    assignedEngineerId: assignedEngineerId || null,
+                    assignedEngineerId: assignedEngineerId,
                     departmentId: transaction.departmentId || department?.id,
                     status: 'in-progress',
                     createdAt: serverTimestamp(),
@@ -461,7 +458,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const department = referenceData.departments.find(d => d.name === engineer?.department);
             const autoTags = {
                 clientId, transactionId: finalTransactionId, auto_profit_center: finalTransactionId,
-                auto_resource_id: assignedEngineerId || null,
+                auto_resource_id: assignedEngineerId,
                 ...(department && { auto_dept_id: department.id }),
             };
             
@@ -502,6 +499,27 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         });
 
         toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء القيد المحاسبي بنجاح.' });
+        
+        // --- NOTIFICATION LOGIC (Post-transaction) ---
+        if (assignedEngineerId) {
+             const engineer = referenceData.employees.find(e => e.id === assignedEngineerId);
+             const engineerName = engineer ? engineer.fullName : 'غير مسند';
+             const recipients = new Set<string>();
+             if (currentUser?.id) recipients.add(currentUser.id);
+             
+             const targetUserId = await findUserIdByEmployeeId(firestore, assignedEngineerId);
+             if (targetUserId) recipients.add(targetUserId);
+
+             for (const recipientId of recipients) {
+                const isCreator = recipientId === currentUser.id;
+                const title = isCreator ? 'تم إنشاء عقد بنجاح' : 'تم إسناد عقد جديد لك';
+                const body = isCreator 
+                    ? `لقد أنشأت العقد "${transaction.transactionType}" للعميل ${clientName}.`
+                    : `أسند إليك ${currentUser.fullName} العقد "${transaction.transactionType}" للعميل ${clientName}.`;
+                
+                await createNotification(firestore, { userId: recipientId, title, body, link: `/dashboard/clients/${clientId}/transactions/${finalTransactionId}` });
+             }
+        }
         
         onClose();
         if (onSaveSuccess) onSaveSuccess();
@@ -567,20 +585,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             <ScrollArea className="h-[calc(90vh-250px)] px-6">
                 <div className="py-4 space-y-8">
                      <section className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1">
                             <div className="grid gap-2">
                                 <Label>العميل</Label>
                                 <Input value={clientName} disabled readOnly />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="assigned-engineer">المهندس المسؤول عن المعاملة</Label>
-                                <InlineSearchList
-                                    value={assignedEngineerId}
-                                    onSelect={setAssignedEngineerId}
-                                    options={referenceData.employees.map(e => ({ value: e.id!, label: e.fullName }))}
-                                    placeholder="اختر مهندسًا..."
-                                    disabled={loadingRefData}
-                                />
                             </div>
                         </div>
                     </section>
