@@ -94,7 +94,7 @@ export default function ViewCashReceiptPage() {
                     <img 
                         src={branding.letterhead_image_url} 
                         alt="Letterhead"
-                        className="w-full h-auto"
+                        className="w-full h-auto block"
                     />
                 )}
                 <div className="p-8 md:p-12">

@@ -142,94 +142,101 @@ export default function ViewJournalEntryPage() {
   return (
     <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
         <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
-            <div 
-                id="printable-area" 
-                className="p-8 md:p-12 printable-content bg-no-repeat bg-top bg-cover"
-                style={branding?.letterhead_image_url ? { backgroundImage: `url(${branding.letterhead_image_url})` } : {}}
-            >
-                <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                    <div className="flex justify-between items-start">
-                         <div className="text-left flex-shrink-0">
-                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قـيـد يـومـيـة</h2>
-                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Journal Entry</p>
-                            <div className='flex items-center gap-2 mt-2'>
-                               <p className="font-mono text-sm text-muted-foreground">{entry.entryNumber} : <span className='font-sans'>رقم القيد</span></p>
-                               <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
+            <div id="printable-area" className="printable-content">
+                {branding?.letterhead_image_url && (
+                    <img 
+                        src={branding.letterhead_image_url} 
+                        alt="Letterhead"
+                        className="w-full h-auto block"
+                    />
+                )}
+                <div className="p-8 md:p-12">
+                    {!branding?.letterhead_image_url && (
+                        <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                            <div className="flex justify-between items-start">
+                                <div className="text-left flex-shrink-0">
+                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قـيـد يـومـيـة</h2>
+                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Journal Entry</p>
+                                    <div className='flex items-center gap-2 mt-2'>
+                                    <p className="font-mono text-sm text-muted-foreground">{entry.entryNumber} : <span className='font-sans'>رقم القيد</span></p>
+                                    <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                    <div>
+                                    <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                                    <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
+                                    <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+                    )}
+
+                    <main className="py-8 space-y-8">
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                            <div className="flex items-baseline">
+                                <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">التاريخ:</span>
+                                <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-center font-mono text-gray-800 dark:text-gray-200">{formattedDate}</span>
+                            </div>
+                            <div className="flex items-baseline">
+                                <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">المرجع:</span>
+                                <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-gray-800 dark:text-gray-200">{entry.reference || '---'}</span>
+                            </div>
+                            <div className="flex items-baseline col-span-2">
+                                <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">البيان:</span>
+                                <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-gray-800 dark:text-gray-200">{entry.narration || '---'}</span>
                             </div>
                         </div>
-                         <div className="flex items-center gap-4">
-                           <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                            <div>
-                               <h1 className="font-bold text-lg">{branding?.company_name}</h1>
-                               <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
-                               <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                            </div>
-                        </div>
-                    </div>
-                </header>
 
-                <main className="py-8 space-y-8">
-                     <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                        <div className="flex items-baseline">
-                            <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">التاريخ:</span>
-                            <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-center font-mono text-gray-800 dark:text-gray-200">{formattedDate}</span>
-                        </div>
-                        <div className="flex items-baseline">
-                             <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">المرجع:</span>
-                             <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-gray-800 dark:text-gray-200">{entry.reference || '---'}</span>
-                        </div>
-                         <div className="flex items-baseline col-span-2">
-                             <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">البيان:</span>
-                             <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-gray-800 dark:text-gray-200">{entry.narration || '---'}</span>
-                         </div>
-                    </div>
-
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-2/5">الحساب</TableHead>
-                                <TableHead className="text-left">مدين</TableHead>
-                                <TableHead className="text-left">دائن</TableHead>
-                                <TableHead>ملاحظات</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {entry.lines.map((line, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="font-medium">{line.accountName}</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(line.debit)}</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(line.credit)}</TableCell>
-                                    <TableCell>{line.notes || '-'}</TableCell>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-2/5">الحساب</TableHead>
+                                    <TableHead className="text-left">مدين</TableHead>
+                                    <TableHead className="text-left">دائن</TableHead>
+                                    <TableHead>ملاحظات</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow className="font-bold bg-muted/50">
-                                <TableCell>الإجمالي</TableCell>
-                                <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>
-                                <TableCell className="text-left font-mono">{formatCurrency(entry.totalCredit)}</TableCell>
-                                <TableCell></TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </main>
-                
-                 <footer className="pt-24">
-                    <div className="grid grid-cols-2 gap-20">
-                        <div className="text-center">
-                            <div className="border-t-2 border-gray-300 pt-2">
-                                <p className="font-semibold">المحاسب</p>
-                                <p className="text-sm text-muted-foreground">Accountant's Signature</p>
+                            </TableHeader>
+                            <TableBody>
+                                {entry.lines.map((line, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">{line.accountName}</TableCell>
+                                        <TableCell className="text-left font-mono">{formatCurrency(line.debit)}</TableCell>
+                                        <TableCell className="text-left font-mono">{formatCurrency(line.credit)}</TableCell>
+                                        <TableCell>{line.notes || '-'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFooter>
+                                <TableRow className="font-bold bg-muted/50">
+                                    <TableCell>الإجمالي</TableCell>
+                                    <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>
+                                    <TableCell className="text-left font-mono">{formatCurrency(entry.totalCredit)}</TableCell>
+                                    <TableCell></TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
+                    </main>
+                    
+                    <footer className="pt-24">
+                        <div className="grid grid-cols-2 gap-20">
+                            <div className="text-center">
+                                <div className="border-t-2 border-gray-300 pt-2">
+                                    <p className="font-semibold">المحاسب</p>
+                                    <p className="text-sm text-muted-foreground">Accountant's Signature</p>
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                <div className="border-t-2 border-gray-300 pt-2">
+                                    <p className="font-semibold">المدير المالي</p>
+                                    <p className="text-sm text-muted-foreground">CFO's Signature</p>
+                                </div>
                             </div>
                         </div>
-                         <div className="text-center">
-                            <div className="border-t-2 border-gray-300 pt-2">
-                                <p className="font-semibold">المدير المالي</p>
-                                <p className="text-sm text-muted-foreground">CFO's Signature</p>
-                            </div>
-                        </div>
-                    </div>
-                </footer>
+                    </footer>
+                </div>
             </div>
              <div className="p-6 bg-muted/50 rounded-b-lg flex justify-end gap-2 no-print">
                 {entry.status === 'draft' && (
