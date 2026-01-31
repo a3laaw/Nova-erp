@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -289,16 +289,12 @@ export default function ClientProfilePage() {
         const transactionTimelineRef = collection(firestore, `clients/${client.id}/transactions/${transactionToCancel.id}/timelineEvents`);
         
         const logContent = `قام بإلغاء عقد المعاملة: "${transactionToCancel.transactionType}".`;
-        const commentContent = `**تم إلغاء العقد**\nقام ${currentUser.fullName} بإلغاء العقد المرتبط بهذه المعاملة.`;
-
         const logData = { type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
-        const commentData = { type: 'comment', content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
-
         batch.set(doc(historyCollectionRef), logData);
-        batch.set(doc(transactionTimelineRef), logData);
-        batch.set(doc(historyCollectionRef), commentData);
-        batch.set(doc(transactionTimelineRef), commentData);
 
+        const commentContent = `**تم إلغاء العقد**\nقام ${currentUser.fullName} بإلغاء العقد المرتبط بهذه المعاملة.`;
+        const commentData = { type: 'comment', content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
+        batch.set(doc(transactionTimelineRef), commentData);
 
         // Check if this is the last contract to potentially revert client status
         const otherTransactions = transactions.filter(tx => tx.id !== transactionToCancel.id!);
@@ -311,7 +307,6 @@ export default function ClientProfilePage() {
             const statusLogContent = `تغيرت حالة الملف من "تم التعاقد" إلى "جديد" بعد إلغاء آخر عقد.`;
             const statusLogData = { type: 'log', content: statusLogContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
             batch.set(doc(historyCollectionRef), statusLogData);
-            batch.set(doc(transactionTimelineRef), statusLogData);
         }
 
         await batch.commit();
@@ -472,7 +467,7 @@ export default function ClientProfilePage() {
                 <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
                 <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
                 <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+                <InfoRow icon={<FileText />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
             </CardContent>
         </Card>
 

@@ -317,8 +317,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   useEffect(() => {
     // If we are editing an existing transaction that already has contract data,
-    // don't re-calculate clauses from financials. They are set directly.
-    if (transaction?.id && transaction?.contract) {
+    // or if we're creating from a quotation, don't re-calculate.
+    if ((transaction?.id && transaction?.contract) || quotationIdToUpdate) {
         return;
     }
     
@@ -343,7 +343,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         }));
         setClauses(calculatedClauses);
     }
-  }, [financials, transaction?.id, transaction?.contract]);
+  }, [financials, transaction?.id, transaction?.contract, quotationIdToUpdate]);
 
 
   const handleSelectTransaction = (txId: string) => {
@@ -454,7 +454,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [ clientSnap, journalEntryCounterDoc, coaClientCounterDoc ] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterRef),
+                getDoc(coaClientCounterRef),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -560,15 +560,21 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 transaction_firestore.update(quotationRef, { transactionId: finalTransactionId, status: 'accepted' });
             }
 
-            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
             const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${finalTransactionId}/timelineEvents`);
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            
+            // Detailed comment for transaction timeline
             let contractDetailsComment = `**تم ${transaction.contract ? 'تحديث' : 'توقيع'} العقد**\n\n`;
             contractDetailsComment += `**نوع المعاملة:** ${transaction.transactionType}\n`;
             contractDetailsComment += `**قيمة العقد:** ${formatCurrency(totalAmount)}\n\n`;
             contractDetailsComment += `**الدفعات:**\n` + clauses.map(c => `  - ${c.name}: ${formatCurrency(c.amount)}`).join('\n');
             const commentData = { type: 'comment' as const, content: contractDetailsComment, userId: currentUser!.id, userName: currentUser!.fullName || 'النظام', userAvatar: currentUser!.avatarUrl || '', createdAt: serverTimestamp() };
             transaction_firestore.set(doc(transactionTimelineRef), commentData);
-            transaction_firestore.set(doc(historyCollectionRef), commentData);
+            
+            // Concise log for main client history
+            const conciseLogContent = `تم ${transaction.contract ? 'تحديث' : 'توقيع'} عقد لمعاملة "${transaction.transactionType}" بقيمة ${formatCurrency(totalAmount)}.`;
+            const logData = { type: 'log' as const, content: conciseLogContent, userId: currentUser!.id, userName: currentUser!.fullName || 'النظام', userAvatar: currentUser!.avatarUrl || '', createdAt: serverTimestamp() };
+            transaction_firestore.set(doc(historyCollectionRef), logData);
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء القيد المحاسبي بنجاح.' });

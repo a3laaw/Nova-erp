@@ -189,29 +189,42 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
                 transaction_firestore.set(newTransactionRef, newTransactionData);
 
-                let logContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
+                const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
+                const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+
+                // Detailed log for transaction timeline
+                let detailedLogContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
                 if (engineer) {
-                    logContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
+                    detailedLogContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
                 }
-                
+
                 if (fromAppointmentId) {
                     const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
                     transaction_firestore.update(appointmentRef, { transactionId: newTransactionRefId });
-                    logContent += ` (مرتبطة بالموعد ${fromAppointmentId.substring(0, 5)}...).`;
+                    detailedLogContent += ` (مرتبطة بالموعد ${fromAppointmentId.substring(0, 5)}...).`;
                 }
                 
-                const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
-                const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
-                const logEventData = {
+                const detailedLogEventData = {
                     type: 'log' as const,
-                    content: logContent,
+                    content: detailedLogContent,
                     userId: currentUser.id,
                     userName: currentUser.fullName,
                     userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 };
-                transaction_firestore.set(doc(timelineCollectionRef), logEventData);
-                transaction_firestore.set(doc(historyCollectionRef), logEventData);
+                transaction_firestore.set(doc(timelineCollectionRef), detailedLogEventData);
+
+                // Concise log for main client history
+                const conciseLogContent = `تم إنشاء معاملة جديدة: "${transactionTypeName}".`;
+                const conciseLogEventData = {
+                    type: 'log' as const,
+                    content: conciseLogContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                };
+                transaction_firestore.set(doc(historyCollectionRef), conciseLogEventData);
             });
             
             toast({ title: 'نجاح', description: 'تمت إضافة المعاملة والسجل بنجاح.' });
