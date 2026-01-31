@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -279,6 +278,13 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
+        let isFirstReceipt = false;
+        if (selectedProjectId) {
+            const receiptsQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
+            const existingReceiptsSnap = await getDocs(receiptsQuery);
+            isFirstReceipt = existingReceiptsSnap.empty;
+        }
+
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
@@ -381,6 +387,35 @@ export default function NewCashReceiptPage() {
                     createdAt: serverTimestamp(),
                 });
             }
+
+            if (isFirstReceipt && selectedProjectId) {
+                const transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
+                const transactionSnap = await transaction_fs.get(transactionRef);
+                if (transactionSnap.exists()) {
+                    const transactionData = transactionSnap.data();
+                    const currentStages = [...(transactionData.stages || [])];
+                    const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+
+                    if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
+                        currentStages[contractStageIndex] = {
+                            ...currentStages[contractStageIndex],
+                            status: 'completed',
+                            endDate: serverTimestamp(),
+                        };
+                        transaction_fs.update(transactionRef, { stages: currentStages });
+
+                        const timelineLogRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
+                        transaction_fs.set(timelineLogRef, {
+                            type: 'log',
+                            content: `تم إكمال مرحلة "توقيع العقد" تلقائيًا بعد استلام أول دفعة عبر السند رقم ${newVoucherNumber}.`,
+                            userId: 'system',
+                            userName: 'النظام',
+                            createdAt: serverTimestamp(),
+                        });
+                    }
+                }
+            }
+
         });
         
         // Post-transaction logic
@@ -529,5 +564,3 @@ export default function NewCashReceiptPage() {
     </Card>
   );
 }
-
-    

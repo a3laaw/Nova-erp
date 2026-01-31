@@ -367,7 +367,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, journalEntryCounterDoc, coaClientCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterRef)
+                transaction_firestore.get(coaClientCounterDoc)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -398,23 +398,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const nextJournalEntryNumber = ((journalEntryCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
 
             const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
-            const updatedStages = [...(transaction.stages || [])];
-            const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
-            if (contractStageIndex > -1 && updatedStages[contractStageIndex].status !== 'completed') {
-                const stageToUpdate = { ...updatedStages[contractStageIndex] };
-                stageToUpdate.status = 'completed';
-                if (!(stageToUpdate as any).startDate) (stageToUpdate as any).startDate = new Date();
-                (stageToUpdate as any).endDate = new Date();
-                updatedStages[contractStageIndex] = stageToUpdate as TransactionStage;
-            }
-
+            
             const transactionRef = transaction.id ? doc(firestore, 'clients', clientId, 'transactions', transaction.id) : doc(collection(firestore, `clients/${clientId}/transactions`));
             if (!finalTransactionId) finalTransactionId = transactionRef.id;
             
-            const transactionPayload: any = { ...transaction, contract: contractData, stages: updatedStages, status: 'in-progress', updatedAt: serverTimestamp() };
+            const transactionPayload: any = { ...transaction, contract: contractData, status: 'in-progress', updatedAt: serverTimestamp() };
             if (!transaction.id) transactionPayload.createdAt = serverTimestamp();
             
-            // Use set with merge to safely update or create the document
             transaction_firestore.set(transactionRef, cleanFirestoreData(transactionPayload), { merge: true });
             
             const engineer = referenceData.employees.find(e => e.id === transaction.assignedEngineerId);
