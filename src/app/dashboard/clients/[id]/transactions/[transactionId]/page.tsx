@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirestore, useDocument, useSubscription } from '@/firebase';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy, where } from 'firebase/firestore';
 import {
   Card,
@@ -126,7 +126,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const firestore = useFirebase();
+  const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   
@@ -716,5 +716,7 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
 
     
