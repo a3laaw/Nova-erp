@@ -72,11 +72,11 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                 
                 const [deptsSnap, engsSnap, assignmentsSnap, clientTxnsSnap, clientReceiptsSnap, transTypesSnap] = await Promise.all([
                     getDocs(deptsQuery),
-                    getDocs(engsSnap),
+                    getDocs(engineersQuery),
                     getDocs(existingAssignmentsQuery),
                     getDocs(clientTransactionsQuery),
                     getDocs(clientReceiptsQuery),
-                    getDocs(transactionTypesQuery),
+                    getDocs(transTypesSnap),
                 ]);
 
                 const allDepartments = deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
@@ -382,7 +382,6 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
-        </AlertDialog>
         </>
     );
 }
