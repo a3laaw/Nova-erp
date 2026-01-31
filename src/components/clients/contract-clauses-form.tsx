@@ -351,11 +351,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     let assignedEngineerId: string | null = null;
 
     try {
-        // --- 1. PERFORM ALL QUERIES OUTSIDE TRANSACTION ---
+        // --- PRE-TRANSACTION QUERIES ---
         const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
-
+        
         const [
             clientAccountSnap,
             revenueAccountSnap,
@@ -369,14 +369,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         if (revenueAccountSnap.empty) throw new Error("حساب 'إيرادات استشارات هندسية' غير موجود.");
         if (clientAccountSnap.empty && parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
 
-        // --- 2. RUN THE TRANSACTION WITH DOC READS & ALL WRITES ---
+
+        // --- FIRESTORE TRANSACTION ---
         await runTransaction(firestore, async (transaction_firestore) => {
-            // --- 2a. DEFINE DOCUMENT REFS ---
             const clientRef = doc(firestore, 'clients', clientId);
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
 
-            // --- 2b. EXECUTE DOC READS ---
             const [
                 clientSnap,
                 journalEntryCounterDoc,
@@ -388,12 +387,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
-
-            // --- 2c. PREPARE LOGIC AND WRITES using results from outside and inside transaction ---
+            
             const clientData = clientSnap.data() as Client;
             let clientAccountId: string;
 
-            // Handle creating a new client account if it doesn't exist
             if (clientAccountSnap.empty) {
                 const parentData = parentAccountSnap.docs[0].data();
                 const parentCode = parentData.code as string;
@@ -411,11 +408,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 clientAccountId = clientAccountSnap.docs[0].id;
             }
             
-            // Assign engineer automatically
             assignedEngineerId = transaction.assignedEngineerId || clientData.assignedEngineer || null;
+            if ((transaction.transactionType || '').includes('سكن خاص') && !assignedEngineerId) {
+                throw new Error('يجب إسناد مهندس مسؤول لملف العميل أولاً قبل إنشاء عقد سكن خاص.');
+            }
 
-            // Handle transaction (create or update)
-            if (!transaction.id || !transaction.createdAt) { // Creating new transaction
+            if (!transaction.id || !transaction.createdAt) {
                 const currentCounter = clientData.transactionCounter || 0;
                 const newCounter = currentCounter + 1;
                 const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
@@ -438,7 +436,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     contract: { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type },
                 };
                 transaction_firestore.set(newTransactionRef, cleanFirestoreData(transactionPayload));
-            } else { // Updating existing transaction
+            } else {
                 finalTransactionId = transaction.id!;
                 const transactionRef = doc(firestore, 'clients', clientId, 'transactions', finalTransactionId);
                 const transactionPayload: any = {
@@ -452,7 +450,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 transaction_firestore.update(transactionRef, cleanFirestoreData(transactionPayload));
             }
 
-            // Create Journal Entry
             const currentYear = new Date().getFullYear();
             const nextJournalEntryNumber = ((journalEntryCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
             const newEntryNumber = `JV-${currentYear}-${String(nextJournalEntryNumber).padStart(4, '0')}`;
@@ -480,18 +477,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             });
             transaction_firestore.set(journalEntryCounterRef, { counts: { [currentYear]: nextJournalEntryNumber } }, { merge: true });
 
-            // Update client status if needed
             if (clientData.status === 'new') {
                 transaction_firestore.update(clientRef, { status: 'contracted' });
             }
 
-            // Update quotation if linked
             if (quotationIdToUpdate) {
                 const quotationRef = doc(firestore, 'quotations', quotationIdToUpdate);
                 transaction_firestore.update(quotationRef, { transactionId: finalTransactionId, status: 'accepted' });
             }
 
-            // Create log entries
             const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
             const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${finalTransactionId}/timelineEvents`);
             let contractDetailsComment = `**تم ${transaction.contract ? 'تحديث' : 'توقيع'} العقد**\n\n`;
@@ -502,10 +496,46 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             transaction_firestore.set(doc(transactionTimelineRef), commentData);
             transaction_firestore.set(doc(historyCollectionRef), commentData);
         });
+        
+        // --- POST-TRANSACTION LOGIC ---
+        
+        // Complete the contract signing stage
+        if (finalTransactionId) {
+            const txRef = doc(firestore, 'clients', clientId, 'transactions', finalTransactionId);
+            const txSnap = await getDoc(txRef);
+            if (txSnap.exists()) {
+                const transactionData = txSnap.data() as ClientTransaction;
+                const currentStages = transactionData.stages || [];
+                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+
+                if (contractStageIndex > -1 && currentStages[contractStageIndex].status !== 'completed') {
+                    const newStages = [...currentStages];
+                    newStages[contractStageIndex] = {
+                        ...newStages[contractStageIndex],
+                        status: 'completed',
+                        endDate: serverTimestamp(),
+                    };
+                    
+                    const stageUpdateBatch = writeBatch(firestore);
+                    stageUpdateBatch.update(txRef, { stages: newStages });
+
+                    const logContent = `تم إكمال مرحلة "توقيع العقد" تلقائيًا عند إنشاء/حفظ العقد.`;
+                    const timelineRef = doc(collection(txRef, 'timelineEvents'));
+                    stageUpdateBatch.set(timelineRef, {
+                        type: 'log',
+                        content: logContent,
+                        userId: currentUser?.id || 'system',
+                        userName: currentUser?.fullName || 'System',
+                        createdAt: serverTimestamp(),
+                    });
+
+                    await stageUpdateBatch.commit();
+                }
+            }
+        }
 
         toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء القيد المحاسبي بنجاح.' });
         
-        // --- POST-TRANSACTION NOTIFICATIONS ---
         if (assignedEngineerId) {
              const engineer = referenceData.employees.find(e => e.id === assignedEngineerId);
              const engineerName = engineer ? engineer.fullName : 'غير مسند';
