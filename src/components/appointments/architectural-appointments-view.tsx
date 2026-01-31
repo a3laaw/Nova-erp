@@ -24,7 +24,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -110,11 +109,13 @@ export function ArchitecturalAppointmentsView() {
             const apptSnap = await getDocs(query(
                 collection(firestore, 'appointments'),
                 where('appointmentDate', '>=', dayStart),
-                where('appointmentDate', '<=', dayEnd),
-                where('type', '==', 'architectural')
+                where('appointmentDate', '<=', dayEnd)
             ));
             
-            const appts = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            const appts = apptSnap.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                .filter(appt => appt.type === 'architectural');
+
             setRawAppointments(appts);
         } catch (error) {
             console.error("Error fetching appointments:", error);
