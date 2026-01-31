@@ -1,9 +1,4 @@
 
-
-
-
-
-
       'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -377,8 +372,7 @@ export default function TransactionDetailPage() {
 
     updatedProgress.status = newStatus;
     const now = new Date();
-    let logContent: string;
-
+    
     if (newStatus === 'in-progress') {
         if (oldStatus === 'pending') {
             updatedProgress.startDate = now;
@@ -386,18 +380,13 @@ export default function TransactionDetailPage() {
         if (templateStageInfo.expectedDurationDays && templateStageInfo.expectedDurationDays > 0) {
             updatedProgress.expectedEndDate = addDays(now, templateStageInfo.expectedDurationDays);
         }
-        logContent = `... ${oldStatus === 'pending' ? 'بدأ العمل على' : 'استأنف العمل على'} مرحلة "${updatedProgress.name}".`;
     } else if (newStatus === 'completed') {
         if (!updatedProgress.startDate) updatedProgress.startDate = now;
         updatedProgress.endDate = now;
-        logContent = `... أكمل مرحلة "${updatedProgress.name}".`;
-    } else if (newStatus === 'awaiting-review') {
-        logContent = `... أوقف العمل على مرحلة "${updatedProgress.name}" بانتظار المراجعة.`;
-    } else { // pending
-        updatedProgress.startDate = null;
+    } else { // pending or awaiting-review
+        updatedProgress.startDate = updatedProgress.startDate || null;
         updatedProgress.endDate = null;
         updatedProgress.expectedEndDate = null;
-        logContent = `... أعاد مرحلة "${updatedProgress.name}" إلى الحالة المعلقة.`;
     }
 
     let newProgressForFirestore;
@@ -414,8 +403,56 @@ export default function TransactionDetailPage() {
     try {
         const batch = writeBatch(firestore);
         
-        let commentContent = `تم تغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
-        logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        const completedStage = newStatus === 'completed' ? stages.find(s => s.stageId === stageId) : null;
+        
+        // --- SMART AUTO-START LOGIC ---
+        let shouldStartNextStage = false;
+        let nextStageInTemplate: WorkStage | undefined = undefined;
+
+        if (newStatus === 'completed' && completedStage) {
+            if (completedStage.name === 'ارسال فحص التربه') {
+                nextStageInTemplate = stages.find(s => s.name === 'استلام فحص التربه') as WorkStage | undefined;
+            } else if (completedStage.name !== 'توقيع العقد' && completedStage.name !== 'استلام فحص التربه') {
+                const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
+                if (completedStageOrderIndex > -1 && (completedStageOrderIndex + 1) < stages.length) {
+                    const potentialNext = stages[completedStageOrderIndex + 1];
+                    if (potentialNext && potentialNext.name !== 'ارسال فحص التربه' && potentialNext.name !== 'توقيع العقد') {
+                         nextStageInTemplate = potentialNext as WorkStage;
+                    }
+                }
+            }
+        }
+
+        if (nextStageInTemplate) {
+            const nextStageId = nextStageInTemplate.id!;
+            const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
+
+            if (!isDiscussionStage) {
+                const nextStageIndexInProg = newProgressForFirestore.findIndex(s => s.stageId === nextStageId);
+                if (nextStageIndexInProg !== -1) {
+                    const stageToStart = { ...newProgressForFirestore[nextStageIndexInProg] };
+                    if (stageToStart.status === 'pending') {
+                        stageToStart.status = 'in-progress';
+                        stageToStart.startDate = now;
+                        newProgressForFirestore[nextStageIndexInProg] = stageToStart;
+                        shouldStartNextStage = true;
+                    }
+                } else {
+                    newProgressForFirestore.push({
+                        stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
+                    });
+                    shouldStartNextStage = true;
+                }
+            }
+        }
+        
+        // --- LOGGING & NOTIFICATIONS ---
+        let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        if (shouldStartNextStage && nextStageInTemplate) {
+            logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+        }
+
+        let commentContent = `تم تغيير حالة المرحلة: ${updatedProgress.name} إلى ${stageStatusTranslations[newStatus]}.`;
 
         // --- SMART PAYMENT DUE LOGIC ---
         const completedStageNames = new Set(
@@ -462,9 +499,6 @@ export default function TransactionDetailPage() {
         await batch.commit();
 
         toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
-
-        // --- Notification Logic ---
-        // (omitted for brevity, but would be here)
     
     } catch (e) {
         console.error("Failed to update stage status:", e);
@@ -506,7 +540,7 @@ export default function TransactionDetailPage() {
     {transaction && client && (
         <ContractClausesForm
             isOpen={isContractFormOpen}
-            onClose={() => setContractTransaction(null)}
+            onClose={() => setIsContractFormOpen(false)}
             transaction={transaction}
             clientId={clientId}
             clientName={(client as any).nameAr}
@@ -715,5 +749,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
-    
