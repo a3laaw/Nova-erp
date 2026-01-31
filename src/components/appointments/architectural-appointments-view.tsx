@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -25,6 +26,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -108,13 +110,12 @@ export function ArchitecturalAppointmentsView() {
             
             const apptSnap = await getDocs(query(
                 collection(firestore, 'appointments'),
+                where('type', '==', 'architectural'),
                 where('appointmentDate', '>=', dayStart),
                 where('appointmentDate', '<=', dayEnd)
             ));
             
-            const appts = apptSnap.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                .filter(appt => appt.type === 'architectural');
+            const appts = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
             setRawAppointments(appts);
         } catch (error) {
@@ -763,3 +764,4 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
