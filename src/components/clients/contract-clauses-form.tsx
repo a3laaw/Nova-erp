@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown, FileSignature } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, writeBatch, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -50,7 +50,6 @@ interface ContractClausesFormProps {
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
-
 
 // --- Sub-component for Template Selection ---
 function TemplateSelectionView({
@@ -91,6 +90,53 @@ function TemplateSelectionView({
   );
 }
 
+// --- NEW Sub-component for Transaction Selection ---
+function TransactionSelectionView({
+  transactions,
+  onSelect,
+  onCreateNew,
+}: {
+  transactions: ClientTransaction[];
+  onSelect: (txId: string) => void;
+  onCreateNew: () => void;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>ربط العقد بمعاملة</DialogTitle>
+        <DialogDescription>
+          هذا العقد جديد. الرجاء اختيار المعاملة الداخلية التي تريد ربط هذا العقد بها، أو قم بإنشاء معاملة جديدة.
+        </DialogDescription>
+      </DialogHeader>
+      <ScrollArea className="h-[60vh]">
+        <div className="py-4 space-y-2 px-6">
+          <h4 className="font-semibold text-sm mb-2">المعاملات الحالية (بدون عقد)</h4>
+          {transactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center p-4">لا توجد معاملات حالية بدون عقد لهذا العميل.</p>
+          ) : (
+            transactions.map((tx) => (
+              <button
+                key={tx.id}
+                onClick={() => onSelect(tx.id!)}
+                className="block w-full text-right p-4 border rounded-lg hover:bg-accent transition-colors"
+              >
+                <p className="font-semibold">{tx.transactionType}</p>
+                <p className="text-sm text-muted-foreground">رقم: {tx.transactionNumber || 'N/A'}</p>
+              </button>
+            ))
+          )}
+        </div>
+      </ScrollArea>
+      <DialogFooter className="pt-4 border-t">
+        <Button variant="outline" type="button" onClick={onCreateNew}>
+          <PlusCircle className="ml-2 h-4 w-4" />
+          أو، إنشاء معاملة جديدة لهذا العقد
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
 
 export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
@@ -112,10 +158,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   });
   
   // Control flow state
-  const [isSaving, setIsSaving] = useState(false);
-  const [step, setStep] = useState<'loading' | 'select' | 'edit'>('loading');
+  const [step, setStep] = useState<'loading' | 'select-transaction' | 'select-template' | 'edit-contract'>('loading');
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
+  const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
   const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[], employees: Employee[], departments: Department[] }>({ stages: [], templates: [], employees: [], departments: [] });
   const [loadingRefData, setLoadingRefData] = useState(true);
@@ -133,6 +180,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setChosenTemplate(null);
       setFinancials({ type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setReferenceData({ templates: [], stages: [], employees: [], departments: [] });
+      setClientTransactions([]);
+      setSelectedTransactionId(null);
       setLoadingRefData(true);
     }
   }, [isOpen]);
@@ -147,7 +196,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         type: contract.financialsType || 'fixed',
         totalAmount: contract.totalAmount || 0,
         discount: 0, // This model doesn't store discount on contract level yet
-        // Recreate milestones from clauses for editing UI consistency
         milestones: (contract.clauses || []).map(c => ({
             id: c.id,
             name: c.name,
@@ -165,10 +213,29 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setOpenClauses(template?.openClauses || []);
       setFinancials(template?.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setChosenTemplate(template);
-      // Clauses are derived from financials, so this will be handled in a later effect
   }, []);
 
-  // Effect 1: Fetch all reference data (templates, stages, employees, departments) once when the dialog opens.
+  const populateFormFromQuotation = useCallback(() => {
+    if (!transaction?.contract) return;
+    const contractData = transaction.contract;
+    
+    setScopeOfWork(contractData.scopeOfWork || []);
+    setTerms(contractData.termsAndConditions || []);
+    setOpenClauses(contractData.openClauses || []);
+    
+    setFinancials({
+        type: contractData.financialsType || 'fixed',
+        totalAmount: contractData.totalAmount || 0,
+        discount: 0,
+        milestones: (contractData.clauses || []).map(c => ({
+            id: c.id || generateId(),
+            name: c.name,
+            condition: c.condition || '',
+            value: contractData.financialsType === 'percentage' ? c.percentage || 0 : c.amount,
+        }))
+    });
+}, [transaction]);
+
   useEffect(() => {
     if (!isOpen || !firestore || !transaction) return;
 
@@ -181,7 +248,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         const departmentsQuery = query(collection(firestore, 'departments'));
         
         let stages: MultiSelectOption[] = [];
-
         if(transaction.departmentId) {
             const departmentStagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`), orderBy('order', 'asc'));
             const departmentStagesSnapshot = await getDocs(departmentStagesQuery);
@@ -203,42 +269,49 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         const departments = departmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
         
         setReferenceData({ templates, stages, employees, departments });
+        
+        // --- Step Determination Logic ---
+        if (transaction.id) { // Editing an existing transaction
+            setSelectedTransactionId(transaction.id);
+            if (transaction.contract) {
+                populateFormFromExistingContract(transaction.contract);
+                setStep('edit-contract');
+            } else {
+                const matchingTemplates = templates.filter(t => t.transactionTypes?.includes(transaction.transactionType || ''));
+                if (matchingTemplates.length > 1) {
+                    setAvailableTemplates(matchingTemplates);
+                    setStep('select-template');
+                } else {
+                    const templateToUse = matchingTemplates.length === 1 ? matchingTemplates[0] : null;
+                    populateFormFromTemplate(templateToUse);
+                    setStep('edit-contract');
+                }
+            }
+        } else { // New contract from quotation
+            if (clientId) {
+                const txQuery = query(collection(firestore, 'clients', clientId, 'transactions'), where('contract', '==', null));
+                const txSnap = await getDocs(txQuery);
+                const availableTx = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+                setClientTransactions(availableTx);
+                populateFormFromQuotation();
+                setStep('select-transaction');
+            } else {
+                throw new Error("clientId is required to create a new contract.");
+            }
+        }
 
       } catch (error) {
         console.error("Error fetching reference data:", error);
         toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب البيانات المرجعية." });
-        setReferenceData({ templates: [], stages: [], employees: [], departments: [] });
       } finally {
         setLoadingRefData(false);
       }
     };
 
     fetchAllReferenceData();
-  }, [isOpen, firestore, transaction, toast]);
+  }, [isOpen, firestore, transaction, clientId, toast, populateFormFromExistingContract, populateFormFromTemplate, populateFormFromQuotation]);
 
 
-  // Effect 2: Populate form or show template selection once reference data is loaded.
-  useEffect(() => {
-    if (loadingRefData || !isOpen || !transaction) return;
-
-    if (transaction.contract) {
-        populateFormFromExistingContract(transaction.contract);
-        setStep('edit');
-    } else {
-        const matchingTemplates = referenceData.templates.filter(t => t.transactionTypes?.includes(transaction.transactionType || ''));
-        
-        if (matchingTemplates.length > 1) {
-            setAvailableTemplates(matchingTemplates);
-            setStep('select');
-        } else {
-            const templateToUse = matchingTemplates.length === 1 ? matchingTemplates[0] : null;
-            populateFormFromTemplate(templateToUse);
-            setStep('edit');
-        }
-    }
-  }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract]);
-  
-  // Effect 3: Derive clauses from financials state
   useEffect(() => {
     if(transaction?.contract) return;
     
@@ -266,7 +339,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   }, [financials, transaction?.contract]);
 
 
-  // --- State Handlers ---
+  const handleSelectTransaction = (txId: string) => {
+    setSelectedTransactionId(txId);
+    setStep('edit-contract');
+  };
+
+  const handleCreateNewTransaction = () => {
+    setSelectedTransactionId('__NEW__');
+    setStep('edit-contract');
+  };
 
   const addScopeItem = () => setScopeOfWork(prev => [...prev, { id: generateId(), title: '', description: '' }]);
   const updateScopeItem = (id: string, field: 'title' | 'description', value: string) => {
@@ -338,11 +419,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     if (!firestore || !transaction || !currentUser) return;
 
     if (!clientName) {
-        toast({
-            variant: 'destructive',
-            title: 'خطأ في البيانات',
-            description: 'اسم العميل مطلوب لإنشاء العقد. الرجاء المحاولة مرة أخرى.',
-        });
+        toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'اسم العميل مطلوب لإنشاء العقد. الرجاء المحاولة مرة أخرى.' });
         return;
     }
 
@@ -351,37 +428,23 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     let assignedEngineerId: string | null = null;
 
     try {
-        // --- PRE-TRANSACTION QUERIES ---
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
         
-        const [
-            revenueAccountSnap,
-            parentAccountSnap,
-        ] = await Promise.all([
-            getDocs(revenueAccountQuery),
-            getDocs(parentAccountQuery),
-        ]);
+        const [ revenueAccountSnap, parentAccountSnap ] = await Promise.all([ getDocs(revenueAccountQuery), getDocs(parentAccountQuery) ]);
 
         if (revenueAccountSnap.empty) throw new Error("حساب 'إيرادات استشارات هندسية' غير موجود.");
         if (parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
 
-
-        // --- FIRESTORE TRANSACTION ---
         await runTransaction(firestore, async (transaction_firestore) => {
             const clientRef = doc(firestore, 'clients', clientId);
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
-
-            // Use a separate, non-transactional query to check for the client account
+            
             const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
             const clientAccountSnap = await getDocs(clientAccountQuery);
             
-            const [
-                clientSnap,
-                journalEntryCounterDoc,
-                coaClientCounterDoc,
-            ] = await Promise.all([
+            const [ clientSnap, journalEntryCounterDoc, coaClientCounterDoc ] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
                 transaction_firestore.get(coaClientCounterRef),
@@ -409,12 +472,27 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 clientAccountId = clientAccountSnap.docs[0].id;
             }
             
-            assignedEngineerId = transaction.assignedEngineerId || clientData.assignedEngineer || null;
-            if ((transaction.transactionType || '').includes('سكن خاص') && !assignedEngineerId) {
+            const originalTransaction = clientTransactions.find(tx => tx.id === selectedTransactionId) || transaction;
+            assignedEngineerId = originalTransaction.assignedEngineerId || clientData.assignedEngineer || null;
+            if ((originalTransaction.transactionType || '').includes('سكن خاص') && !assignedEngineerId) {
                 throw new Error('يجب إسناد مهندس مسؤول لملف العميل أولاً قبل إنشاء عقد سكن خاص.');
             }
 
-            if (!transaction.id || !transaction.createdAt) {
+            const contractPayload = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
+
+            if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
+                finalTransactionId = selectedTransactionId;
+                const transactionRef = doc(firestore, 'clients', clientId, 'transactions', finalTransactionId);
+                const transactionPayload: any = {
+                    contract: contractPayload,
+                    status: 'in-progress',
+                    updatedAt: serverTimestamp(),
+                };
+                 if (assignedEngineerId && assignedEngineerId !== originalTransaction.assignedEngineerId) {
+                    transactionPayload.assignedEngineerId = assignedEngineerId;
+                }
+                transaction_firestore.update(transactionRef, cleanFirestoreData(transactionPayload));
+            } else {
                 const currentCounter = clientData.transactionCounter || 0;
                 const newCounter = currentCounter + 1;
                 const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
@@ -434,21 +512,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     status: 'in-progress',
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
-                    contract: { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type },
+                    contract: contractPayload,
                 };
                 transaction_firestore.set(newTransactionRef, cleanFirestoreData(transactionPayload));
-            } else {
-                finalTransactionId = transaction.id!;
-                const transactionRef = doc(firestore, 'clients', clientId, 'transactions', finalTransactionId);
-                const transactionPayload: any = {
-                    contract: { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type },
-                    status: 'in-progress',
-                    updatedAt: serverTimestamp(),
-                };
-                 if (assignedEngineerId && assignedEngineerId !== transaction.assignedEngineerId) {
-                    transactionPayload.assignedEngineerId = assignedEngineerId;
-                }
-                transaction_firestore.update(transactionRef, cleanFirestoreData(transactionPayload));
             }
 
             const currentYear = new Date().getFullYear();
@@ -549,36 +615,37 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       >
         {step === 'loading' && (
             <>
-                <DialogHeader>
-                    <DialogTitle>جاري التحميل...</DialogTitle>
-                    <DialogDescription>
-                        يتم الآن جلب بيانات العقود والنماذج.
-                    </DialogDescription>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>جاري التحميل...</DialogTitle></DialogHeader>
                 <div className='flex justify-center items-center h-48'><Loader2 className="h-8 w-8 animate-spin" /></div>
             </>
         )}
-        
-        {step === 'select' && (
+        {step === 'select-transaction' && (
+            <TransactionSelectionView
+                transactions={clientTransactions}
+                onSelect={handleSelectTransaction}
+                onCreateNew={handleCreateNewTransaction}
+            />
+        )}
+        {step === 'select-template' && (
           <TemplateSelectionView 
             templates={availableTemplates}
             onSelect={(selected) => {
               populateFormFromTemplate(selected);
-              setStep('edit');
+              setStep('edit-contract');
             }}
             onContinueWithout={() => {
               populateFormFromTemplate(null);
-              setStep('edit');
+              setStep('edit-contract');
             }}
           />
         )}
         
-        {step === 'edit' && (
+        {step === 'edit-contract' && (
           <>
             <DialogHeader>
               <DialogTitle>إدارة بنود العقد للمعاملة</DialogTitle>
               <DialogDescription>
-                {chosenTemplate ? `تعديل الدفعات المالية والشروط للعقد "${chosenTemplate.title}".` : 'لا يوجد نموذج عقد لهذه المعاملة، قم بالإنشاء اليدوي.'}
+                {chosenTemplate ? `تعديل الدفعات المالية والشروط للعقد "${chosenTemplate.title}".` : transaction?.contract ? 'تعديل العقد الحالي.' : 'لا يوجد نموذج عقد لهذه المعاملة، قم بالإنشاء اليدوي.'}
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="h-[calc(90vh-250px)] px-6">
@@ -592,7 +659,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         </div>
                     </section>
                     <Separator />
-
                     <section className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">نطاق العمل (Scope of Work)</h3>
@@ -617,7 +683,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </div>
                         ))}
                     </section>
-
                     <section className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">الشروط والأحكام</h3>
@@ -635,8 +700,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </div>
                          ))}
                     </section>
-
-                    <section className="space-y-4">
+                    <section className="space-y-4 p-4 border rounded-lg">
                         <h3 className="font-semibold">البنود المالية</h3>
                          <div className="grid md:grid-cols-2 gap-4">
                             <div className="grid gap-2">
@@ -691,8 +755,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </div>
                          )}
                     </section>
-                    
-                     <section className="space-y-4">
+                    <section className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
                             <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2"/> إضافة بند</Button>
