@@ -15,13 +15,36 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { signalUpdate } = useSyncStatus();
 
-    // This is the key change. By stringifying the constraints first,
-    // we get a stable primitive value that React's dependency arrays can correctly compare.
-    const stringifiedConstraints = JSON.stringify(constraints);
+    // Create a stable and unique key from the constraints array.
+    // JSON.stringify doesn't work on complex objects like Firestore constraints.
+    // This manual serialization is safer and ensures query uniqueness for caching.
+    const serializedConstraints = useMemo(() => {
+        if (!constraints || constraints.length === 0) return 'all';
+        return constraints.map(c => {
+            const internal = c as any;
+            try {
+                if (internal._type === 'where') {
+                    // Example: "where:clientId:==:someClientId"
+                    const value = internal._getFilters()[0].value.stringValue || internal._getFilters()[0].value.integerValue || 'unknown';
+                    return `where:${internal._getFilters()[0].field.segments.join('.')}:${internal._getFilters()[0].op}:${value}`;
+                }
+                if (internal._type === 'orderBy') {
+                    // Example: "orderBy:date:desc"
+                    const field = internal._query.orderBy[0].field.segments.join('.');
+                    const dir = internal._query.orderBy[0].dir;
+                    return `orderBy:${field}:${dir}`;
+                }
+            } catch {
+                // Fallback for safety
+                return 'unknown_constraint';
+            }
+            return 'unknown_constraint';
+        }).join('|');
+    }, [constraints]);
 
     const cacheKey = useMemo(() => {
-        return `${collectionPath}:${stringifiedConstraints}`;
-    }, [collectionPath, stringifiedConstraints]);
+        return `${collectionPath}:${serializedConstraints}`;
+    }, [collectionPath, serializedConstraints]);
 
     useEffect(() => {
         if (!collectionPath) {
@@ -34,7 +57,6 @@ export function useSubscription<T extends { id?: string }>(
         let isFirstLoad = true;
         setLoading(true);
         
-        // Load initial data from cache
         cache.getFromStorage<T[]>(cacheKey).then(cached => {
             if (isMounted && cached?.data) {
                 setData(cached.data);
@@ -62,14 +84,12 @@ export function useSubscription<T extends { id?: string }>(
                     setLoading(false);
                 }
             },
-            // The original `constraints` object is still needed here.
-            // It's safe to use because this effect only re-runs when the stringified version changes.
             constraints
         );
         
         return () => { isMounted = false; unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collectionPath, cacheKey, signalUpdate, stringifiedConstraints]);
+    }, [cacheKey, collectionPath, signalUpdate]);
 
     return { data, setData, loading, error };
 }
