@@ -75,7 +75,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                     getDocs(engineersQuery),
                     getDocs(existingAssignmentsQuery),
                     getDocs(clientTransactionsQuery),
-                    getDocs(clientReceiptsSnap),
+                    getDocs(clientReceiptsQuery),
                     getDocs(transTypesSnap),
                 ]);
 
