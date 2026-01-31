@@ -402,8 +402,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const contractStageIndex = updatedStages.findIndex(stage => stage.name === 'توقيع العقد');
             if (contractStageIndex > -1 && updatedStages[contractStageIndex].status !== 'completed') {
                 const stageToUpdate = { ...updatedStages[contractStageIndex] };
-                stageToUpdate.status = 'awaiting-review';
-                if (!stageToUpdate.startDate) (stageToUpdate as any).startDate = new Date();
+                stageToUpdate.status = 'completed';
+                if (!(stageToUpdate as any).startDate) (stageToUpdate as any).startDate = new Date();
+                (stageToUpdate as any).endDate = new Date();
                 updatedStages[contractStageIndex] = stageToUpdate as TransactionStage;
             }
 
@@ -628,7 +629,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                      <section className="space-y-4 p-4 border rounded-lg">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
-                            <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
+                            <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2"/> إضافة بند</Button>
                         </div>
                         <div className='space-y-2'>
                             {openClauses.map((clause, index) => (

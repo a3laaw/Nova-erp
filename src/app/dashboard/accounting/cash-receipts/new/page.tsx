@@ -387,68 +387,30 @@ export default function NewCashReceiptPage() {
         toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
 
         if (selectedProjectId) {
-            // Check if it's the first receipt
-            const cashReceiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId));
-            const receiptsSnap = await getDocs(cashReceiptsForProjectQuery);
-
             const transactionRef = doc(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}`);
             const transactionDoc = await getDoc(transactionRef);
 
-            if (transactionDoc.exists()) {
+            if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
                 const transactionData = transactionDoc.data();
-                const batch = writeBatch(firestore);
-                let changesMade = false;
-
-                // 1. Logic to complete "Contract Signing" stage if this is the first receipt
-                if (receiptsSnap.size === 1) { // It's the first receipt
-                    const stages = [...(transactionData.stages || [])];
-                    const contractStageIndex = stages.findIndex((s: any) => s.name === 'توقيع العقد');
-
-                    if (contractStageIndex > -1 && stages[contractStageIndex].status !== 'completed') {
-                        stages[contractStageIndex].status = 'completed';
-                        (stages[contractStageIndex] as any).endDate = serverTimestamp();
-                        batch.update(transactionRef, { stages });
-                        changesMade = true;
-
-                        const logContent = `تم تحديث مرحلة "توقيع العقد" إلى "مكتملة" تلقائياً بعد استلام أول دفعة.`;
-                        const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
-                        batch.set(timelineRef, {
-                            type: 'log', content: logContent, userId: currentUser.id,
-                            userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
-                            createdAt: serverTimestamp(),
-                        });
-                        toast({ title: 'تحديث تلقائي', description: 'تم تحديث مرحلة توقيع العقد إلى "مكتملة".' });
+                const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
+                let accumulatedAmount = 0;
+                let dueClauseFound = false;
+                const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                    const newClause = { ...clause };
+                    if (totalPaid >= accumulatedAmount + clause.amount) {
+                        newClause.status = 'مدفوعة';
+                    } else if (totalPaid > accumulatedAmount && !dueClauseFound) {
+                        newClause.status = 'مستحقة';
+                        dueClauseFound = true;
+                    } else {
+                        newClause.status = 'غير مستحقة';
                     }
-                }
+                    accumulatedAmount += clause.amount;
+                    return newClause;
+                });
 
-                // 2. Logic to update payment statuses on clauses
-                if (transactionData.contract?.clauses) {
-                    const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
-                    let accumulatedAmount = 0;
-                    let dueClauseFound = false;
-                    const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
-                        const newClause = { ...clause };
-                        if (totalPaid >= accumulatedAmount + clause.amount) {
-                            newClause.status = 'مدفوعة';
-                        } else if (totalPaid > accumulatedAmount && !dueClauseFound) {
-                            newClause.status = 'مستحقة';
-                            dueClauseFound = true;
-                        } else {
-                            newClause.status = 'غير مستحقة';
-                        }
-                        accumulatedAmount += clause.amount;
-                        return newClause;
-                    });
-
-                    // Only update if there's a change to avoid unnecessary writes
-                    if (JSON.stringify(updatedClauses) !== JSON.stringify(transactionData.contract.clauses)) {
-                        batch.update(transactionRef, { 'contract.clauses': updatedClauses });
-                        changesMade = true;
-                    }
-                }
-
-                if (changesMade) {
-                    await batch.commit();
+                if (JSON.stringify(updatedClauses) !== JSON.stringify(transactionData.contract.clauses)) {
+                    await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
                 }
             }
         }
