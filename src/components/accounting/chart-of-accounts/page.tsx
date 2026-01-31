@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud, Folder, FolderOpen } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
@@ -193,21 +193,24 @@ export default function ChartOfAccountsPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const [isSaving, setIsSaving] = useState(false);
-    const [isSeeding, setIsSeeding] = useState(false);
-    const [confirmSeedText, setConfirmSeedText] = useState('');
-
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
-    const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-    const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
-    const [parentAccount, setParentAccount] = useState<Account | null>(null);
-    const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
-
+    
+    // UI and data state
+    const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set(['1', '2', '3', '4', '5']));
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [accountBalances, setAccountBalances] = useState<Map<string, number>>(new Map());
+
+    // Form and Dialog state
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
+    const [confirmSeedText, setConfirmSeedText] = useState('');
+    const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+    const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+    const [parentAccount, setParentAccount] = useState<Account | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
+
 
     const fetchAllData = useCallback(async () => {
         if (!firestore) return;
@@ -249,15 +252,10 @@ export default function ChartOfAccountsPage() {
               .sort((a, b) => (b.level || 0) - (a.level || 0)) 
               .forEach(account => {
                   let totalBalance = directBalances.get(account.id!) || 0;
-                  
-                  const children = fetchedAccounts.filter(child => 
-                      child.parentCode === account.code
-                  );
-                  
+                  const children = fetchedAccounts.filter(child => child.parentCode === account.code);
                   children.forEach(child => {
                       totalBalance += aggregatedBalances.get(child.id!) || 0;
                   });
-                  
                   aggregatedBalances.set(account.id!, totalBalance);
               });
 
@@ -277,10 +275,8 @@ export default function ChartOfAccountsPage() {
 
     const displayedAccounts = useMemo(() => {
         if (accounts.length === 0) return [];
-        
         const accountMap = new Map(accounts.map(acc => [acc.code, acc]));
         const childrenMap = new Map<string, Account[]>();
-        
         accounts.forEach(acc => {
             if (acc.parentCode) {
                 if (!childrenMap.has(acc.parentCode)) {
@@ -290,23 +286,16 @@ export default function ChartOfAccountsPage() {
             }
         });
 
-        const getChildren = (code: string): Account[] => {
-            return (childrenMap.get(code) || []).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
-        };
-        
+        const getChildren = (code: string): Account[] => (childrenMap.get(code) || []).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
         const roots = accounts.filter(a => a.level === 0).sort((a,b) => (a.code || '').localeCompare(b.code || ''));
         
         const finalDisplayedList: Account[] = [];
-        
         function buildDisplayList(accountCode: string) {
             const account = accountMap.get(accountCode);
             if (!account) return;
-
             finalDisplayedList.push(account);
-
             if (openAccounts.has(accountCode)) {
-                const children = getChildren(accountCode);
-                children.forEach(child => buildDisplayList(child.code));
+                getChildren(accountCode).forEach(child => buildDisplayList(child.code));
             }
         }
 
@@ -314,6 +303,14 @@ export default function ChartOfAccountsPage() {
         return finalDisplayedList;
     }, [accounts, openAccounts]);
 
+    const toggleAccount = (code: string) => {
+        setOpenAccounts(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(code)) newSet.delete(code);
+            else newSet.add(code);
+            return newSet;
+        });
+    };
 
     const handleAddClick = () => {
         setEditingAccount(null);
@@ -409,29 +406,20 @@ export default function ChartOfAccountsPage() {
         }
     };
 
-    const toggleAccount = (code: string) => {
-        setOpenAccounts(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(code)) {
-                newSet.delete(code);
-            } else {
-                newSet.add(code);
-            }
-            return newSet;
-        });
-    };
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Card>
+             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
                             <CardTitle>شجرة الحسابات</CardTitle>
-                            <CardDescription>عرض وإدارة دليل الحسابات الخاص بالشركة وأرصدتها الحالية.</CardDescription>
+                            <CardDescription>
+                                عرض وإدارة دليل الحسابات الخاص بالشركة وأرصدتها الحالية.
+                            </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                             <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
+                         <div className="flex gap-2">
+                            <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
                                 {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
                                 {isSeeding ? 'جاري التنزيل...' : 'تنزيل شجرة حسابات أساسية'}
                             </Button>
@@ -460,10 +448,8 @@ export default function ChartOfAccountsPage() {
                                     ))
                                 ) : displayedAccounts.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center h-48">
-                                            <div className="flex flex-col items-center justify-center gap-4">
-                                                <p className="text-muted-foreground">لا توجد حسابات. ابدأ بإضافة حساب رئيسي، أو قم بتنزيل شجرة الحسابات الأساسية.</p>
-                                            </div>
+                                        <TableCell colSpan={7} className="text-center h-48 text-muted-foreground">
+                                            لا توجد حسابات. قم بإضافة حساب رئيسي للبدء.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -473,13 +459,20 @@ export default function ChartOfAccountsPage() {
                                         const isOpen = openAccounts.has(account.code);
 
                                         return (
-                                            <TableRow key={account.id} className={account.level === 0 ? 'bg-muted/50' : ''}>
+                                            <TableRow 
+                                                key={account.id} 
+                                                className={cn(
+                                                    account.level === 0 ? 'bg-muted/50' : '',
+                                                    hasChildren && 'cursor-pointer'
+                                                )}
+                                                onClick={() => hasChildren && toggleAccount(account.code)}
+                                            >
                                                 <TableCell style={{ paddingRight: `${(account.level || 0) * 1.5 + 1}rem` }}>
                                                     <div className="flex items-center gap-2 group">
                                                         {hasChildren ? (
-                                                            <button onClick={() => toggleAccount(account.code)} className="p-1 -mr-1">
-                                                               {isOpen ? <FolderOpen className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
-                                                            </button>
+                                                             <button onClick={(e) => { e.stopPropagation(); toggleAccount(account.code); }} className="p-1 -mr-1">
+                                                                {isOpen ? <Minus className="h-4 w-4 text-muted-foreground" /> : <Plus className="h-4 w-4 text-muted-foreground" />}
+                                                             </button>
                                                         ) : (
                                                             <span className="w-6 h-4 inline-block"></span>
                                                         )}
@@ -509,10 +502,20 @@ export default function ChartOfAccountsPage() {
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                                                <MoreHorizontal className="h-4 w-4"/>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
                                                         <DropdownMenuContent dir="rtl" onClick={(e) => e.stopPropagation()}>
-                                                            <DropdownMenuItem onClick={() => handleEditClick(account)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleEditClick(account)}>
+                                                                <Pencil className="ml-2 h-4 w-4" />
+                                                                تعديل
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleDeleteClick(account)} className="text-destructive focus:text-destructive">
+                                                                <Trash2 className="ml-2 h-4 w-4" />
+                                                                حذف
+                                                            </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </TableCell>
@@ -525,15 +528,17 @@ export default function ChartOfAccountsPage() {
                     </div>
                 </CardContent>
             </Card>
-
-            <AccountForm 
-                isOpen={isFormOpen} 
-                onClose={() => setIsFormOpen(false)} 
-                onSave={handleSave} 
-                account={editingAccount} 
-                parentAccount={parentAccount}
-                accounts={accounts}
-            />
+            
+            {isFormOpen && (
+                <AccountForm 
+                    isOpen={isFormOpen} 
+                    onClose={() => setIsFormOpen(false)} 
+                    onSave={handleSave} 
+                    account={editingAccount} 
+                    parentAccount={parentAccount}
+                    accounts={accounts}
+                />
+            )}
             
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent dir="rtl">
