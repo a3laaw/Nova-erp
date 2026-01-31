@@ -352,22 +352,19 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
     try {
         // --- PRE-TRANSACTION QUERIES ---
-        const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
         
         const [
-            clientAccountSnap,
             revenueAccountSnap,
             parentAccountSnap,
         ] = await Promise.all([
-            getDocs(clientAccountQuery),
             getDocs(revenueAccountQuery),
             getDocs(parentAccountQuery),
         ]);
 
         if (revenueAccountSnap.empty) throw new Error("حساب 'إيرادات استشارات هندسية' غير موجود.");
-        if (clientAccountSnap.empty && parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
+        if (parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
 
 
         // --- FIRESTORE TRANSACTION ---
@@ -376,6 +373,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
 
+            // Use a separate, non-transactional query to check for the client account
+            const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
+            const clientAccountSnap = await getDocs(clientAccountQuery);
+            
             const [
                 clientSnap,
                 journalEntryCounterDoc,
@@ -497,43 +498,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             transaction_firestore.set(doc(historyCollectionRef), commentData);
         });
         
-        // --- POST-TRANSACTION LOGIC ---
-        
-        // Complete the contract signing stage
-        if (finalTransactionId) {
-            const txRef = doc(firestore, 'clients', clientId, 'transactions', finalTransactionId);
-            const txSnap = await getDoc(txRef);
-            if (txSnap.exists()) {
-                const transactionData = txSnap.data() as ClientTransaction;
-                const currentStages = transactionData.stages || [];
-                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
-
-                if (contractStageIndex > -1 && currentStages[contractStageIndex].status !== 'completed') {
-                    const newStages = [...currentStages];
-                    newStages[contractStageIndex] = {
-                        ...newStages[contractStageIndex],
-                        status: 'completed',
-                        endDate: serverTimestamp(),
-                    };
-                    
-                    const stageUpdateBatch = writeBatch(firestore);
-                    stageUpdateBatch.update(txRef, { stages: newStages });
-
-                    const logContent = `تم إكمال مرحلة "توقيع العقد" تلقائيًا عند إنشاء/حفظ العقد.`;
-                    const timelineRef = doc(collection(txRef, 'timelineEvents'));
-                    stageUpdateBatch.set(timelineRef, {
-                        type: 'log',
-                        content: logContent,
-                        userId: currentUser?.id || 'system',
-                        userName: currentUser?.fullName || 'System',
-                        createdAt: serverTimestamp(),
-                    });
-
-                    await stageUpdateBatch.commit();
-                }
-            }
-        }
-
         toast({ title: 'نجاح', description: 'تم حفظ بنود العقد وإنشاء القيد المحاسبي بنجاح.' });
         
         if (assignedEngineerId) {
