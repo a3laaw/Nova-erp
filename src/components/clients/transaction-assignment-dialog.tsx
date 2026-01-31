@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -8,14 +7,14 @@ import { Checkbox } from '../ui/checkbox';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, getDocs, query, where, writeBatch, serverTimestamp, doc } from 'firebase/firestore';
-import type { Department, Employee, ClientTransaction, TransactionAssignment } from '@/lib/types';
+import { collection, getDocs, query, where, writeBatch, serverTimestamp, doc, collectionGroup } from 'firebase/firestore';
+import type { Department, Employee, ClientTransaction, TransactionAssignment, TransactionType } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Shield } from 'lucide-react';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { Input } from '../ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
-// Interface for what the dialog manages
 interface AssignmentState {
   departmentId: string;
   departmentName: string;
@@ -23,6 +22,7 @@ interface AssignmentState {
   engineerId: string;
   notes: string;
   existingAssignmentId?: string;
+  isAvailable: boolean;
 }
 
 interface TransactionAssignmentDialogProps {
@@ -51,17 +51,38 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const engineersQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
                 const existingAssignmentsQuery = query(collection(firestore, 'transaction_assignments'), where('transactionId', '==', transaction.id));
+                const clientTransactionsQuery = query(collection(firestore, `clients/${transaction.clientId}/transactions`));
+                const clientReceiptsQuery = query(collection(firestore, 'cashReceipts'), where('clientId', '==', transaction.clientId));
+                const transactionTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
                 
-                const [deptsSnap, engsSnap, assignmentsSnap] = await Promise.all([
+                const [deptsSnap, engsSnap, assignmentsSnap, clientTxnsSnap, clientReceiptsSnap, transTypesSnap] = await Promise.all([
                     getDocs(deptsQuery),
                     getDocs(engineersQuery),
                     getDocs(existingAssignmentsQuery),
+                    getDocs(clientTransactionsQuery),
+                    getDocs(clientReceiptsQuery),
+                    getDocs(transactionTypesQuery),
                 ]);
 
                 const allDepartments = deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
                 const allEngineers = engsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
                 setEngineers(allEngineers);
                 
+                const allClientTransactions = clientTxnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+                const paidTransactionIds = new Set(clientReceiptsSnap.docs.map(doc => doc.data().projectId));
+                
+                const transactionTypesMap = new Map<string, string>();
+                transTypesSnap.forEach(doc => {
+                    const type = doc.data() as TransactionType;
+                    const deptId = doc.ref.parent.parent?.id;
+                    if (deptId) {
+                        const deptName = allDepartments.find(d => d.id === deptId)?.name;
+                        if (deptName && type.name.includes(deptName)) {
+                            transactionTypesMap.set(deptId, type.name);
+                        }
+                    }
+                });
+
                 const existingAssignmentsMap = new Map(assignmentsSnap.docs.map(doc => {
                     const data = doc.data();
                     return [data.departmentId, { id: doc.id, ...data }];
@@ -69,6 +90,25 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                 
                 const initialAssignments = allDepartments.map(dept => {
                     const existing = existingAssignmentsMap.get(dept.id);
+                    
+                    let isAvailable = false;
+                    const openDepts = ['الإنشائي', 'السكرتارية', 'المحاسبة'];
+                    if (openDepts.includes(dept.name) || currentUser?.role === 'Admin') {
+                        isAvailable = true;
+                    } else {
+                        const requiredTransactionType = transactionTypesMap.get(dept.id);
+                        if (requiredTransactionType) {
+                            const hasPaidPrerequisite = allClientTransactions.some(tx => 
+                                tx.id !== transaction.id && // Exclude the current transaction
+                                tx.transactionType === requiredTransactionType && 
+                                paidTransactionIds.has(tx.id!)
+                            );
+                            if (hasPaidPrerequisite) {
+                                isAvailable = true;
+                            }
+                        }
+                    }
+
                     return {
                         departmentId: dept.id,
                         departmentName: dept.name,
@@ -76,6 +116,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                         engineerId: existing?.engineerId || '',
                         notes: existing?.notes || '',
                         existingAssignmentId: existing?.id,
+                        isAvailable: isAvailable,
                     };
                 });
 
@@ -90,7 +131,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
         };
 
         fetchData();
-    }, [firestore, isOpen, transaction.id, toast]);
+    }, [firestore, isOpen, transaction.id, transaction.clientId, toast, currentUser?.role]);
 
     const handleAssignmentChange = (departmentId: string, field: 'selected' | 'engineerId' | 'notes', value: string | boolean) => {
         setAssignments(prev => prev.map(a => a.departmentId === departmentId ? { ...a, [field]: value } : a));
@@ -98,7 +139,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
 
     const getEngineersForDept = (deptName: string) => {
         return engineers
-            .filter(e => e.department === deptName && (e.jobTitle?.includes('مهندس') || e.jobTitle?.includes('موظف')))
+            .filter(e => e.department === deptName)
             .map(e => ({ value: e.id!, label: e.fullName }));
     };
 
@@ -202,12 +243,32 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                 </TableHeader>
                                 <TableBody>
                                     {assignments.map(a => (
-                                        <TableRow key={a.departmentId} className={!a.selected ? 'opacity-50' : ''}>
+                                        <TableRow key={a.departmentId} className={!a.isAvailable ? 'bg-muted/30 text-muted-foreground' : ''}>
                                             <TableCell>
-                                                <Checkbox
-                                                    checked={a.selected}
-                                                    onCheckedChange={(checked) => handleAssignmentChange(a.departmentId, 'selected', !!checked)}
-                                                />
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span tabIndex={0} className="flex items-center gap-2">
+                                                                <Checkbox
+                                                                    checked={a.selected}
+                                                                    onCheckedChange={(checked) => handleAssignmentChange(a.departmentId, 'selected', !!checked)}
+                                                                    disabled={!a.isAvailable}
+                                                                />
+                                                                 {currentUser?.role === 'Admin' && !a.isAvailable && <Shield className="h-4 w-4 text-blue-500" />}
+                                                            </span>
+                                                        </TooltipTrigger>
+                                                        {!a.isAvailable && currentUser?.role !== 'Admin' && (
+                                                            <TooltipContent>
+                                                                <p>يجب وجود معاملة سابقة مدفوعة لهذا القسم.</p>
+                                                            </TooltipContent>
+                                                        )}
+                                                        {!a.isAvailable && currentUser?.role === 'Admin' && (
+                                                            <TooltipContent>
+                                                                <p>صلاحية المدير تتجاوز هذا الشرط.</p>
+                                                            </TooltipContent>
+                                                        )}
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             </TableCell>
                                             <TableCell className="font-semibold">{a.departmentName}</TableCell>
                                             <TableCell>
@@ -216,7 +277,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                                     onSelect={(value) => handleAssignmentChange(a.departmentId, 'engineerId', value)}
                                                     options={getEngineersForDept(a.departmentName)}
                                                     placeholder="اختر موظف..."
-                                                    disabled={!a.selected}
+                                                    disabled={!a.selected || !a.isAvailable}
                                                 />
                                             </TableCell>
                                             <TableCell>
@@ -224,7 +285,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                                                     value={a.notes}
                                                     onChange={(e) => handleAssignmentChange(a.departmentId, 'notes', e.target.value)}
                                                     placeholder="ملاحظات للقسم..."
-                                                    disabled={!a.selected}
+                                                    disabled={!a.selected || !a.isAvailable}
                                                 />
                                             </TableCell>
                                         </TableRow>
