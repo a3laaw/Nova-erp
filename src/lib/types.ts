@@ -392,6 +392,20 @@ export type ClientTransaction = {
     };
 };
 
+export type TransactionAssignment = {
+    id?: string;
+    transactionId: string;
+    clientId: string;
+    departmentId: string;
+    departmentName: string;
+    engineerId?: string;
+    notes?: string;
+    status: 'pending' | 'in-progress' | 'completed';
+    createdAt: any;
+    createdBy: string;
+};
+
+
 export type TransactionTimelineEvent = {
   id: string;
   type: 'comment' | 'log';

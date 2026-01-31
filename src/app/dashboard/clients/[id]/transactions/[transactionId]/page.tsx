@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -38,6 +38,7 @@ import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { TransactionAssignmentDialog } from '@/components/clients/transaction-assignment-dialog';
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
     let total = 0;
@@ -125,7 +126,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const firestore = useFirestore();
+  const firestore = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   
@@ -135,10 +136,9 @@ export default function TransactionDetailPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [newStatus, setNewStatus] = useState('');
-  const [newEngineerId, setNewEngineerId] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [stages, setStages] = useState<TransactionStage[]>([]);
   const [loadingStages, setLoadingStages] = useState(true);
 
@@ -226,26 +226,10 @@ export default function TransactionDetailPage() {
     mergeAndSetStages();
     
     setNewStatus(transaction.status);
-    setNewEngineerId(transaction.assignedEngineerId || '');
     
   }, [transaction, firestore, toast]);
 
-    useEffect(() => {
-        if (transaction?.assignedEngineerId && employees.length > 0 && departments.length > 0) {
-            const engineer = employees.find(e => e.id === transaction.assignedEngineerId);
-            const department = departments.find(d => d.name === engineer?.department);
-            if (department) {
-                setSelectedDepartment(department.id);
-            }
-        }
-    }, [transaction, employees, departments]);
-
-    const filteredEngineers = useMemo(() => {
-        if (!selectedDepartment || selectedDepartment === 'all') return employees;
-        const departmentName = departments.find(d => d.id === selectedDepartment)?.name;
-        if (!departmentName) return employees;
-        return employees.filter(e => e.department === departmentName);
-    }, [selectedDepartment, employees, departments]);
+    
 
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
@@ -258,10 +242,9 @@ export default function TransactionDetailPage() {
     if (!firestore || !currentUser || !client || !transaction) return;
 
     const statusChanged = newStatus !== transaction.status;
-    const engineerChanged = newEngineerId !== (transaction.assignedEngineerId || '');
 
-    if (!statusChanged && !engineerChanged) {
-        toast({ title: 'لا توجد تغييرات', description: 'لم يتم تغيير الحالة أو المهندس المسؤول.' });
+    if (!statusChanged) {
+        toast({ title: 'لا توجد تغييرات', description: 'لم يتم تغيير حالة المعاملة.' });
         return;
     }
     
@@ -271,47 +254,24 @@ export default function TransactionDetailPage() {
     const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     const timelineRef = collection(transactionRefDoc, 'timelineEvents');
     
-    const updateData: any = { updatedAt: serverTimestamp() };
+    const updateData: any = { updatedAt: serverTimestamp(), status: newStatus };
 
-    if (statusChanged) {
-        updateData.status = newStatus;
-        const logContent = `قام بتغيير حالة المعاملة من "${transactionStatusTranslations[transaction.status]}" إلى "${transactionStatusTranslations[newStatus]}".`;
-        batch.set(doc(timelineRef), {
-            type: 'log',
-            content: logContent,
-            userId: currentUser.id,
-            userName: currentUser.fullName,
-            userAvatar: currentUser.avatarUrl,
-            createdAt: serverTimestamp(),
-        });
-    }
-
-    if (engineerChanged) {
-        updateData.assignedEngineerId = newEngineerId;
-        const oldEngineerName = transaction.assignedEngineerId ? employees.find(e => e.id === transaction.assignedEngineerId)?.fullName || 'غير مسند' : 'غير مسند';
-        const newEngineerName = newEngineerId ? employees.find(e => e.id === newEngineerId)?.fullName || 'غير مسند' : 'غير مسند';
-        const logContent = `قام بتغيير المهندس المسؤول من "${oldEngineerName}" إلى "${newEngineerName}".`;
-        batch.set(doc(timelineRef), {
-            type: 'log',
-            content: logContent,
-            userId: currentUser.id,
-            userName: currentUser.fullName,
-            userAvatar: currentUser.avatarUrl,
-            createdAt: serverTimestamp(),
-        });
-        
-        if (transaction.transactionType === 'بلدية سكن خاص') {
-            const clientRefDoc = doc(firestore, 'clients', clientId);
-            batch.update(clientRefDoc, { assignedEngineer: newEngineerId || null });
-        }
-    }
+    const logContent = `قام بتغيير حالة المعاملة من "${transactionStatusTranslations[transaction.status]}" إلى "${transactionStatusTranslations[newStatus]}".`;
+    batch.set(doc(timelineRef), {
+        type: 'log',
+        content: logContent,
+        userId: currentUser.id,
+        userName: currentUser.fullName,
+        userAvatar: currentUser.avatarUrl,
+        createdAt: serverTimestamp(),
+    });
 
     const safeUpdateData = cleanFirestoreData(updateData);
     batch.update(transactionRefDoc, safeUpdateData);
     
     try {
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تم تحديث المعاملة بنجاح.' });
+        toast({ title: 'نجاح', description: 'تم تحديث حالة المعاملة بنجاح.' });
     } catch (error) {
         console.error(error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المعاملة.' });
@@ -559,6 +519,14 @@ export default function TransactionDetailPage() {
             clientName={(client as any).nameAr}
         />
     )}
+    {transaction && client && (
+        <TransactionAssignmentDialog
+            isOpen={isAssignmentDialogOpen}
+            onClose={() => setIsAssignmentDialogOpen(false)}
+            transaction={transaction}
+            clientName={(client as any).nameAr}
+        />
+    )}
     <div className='space-y-6' dir='rtl'>
         <Card>
             <CardHeader>
@@ -619,7 +587,7 @@ export default function TransactionDetailPage() {
             <CardHeader>
                 <CardTitle>إدارة المعاملة</CardTitle>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-3 gap-6">
+            <CardContent className="grid md:grid-cols-2 gap-6 items-end">
                 <div className="grid gap-2">
                     <Label htmlFor="status">تغيير الحالة</Label>
                     <Select dir="rtl" value={newStatus} onValueChange={setNewStatus}>
@@ -631,39 +599,17 @@ export default function TransactionDetailPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                {transaction.transactionType !== 'بلدية سكن خاص' ? (
-                     <>
-                        <div className="grid gap-2">
-                            <Label htmlFor="department-select">القسم</Label>
-                            <InlineSearchList 
-                                value={selectedDepartment}
-                                onSelect={(val) => { setSelectedDepartment(val); setNewEngineerId(''); }}
-                                options={departments.map(d => ({ value: d.id, label: d.name }))}
-                                placeholder="فلترة حسب القسم..."
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="engineer-select">إسناد إلى موظف</Label>
-                             <InlineSearchList 
-                                value={newEngineerId}
-                                onSelect={setNewEngineerId}
-                                options={filteredEngineers.map(e => ({ value: e.id!, label: e.fullName }))}
-                                placeholder="اختر موظفًا..."
-                            />
-                        </div>
-                    </>
-                ) : (
-                    <div className="grid gap-2 md:col-span-2">
-                        <Label>المهندس المسؤول</Label>
-                        <Input value={employees.find(e => e.id === newEngineerId)?.fullName || 'غير مسند'} readOnly disabled />
-                        <p className="text-xs text-muted-foreground">يتم التحكم في المهندس من ملف العميل لهذه المعاملة.</p>
-                    </div>
-                )}
+                 <div className="grid gap-2">
+                    <Button onClick={() => setIsAssignmentDialogOpen(true)} className='w-full'>
+                        <Users className="ml-2 h-4 w-4" />
+                        تحويل / إسناد للأقسام
+                    </Button>
+                </div>
             </CardContent>
             <CardFooter className="flex justify-end">
                 <Button onClick={handleUpdateTransaction} disabled={isSaving}>
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                    حفظ التغييرات
+                    حفظ تغيير الحالة
                 </Button>
             </CardFooter>
         </Card>

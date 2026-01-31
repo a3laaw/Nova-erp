@@ -213,14 +213,14 @@
             "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
-            "departmentId": { "type": "string", "description": "The ID of the department this transaction belongs to." },
+            "departmentId": { "type": "string", "description": "The ID of the primary department for this transaction." },
             "transactionTypeId": { "type": "string", "description": "The ID of the transaction type." },
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
                 "enum": ["new", "in-progress", "completed", "submitted", "on-hold"]
             },
-            "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
+            "assignedEngineerId": { "type": "string", "description": "The ID of the primary engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },
             "updatedAt": { "type": "string", "format": "date-time" },
             "stages": {
@@ -268,7 +268,47 @@
                 "required": ["clauses", "totalAmount"]
             }
         },
-        "required": ["transactionNumber", "clientId", "transactionType", "departmentId", "status", "createdAt"]
+        "required": ["transactionNumber", "clientId", "transactionType", "status", "createdAt"]
+    },
+    "TransactionAssignment": {
+        "title": "Transaction Assignment",
+        "description": "Represents an assignment or forwarding of a transaction to a specific department and engineer.",
+        "type": "object",
+        "properties": {
+            "transactionId": {
+                "type": "string",
+                "description": "The ID of the parent ClientTransaction."
+            },
+            "clientId": {
+                "type": "string",
+                "description": "The ID of the client."
+            },
+            "departmentId": { "type": "string" },
+            "departmentName": { "type": "string" },
+            "engineerId": { "type": "string" },
+            "notes": { "type": "string" },
+            "status": {
+                "type": "string",
+                "enum": ["pending", "in-progress", "completed"]
+            },
+            "createdAt": {
+                "type": "string",
+                "format": "date-time"
+            },
+            "createdBy": {
+                "type": "string",
+                "description": "The ID of the user who created the assignment."
+            }
+        },
+        "required": [
+            "transactionId",
+            "clientId",
+            "departmentId",
+            "departmentName",
+            "status",
+            "createdAt",
+            "createdBy"
+        ]
     },
     "TransactionTimelineEvent": {
       "title": "Transaction Timeline Event",
@@ -1131,6 +1171,12 @@
             "$ref": "#/entities/ClientTransaction"
         },
         "description": "Stores internal transactions/services for a specific client."
+    },
+    "/transaction_assignments/{assignmentId}": {
+        "schema": {
+            "$ref": "#/entities/TransactionAssignment"
+        },
+        "description": "Stores individual assignments of a transaction to different departments."
     },
     "/clients/{clientId}/transactions/{transactionId}/timelineEvents/{eventId}": {
       "schema": {
