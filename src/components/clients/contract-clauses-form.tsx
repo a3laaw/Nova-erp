@@ -290,9 +290,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             }
         } else { // New contract from quotation
             if (clientId) {
-                const txQuery = query(collection(firestore, 'clients', clientId, 'transactions'), where('contract', '==', null));
+                // Fetch all transactions for the client and filter client-side.
+                // This is more robust than `where('contract', '==', null)` which can sometimes have issues with nested objects.
+                const txQuery = query(collection(firestore, 'clients', clientId, 'transactions'));
                 const txSnap = await getDocs(txQuery);
-                const availableTx = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+                const allTx = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
+                const availableTx = allTx.filter(tx => !tx.contract);
+                
                 setClientTransactions(availableTx);
                 populateFormFromQuotation();
                 setStep('select-transaction');
@@ -448,7 +452,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [ clientSnap, journalEntryCounterDoc, coaClientCounterDoc ] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterRef),
+                transaction_firestore.get(coaClientCounterDoc),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
