@@ -309,11 +309,55 @@ export default function TransactionDetailPage() {
     const originalProgress = [...(transaction.stages || [])];
     const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
     
-    const templateStageInfo = stages.find(s => s.stageId === stageId);
+    // Get info about the stage we're trying to change
+    const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
+    const templateStageInfo = stages[currentIndexInUI];
     if (!templateStageInfo) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
         return;
     }
+    
+    // --- NEW DEPENDENCY LOGIC ---
+    if (newStatus === 'in-progress') {
+        const contractSigningStage = stages.find(s => s.name === 'توقيع العقد');
+        const sendSoilTestStage = stages.find(s => s.name === 'ارسال فحص التربه');
+
+        let prerequisiteMet = true;
+        let errorMessage = 'الرجاء إكمال المرحلة السابقة أولاً.';
+
+        if (templateStageInfo?.name === 'ارسال فحص التربه') {
+            if (!contractSigningStage || contractSigningStage.status !== 'completed') {
+                prerequisiteMet = false;
+                errorMessage = 'يجب إكمال مرحلة "توقيع العقد" أولاً.';
+            }
+        } 
+        else if (templateStageInfo?.name === 'استلام فحص التربه') {
+            if (!sendSoilTestStage || sendSoilTestStage.status !== 'completed') {
+                prerequisiteMet = false;
+                errorMessage = 'يجب إكمال مرحلة "ارسال فحص التربه" أولاً.';
+            }
+        }
+        else if (templateStageInfo?.name === 'توقيع العقد') {
+             prerequisiteMet = true; // No prerequisites for signing the contract
+        }
+        else if (currentIndexInUI > 0) {
+            // Fallback for all other stages: linear dependency
+            const previousStageInUI = stages[currentIndexInUI - 1];
+            if (previousStageInUI.status !== 'completed') {
+                prerequisiteMet = false;
+            }
+        }
+        
+        if (!prerequisiteMet) {
+            toast({
+                variant: 'destructive',
+                title: 'لا يمكن بدء هذه المرحلة',
+                description: errorMessage,
+            });
+            return;
+        }
+    }
+    // --- END NEW DEPENDENCY LOGIC ---
 
     let updatedProgress: Partial<TransactionStage>;
 
@@ -330,21 +374,6 @@ export default function TransactionDetailPage() {
     
     const oldStatus = updatedProgress.status || 'pending';
     if(oldStatus === newStatus) return;
-
-    const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
-    const isDiscussionStage = stages[currentIndexInUI]?.name === 'تعديلات ومناقشات';
-
-    if (newStatus === 'in-progress' && !isDiscussionStage && currentIndexInUI > 0) {
-        const previousStageInUI = stages[currentIndexInUI - 1];
-        if (previousStageInUI.status !== 'completed') {
-            toast({
-                variant: 'destructive',
-                title: 'لا يمكن بدء هذه المرحلة',
-                description: 'الرجاء إكمال المرحلة السابقة أولاً.',
-            });
-            return;
-        }
-    }
 
     updatedProgress.status = newStatus;
     const now = new Date();
@@ -477,7 +506,7 @@ export default function TransactionDetailPage() {
     {transaction && client && (
         <ContractClausesForm
             isOpen={isContractFormOpen}
-            onClose={() => setIsContractFormOpen(false)}
+            onClose={() => setContractTransaction(null)}
             transaction={transaction}
             clientId={clientId}
             clientName={(client as any).nameAr}
