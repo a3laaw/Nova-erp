@@ -347,6 +347,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const clientRef = doc(firestore, 'clients', clientId);
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
+            
             const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
             const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
             const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
