@@ -89,89 +89,92 @@ export default function ViewCashReceiptPage() {
   return (
     <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
         <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
-            <div id="printable-area" className="p-8 md:p-12 printable-content">
+            <div id="printable-area" className="printable-content">
                 {branding?.letterhead_image_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img 
                         src={branding.letterhead_image_url} 
-                        alt={`${branding.company_name || ''} Letterhead`}
-                        className="w-full h-auto object-contain mb-4"
+                        alt="Letterhead"
+                        className="w-full h-auto"
                     />
                 )}
-                <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                     <div className="flex justify-between items-start">
-                         <div className="text-left flex-shrink-0">
-                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">سـنـد قـبـض</h2>
-                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Cash Receipt Voucher</p>
-                            <p className="font-mono text-sm mt-2 text-muted-foreground">{receipt.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
-                        </div>
-                         <div className="flex items-center gap-4">
-                           <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                            <div>
-                               <h1 className="font-bold text-lg">{branding?.company_name}</h1>
-                               <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
-                               <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                <div className="p-8 md:p-12">
+                    {!branding?.letterhead_image_url && (
+                        <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                             <div className="flex justify-between items-start">
+                                 <div className="text-left flex-shrink-0">
+                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">سـنـد قـبـض</h2>
+                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Cash Receipt Voucher</p>
+                                    <p className="font-mono text-sm mt-2 text-muted-foreground">{receipt.voucherNumber} : <span className='font-sans'>رقم السند</span></p>
+                                </div>
+                                 <div className="flex items-center gap-4">
+                                   <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                    <div>
+                                       <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                                       <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
+                                       <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </header>
+                        </header>
+                    )}
 
-                <main className="py-8 space-y-8">
-                     <div className="grid grid-cols-5 gap-x-8 gap-y-4">
-                        <div className="col-span-3">
-                            <InfoRow label="استلمنا من السيد/السادة" value={<Link href={`/dashboard/clients/${receipt.clientId}`} className="text-primary hover:underline">{receipt.clientNameAr}</Link>} />
-                        </div>
-                        <div className="col-span-2">
-                             <div className="flex items-baseline">
-                                <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">التاريخ:</span>
-                                <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-center font-mono text-gray-800 dark:text-gray-200">{formattedDate}</span>
+                    <main className="py-8 space-y-8">
+                         <div className="grid grid-cols-5 gap-x-8 gap-y-4">
+                            <div className="col-span-3">
+                                <InfoRow label="استلمنا من السيد/السادة" value={<Link href={`/dashboard/clients/${receipt.clientId}`} className="text-primary hover:underline">{receipt.clientNameAr}</Link>} />
                             </div>
+                            <div className="col-span-2">
+                                 <div className="flex items-baseline">
+                                    <span className="w-20 font-semibold text-gray-600 dark:text-gray-400">التاريخ:</span>
+                                    <span className="flex-1 border-b border-dashed border-gray-400 pb-1 text-center font-mono text-gray-800 dark:text-gray-200">{formattedDate}</span>
+                                </div>
+                            </div>
+                             {receipt.projectNameAr && <div className="col-span-5"><InfoRow label="بخصوص العقد/المشروع" value={receipt.projectNameAr} /></div>}
                         </div>
-                         {receipt.projectNameAr && <div className="col-span-5"><InfoRow label="بخصوص العقد/المشروع" value={receipt.projectNameAr} /></div>}
-                    </div>
-                    
-                    <div className="flex items-center gap-6">
-                        <InfoRow label="مبلغ وقدره" value={formatCurrency(receipt.amount)} />
-                    </div>
+                        
+                        <div className="flex items-center gap-6">
+                            <InfoRow label="مبلغ وقدره" value={formatCurrency(receipt.amount)} />
+                        </div>
 
-                    <InfoRow label="وذلك مبلغ وقدره" value={receipt.amountInWords} />
-                    
-                    <div className="space-y-2">
-                        <Label className="font-semibold text-gray-600 dark:text-gray-400">وذلك عن:</Label>
-                        <div className='p-3 text-sm border rounded-md min-h-[100px] bg-gray-50 dark:bg-gray-800/50 whitespace-pre-wrap text-gray-800 dark:text-gray-200'>
-                            {receipt.description || '-'}
-                        </div>
-                    </div>
-                    
-                     <div className={cn("grid gap-8 pt-4", receipt.paymentMethod !== 'Cash' && receipt.reference ? 'grid-cols-2' : 'grid-cols-1')}>
-                         <InfoRow label="طريقة الدفع" value={paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod} />
-                         
-                         {receipt.paymentMethod !== 'Cash' && receipt.reference && (
-                             <InfoRow 
-                                label={receipt.paymentMethod === 'Cheque' ? 'رقم الشيك' : 'رقم المرجع'} 
-                                value={receipt.reference} 
-                             />
-                         )}
-                    </div>
-                </main>
-                
-                 <footer className="pt-24">
-                    <div className="grid grid-cols-2 gap-20">
-                        <div className="text-center">
-                            <div className="border-t-2 border-gray-300 pt-2">
-                                <p className="font-semibold">المستلم</p>
-                                <p className="text-sm text-muted-foreground">Receiver's Signature</p>
+                        <InfoRow label="وذلك مبلغ وقدره" value={receipt.amountInWords} />
+                        
+                        <div className="space-y-2">
+                            <Label className="font-semibold text-gray-600 dark:text-gray-400">وذلك عن:</Label>
+                            <div className='p-3 text-sm border rounded-md min-h-[100px] bg-gray-50 dark:bg-gray-800/50 whitespace-pre-wrap text-gray-800 dark:text-gray-200'>
+                                {receipt.description || '-'}
                             </div>
                         </div>
-                        <div className="text-center">
-                            <div className="border-t-2 border-gray-300 pt-2">
-                                <p className="font-semibold">المحاسب</p>
-                                <p className="text-sm text-muted-foreground">Accountant's Signature</p>
+                        
+                         <div className={cn("grid gap-8 pt-4", receipt.paymentMethod !== 'Cash' && receipt.reference ? 'grid-cols-2' : 'grid-cols-1')}>
+                             <InfoRow label="طريقة الدفع" value={paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod} />
+                             
+                             {receipt.paymentMethod !== 'Cash' && receipt.reference && (
+                                 <InfoRow 
+                                    label={receipt.paymentMethod === 'Cheque' ? 'رقم الشيك' : 'رقم المرجع'} 
+                                    value={receipt.reference} 
+                                 />
+                             )}
+                        </div>
+                    </main>
+                    
+                     <footer className="pt-24">
+                        <div className="grid grid-cols-2 gap-20">
+                            <div className="text-center">
+                                <div className="border-t-2 border-gray-300 pt-2">
+                                    <p className="font-semibold">المستلم</p>
+                                    <p className="text-sm text-muted-foreground">Receiver's Signature</p>
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                <div className="border-t-2 border-gray-300 pt-2">
+                                    <p className="font-semibold">المحاسب</p>
+                                    <p className="text-sm text-muted-foreground">Accountant's Signature</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </footer>
-            </div>
+                    </footer>
+                </div>
+             </div>
              <div className="p-6 bg-muted/50 rounded-b-lg flex justify-end gap-2 no-print">
                 <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}>
                     <Pencil className="ml-2 h-4 w-4" />
@@ -186,5 +189,3 @@ export default function ViewCashReceiptPage() {
     </div>
   );
 }
-
-    

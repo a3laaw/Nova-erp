@@ -209,7 +209,6 @@ export default function BalanceSheetPage() {
                  <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
                     <div id="printable-area" className="printable-content">
                         {branding?.letterhead_image_url && (
-                            // eslint-disable-next-line @next/next/no-img-element
                             <img 
                                 src={branding.letterhead_image_url} 
                                 alt="Letterhead"
@@ -217,26 +216,30 @@ export default function BalanceSheetPage() {
                             />
                         )}
                         <div className="p-8 md:p-12">
-                            <CardHeader className="p-0">
-                                <div className="flex justify-between items-start pb-4">
-                                    <div className="text-left flex-shrink-0">
-                                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
-                                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
-                                        <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                    <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                        <div>
-                                            <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                            <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                            <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                            {!branding?.letterhead_image_url && (
+                                <CardHeader className="p-0">
+                                    <div className="flex justify-between items-start pb-4">
+                                        <div className="text-left flex-shrink-0">
+                                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
+                                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
+                                            <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                        <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                            <div>
+                                                <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
+                                                <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
+                                                <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="mt-6 text-sm">
-                                    <p><span className="font-semibold w-24 inline-block">المركز المالي كما في:</span> {asOfDate ? format(parseISO(asOfDate), 'dd/MM/yyyy') : ''}</p>
-                                </div>
-                            </CardHeader>
+                                </CardHeader>
+                            )}
+                             <div className="mt-6 text-sm text-center">
+                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
+                                <p className="font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
+                                <p><span className="font-semibold w-24 inline-block">كما في:</span> {asOfDate ? format(parseISO(asOfDate), 'dd/MM/yyyy') : ''}</p>
+                            </div>
                             <CardContent className="px-0 pt-6 space-y-6">
                                 {!balanceSheetData.isBalanced && (
                                     <Alert variant="destructive">
