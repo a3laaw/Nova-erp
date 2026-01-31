@@ -337,6 +337,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const handleSubmit = async () => {
     if (!firestore || !transaction || !currentUser) return;
 
+    if (!clientName) {
+        toast({
+            variant: 'destructive',
+            title: 'خطأ في البيانات',
+            description: 'اسم العميل مطلوب لإنشاء العقد. الرجاء المحاولة مرة أخرى.',
+        });
+        return;
+    }
+
     setIsSaving(true);
     let finalTransactionId = transaction.id;
     let assignedEngineerId: string | null = null;
