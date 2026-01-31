@@ -76,7 +76,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                     getDocs(existingAssignmentsQuery),
                     getDocs(clientTransactionsQuery),
                     getDocs(clientReceiptsQuery),
-                    getDocs(transTypesSnap),
+                    getDocs(transactionTypesQuery),
                 ]);
 
                 const allDepartments = deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
@@ -277,7 +277,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
 
 
     return (
-        <>
+        <React.Fragment>
             <Dialog open={isOpen} onOpenChange={onClose}>
                 <DialogContent className="max-w-4xl" dir="rtl">
                     <DialogHeader>
@@ -378,6 +378,6 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </React.Fragment>
     );
 }
