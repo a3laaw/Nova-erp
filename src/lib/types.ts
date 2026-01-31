@@ -364,6 +364,7 @@ export interface TransactionStage {
   order?: number;
   expectedEndDate?: any;
   completedCount?: number;
+  maxOccurrences?: number;
 }
       
 export type ClientTransaction = {
@@ -442,8 +443,8 @@ export interface WorkStage {
   order?: number;
   allowedRoles?: string[];
   trackingType: 'duration' | 'occurrence' | 'none';
-  expectedDurationDays?: number;
-  maxOccurrences?: number;
+  expectedDurationDays?: number | null;
+  maxOccurrences?: number | null;
 }
 
 export type ContractClause = {
@@ -638,3 +639,5 @@ export interface PurchaseOrder {
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
+
+    
