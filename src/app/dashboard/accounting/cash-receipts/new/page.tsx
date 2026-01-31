@@ -394,8 +394,12 @@ export default function NewCashReceiptPage() {
             if (isFirstReceiptForProject && selectedProjectId && transactionRef && transactionSnap?.exists()) {
                 const contractStageIndex = currentStages?.findIndex(s => s.name === 'توقيع العقد');
                 if (contractStageIndex !== -1 && currentStages?.[contractStageIndex]?.status !== 'completed') {
+                    const now = new Date();
                     currentStages![contractStageIndex].status = 'completed';
-                    (currentStages![contractStageIndex] as any).endDate = serverTimestamp();
+                    (currentStages![contractStageIndex] as any).endDate = now;
+                    if (!(currentStages![contractStageIndex] as any).startDate) {
+                        (currentStages![contractStageIndex] as any).startDate = now;
+                    }
                     transaction_fs.update(transactionRef, { stages: currentStages });
 
                     const timelineLogRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
