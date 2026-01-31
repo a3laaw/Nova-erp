@@ -166,6 +166,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[], employees: Employee[], departments: Department[] }>({ stages: [], templates: [], employees: [], departments: [] });
   const [loadingRefData, setLoadingRefData] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // This effect resets the entire component's state when the dialog is closed.
   useEffect(() => {
