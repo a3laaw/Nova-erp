@@ -188,7 +188,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   }, [isOpen]);
 
   const populateFormFromExistingContract = useCallback((contract: NonNullable<ClientTransaction['contract']>) => {
-    setClauses(JSON.parse(JSON.stringify(contract.clauses || [])));
     setScopeOfWork(JSON.parse(JSON.stringify(contract.scopeOfWork || [])));
     setTerms(JSON.parse(JSON.stringify(contract.termsAndConditions || [])));
     setOpenClauses(JSON.parse(JSON.stringify(contract.openClauses || [])));
@@ -196,7 +195,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     setFinancials({
         type: contract.financialsType || 'fixed',
         totalAmount: contract.totalAmount || 0,
-        discount: 0, // This model doesn't store discount on contract level yet
+        discount: 0,
         milestones: (contract.clauses || []).map(c => ({
             id: c.id,
             name: c.name,
@@ -235,7 +234,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             value: contractData.financialsType === 'percentage' ? c.percentage || 0 : c.amount,
         }))
     });
-}, [transaction]);
+  }, [transaction]);
 
   useEffect(() => {
     if (!isOpen || !firestore || !transaction) return;
@@ -316,34 +315,29 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
 
   useEffect(() => {
-    // If we are editing an existing transaction that already has contract data,
-    // or if we're creating from a quotation, don't re-calculate.
-    if ((transaction?.id && transaction?.contract) || quotationIdToUpdate) {
-        return;
-    }
+    // This effect now ONLY recalculates clauses if the user changes the financial type
+    // or total amount for percentage-based contracts, or the milestones themselves.
+    const totalAmount = financials.totalAmount || 0;
+    const isPercentage = financials.type === 'percentage';
     
-    if (financials.type === 'fixed') {
-        const calculatedClauses = (financials.milestones || []).map(m => ({
-            id: m.id || generateId(),
-            name: m.name,
-            amount: m.value || 0,
+    const calculatedClauses = (financials.milestones || []).map(milestone => {
+        const amount = isPercentage
+            ? ((milestone.value || 0) / 100) * totalAmount
+            : milestone.value || 0;
+        
+        return {
+            id: milestone.id,
+            name: milestone.name,
+            condition: milestone.condition,
+            amount: amount,
             status: 'غير مستحقة' as const,
-            condition: m.condition || ''
-        }));
-        setClauses(calculatedClauses);
-    } else if (financials.type === 'percentage') {
-        const totalAmount = financials.totalAmount || 0;
-        const calculatedClauses = (financials.milestones || []).map(m => ({
-            id: m.id || generateId(),
-            name: m.name,
-            amount: ((m.value || 0) / 100) * totalAmount,
-            status: 'غير مستحقة' as const,
-            percentage: m.value || 0,
-            condition: m.condition || ''
-        }));
-        setClauses(calculatedClauses);
-    }
-  }, [financials, transaction?.id, transaction?.contract, quotationIdToUpdate]);
+            ...(isPercentage && { percentage: milestone.value || 0 }),
+        };
+    });
+    
+    setClauses(calculatedClauses);
+
+  }, [financials]);
 
 
   const handleSelectTransaction = (txId: string) => {
@@ -369,17 +363,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
+  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
-    setTerms(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
-  const removeTerm = (id: string) => setTerms(prev => prev.filter(term => term.id !== id));
+  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
-    const newTerms = [...terms];
+    const newTerms = [...termsAndConditions];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newTerms.length) return;
     [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-    setTerms(newTerms);
+    setTermsAndConditions(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
