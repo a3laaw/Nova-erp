@@ -122,14 +122,17 @@ export function JournalEntriesList() {
         const batch = writeBatch(firestore);
         const entryRef = doc(firestore, 'journalEntries', entryToDelete.id!);
 
-        // 1. Check if this is an auto-generated contract entry
+        // Check if this is an auto-generated contract entry
         if (entryToDelete.clientId && entryToDelete.transactionId) {
             const transactionRef = doc(firestore, 'clients', entryToDelete.clientId, 'transactions', entryToDelete.transactionId);
-            
-            // 2. Remove the contract from the transaction
-            batch.update(transactionRef, { contract: deleteField() });
+            const transactionSnap = await getDoc(transactionRef); // Read before writing
 
-            // 3. Log this action in the client's main history
+            // Only update the transaction if it actually exists
+            if (transactionSnap.exists()) {
+                batch.update(transactionRef, { contract: deleteField() });
+            }
+            
+            // Log this action in the client's main history
             const historyCollectionRef = collection(firestore, `clients/${entryToDelete.clientId}/history`);
             const logContent = `تم إلغاء عقد المعاملة المرتبط بالقيد المحاسبي "${entryToDelete.entryNumber}" الذي تم حذفه.`;
             batch.set(doc(historyCollectionRef), {
@@ -140,40 +143,26 @@ export function JournalEntriesList() {
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
             });
+        }
 
-            // Check if we need to revert client status
+        // Delete the journal entry itself
+        batch.delete(entryRef);
+        
+        await batch.commit();
+
+        // Perform post-commit actions (not atomic, but safer)
+        if (entryToDelete.clientId) {
             const clientTransactionsQuery = query(collection(firestore, 'clients', entryToDelete.clientId, 'transactions'));
-            // We need to fetch the documents outside the batch write to check their content.
             const clientTransactionsSnap = await getDocs(clientTransactionsQuery);
-            const otherTransactions = clientTransactionsSnap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter(tx => tx.id !== entryToDelete.transactionId);
-            
-            const hasOtherContracts = otherTransactions.some(tx => !!tx.contract);
-
+            const hasOtherContracts = clientTransactionsSnap.docs.some(d => d.data().contract);
             if (!hasOtherContracts) {
                 const clientRef = doc(firestore, 'clients', entryToDelete.clientId);
                 const clientSnap = await getDoc(clientRef);
                 if (clientSnap.exists() && clientSnap.data().status === 'contracted') {
-                     batch.update(clientRef, { status: 'new' });
-                     // Log status change
-                     const statusLogContent = `تغيرت حالة الملف إلى "جديد" بعد إلغاء آخر عقد مرتبط.`;
-                     batch.set(doc(historyCollectionRef), {
-                        type: 'log',
-                        content: statusLogContent,
-                        userId: currentUser.id,
-                        userName: currentUser.fullName,
-                        userAvatar: currentUser.avatarUrl,
-                        createdAt: serverTimestamp(),
-                    });
+                    await updateDoc(clientRef, { status: 'new' });
                 }
             }
         }
-        
-        // 4. Delete the journal entry itself
-        batch.delete(entryRef);
-        
-        await batch.commit();
 
         toast({ title: 'نجاح', description: 'تم حذف قيد اليومية وإلغاء العقد المرتبط بنجاح.' });
     } catch (error) {
