@@ -41,6 +41,11 @@
             "format": "uri",
             "description": "URL to the company's full letterhead image."
         },
+        "system_background_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL for the background image of the system pages."
+        },
         "financial_statement_notes": {
             "type": "string",
             "description": "The full text content for the notes to the financial statements."
@@ -1263,5 +1268,3 @@
     }
   }
 }
-
-    

@@ -123,6 +123,21 @@ export function BrandingManager() {
                         </div>
                     </div>
                 </div>
+
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-semibold text-base">خلفية صفحات النظام</h3>
+                     <div className="grid gap-2">
+                        <Label htmlFor="system_background_url">مسار الصورة من الإنترنت</Label>
+                        <div className="flex items-center gap-4">
+                            {formData.system_background_url && (
+                                <img src={formData.system_background_url} alt="System Background Preview" width={128} height={64} className="rounded-md border object-contain p-1" />
+                            )}
+                             <div className="flex-1">
+                                <Input id="system_background_url" value={formData.system_background_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/background.jpg" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <Separator />
                 

@@ -14,6 +14,7 @@ export interface BrandingSettings {
   tax_number?: string;
   letterhead_text?: string;
   letterhead_image_url?: string;
+  system_background_url?: string;
 }
 
 interface BrandingContextType {

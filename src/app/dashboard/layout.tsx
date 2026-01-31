@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
+import { useBranding } from '@/context/branding-context';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
   children,
@@ -19,6 +21,7 @@ export default function DashboardLayout({
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const { language } = useLanguage();
+  const { branding } = useBranding();
 
   if (loading) {
     return (
@@ -49,21 +52,37 @@ export default function DashboardLayout({
     logout();
     router.push('/');
   };
+  
+  const hasBackground = !!branding?.system_background_url;
+  const backgroundStyle = hasBackground ? {
+    backgroundImage: `url(${branding.system_background_url})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+  } : {};
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen">
-        <Sidebar side={language === 'ar' ? 'right' : 'left'} className="no-print">
-          <MainNav currentUser={user} onLogout={handleLogout} />
-        </Sidebar>
-        <SidebarInset>
-          <Header currentUser={user} onLogout={handleLogout} className="no-print" />
-          <main className="flex-1 p-4 md:p-6 lg:p-8">
-            {children}
-          </main>
-          <OfflineIndicator />
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <div className="relative min-h-screen" style={backgroundStyle}>
+      <SidebarProvider>
+        <div className="flex min-h-screen">
+          <Sidebar
+            side={language === 'ar' ? 'right' : 'left'}
+            className={cn(
+                "no-print",
+                hasBackground && "border-r-white/10 bg-card/80 backdrop-blur-sm"
+            )}
+          >
+            <MainNav currentUser={user} onLogout={handleLogout} />
+          </Sidebar>
+          <SidebarInset className={cn(hasBackground && "bg-background/80 backdrop-blur-sm")}>
+            <Header currentUser={user} onLogout={handleLogout} className="no-print" />
+            <main className="flex-1 p-4 md:p-6 lg:p-8">
+              {children}
+            </main>
+            <OfflineIndicator />
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </div>
   );
 }
