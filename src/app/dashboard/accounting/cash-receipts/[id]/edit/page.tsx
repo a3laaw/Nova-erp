@@ -272,84 +272,76 @@ export default function EditCashReceiptPage() {
     }
 
     setIsSaving(true);
+    const batch = writeBatch(firestore);
 
     try {
-        await runTransaction(firestore, async (transaction_fs) => {
-            const receiptRefDoc = doc(firestore, 'cashReceipts', id);
+        const receiptRefDoc = doc(firestore, 'cashReceipts', id);
+        
+        const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
+        const selectedDebitAccount = accounts.find(acc => acc.id === debitAccountId);
+
+        if (!clientAccount || !selectedDebitAccount) {
+            throw new Error("الحسابات المطلوبة (العميل أو حساب الاستلام) غير موجودة.");
+        }
+
+        const receiptUpdatePayload = {
+            receiptDate: new Date(date),
+            projectId: selectedProjectId || null,
+            amount: parseFloat(amount),
+            amountInWords: amountInWords,
+            description: description,
+            paymentMethod: paymentMethod,
+            reference: reference,
+        };
+        batch.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
+
+        const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+        let autoTags = {};
+        if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
+            const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
+            const department = departments.find(d => d.name === engineer?.department);
             
-            // It's safer to get the latest original receipt data inside the transaction
-            const latestReceiptSnap = await transaction_fs.get(receiptRefDoc);
-            if (!latestReceiptSnap.exists()) {
-                throw new Error("لم يتم العثور على سند القبض.");
-            }
-            const freshOriginalReceipt = latestReceiptSnap.data() as CashReceipt;
-
-            const clientAccount = accounts.find(acc => acc.name === freshOriginalReceipt.clientNameAr);
-            const selectedDebitAccount = accounts.find(acc => acc.id === debitAccountId);
-
-            if (!clientAccount || !selectedDebitAccount) {
-                throw new Error("الحسابات المطلوبة (العميل أو حساب الاستلام) غير موجودة.");
-            }
-
-            const receiptUpdatePayload = {
-                receiptDate: new Date(date),
-                projectId: selectedProjectId || null,
-                amount: parseFloat(amount),
-                amountInWords: amountInWords,
-                description: description,
-                paymentMethod: paymentMethod,
-                reference: reference,
+            autoTags = {
+                clientId: originalReceipt.clientId,
+                transactionId: selectedProjectId,
+                auto_profit_center: selectedProjectId,
+                auto_resource_id: selectedProject.assignedEngineerId,
+                ...(department && { auto_dept_id: department.id }),
             };
-            transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
+        }
 
-            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
-            let autoTags = {};
-            if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
-                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
-                const department = departments.find(d => d.name === engineer?.department);
-                
-                autoTags = {
-                    clientId: freshOriginalReceipt.clientId,
-                    transactionId: selectedProjectId,
-                    auto_profit_center: selectedProjectId,
-                    auto_resource_id: selectedProject.assignedEngineerId,
-                    ...(department && { auto_dept_id: department.id }),
-                };
-            }
+        const newLines = [
+            { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
+            { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
+        ];
 
-            const newLines = [
-                { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
-                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
-            ];
+        const jeUpdatePayload = {
+            date: Timestamp.fromDate(new Date(date)),
+            lines: newLines,
+            totalDebit: parseFloat(amount),
+            totalCredit: parseFloat(amount),
+            narration: description || `تحديث سند قبض رقم ${originalReceipt.voucherNumber}`,
+            transactionId: selectedProjectId || null,
+            clientId: originalReceipt.clientId,
+        };
 
-            const jeUpdatePayload = {
-                date: Timestamp.fromDate(new Date(date)),
-                lines: newLines,
-                totalDebit: parseFloat(amount),
-                totalCredit: parseFloat(amount),
-                narration: description || `تحديث سند قبض رقم ${freshOriginalReceipt.voucherNumber}`,
-                transactionId: selectedProjectId || null,
-                clientId: freshOriginalReceipt.clientId,
-            };
+        if (originalReceipt.journalEntryId) {
+            const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
+            batch.update(jeRef, jeUpdatePayload);
+        } else {
+            // This logic is a fallback in case a JE was never created.
+            const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
+            batch.set(newJournalEntryRef, {
+                ...jeUpdatePayload,
+                status: 'posted',
+                createdAt: serverTimestamp(),
+                createdBy: currentUser.id,
+                entryNumber: `CRV-JE-${originalReceipt.voucherNumber}`,
+            });
+            batch.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
+        }
 
-            if (freshOriginalReceipt.journalEntryId) {
-                const jeRef = doc(firestore, 'journalEntries', freshOriginalReceipt.journalEntryId);
-                transaction_fs.update(jeRef, jeUpdatePayload);
-            } else {
-                // This logic is a fallback in case a JE was never created.
-                const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-                transaction_fs.set(newJournalEntryRef, {
-                    ...jeUpdatePayload,
-                    status: 'posted',
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser.id,
-                    entryNumber: `CRV-JE-${freshOriginalReceipt.voucherNumber}`,
-                });
-                transaction_fs.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
-            }
-        });
-
-        // Post-transaction logic for updating contract clauses
+        // Update contract clauses after the main writes
         if (originalReceipt.projectId) {
             const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore);
             const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);
@@ -372,9 +364,11 @@ export default function EditCashReceiptPage() {
                     accumulatedAmount += clause.amount;
                     return newClause;
                 });
-                await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
+                batch.update(transactionRef, { 'contract.clauses': updatedClauses });
             }
         }
+        
+        await batch.commit();
 
         toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي بنجاح.' });
         router.push(`/dashboard/accounting/cash-receipts/${id}`);

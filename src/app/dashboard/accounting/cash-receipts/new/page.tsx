@@ -278,44 +278,48 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
-        let isFirstReceipt = false;
-        if (selectedProjectId) {
-            const receiptsQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
-            const existingReceiptsSnap = await getDocs(receiptsQuery);
-            isFirstReceipt = existingReceiptsSnap.empty;
-        }
-
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
+            
+            // --- All Reads First ---
             const counterDoc = await transaction_fs.get(counterRef);
+            const selectedClient = clients.find(c => c.id === selectedClientId);
+            if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
+            
+            const clientAccount = accounts.find(acc => acc.name === selectedClient.nameAr);
+            if (!clientAccount) throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient.nameAr}. تأكد من إنشاء عقد له أولاً.`);
+            
+            const debitAccount = paymentMethod === 'Cash'
+                ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
+                : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+            if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
+
+            let isFirstReceiptForProject = false;
+            let transactionRef, transactionSnap, currentStages;
+            if(selectedProjectId) {
+                transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
+                const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
+                
+                const [receiptsSnap, txSnap] = await Promise.all([getDocs(receiptsForProjectQuery), transaction_fs.get(transactionRef)]);
+                isFirstReceiptForProject = receiptsSnap.empty;
+                transactionSnap = txSnap;
+                currentStages = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
+            }
+            
+            // --- All Writes Second ---
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
-            
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
             
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             newReceiptId = newReceiptRef.id;
 
-            const selectedClient = clients.find(c => c.id === selectedClientId);
             const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
-            
-            const clientAccount = accounts.find(acc => acc.name === selectedClient?.nameAr);
-            if (!clientAccount) {
-                throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient?.nameAr}. تأكد من إنشاء عقد له أولاً.`);
-            }
-
-            const debitAccount = paymentMethod === 'Cash'
-                ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
-                : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
-
-            if (!debitAccount) {
-                throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك. الرجاء مراجعة شجرة الحسابات.');
-            }
             
             let autoTags = {};
             if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
@@ -375,7 +379,6 @@ export default function NewCashReceiptPage() {
             };
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            
             if (selectedProjectId && description) {
                 const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
                 transaction_fs.set(timelineCommentRef, {
@@ -388,34 +391,26 @@ export default function NewCashReceiptPage() {
                 });
             }
 
-            if (isFirstReceipt && selectedProjectId) {
-                const transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
-                const transactionSnap = await transaction_fs.get(transactionRef);
-                if (transactionSnap.exists()) {
-                    const transactionData = transactionSnap.data();
-                    const currentStages = [...(transactionData.stages || [])];
-                    const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+            if (isFirstReceiptForProject && selectedProjectId && transactionRef && transactionSnap?.exists()) {
+                const contractStageIndex = currentStages?.findIndex(s => s.name === 'توقيع العقد');
+                if (contractStageIndex !== -1 && currentStages?.[contractStageIndex]?.status !== 'completed') {
+                    currentStages![contractStageIndex] = {
+                        ...currentStages![contractStageIndex],
+                        status: 'completed',
+                        endDate: serverTimestamp(),
+                    };
+                    transaction_fs.update(transactionRef, { stages: currentStages });
 
-                    if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
-                        currentStages[contractStageIndex] = {
-                            ...currentStages[contractStageIndex],
-                            status: 'completed',
-                            endDate: serverTimestamp(),
-                        };
-                        transaction_fs.update(transactionRef, { stages: currentStages });
-
-                        const timelineLogRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
-                        transaction_fs.set(timelineLogRef, {
-                            type: 'log',
-                            content: `تم إكمال مرحلة "توقيع العقد" تلقائيًا بعد استلام أول دفعة عبر السند رقم ${newVoucherNumber}.`,
-                            userId: 'system',
-                            userName: 'النظام',
-                            createdAt: serverTimestamp(),
-                        });
-                    }
+                    const timelineLogRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
+                    transaction_fs.set(timelineLogRef, {
+                        type: 'log',
+                        content: `تم إكمال مرحلة "توقيع العقد" تلقائيًا بعد استلام أول دفعة عبر السند رقم ${newVoucherNumber}.`,
+                        userId: 'system',
+                        userName: 'النظام',
+                        createdAt: serverTimestamp(),
+                    });
                 }
             }
-
         });
         
         // Post-transaction logic
@@ -449,9 +444,6 @@ export default function NewCashReceiptPage() {
                 }
             }
         }
-        
-        // --- Notification Logic (outside transaction) ---
-        // ... (existing notification logic) ...
 
         router.push(`/dashboard/accounting/cash-receipts/${newReceiptId}`);
 

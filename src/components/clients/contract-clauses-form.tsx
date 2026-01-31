@@ -83,7 +83,7 @@ function TemplateSelectionView({
         ))}
       </div>
       <DialogFooter>
-        <Button variant="ghost" onClick={onContinueWithout}>
+        <Button variant="ghost" type="button" onClick={onContinueWithout}>
           متابعة بدون نموذج (إنشاء يدوي)
         </Button>
       </DialogFooter>
