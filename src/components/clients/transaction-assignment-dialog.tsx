@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -75,7 +75,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                     getDocs(engineersQuery),
                     getDocs(existingAssignmentsQuery),
                     getDocs(clientTransactionsQuery),
-                    getDocs(clientReceiptsQuery),
+                    getDocs(clientReceiptsSnap),
                     getDocs(transTypesSnap),
                 ]);
 
@@ -278,110 +278,106 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
 
     return (
         <>
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl" dir="rtl">
-                <DialogHeader>
-                    <DialogTitle>تحويل / إسناد المعاملة للأقسام</DialogTitle>
-                    <DialogDescription>
-                        اختر الأقسام التي تريد تحويل المعاملة إليها وأسندها للموظف المسؤول في كل قسم.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    {loading ? (
-                         <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                    ) : (
-                         <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
-                            <Table>
-                                <TableHeader className="sticky top-0 bg-muted z-10">
-                                    <TableRow>
-                                        <TableHead className="w-[40px]"></TableHead>
-                                        <TableHead className="w-[180px]">القسم</TableHead>
-                                        <TableHead>الموظف المسؤول</TableHead>
-                                        <TableHead>ملاحظات</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {assignments.map(a => (
-                                        <TableRow key={a.departmentId} className={!a.isAvailable && currentUser?.role !== 'Admin' ? 'bg-muted/30 text-muted-foreground' : ''}>
-                                            <TableCell>
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <span tabIndex={0} className="flex items-center gap-2">
-                                                                <Checkbox
-                                                                    checked={a.selected}
-                                                                    onCheckedChange={(checked) => handleAssignmentChange(a.departmentId, 'selected', !!checked)}
-                                                                    disabled={!a.isAvailable && currentUser?.role !== 'Admin'}
-                                                                />
-                                                                 {currentUser?.role === 'Admin' && !a.isAvailable && <Shield className="h-4 w-4 text-blue-500" />}
-                                                            </span>
-                                                        </TooltipTrigger>
-                                                        {!a.isAvailable && currentUser?.role !== 'Admin' && (
-                                                            <TooltipContent>
-                                                                <p>يجب وجود معاملة سابقة مدفوعة لهذا القسم.</p>
-                                                            </TooltipContent>
-                                                        )}
-                                                        {currentUser?.role === 'Admin' && !a.isAvailable && (
-                                                            <TooltipContent>
-                                                                <p>صلاحية المدير تتجاوز هذا الشرط.</p>
-                                                            </TooltipContent>
-                                                        )}
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            </TableCell>
-                                            <TableCell className="font-semibold">{a.departmentName}</TableCell>
-                                            <TableCell>
-                                                <InlineSearchList 
-                                                    value={a.engineerId}
-                                                    onSelect={(value) => handleAssignmentChange(a.departmentId, 'engineerId', value)}
-                                                    options={getEngineersForDept(a.departmentName)}
-                                                    placeholder="اختر موظف..."
-                                                    disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input 
-                                                    value={a.notes}
-                                                    onChange={(e) => handleAssignmentChange(a.departmentId, 'notes', e.target.value)}
-                                                    placeholder="ملاحظات للقسم..."
-                                                    disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
-                                                />
-                                            </TableCell>
+            <Dialog open={isOpen} onOpenChange={onClose}>
+                <DialogContent className="max-w-4xl" dir="rtl">
+                    <DialogHeader>
+                        <DialogTitle>تحويل / إسناد المعاملة للأقسام</DialogTitle>
+                        <DialogDescription>
+                            اختر الأقسام التي تريد تحويل المعاملة إليها وأسندها للموظف المسؤول في كل قسم.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {loading ? (
+                             <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                        ) : (
+                             <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+                                <Table>
+                                    <TableHeader className="sticky top-0 bg-muted z-10">
+                                        <TableRow>
+                                            <TableHead className="w-[40px]"></TableHead>
+                                            <TableHead className="w-[180px]">القسم</TableHead>
+                                            <TableHead>الموظف المسؤول</TableHead>
+                                            <TableHead>ملاحظات</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose} disabled={isSaving}>إغلاق</Button>
-                    <Button onClick={handleSave} disabled={isSaving || loading}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                        حفظ
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-        <AlertDialog open={isBypassConfirmOpen} onOpenChange={setIsBypassConfirmOpen}>
-            <AlertDialogContent dir="rtl">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>تأكيد تجاوز الصلاحية</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        أنت على وشك إسناد هذه المعاملة إلى قسم واحد أو أكثر يتطلب معاملة سابقة مدفوعة.
-                        <br />
-                        باستخدام صلاحياتك كمدير، سيتم تجاوز هذا الشرط. هل تود المتابعة؟
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setAssignmentsToCommit([])} disabled={isSaving}>
-                        تراجع
-                    </AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmAndSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700">
-                        {isSaving ? 'جاري الحفظ...' : 'نعم، قم بالإسناد'}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {assignments.map(a => (
+                                            <TableRow key={a.departmentId} className={!a.isAvailable && currentUser?.role !== 'Admin' ? 'bg-muted/30 text-muted-foreground' : ''}>
+                                                <TableCell>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <span tabIndex={0} className="flex items-center gap-2">
+                                                                    <Checkbox
+                                                                        checked={a.selected}
+                                                                        onCheckedChange={(checked) => handleAssignmentChange(a.departmentId, 'selected', !!checked)}
+                                                                        disabled={!a.isAvailable && currentUser?.role !== 'Admin'}
+                                                                    />
+                                                                     {currentUser?.role === 'Admin' && !a.isAvailable && <Shield className="h-4 w-4 text-blue-500" />}
+                                                                </span>
+                                                            </TooltipTrigger>
+                                                            {!a.isAvailable && (
+                                                                <TooltipContent>
+                                                                    <p>{currentUser?.role === 'Admin' ? 'صلاحية المدير تتجاوز هذا الشرط.' : 'يجب وجود معاملة سابقة مدفوعة لهذا القسم.'}</p>
+                                                                </TooltipContent>
+                                                            )}
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </TableCell>
+                                                <TableCell className="font-semibold">{a.departmentName}</TableCell>
+                                                <TableCell>
+                                                    <InlineSearchList 
+                                                        value={a.engineerId}
+                                                        onSelect={(value) => handleAssignmentChange(a.departmentId, 'engineerId', value)}
+                                                        options={getEngineersForDept(a.departmentName)}
+                                                        placeholder="اختر موظف..."
+                                                        disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input 
+                                                        value={a.notes}
+                                                        onChange={(e) => handleAssignmentChange(a.departmentId, 'notes', e.target.value)}
+                                                        placeholder="ملاحظات للقسم..."
+                                                        disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={onClose} disabled={isSaving}>إغلاق</Button>
+                        <Button onClick={handleSave} disabled={isSaving || loading}>
+                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                            حفظ
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <AlertDialog open={isBypassConfirmOpen} onOpenChange={setIsBypassConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد تجاوز الصلاحية</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            أنت على وشك إسناد هذه المعاملة إلى قسم واحد أو أكثر يتطلب معاملة سابقة مدفوعة.
+                            <br />
+                            باستخدام صلاحياتك كمدير، سيتم تجاوز هذا الشرط. هل تود المتابعة؟
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setAssignmentsToCommit([])} disabled={isSaving}>
+                            تراجع
+                        </AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmAndSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700">
+                            {isSaving ? 'جاري الحفظ...' : 'نعم، قم بالإسناد'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
