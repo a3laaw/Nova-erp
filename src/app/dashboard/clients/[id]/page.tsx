@@ -196,6 +196,19 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
 }
 
 
+function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
+    if (value === null || value === undefined || value === '') return null;
+    return (
+        <div className="flex items-start gap-2 text-sm">
+            <div className="flex-shrink-0 pt-1 text-muted-foreground">{icon}</div>
+            <div>
+                <p className="font-semibold text-muted-foreground">{label}</p>
+                <div className="text-foreground">{value}</div>
+            </div>
+        </div>
+    );
+}
+
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -435,70 +448,41 @@ export default function ClientProfilePage() {
         clientName={(client as any).nameAr}
     />
     <div className='space-y-6' dir='rtl'>
-        <Tabs defaultValue="profile" dir="rtl">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
-                <TabsTrigger value="transactions">المعاملات ({transactions.length})</TabsTrigger>
-                <TabsTrigger value="quotations">عروض الأسعار</TabsTrigger>
-                <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="profile" className="mt-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>بيانات العميل</CardTitle>
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={`/dashboard/clients/${id}/edit`}>
-                                        <Pencil className="ml-2 h-4 w-4" />
-                                        تعديل
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent className='space-y-6'>
-                                <div className="text-center space-y-2 py-4">
-                                    <h2 className="text-2xl font-bold">{client.nameAr}</h2>
-                                    {client.nameEn && <p className="text-muted-foreground">{client.nameEn}</p>}
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm border-t pt-6">
-                                    <div className="flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">رقم الملف:</span>
-                                        <span className="font-mono">{client.fileId}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">الحالة:</span>
-                                        <Badge variant="outline" className={clientStatusColors[client.status]}>
-                                            {clientStatusTranslations[client.status]}
-                                        </Badge>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">رقم الجوال:</span>
-                                        <span className="font-mono">{client.mobile}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">الرقم المدني:</span>
-                                        <span className="font-mono">{client.civilId || '-'}</span>
-                                    </div>
-                                    <div className="sm:col-span-2 flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">المهندس المسؤول:</span>
-                                        <span>{assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>}</span>
-                                    </div>
-                                    <div className="sm:col-span-2 flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">العنوان:</span>
-                                        <span className="text-right">{clientAddress}</span>
-                                    </div>
-                                     <div className="flex justify-between">
-                                        <span className="font-semibold text-muted-foreground">تاريخ الإنشاء:</span>
-                                        <span>{formatDate(client.createdAt)}</span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+        <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                    <CardTitle className="text-2xl font-bold">{client.nameAr}</CardTitle>
+                    <CardDescription>{client.nameEn}</CardDescription>
+                    <div className="mt-2 flex items-center gap-4">
+                        <Badge variant="secondary" className="font-mono text-sm">{client.fileId}</Badge>
+                        <Badge variant="outline" className={clientStatusColors[client.status]}>
+                            {clientStatusTranslations[client.status]}
+                        </Badge>
                     </div>
                 </div>
-            </TabsContent>
+                 <Button asChild variant="outline" size="sm">
+                    <Link href={`/dashboard/clients/${id}/edit`}>
+                        <Pencil className="ml-2 h-4 w-4" />
+                        تعديل
+                    </Link>
+                </Button>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-6 border-t">
+                <InfoRow icon={<BadgeInfo className="h-5 w-5"/>} label="الرقم المدني" value={client.civilId} />
+                <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
+                <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
+                <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
+                <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+            </CardContent>
+        </Card>
 
+        <Tabs defaultValue="transactions" dir="rtl">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="transactions">المعاملات ({transactions.length})</TabsTrigger>
+                <TabsTrigger value="quotations">عروض الأسعار</TabsTrigger>
+                <TabsTrigger value="statement">كشف الحساب</TabsTrigger>
+                <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
+            </TabsList>
             <TabsContent value="transactions" className="mt-6">
                  <Card>
                     <CardHeader className="flex-row items-center justify-between">
@@ -506,18 +490,10 @@ export default function ClientProfilePage() {
                             <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
                             <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                            <Button asChild variant="outline">
-                                <Link href={`/dashboard/clients/${id}/statement`}>
-                                    <Printer className="ml-2 h-4 w-4" />
-                                    كشف حساب
-                                </Link>
-                            </Button>
-                            <Button onClick={() => setIsFormOpen(true)}>
-                                <PlusCircle className="ml-2 h-4 w-4" />
-                                إضافة معاملة
-                            </Button>
-                        </div>
+                        <Button onClick={() => setIsFormOpen(true)}>
+                            <PlusCircle className="ml-2 h-4 w-4" />
+                            إضافة معاملة
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         {transactionsLoading && <Skeleton className="h-24 w-full" />}
@@ -600,6 +576,22 @@ export default function ClientProfilePage() {
 
             <TabsContent value="quotations" className="mt-6">
                 <ClientQuotationsList clientId={id} clientName={client.nameAr} />
+            </TabsContent>
+            
+            <TabsContent value="statement" className="mt-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>كشف الحساب</CardTitle>
+                        <CardDescription>عرض تفصيلي لجميع الحركات المالية للعميل.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                        <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <p className="mt-4">لعرض كشف حساب تفصيلي، الرجاء الذهاب إلى قسم المحاسبة.</p>
+                        <Button asChild className="mt-4">
+                            <Link href={`/dashboard/clients/${id}/statement`}>الذهاب إلى كشف الحساب</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
             </TabsContent>
 
             <TabsContent value="history" className="mt-6">
