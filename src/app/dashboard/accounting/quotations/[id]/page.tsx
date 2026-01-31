@@ -131,34 +131,33 @@ export default function ViewQuotationPage() {
     <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
         <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
             <div id="printable-area" className="p-8 md:p-12 printable-content">
-                 <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                    {branding?.letterhead_image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img 
-                            src={branding.letterhead_image_url} 
-                            alt={`${branding.company_name || ''} Letterhead`}
-                            className="w-full h-auto object-contain max-h-[150px] mb-4"
-                        />
-                    ) : (
-                        <div className="flex justify-between items-start">
-                             <div className="text-left flex-shrink-0">
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">عرض سعر</h2>
-                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Quotation</p>
-                                <div className='flex items-center gap-2 mt-2'>
-                                   <p className="font-mono text-sm text-muted-foreground">{quotation.quotationNumber} : <span className='font-sans'>رقم العرض</span></p>
-                                    <Badge variant="outline" className={statusColors[quotation.status]}>{statusTranslations[quotation.status]}</Badge>
-                                </div>
-                            </div>
-                             <div className="flex items-center gap-4">
-                               <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                <div>
-                                   <h1 className="font-bold text-lg">{branding?.company_name}</h1>
-                                   <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
-                                   <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                                </div>
+                 {branding?.letterhead_image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                        src={branding.letterhead_image_url} 
+                        alt={`${branding.company_name || ''} Letterhead`}
+                        className="w-full h-auto object-contain mb-4"
+                    />
+                )}
+                <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                    <div className="flex justify-between items-start">
+                         <div className="text-left flex-shrink-0">
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">عرض سعر</h2>
+                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Quotation</p>
+                            <div className='flex items-center gap-2 mt-2'>
+                               <p className="font-mono text-sm text-muted-foreground">{quotation.quotationNumber} : <span className='font-sans'>رقم العرض</span></p>
+                                <Badge variant="outline" className={statusColors[quotation.status]}>{statusTranslations[quotation.status]}</Badge>
                             </div>
                         </div>
-                    )}
+                         <div className="flex items-center gap-4">
+                           <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                            <div>
+                               <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                               <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
+                               <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                            </div>
+                        </div>
+                    </div>
                 </header>
 
                 <main className="py-8 space-y-8">

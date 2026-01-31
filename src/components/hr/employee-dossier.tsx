@@ -81,6 +81,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
   };
   
   const currentStatus = employee.status || 'active';
+  const toDate = (val: any) => val ? new Date(val) : null;
 
 
   return (
@@ -89,19 +90,17 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
       dir="rtl"
     >
       <div className="max-w-4xl mx-auto space-y-4 bg-card p-6 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:p-2 print:bg-transparent">
+          {branding?.letterhead_image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img 
+                src={branding.letterhead_image_url} 
+                alt="Letterhead"
+                className="w-full h-auto object-contain mb-4"
+            />
+          )}
           {/* Header */}
           <header className="flex justify-between items-start pb-4 border-b">
-                 {branding?.letterhead_image_url && (
-                    <div className="absolute top-0 left-0 right-0 h-40">
-                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                            src={branding.letterhead_image_url} 
-                            alt="Letterhead"
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-                 )}
-                  <div className="relative z-10 w-full">
+                 <div className="w-full">
                       <div className='flex items-center gap-4'>
                           <Logo className="h-16 w-16 !p-3 print:hidden" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                           <div>
@@ -121,7 +120,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                   <InfoItem label="الاسم بالعربية" value={employee.fullName} />
                   <InfoItem label="الاسم بالإنجليزية" value={employee.nameEn} />
                   <InfoItem label="الرقم المدني" value={employee.civilId} />
-                  <InfoItem label="تاريخ الميلاد" value={formatDate(employee.dob)} />
+                  <InfoItem label="تاريخ الميلاد" value={formatDate(toDate(employee.dob))} />
                   <InfoItem label="النوع" value={employee.gender === 'male' ? 'ذكر' : 'أنثى'} />
                    <InfoItem 
                       label="حالة الموظف" 
@@ -136,14 +135,14 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
               </Section>
               
               <Section title="البيانات الوظيفية والعقد" icon={<Briefcase />}>
-                  <InfoItem label="القسم" value={reportData.department} />
-                  <InfoItem label="المسمى الوظيفي" value={reportData.jobTitle} />
-                  <InfoItem label="المنصب" value={reportData.position} />
+                  <InfoItem label="القسم" value={employee.department} />
+                  <InfoItem label="المسمى الوظيفي" value={employee.jobTitle} />
+                  <InfoItem label="المنصب" value={employee.position} />
                   <InfoItem label="تاريخ التعيين" value={formatDate(hireDate)} />
                   <InfoItem label="نوع العقد" value={employee.contractType} />
-                  <InfoItem label="تاريخ انتهاء العقد" value={formatDate(toDate(reportData.contractExpiry))} />
+                  <InfoItem label="تاريخ انتهاء العقد" value={formatDate(toDate(employee.contractExpiry))} />
                   <InfoItem label="الجنسية" value={employee.nationality} />
-                  {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(toDate(reportData.residencyExpiry))} />}
+                  {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(toDate(employee.residencyExpiry))} />}
                      {employee.status === 'terminated' && (
                       <>
                        <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(toDate(employee.terminationDate))} />
@@ -153,10 +152,10 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
               </Section>
 
               <Section title="البيانات المالية" icon={<Wallet />}>
-                   <InfoItem label="الراتب الأساسي" value={formatCurrency(reportData.basicSalary || 0)} />
-                   <InfoItem label="بدل السكن" value={formatCurrency(reportData.housingAllowance || 0)} />
-                   <InfoItem label="بدل النقل" value={formatCurrency(reportData.transportAllowance || 0)} />
-                   <InfoItem label="الإجمالي" value={formatCurrency((reportData.basicSalary || 0) + (reportData.housingAllowance || 0) + (reportData.transportAllowance || 0))} className="font-bold border-t pt-2" />
+                   <InfoItem label="الراتب الأساسي" value={formatCurrency(employee.basicSalary || 0)} />
+                   <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
+                   <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
+                   <InfoItem label="الإجمالي" value={formatCurrency((employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0))} className="font-bold border-t pt-2" />
                    <Separator className='md:col-span-2 my-1' />
                    <InfoItem label="طريقة دفع الراتب" value={employee.salaryPaymentType} />
                    {employee.salaryPaymentType === 'transfer' && (
