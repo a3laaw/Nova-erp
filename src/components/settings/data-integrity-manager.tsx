@@ -434,11 +434,13 @@ export function DataIntegrityManager() {
         let revertedCount = 0;
 
         try {
-            const transactionsSnapshot = await getDocs(query(collectionGroup(firestore, 'transactions'), where('contract', '!=', null)));
-
+            const transactionsSnapshot = await getDocs(query(collectionGroup(firestore, 'transactions')));
+            
             const batch = writeBatch(firestore);
 
             for (const txDoc of transactionsSnapshot.docs) {
+                if (!txDoc.data().contract) continue;
+
                 const transaction = { id: txDoc.id, ...txDoc.data() } as ClientTransaction;
                 const clientPath = txDoc.ref.path.split('/');
                 const clientId = clientPath[1];
