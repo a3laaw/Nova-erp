@@ -12,6 +12,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
   Table,
   TableBody,
   TableCell,
@@ -388,13 +394,9 @@ export default function ClientProfilePage() {
     }
   };
 
-  // --- Render Logic ---
-
   if (clientLoading) {
     return (
         <div className="space-y-6" dir="rtl">
-            <div className='flex justify-end items-center no-print'>
-            </div>
              <Card>
                 <CardHeader className='flex-row items-center gap-6'>
                     <Skeleton className="h-16 w-16 rounded-full" />
@@ -403,11 +405,8 @@ export default function ClientProfilePage() {
                         <Skeleton className="h-5 w-32" />
                     </div>
                 </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-6">
-                    <Skeleton className="h-32 w-full" />
-                    <Skeleton className="h-32 w-full" />
-                </CardContent>
             </Card>
+             <Skeleton className="h-64 w-full" />
         </div>
     );
   }
@@ -479,10 +478,31 @@ export default function ClientProfilePage() {
                 </div>
             </CardHeader>
         </Card>
+        
+        <Tabs defaultValue="transactions" dir="rtl">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
+                <TabsTrigger value="transactions">المعاملات ({transactions.length})</TabsTrigger>
+                <TabsTrigger value="quotations">عروض الأسعار</TabsTrigger>
+                <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
+            </TabsList>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-            <div className="xl:col-span-2 space-y-6">
+            <TabsContent value="profile" className="mt-6">
                 <Card>
+                    <CardHeader>
+                        <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
+                    </CardHeader>
+                    <CardContent className='space-y-4'>
+                        <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
+                        <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
+                        <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
+                        <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="transactions" className="mt-6">
+                 <Card>
                     <CardHeader className="flex-row items-center justify-between">
                         <div>
                             <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
@@ -578,24 +598,16 @@ export default function ClientProfilePage() {
                         )}
                     </CardContent>
                 </Card>
-                <ClientQuotationsList clientId={id} clientName={client.nameAr} />
-            </div>
+            </TabsContent>
 
-            <div className="xl:col-span-1 space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
-                    </CardHeader>
-                    <CardContent className='space-y-4'>
-                        <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
-                        <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
-                        <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                        <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
-                    </CardContent>
-                </Card>
-                <ClientHistoryTimeline clientId={id} />
-            </div>
-        </div>
+            <TabsContent value="quotations" className="mt-6">
+                <ClientQuotationsList clientId={id} clientName={client.nameAr} />
+            </TabsContent>
+
+            <TabsContent value="history" className="mt-6">
+                 <ClientHistoryTimeline clientId={id} />
+            </TabsContent>
+        </Tabs>
     </div>
      <AlertDialog open={!!transactionToCancel} onOpenChange={(open) => !open && setTransactionToCancel(null)}>
         <AlertDialogContent dir="rtl">
@@ -632,5 +644,3 @@ export default function ClientProfilePage() {
     </>
   );
 }
-
-    
