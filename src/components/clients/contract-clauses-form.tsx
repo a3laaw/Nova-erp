@@ -25,7 +25,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-re
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, writeBatch, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account, ContractFinancialMilestone } from '@/lib/types';
+import type { Client, ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account, ContractFinancialMilestone } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -35,6 +35,7 @@ import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { Separator } from '../ui/separator';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -102,6 +103,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
+  const [assignedEngineerId, setAssignedEngineerId] = useState('');
   
   const [financials, setFinancials] = useState<ContractTemplate['financials']>({
     type: 'fixed',
@@ -126,6 +128,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setClauses([]);
       setTerms([]);
       setOpenClauses([]);
+      setAssignedEngineerId('');
       setIsSaving(false);
       setStep('loading');
       setAvailableTemplates([]);
@@ -221,26 +224,36 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     if (loadingRefData || !isOpen || !transaction) return;
 
     if (transaction.contract) {
-      populateFormFromExistingContract(transaction.contract);
-      setStep('edit');
-    } else {
-      const matchingTemplates = referenceData.templates.filter(t => t.transactionTypes?.includes(transaction.transactionType || ''));
-      
-      if (matchingTemplates.length > 1) {
-        setAvailableTemplates(matchingTemplates);
-        setStep('select');
-      } else {
-        const templateToUse = matchingTemplates.length === 1 ? matchingTemplates[0] : null;
-        populateFormFromTemplate(templateToUse);
+        populateFormFromExistingContract(transaction.contract);
+        setAssignedEngineerId(transaction.assignedEngineerId || '');
         setStep('edit');
-      }
+    } else {
+        const fetchClientData = async () => {
+            if (firestore && clientId) {
+                const clientDoc = await getDoc(doc(firestore, 'clients', clientId));
+                if (clientDoc.exists()) {
+                    const clientData = clientDoc.data() as Client;
+                    setAssignedEngineerId(clientData.assignedEngineer || '');
+                }
+            }
+        };
+        fetchClientData();
+
+        const matchingTemplates = referenceData.templates.filter(t => t.transactionTypes?.includes(transaction.transactionType || ''));
+        
+        if (matchingTemplates.length > 1) {
+            setAvailableTemplates(matchingTemplates);
+            setStep('select');
+        } else {
+            const templateToUse = matchingTemplates.length === 1 ? matchingTemplates[0] : null;
+            populateFormFromTemplate(templateToUse);
+            setStep('edit');
+        }
     }
-  }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract]);
+  }, [loadingRefData, isOpen, transaction, referenceData.templates, populateFormFromTemplate, populateFormFromExistingContract, firestore, clientId]);
   
   // Effect 3: Derive clauses from financials state
   useEffect(() => {
-    // Only derive if we are NOT editing an existing contract.
-    // If we are editing, clauses are populated from the contract data directly.
     if(transaction?.contract) return;
     
     if (financials.type === 'fixed') {
@@ -393,25 +406,62 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             } else {
                 clientAccountId = clientAccountSnap.docs[0].id;
             }
+            
+            const isNewTransaction = !transaction.id || !transaction.createdAt;
 
+            if (isNewTransaction) { // --- CREATE NEW TRANSACTION ---
+                const currentCounter = clientData.transactionCounter || 0;
+                const newCounter = currentCounter + 1;
+                const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
+                transaction_firestore.update(clientRef, { transactionCounter: newCounter });
+
+                const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
+                finalTransactionId = newTransactionRef.id;
+
+                const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
+                
+                const engineer = referenceData.employees.find(e => e.id === assignedEngineerId);
+                const department = referenceData.departments.find(d => d.name === engineer?.department);
+                
+                const transactionPayload = {
+                    ...transaction,
+                    transactionNumber,
+                    assignedEngineerId: assignedEngineerId || null,
+                    departmentId: transaction.departmentId || department?.id,
+                    status: 'in-progress',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    contract: contractData,
+                };
+                
+                transaction_firestore.set(newTransactionRef, cleanFirestoreData(transactionPayload));
+            
+            } else { // --- UPDATE EXISTING TRANSACTION ---
+                finalTransactionId = transaction.id!;
+                const transactionRef = doc(firestore, 'clients', clientId, 'transactions', finalTransactionId);
+                const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
+                const transactionPayload: any = {
+                    contract: contractData,
+                    status: 'in-progress',
+                    updatedAt: serverTimestamp(),
+                };
+                if (assignedEngineerId !== transaction.assignedEngineerId) {
+                    transactionPayload.assignedEngineerId = assignedEngineerId;
+                }
+                transaction_firestore.update(transactionRef, cleanFirestoreData(transactionPayload));
+            }
+
+
+            // --- Shared Logic: Journal Entry, Client Status, Notifications etc. ---
+            
             const currentYear = new Date().getFullYear();
             const nextJournalEntryNumber = ((journalEntryCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-
-            const contractData = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
             
-            const transactionRef = transaction.id ? doc(firestore, 'clients', clientId, 'transactions', transaction.id) : doc(collection(firestore, `clients/${clientId}/transactions`));
-            if (!finalTransactionId) finalTransactionId = transactionRef.id;
-            
-            const transactionPayload: any = { ...transaction, contract: contractData, status: 'in-progress', updatedAt: serverTimestamp() };
-            if (!transaction.id) transactionPayload.createdAt = serverTimestamp();
-            
-            transaction_firestore.set(transactionRef, cleanFirestoreData(transactionPayload), { merge: true });
-            
-            const engineer = referenceData.employees.find(e => e.id === transaction.assignedEngineerId);
+            const engineer = referenceData.employees.find(e => e.id === assignedEngineerId);
             const department = referenceData.departments.find(d => d.name === engineer?.department);
             const autoTags = {
                 clientId, transactionId: finalTransactionId, auto_profit_center: finalTransactionId,
-                auto_resource_id: transaction.assignedEngineerId || null,
+                auto_resource_id: assignedEngineerId || null,
                 ...(department && { auto_dept_id: department.id }),
             };
             
@@ -514,9 +564,29 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 {chosenTemplate ? `تعديل الدفعات المالية والشروط للعقد "${chosenTemplate.title}".` : 'لا يوجد نموذج عقد لهذه المعاملة، قم بالإنشاء اليدوي.'}
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="h-[calc(90vh-150px)]">
-                <div className="p-4 space-y-8">
-                    <section className="space-y-4 p-4 border rounded-lg">
+            <ScrollArea className="h-[calc(90vh-250px)] px-6">
+                <div className="py-4 space-y-8">
+                     <section className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label>العميل</Label>
+                                <Input value={clientName} disabled readOnly />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="assigned-engineer">المهندس المسؤول عن المعاملة</Label>
+                                <InlineSearchList
+                                    value={assignedEngineerId}
+                                    onSelect={setAssignedEngineerId}
+                                    options={referenceData.employees.map(e => ({ value: e.id!, label: e.fullName }))}
+                                    placeholder="اختر مهندسًا..."
+                                    disabled={loadingRefData}
+                                />
+                            </div>
+                        </div>
+                    </section>
+                    <Separator />
+
+                    <section className="space-y-4">
                         <h3 className="font-semibold">نطاق العمل (Scope of Work)</h3>
                          <div className="flex justify-between items-center">
                             <h3 className="font-semibold text-transparent">.</h3>
@@ -542,7 +612,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         ))}
                     </section>
 
-                    <section className="space-y-4 p-4 border rounded-lg">
+                    <section className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">الشروط والأحكام</h3>
                             <Button size="sm" variant="outline" type="button" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
@@ -560,7 +630,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                          ))}
                     </section>
 
-                    <section className="space-y-4 p-4 border rounded-lg">
+                    <section className="space-y-4">
                         <h3 className="font-semibold">البنود المالية</h3>
                          <div className="grid md:grid-cols-2 gap-4">
                             <div className="grid gap-2">
@@ -616,7 +686,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                          )}
                     </section>
                     
-                     <section className="space-y-4 p-4 border rounded-lg">
+                     <section className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
                             <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2"/> إضافة بند</Button>
