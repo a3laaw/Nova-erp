@@ -110,12 +110,14 @@ export function ArchitecturalAppointmentsView() {
             
             const apptSnap = await getDocs(query(
                 collection(firestore, 'appointments'),
-                where('type', '==', 'architectural'),
                 where('appointmentDate', '>=', dayStart),
                 where('appointmentDate', '<=', dayEnd)
             ));
             
-            const appts = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            const appts = apptSnap.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                .filter(appt => appt.type === 'architectural');
+
 
             setRawAppointments(appts);
         } catch (error) {
@@ -764,4 +766,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-
