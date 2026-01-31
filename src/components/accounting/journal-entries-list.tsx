@@ -15,7 +15,7 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -231,7 +231,7 @@ export function JournalEntriesList() {
                     </TableRow>
                 ) : (
                     filteredEntries.map((entry) => (
-                        <TableRow key={entry.id}>
+                        <TableRow key={entry.id} className={cn(entry.entryNumber?.startsWith('CRV-JE-') && 'bg-blue-50 dark:bg-blue-900/20')}>
                         <TableCell className="font-mono">
                             <Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline text-primary">
                                 {entry.entryNumber}
