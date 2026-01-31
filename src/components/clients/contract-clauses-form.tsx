@@ -451,7 +451,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [ clientSnap, journalEntryCounterDoc, coaClientCounterDoc ] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterDoc),
+                transaction_firestore.get(coaClientCounterRef),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -805,3 +805,5 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   )
 }
+
+    
