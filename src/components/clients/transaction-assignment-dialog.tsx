@@ -72,7 +72,7 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
                 
                 const [deptsSnap, engsSnap, assignmentsSnap, clientTxnsSnap, clientReceiptsSnap, transTypesSnap] = await Promise.all([
                     getDocs(deptsQuery),
-                    getDocs(engineersQuery),
+                    getDocs(engsSnap),
                     getDocs(existingAssignmentsQuery),
                     getDocs(clientTransactionsQuery),
                     getDocs(clientReceiptsQuery),
@@ -163,10 +163,17 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
         setIsSaving(true);
         const batch = writeBatch(firestore);
         const assignmentsRef = collection(firestore, 'transaction_assignments');
+
+        const timelineCollectionRef = collection(firestore, `clients/${transaction.clientId}/transactions/${transaction.id}/timelineEvents`);
+        const historyCollectionRef = collection(firestore, `clients/${transaction.clientId}/history`);
     
         const notificationsToSend: any[] = [];
+        const originalAssignments = assignments; // Capture original state to compare changes
     
         for (const assignment of assignmentsToProcess) {
+          const engineer = engineers.find(e => e.id === assignment.engineerId);
+          let logContent = '';
+          
           if (assignment.selected) {
             if (!assignment.engineerId) {
               toast({ variant: 'destructive', title: 'حقل ناقص', description: `الرجاء اختيار موظف لقسم: ${assignment.departmentName}` });
@@ -185,14 +192,17 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
               createdAt: serverTimestamp(),
             };
     
-            const engineer = engineers.find(e => e.id === assignment.engineerId);
-    
             if (assignment.existingAssignmentId) {
-              const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
-              batch.update(docRef, { engineerId: data.engineerId, notes: data.notes });
+              const originalAssignment = originalAssignments.find(a => a.existingAssignmentId === assignment.existingAssignmentId);
+              if (originalAssignment?.engineerId !== assignment.engineerId || originalAssignment?.notes !== assignment.notes) {
+                const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
+                batch.update(docRef, { engineerId: data.engineerId, notes: data.notes });
+                logContent = `قام ${currentUser.fullName} بتحديث إسناد قسم "${assignment.departmentName}" إلى الموظف "${engineer?.fullName}".`;
+              }
             } else {
               const docRef = doc(assignmentsRef);
               batch.set(docRef, data);
+              logContent = `قام ${currentUser.fullName} بإسناد المعاملة إلى قسم "${assignment.departmentName}" للموظف "${engineer?.fullName}".`;
               if (engineer) {
                 notificationsToSend.push({
                   engineerId: engineer.id,
@@ -204,6 +214,20 @@ export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clie
           } else if (assignment.existingAssignmentId) {
             const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
             batch.delete(docRef);
+            logContent = `قام ${currentUser.fullName} بإلغاء إسناد المعاملة من قسم "${assignment.departmentName}".`;
+          }
+
+          if (logContent) {
+              const logData = {
+                  type: 'log' as const,
+                  content: logContent,
+                  userId: currentUser.id,
+                  userName: currentUser.fullName,
+                  userAvatar: currentUser.avatarUrl,
+                  createdAt: serverTimestamp(),
+              };
+              batch.set(doc(timelineCollectionRef), logData);
+              batch.set(doc(historyCollectionRef), logData);
           }
         }
     

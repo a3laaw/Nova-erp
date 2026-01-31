@@ -15,11 +15,11 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause, Users } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause, Users, Separator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
-import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole, Client, Department } from '@/lib/types';
+import type { Employee, ClientTransaction, TransactionStage, WorkStage, UserRole, Client, Department, TransactionAssignment } from '@/lib/types';
 import {
   Tabs,
   TabsContent,
@@ -135,8 +135,6 @@ export default function TransactionDetailPage() {
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [newStatus, setNewStatus] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [stages, setStages] = useState<TransactionStage[]>([]);
@@ -157,6 +155,13 @@ export default function TransactionDetailPage() {
   const { data: transaction, loading: transactionLoading, error: transactionError } = useDocument<ClientTransaction>(firestore, transactionRef ? transactionRef.path : null);
   const { data: client, loading: clientLoading, error: clientError } = useDocument<Client>(firestore, clientRef ? clientRef.path : null);
   
+  const assignmentsQuery = useMemo(() => {
+    if (!firestore || !transactionId) return null;
+    return [where('transactionId', '==', transactionId)];
+  }, [firestore, transactionId]);
+
+  const { data: assignments, loading: assignmentsLoading } = useSubscription<TransactionAssignment>(firestore, 'transaction_assignments', assignmentsQuery || []);
+
   useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
@@ -225,8 +230,6 @@ export default function TransactionDetailPage() {
     
     mergeAndSetStages();
     
-    setNewStatus(transaction.status);
-    
   }, [transaction, firestore, toast]);
 
     
@@ -237,48 +240,6 @@ export default function TransactionDetailPage() {
       if (isNaN(date.getTime())) return '-';
       return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
   }
-
-  const handleUpdateTransaction = async () => {
-    if (!firestore || !currentUser || !client || !transaction) return;
-
-    const statusChanged = newStatus !== transaction.status;
-
-    if (!statusChanged) {
-        toast({ title: 'لا توجد تغييرات', description: 'لم يتم تغيير حالة المعاملة.' });
-        return;
-    }
-    
-    setIsSaving(true);
-    
-    const batch = writeBatch(firestore);
-    const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-    const timelineRef = collection(transactionRefDoc, 'timelineEvents');
-    
-    const updateData: any = { updatedAt: serverTimestamp(), status: newStatus };
-
-    const logContent = `قام بتغيير حالة المعاملة من "${transactionStatusTranslations[transaction.status]}" إلى "${transactionStatusTranslations[newStatus]}".`;
-    batch.set(doc(timelineRef), {
-        type: 'log',
-        content: logContent,
-        userId: currentUser.id,
-        userName: currentUser.fullName,
-        userAvatar: currentUser.avatarUrl,
-        createdAt: serverTimestamp(),
-    });
-
-    const safeUpdateData = cleanFirestoreData(updateData);
-    batch.update(transactionRefDoc, safeUpdateData);
-    
-    try {
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تم تحديث حالة المعاملة بنجاح.' });
-    } catch (error) {
-        console.error(error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المعاملة.' });
-    } finally {
-        setIsSaving(false);
-    }
-};
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser || !client) return;
@@ -481,7 +442,7 @@ export default function TransactionDetailPage() {
 
 
   // --- Render Logic ---
-  const isLoading = transactionLoading || clientLoading;
+  const isLoading = transactionLoading || clientLoading || assignmentsLoading;
 
   if (isLoading) {
     return (
@@ -587,31 +548,33 @@ export default function TransactionDetailPage() {
             <CardHeader>
                 <CardTitle>إدارة المعاملة</CardTitle>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-6 items-end">
-                <div className="grid gap-2">
-                    <Label htmlFor="status">تغيير الحالة</Label>
-                    <Select dir="rtl" value={newStatus} onValueChange={setNewStatus}>
-                        <SelectTrigger id="status"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {Object.keys(transactionStatusTranslations).map(key => (
-                                <SelectItem key={key} value={key}>{transactionStatusTranslations[key]}</SelectItem>
+            <CardContent className="space-y-4">
+                <Button onClick={() => setIsAssignmentDialogOpen(true)} className='w-full'>
+                    <Users className="ml-2 h-4 w-4" />
+                    تحويل / إسناد للأقسام
+                </Button>
+                <Separator />
+                <div>
+                    <h4 className="font-semibold mb-2">الإسنادات الحالية:</h4>
+                    {assignmentsLoading ? (
+                        <div className="space-y-2">
+                            <Skeleton className="h-6 w-full" />
+                            <Skeleton className="h-6 w-2/3" />
+                        </div>
+                    ) : assignments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center p-4">لم يتم إسناد هذه المعاملة لأي قسم بعد.</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {assignments.map(a => (
+                                <li key={a.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
+                                    <span className="font-semibold">{a.departmentName}</span>
+                                    <span className="text-muted-foreground">{a.engineerId ? (employees.find(e => e.id === a.engineerId)?.fullName || '...') : 'غير مسند'}</span>
+                                </li>
                             ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                 <div className="grid gap-2">
-                    <Button onClick={() => setIsAssignmentDialogOpen(true)} className='w-full'>
-                        <Users className="ml-2 h-4 w-4" />
-                        تحويل / إسناد للأقسام
-                    </Button>
+                        </ul>
+                    )}
                 </div>
             </CardContent>
-            <CardFooter className="flex justify-end">
-                <Button onClick={handleUpdateTransaction} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                    حفظ تغيير الحالة
-                </Button>
-            </CardFooter>
         </Card>
         
          <Tabs defaultValue="stages" dir="rtl">
@@ -716,7 +679,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
-    
-
-    
