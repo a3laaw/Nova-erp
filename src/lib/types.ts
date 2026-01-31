@@ -363,7 +363,6 @@ export interface TransactionStage {
   notes?: string;
   order?: number;
   expectedEndDate?: any;
-  maxOccurrences?: number;
   completedCount?: number;
 }
       
@@ -639,5 +638,3 @@ export interface PurchaseOrder {
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
-
-    

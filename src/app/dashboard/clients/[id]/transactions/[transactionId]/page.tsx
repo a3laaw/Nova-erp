@@ -212,11 +212,14 @@ export default function TransactionDetailPage() {
                     order: (template as any).order,
                     allowedRoles: template.allowedRoles,
                     expectedDurationDays: template.expectedDurationDays,
+                    trackingType: template.trackingType,
+                    maxOccurrences: template.maxOccurrences,
                     status: progress?.status || 'pending',
                     startDate: progress?.startDate || null,
                     endDate: progress?.endDate || null,
                     expectedEndDate: progress?.expectedEndDate || null,
                     notes: progress?.notes || '',
+                    completedCount: progress?.completedCount || 0,
                 };
             });
 
@@ -256,43 +259,46 @@ export default function TransactionDetailPage() {
     }
     
     if (newStatus === 'in-progress') {
-        const contractSigningStage = stages.find(s => s.name === 'توقيع العقد');
-        const sendSoilTestStage = stages.find(s => s.name === 'ارسال فحص التربه');
+        const contractStage = stages.find(s => s.name === 'توقيع العقد');
+        
+        let canStart = false;
+        let errorMessage = "الرجاء إكمال المرحلة السابقة أولاً.";
 
-        let prerequisiteMet = true;
-        let errorMessage = 'الرجاء إكمال المرحلة السابقة أولاً.';
-
-        if (templateStageInfo?.name === 'ارسال فحص التربه') {
-            if (!contractSigningStage || contractSigningStage.status !== 'completed') {
-                prerequisiteMet = false;
+        if (['توقيع العقد', 'تعديلات ومناقشات', 'الاستفسارات والتواصل المبدئي'].includes(templateStageInfo.name)) {
+            canStart = true;
+        } else if (['ارسال فحص التربه', 'الانتهاء من السرداب'].includes(templateStageInfo.name)) {
+            if (contractStage?.status === 'completed') {
+                canStart = true;
+            } else {
                 errorMessage = 'يجب إكمال مرحلة "توقيع العقد" أولاً.';
             }
-        } 
-        else if (templateStageInfo?.name === 'استلام فحص التربه') {
-            if (!sendSoilTestStage || sendSoilTestStage.status !== 'completed') {
-                prerequisiteMet = false;
-                errorMessage = 'يجب إكمال مرحلة "ارسال فحص التربه" أولاً.';
-            }
-        }
-        else if (templateStageInfo?.name === 'توقيع العقد') {
-             prerequisiteMet = true;
-        }
-        else if (currentIndexInUI > 0) {
-            const previousStageInUI = stages[currentIndexInUI - 1];
-            if (previousStageInUI.status !== 'completed') {
-                prerequisiteMet = false;
+        } else if (templateStageInfo.name === 'استلام فحص التربه') {
+            errorMessage = 'هذه المرحلة تبدأ تلقائيًا.';
+        } else { // Default sequential check
+            if (currentIndexInUI > 0) {
+                let prevIndex = currentIndexInUI - 1;
+                let actualPreviousStage = stages[prevIndex];
+                // If the immediate previous stage is 'Amendments', skip it and check the one before that.
+                if (actualPreviousStage?.name === 'تعديلات ومناقشات' && prevIndex > 0) {
+                    actualPreviousStage = stages[prevIndex - 1];
+                }
+                
+                if (actualPreviousStage?.status === 'completed') {
+                    canStart = true;
+                } else {
+                    errorMessage = `الرجاء إكمال المرحلة السابقة: "${actualPreviousStage?.name || 'غير معروفة'}".`;
+                }
+            } else {
+                canStart = true; // First stage in list (that is not special)
             }
         }
         
-        if (!prerequisiteMet) {
-            toast({
-                variant: 'destructive',
-                title: 'لا يمكن بدء هذه المرحلة',
-                description: errorMessage,
-            });
+        if (!canStart) {
+            toast({ variant: 'destructive', title: 'لا يمكن بدء المرحلة', description: errorMessage });
             return;
         }
     }
+
 
     let updatedProgress: Partial<TransactionStage>;
 
@@ -303,6 +309,7 @@ export default function TransactionDetailPage() {
             stageId: stageId,
             name: templateStageInfo.name,
             allowedRoles: templateStageInfo.allowedRoles,
+            trackingType: templateStageInfo.trackingType,
         };
     }
     
@@ -315,9 +322,9 @@ export default function TransactionDetailPage() {
     if (newStatus === 'in-progress') {
         if (oldStatus === 'pending') {
             updatedProgress.startDate = now;
-        }
-        if (templateStageInfo.expectedDurationDays && templateStageInfo.expectedDurationDays > 0) {
-            updatedProgress.expectedEndDate = addDays(now, templateStageInfo.expectedDurationDays);
+             if (templateStageInfo.trackingType === 'duration' && templateStageInfo.expectedDurationDays) {
+                updatedProgress.expectedEndDate = addDays(now, templateStageInfo.expectedDurationDays);
+            }
         }
     } else if (newStatus === 'completed') {
         if (!updatedProgress.startDate) updatedProgress.startDate = now;
@@ -350,16 +357,21 @@ export default function TransactionDetailPage() {
         if (newStatus === 'completed' && completedStage) {
             if (completedStage.name === 'ارسال فحص التربه') {
                 nextStageInTemplate = stages.find(s => s.name === 'استلام فحص التربه') as WorkStage | undefined;
-            } else if (completedStage.name !== 'توقيع العقد' && completedStage.name !== 'استلام فحص التربه') {
+            } else {
                 const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
                 if (completedStageOrderIndex > -1 && (completedStageOrderIndex + 1) < stages.length) {
-                    const potentialNext = stages[completedStageOrderIndex + 1];
-                    if (potentialNext && potentialNext.name !== 'ارسال فحص التربه' && potentialNext.name !== 'توقيع العقد') {
-                         nextStageInTemplate = potentialNext as WorkStage;
+                    let potentialNext = stages[completedStageOrderIndex + 1];
+                    // if next stage is 'amendments', skip to the one after
+                    if (potentialNext?.name === 'تعديلات ومناقشات' && (completedStageOrderIndex + 2) < stages.length) {
+                        potentialNext = stages[completedStageOrderIndex + 2];
+                    }
+                    if (potentialNext && !['ارسال فحص التربه', 'توقيع العقد'].includes(potentialNext.name)) {
+                        nextStageInTemplate = potentialNext as WorkStage;
                     }
                 }
             }
         }
+
 
         if (nextStageInTemplate) {
             const nextStageId = nextStageInTemplate.id!;
@@ -367,18 +379,30 @@ export default function TransactionDetailPage() {
 
             if (!isDiscussionStage) {
                 const nextStageIndexInProg = newProgressForFirestore.findIndex(s => s.stageId === nextStageId);
+                let stageToStart: Partial<TransactionStage>;
                 if (nextStageIndexInProg !== -1) {
-                    const stageToStart = { ...newProgressForFirestore[nextStageIndexInProg] };
-                    if (stageToStart.status === 'pending') {
-                        stageToStart.status = 'in-progress';
-                        stageToStart.startDate = now;
-                        newProgressForFirestore[nextStageIndexInProg] = stageToStart;
-                        shouldStartNextStage = true;
-                    }
+                    stageToStart = { ...newProgressForFirestore[nextStageIndexInProg] };
                 } else {
-                    newProgressForFirestore.push({
-                        stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now as any, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
-                    });
+                    stageToStart = {
+                        stageId: nextStageId,
+                        name: nextStageInTemplate.name,
+                        allowedRoles: nextStageInTemplate.allowedRoles,
+                        trackingType: nextStageInTemplate.trackingType,
+                    };
+                }
+
+                if (stageToStart.status === 'pending') {
+                    stageToStart.status = 'in-progress';
+                    stageToStart.startDate = now as any;
+                    if (nextStageInTemplate.trackingType === 'duration' && nextStageInTemplate.expectedDurationDays) {
+                        stageToStart.expectedEndDate = addDays(now, nextStageInTemplate.expectedDurationDays);
+                    }
+
+                    if(nextStageIndexInProg !== -1) {
+                        newProgressForFirestore[nextStageIndexInProg] = stageToStart as TransactionStage;
+                    } else {
+                        newProgressForFirestore.push(stageToStart as TransactionStage);
+                    }
                     shouldStartNextStage = true;
                 }
             }
@@ -597,7 +621,7 @@ export default function TransactionDetailPage() {
                             <div className="space-y-4">
                                 {stages.map((stage, index) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
-                                    const isContractStage = stage.name === 'توقيع العقد';
+                                    
                                     return (
                                         <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -612,18 +636,18 @@ export default function TransactionDetailPage() {
                                             </div>
                                             <div className="flex gap-2">
                                                 {stage.status === 'pending' && (
-                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || isContractStage}>
+                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract}>
                                                         <Play className="ml-2 h-4 w-4" />
                                                         بدء
                                                     </Button>
                                                 )}
                                                 {stage.status === 'in-progress' && (
                                                     <>
-                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract || isContractStage}>
+                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
                                                             <Check className="ml-2 h-4 w-4" />
                                                             إكمال
                                                         </Button>
-                                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'awaiting-review')} disabled={!canInteract || isContractStage}>
+                                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'awaiting-review')} disabled={!canInteract}>
                                                             <Pause className="ml-2 h-4 w-4" />
                                                             إيقاف للمراجعة
                                                         </Button>
