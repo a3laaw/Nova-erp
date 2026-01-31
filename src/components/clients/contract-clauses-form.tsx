@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -343,7 +342,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     let finalTransactionId = transaction.id;
 
     try {
-        // We now fetch data outside the transaction to comply with Firestore rules.
         const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
         const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
         const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
@@ -415,11 +413,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const transactionPayload: any = { ...transaction, contract: contractData, stages: updatedStages, status: 'in-progress', updatedAt: serverTimestamp() };
             if (!transaction.id) transactionPayload.createdAt = serverTimestamp();
             
-            if (transaction.id) {
-                transaction_firestore.update(transactionRef, cleanFirestoreData(transactionPayload));
-            } else {
-                transaction_firestore.set(transactionRef, cleanFirestoreData(transactionPayload));
-            }
+            // Use set with merge to safely update or create the document
+            transaction_firestore.set(transactionRef, cleanFirestoreData(transactionPayload), { merge: true });
             
             const engineer = referenceData.employees.find(e => e.id === transaction.assignedEngineerId);
             const department = referenceData.departments.find(d => d.name === engineer?.department);
