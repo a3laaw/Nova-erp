@@ -1,5 +1,5 @@
 
-'use client';
+      'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -57,6 +57,8 @@ import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
+import { toFirestoreDate } from '@/services/date-converter';
+
 
 const clientStatusTranslations: Record<string, string> = {
   new: 'جديد',
@@ -102,14 +104,20 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
   
   const sortedQuotations = useMemo(() => {
     if (!quotations) return [];
-    return [...quotations].sort((a,b) => (b.date?.toMillis() || 0) - (a.date?.toMillis() || 0));
+    return [...quotations].sort((a,b) => {
+        const dateB = toFirestoreDate(b.date);
+        const dateA = toFirestoreDate(a.date);
+        return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+    });
   }, [quotations]);
 
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return '-';
+    const date = toFirestoreDate(dateValue);
+    if (!date) return '-';
     try {
-      return format(dateValue.toDate(), 'dd/MM/yyyy');
+      return format(date, 'dd/MM/yyyy');
     } catch (e) {
       return '-';
     }
@@ -390,8 +398,8 @@ export default function ClientProfilePage() {
 
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
-      const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
-      if (isNaN(date.getTime())) return '-';
+      const date = toFirestoreDate(dateValue);
+      if (!date) return '-';
       try {
         return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
       } catch (e) {
@@ -467,7 +475,7 @@ export default function ClientProfilePage() {
                 <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
                 <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
                 <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                <InfoRow icon={<FileText />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+                <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
             </CardContent>
         </Card>
 
