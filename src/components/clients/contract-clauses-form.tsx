@@ -367,7 +367,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, journalEntryCounterDoc, coaClientCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
-                transaction_firestore.get(coaClientCounterDoc)
+                transaction_firestore.get(coaClientCounterRef)
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -595,9 +595,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     <Separator />
 
                     <section className="space-y-4">
-                        <h3 className="font-semibold">نطاق العمل (Scope of Work)</h3>
-                         <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-transparent">.</h3>
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold">نطاق العمل (Scope of Work)</h3>
                             <Button size="sm" variant="outline" type="button" onClick={addScopeItem}><PlusCircle className="ml-2"/> إضافة بند</Button>
                         </div>
                         {scopeOfWork.map((item, index) => (
