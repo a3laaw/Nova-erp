@@ -58,20 +58,6 @@ import { useToast } from '@/hooks/use-toast';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
 
-
-function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: React.ReactNode | string | number | null | undefined }) {
-    if (!value) return null;
-    return (
-        <div className="flex items-start gap-4 text-sm">
-            <div className="flex-shrink-0 text-muted-foreground pt-1">{icon}</div>
-            <div className="flex-1">
-                <p className="font-semibold">{label}</p>
-                <div className="text-muted-foreground break-words">{value}</div>
-            </div>
-        </div>
-    );
-}
-
 const clientStatusTranslations: Record<string, string> = {
   new: 'جديد',
   contracted: 'تم التعاقد',
@@ -356,7 +342,7 @@ export default function ClientProfilePage() {
         setTransactionToDelete(null);
     }
   };
-
+  
   const handleToggleFreeze = async (tx: ClientTransaction) => {
     if (!firestore || !currentUser) return;
     setIsProcessing(true);
@@ -394,18 +380,31 @@ export default function ClientProfilePage() {
     }
   };
 
+  const formatDate = (dateValue: any): string => {
+      if (!dateValue) return '-';
+      const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+      if (isNaN(date.getTime())) return '-';
+      try {
+        return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+      } catch (e) {
+        return '-';
+      }
+  }
+  
+  const clientAddress = client?.address ? [
+      client.address.governorate, 
+      client.address.area, 
+      `قطعة ${client.address.block}`, 
+      `شارع ${client.address.street}`, 
+      `منزل ${client.address.houseNumber}`
+    ].filter(Boolean).join('، ') : 'غير محدد';
+  
+  const assignedEngineerName = client?.assignedEngineer ? employeesMap.get(client.assignedEngineer) : null;
+
+
   if (clientLoading) {
     return (
         <div className="space-y-6" dir="rtl">
-             <Card>
-                <CardHeader className='flex-row items-center gap-6'>
-                    <Skeleton className="h-16 w-16 rounded-full" />
-                    <div className='space-y-1'>
-                        <Skeleton className="h-8 w-48" />
-                        <Skeleton className="h-5 w-32" />
-                    </div>
-                </CardHeader>
-            </Card>
              <Skeleton className="h-64 w-full" />
         </div>
     );
@@ -419,28 +418,6 @@ export default function ClientProfilePage() {
     );
   }
   
-  const formatDate = (dateValue: any): string => {
-      if (!dateValue) return '-';
-      const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
-      if (isNaN(date.getTime())) return '-';
-      try {
-        return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-      } catch (e) {
-        return '-';
-      }
-  }
-
-  const clientAddress = client.address ? [
-      client.address.governorate, 
-      client.address.area, 
-      `قطعة ${client.address.block}`, 
-      `شارع ${client.address.street}`, 
-      `منزل ${client.address.houseNumber}`
-    ].filter(Boolean).join('، ') : 'غير محدد';
-  
-  const assignedEngineerName = client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : null;
-
-
   return (
     <>
     <ClientTransactionForm 
@@ -458,28 +435,7 @@ export default function ClientProfilePage() {
         clientName={(client as any).nameAr}
     />
     <div className='space-y-6' dir='rtl'>
-        <Card>
-            <CardHeader className='flex-row items-center gap-6'>
-                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                    <User className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className='space-y-1'>
-                    <CardTitle className='text-3xl'>{client.nameAr}</CardTitle>
-                    <CardDescription className='text-md'>{client.nameEn}</CardDescription>
-                    <div className='flex items-center gap-4 pt-1'>
-                        <div className='flex items-center gap-2 text-sm text-muted-foreground font-mono'>
-                            <Hash className='h-4 w-4'/>
-                            <span>{client.fileId}</span>
-                        </div>
-                        <Badge variant="outline" className={clientStatusColors[client.status]}>
-                            {clientStatusTranslations[client.status]}
-                        </Badge>
-                    </div>
-                </div>
-            </CardHeader>
-        </Card>
-        
-        <Tabs defaultValue="transactions" dir="rtl">
+        <Tabs defaultValue="profile" dir="rtl">
             <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
                 <TabsTrigger value="transactions">المعاملات ({transactions.length})</TabsTrigger>
@@ -488,17 +444,59 @@ export default function ClientProfilePage() {
             </TabsList>
 
             <TabsContent value="profile" className="mt-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
-                    </CardHeader>
-                    <CardContent className='space-y-4'>
-                        <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
-                        <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
-                        <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                        <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
-                    </CardContent>
-                </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle>بيانات العميل</CardTitle>
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={`/dashboard/clients/${id}/edit`}>
+                                        <Pencil className="ml-2 h-4 w-4" />
+                                        تعديل
+                                    </Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent className='space-y-6'>
+                                <div className="text-center space-y-2 py-4">
+                                    <h2 className="text-2xl font-bold">{client.nameAr}</h2>
+                                    {client.nameEn && <p className="text-muted-foreground">{client.nameEn}</p>}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm border-t pt-6">
+                                    <div className="flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">رقم الملف:</span>
+                                        <span className="font-mono">{client.fileId}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">الحالة:</span>
+                                        <Badge variant="outline" className={clientStatusColors[client.status]}>
+                                            {clientStatusTranslations[client.status]}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">رقم الجوال:</span>
+                                        <span className="font-mono">{client.mobile}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">الرقم المدني:</span>
+                                        <span className="font-mono">{client.civilId || '-'}</span>
+                                    </div>
+                                    <div className="sm:col-span-2 flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">المهندس المسؤول:</span>
+                                        <span>{assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>}</span>
+                                    </div>
+                                    <div className="sm:col-span-2 flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">العنوان:</span>
+                                        <span className="text-right">{clientAddress}</span>
+                                    </div>
+                                     <div className="flex justify-between">
+                                        <span className="font-semibold text-muted-foreground">تاريخ الإنشاء:</span>
+                                        <span>{formatDate(client.createdAt)}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </TabsContent>
 
             <TabsContent value="transactions" className="mt-6">
