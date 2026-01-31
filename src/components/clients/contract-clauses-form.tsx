@@ -351,39 +351,45 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     let assignedEngineerId: string | null = null;
 
     try {
+        // --- 1. PERFORM ALL QUERIES OUTSIDE TRANSACTION ---
+        const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
+        const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
+        const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
+
+        const [
+            clientAccountSnap,
+            revenueAccountSnap,
+            parentAccountSnap,
+        ] = await Promise.all([
+            getDocs(clientAccountQuery),
+            getDocs(revenueAccountQuery),
+            getDocs(parentAccountQuery),
+        ]);
+
+        if (revenueAccountSnap.empty) throw new Error("حساب 'إيرادات استشارات هندسية' غير موجود.");
+        if (clientAccountSnap.empty && parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
+
+        // --- 2. RUN THE TRANSACTION WITH DOC READS & ALL WRITES ---
         await runTransaction(firestore, async (transaction_firestore) => {
-            // --- 1. DEFINE ALL REFS AND QUERIES ---
+            // --- 2a. DEFINE DOCUMENT REFS ---
             const clientRef = doc(firestore, 'clients', clientId);
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
-            
-            const clientAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1));
-            const revenueAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1));
-            const parentAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1));
 
-            // --- 2. EXECUTE ALL READS ---
+            // --- 2b. EXECUTE DOC READS ---
             const [
                 clientSnap,
                 journalEntryCounterDoc,
                 coaClientCounterDoc,
-                clientAccountSnap,
-                revenueAccountSnap,
-                parentAccountSnap,
             ] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(journalEntryCounterRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(clientAccountQuery),
-                transaction_firestore.get(revenueAccountQuery),
-                transaction_firestore.get(parentAccountQuery),
             ]);
 
-            // --- 3. VALIDATE READS ---
             if (!clientSnap.exists()) throw new Error("Client not found.");
-            if (revenueAccountSnap.empty) throw new Error("حساب 'إيرادات استشارات هندسية' غير موجود.");
-            if (clientAccountSnap.empty && parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود في شجرة الحسابات.");
 
-            // --- 4. PREPARE LOGIC AND WRITES ---
+            // --- 2c. PREPARE LOGIC AND WRITES using results from outside and inside transaction ---
             const clientData = clientSnap.data() as Client;
             let clientAccountId: string;
 
