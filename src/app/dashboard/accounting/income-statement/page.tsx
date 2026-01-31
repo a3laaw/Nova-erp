@@ -186,109 +186,110 @@ export default function IncomeStatementPage() {
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
             {!isLoading && incomeStatementData && (
-                 <Card 
-                    id="printable-area" 
-                    className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent p-8 md:p-12"
-                >
-                    <CardHeader className="p-0">
+                 <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
+                    <div id="printable-area" className="printable-content">
                         {branding?.letterhead_image_url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img 
                                 src={branding.letterhead_image_url} 
                                 alt="Letterhead"
-                                className="w-full h-auto object-contain mb-6"
+                                className="w-full h-auto"
                             />
                         )}
-                         <div className="flex justify-between items-start pb-4">
-                            <div className="text-left flex-shrink-0">
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة الدخل</h2>
-                                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Income Statement</p>
-                                <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                               <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                <div>
-                                    <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                    <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                    <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                        <div className="p-8 md:p-12">
+                            <CardHeader className="p-0">
+                                <div className="flex justify-between items-start pb-4">
+                                    <div className="text-left flex-shrink-0">
+                                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة الدخل</h2>
+                                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Income Statement</p>
+                                        <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                    <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                        <div>
+                                            <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
+                                            <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
+                                            <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                                <div className="mt-6 text-sm">
+                                    <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="px-0 pt-6 space-y-6">
+                                <div className="space-y-4">
+                                    {/* Revenue */}
+                                    <div>
+                                        <h3 className="font-bold mb-2">الإيرادات</h3>
+                                        {incomeStatementData.revenueAccounts.map(acc => (
+                                            <div key={acc.name} className="flex justify-between items-center text-sm p-2">
+                                                <span>{acc.name}</span>
+                                                <span className="font-mono">{formatCurrency(acc.total)}</span>
+                                            </div>
+                                        ))}
+                                        <Separator />
+                                        <div className="flex justify-between items-center text-sm p-2 font-bold">
+                                            <span>إجمالي الإيرادات</span>
+                                            <span className="font-mono">{formatCurrency(incomeStatementData.totalRevenue)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Cost of Revenue */}
+                                    <div>
+                                        <h3 className="font-bold mb-2">تكلفة الإيرادات (المصاريف التشغيلية المباشرة)</h3>
+                                        {incomeStatementData.cogsAccounts.map(acc => (
+                                            <div key={acc.name} className="flex justify-between items-center text-sm p-2">
+                                                <span>({acc.name})</span>
+                                                <span className="font-mono text-red-600">({formatCurrency(acc.total)})</span>
+                                            </div>
+                                        ))}
+                                        <Separator />
+                                        <div className="flex justify-between items-center text-sm p-2 font-bold">
+                                            <span>إجمالي تكلفة الإيرادات</span>
+                                            <span className="font-mono text-red-600">({formatCurrency(incomeStatementData.totalCogs)})</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Gross Profit */}
+                                    <div className="flex justify-between items-center text-md p-2 font-extrabold bg-muted/50 rounded-md">
+                                        <span>مجمل الربح</span>
+                                        <span className="font-mono">{formatCurrency(incomeStatementData.grossProfit)}</span>
+                                    </div>
+
+                                    {/* Operating Expenses */}
+                                    <div>
+                                        <h3 className="font-bold mb-2 mt-4">المصاريف الإدارية والعمومية</h3>
+                                        {incomeStatementData.expenseAccounts.map(acc => (
+                                            <div key={acc.name} className="flex justify-between items-center text-sm p-2">
+                                                <span>({acc.name})</span>
+                                                <span className="font-mono text-red-600">({formatCurrency(acc.total)})</span>
+                                            </div>
+                                        ))}
+                                        <Separator />
+                                        <div className="flex justify-between items-center text-sm p-2 font-bold">
+                                            <span>إجمالي المصاريف الإدارية والعمومية</span>
+                                            <span className="font-mono text-red-600">({formatCurrency(incomeStatementData.totalExpenses)})</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Net Income */}
+                                    <Separator className="my-4"/>
+                                    <div className="flex justify-between items-center text-xl p-4 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <span>صافي {incomeStatementData.netIncome >= 0 ? 'الربح' : 'الخسارة'}</span>
+                                        <span className="font-mono">{formatCurrency(incomeStatementData.netIncome)}</span>
+                                    </div>
+
+                                </div>
+                            </CardContent>
+                            <CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
+                                <Button onClick={handlePrint}>
+                                    <Printer className="ml-2 h-4 w-4" />
+                                    طباعة / تصدير PDF
+                                </Button>
+                            </CardFooter>
                         </div>
-                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
-                         </div>
-                    </CardHeader>
-                    <CardContent className="px-0 pt-6 space-y-6">
-                        <div className="space-y-4">
-                            {/* Revenue */}
-                            <div>
-                                <h3 className="font-bold mb-2">الإيرادات</h3>
-                                {incomeStatementData.revenueAccounts.map(acc => (
-                                    <div key={acc.name} className="flex justify-between items-center text-sm p-2">
-                                        <span>{acc.name}</span>
-                                        <span className="font-mono">{formatCurrency(acc.total)}</span>
-                                    </div>
-                                ))}
-                                <Separator />
-                                <div className="flex justify-between items-center text-sm p-2 font-bold">
-                                    <span>إجمالي الإيرادات</span>
-                                    <span className="font-mono">{formatCurrency(incomeStatementData.totalRevenue)}</span>
-                                </div>
-                            </div>
-
-                            {/* Cost of Revenue */}
-                            <div>
-                                <h3 className="font-bold mb-2">تكلفة الإيرادات (المصاريف التشغيلية المباشرة)</h3>
-                                {incomeStatementData.cogsAccounts.map(acc => (
-                                    <div key={acc.name} className="flex justify-between items-center text-sm p-2">
-                                        <span>({acc.name})</span>
-                                        <span className="font-mono text-red-600">({formatCurrency(acc.total)})</span>
-                                    </div>
-                                ))}
-                                <Separator />
-                                <div className="flex justify-between items-center text-sm p-2 font-bold">
-                                    <span>إجمالي تكلفة الإيرادات</span>
-                                    <span className="font-mono text-red-600">({formatCurrency(incomeStatementData.totalCogs)})</span>
-                                </div>
-                            </div>
-                            
-                            {/* Gross Profit */}
-                            <div className="flex justify-between items-center text-md p-2 font-extrabold bg-muted/50 rounded-md">
-                                <span>مجمل الربح</span>
-                                <span className="font-mono">{formatCurrency(incomeStatementData.grossProfit)}</span>
-                            </div>
-
-                            {/* Operating Expenses */}
-                            <div>
-                                <h3 className="font-bold mb-2 mt-4">المصاريف الإدارية والعمومية</h3>
-                                {incomeStatementData.expenseAccounts.map(acc => (
-                                    <div key={acc.name} className="flex justify-between items-center text-sm p-2">
-                                        <span>({acc.name})</span>
-                                        <span className="font-mono text-red-600">({formatCurrency(acc.total)})</span>
-                                    </div>
-                                ))}
-                                <Separator />
-                                <div className="flex justify-between items-center text-sm p-2 font-bold">
-                                    <span>إجمالي المصاريف الإدارية والعمومية</span>
-                                    <span className="font-mono text-red-600">({formatCurrency(incomeStatementData.totalExpenses)})</span>
-                                </div>
-                            </div>
-                            
-                             {/* Net Income */}
-                             <Separator className="my-4"/>
-                            <div className="flex justify-between items-center text-xl p-4 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <span>صافي {incomeStatementData.netIncome >= 0 ? 'الربح' : 'الخسارة'}</span>
-                                <span className="font-mono">{formatCurrency(incomeStatementData.netIncome)}</span>
-                            </div>
-
-                        </div>
-                    </CardContent>
-                     <CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
-                        <Button onClick={handlePrint}>
-                            <Printer className="ml-2 h-4 w-4" />
-                            طباعة / تصدير PDF
-                        </Button>
-                    </CardFooter>
+                    </div>
                  </Card>
             )}
         </div>

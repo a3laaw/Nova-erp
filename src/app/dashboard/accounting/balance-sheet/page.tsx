@@ -206,78 +206,77 @@ export default function BalanceSheetPage() {
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
             {!isLoading && balanceSheetData && (
-                 <div 
-                    id="printable-area" 
-                    className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent"
-                >
-                    {branding?.letterhead_image_url && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img 
-                            src={branding.letterhead_image_url} 
-                            alt="Letterhead"
-                            className="w-full h-auto object-contain"
-                        />
-                    )}
-                    <div className="p-8 md:p-12">
-                        <CardHeader className="p-0">
-                             <div className="flex justify-between items-start pb-4">
-                                <div className="text-left flex-shrink-0">
-                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
-                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
-                                    <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                   <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                    <div>
-                                        <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                        <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                        <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                 <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
+                    <div id="printable-area" className="printable-content">
+                        {branding?.letterhead_image_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img 
+                                src={branding.letterhead_image_url} 
+                                alt="Letterhead"
+                                className="w-full h-auto"
+                            />
+                        )}
+                        <div className="p-8 md:p-12">
+                            <CardHeader className="p-0">
+                                <div className="flex justify-between items-start pb-4">
+                                    <div className="text-left flex-shrink-0">
+                                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
+                                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
+                                        <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                    <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                        <div>
+                                            <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
+                                            <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
+                                            <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                             <div className="mt-6 text-sm">
-                                <p><span className="font-semibold w-24 inline-block">المركز المالي كما في:</span> {asOfDate ? format(parseISO(asOfDate), 'dd/MM/yyyy') : ''}</p>
-                             </div>
-                        </CardHeader>
-                        <CardContent className="px-0 pt-6 space-y-6">
-                            {!balanceSheetData.isBalanced && (
-                                <Alert variant="destructive">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>الميزانية غير متوازنة!</AlertTitle>
-                                    <AlertDescription>
-                                        إجمالي الأصول ({formatCurrency(balanceSheetData.assets.total)}) لا يساوي إجمالي الالتزامات وحقوق الملكية ({formatCurrency(balanceSheetData.liabilitiesAndEquity.total)}).
-                                        الرجاء مراجعة القيود المحاسبية.
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                            <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
-                                {/* Assets Column */}
-                                <div className="space-y-6">
-                                    {renderSection("الأصول المتداولة", balanceSheetData.assets.current, balanceSheetData.assets.totalCurrent)}
-                                    {renderSection("الأصول غير المتداولة", balanceSheetData.assets.nonCurrent, balanceSheetData.assets.totalNonCurrent)}
-                                    <div className="flex justify-between items-center text-lg p-2 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                        <span>مجموع الأصول</span>
-                                        <span className="font-mono">{formatCurrency(balanceSheetData.assets.total)}</span>
+                                <div className="mt-6 text-sm">
+                                    <p><span className="font-semibold w-24 inline-block">المركز المالي كما في:</span> {asOfDate ? format(parseISO(asOfDate), 'dd/MM/yyyy') : ''}</p>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="px-0 pt-6 space-y-6">
+                                {!balanceSheetData.isBalanced && (
+                                    <Alert variant="destructive">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>الميزانية غير متوازنة!</AlertTitle>
+                                        <AlertDescription>
+                                            إجمالي الأصول ({formatCurrency(balanceSheetData.assets.total)}) لا يساوي إجمالي الالتزامات وحقوق الملكية ({formatCurrency(balanceSheetData.liabilitiesAndEquity.total)}).
+                                            الرجاء مراجعة القيود المحاسبية.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                                <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
+                                    {/* Assets Column */}
+                                    <div className="space-y-6">
+                                        {renderSection("الأصول المتداولة", balanceSheetData.assets.current, balanceSheetData.assets.totalCurrent)}
+                                        {renderSection("الأصول غير المتداولة", balanceSheetData.assets.nonCurrent, balanceSheetData.assets.totalNonCurrent)}
+                                        <div className="flex justify-between items-center text-lg p-2 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                            <span>مجموع الأصول</span>
+                                            <span className="font-mono">{formatCurrency(balanceSheetData.assets.total)}</span>
+                                        </div>
+                                    </div>
+                                    {/* Liabilities & Equity Column */}
+                                    <div className="space-y-6">
+                                        {renderSection("الالتزامات المتداولة", balanceSheetData.liabilitiesAndEquity.currentLiabilities, balanceSheetData.liabilitiesAndEquity.totalCurrentLiabilities)}
+                                        {renderSection("الالتزامات غير المتداولة", balanceSheetData.liabilitiesAndEquity.nonCurrentLiabilities, balanceSheetData.liabilitiesAndEquity.totalNonCurrentLiabilities)}
+                                        {renderSection("حقوق الملكية", balanceSheetData.liabilitiesAndEquity.equity, balanceSheetData.liabilitiesAndEquity.totalEquity)}
+                                        <div className="flex justify-between items-center text-lg p-2 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                            <span>مجموع الالتزامات وحقوق الملكية</span>
+                                            <span className="font-mono">{formatCurrency(balanceSheetData.liabilitiesAndEquity.total)}</span>
+                                        </div>
                                     </div>
                                 </div>
-                                {/* Liabilities & Equity Column */}
-                                <div className="space-y-6">
-                                    {renderSection("الالتزامات المتداولة", balanceSheetData.liabilitiesAndEquity.currentLiabilities, balanceSheetData.liabilitiesAndEquity.totalCurrentLiabilities)}
-                                    {renderSection("الالتزامات غير المتداولة", balanceSheetData.liabilitiesAndEquity.nonCurrentLiabilities, balanceSheetData.liabilitiesAndEquity.totalNonCurrentLiabilities)}
-                                    {renderSection("حقوق الملكية", balanceSheetData.liabilitiesAndEquity.equity, balanceSheetData.liabilitiesAndEquity.totalEquity)}
-                                     <div className="flex justify-between items-center text-lg p-2 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                        <span>مجموع الالتزامات وحقوق الملكية</span>
-                                        <span className="font-mono">{formatCurrency(balanceSheetData.liabilitiesAndEquity.total)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                         <CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
-                            <Button onClick={handlePrint}>
-                                <Printer className="ml-2 h-4 w-4" />
-                                طباعة / تصدير PDF
-                            </Button>
-                        </CardFooter>
+                            </CardContent>
+                            <CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
+                                <Button onClick={handlePrint}>
+                                    <Printer className="ml-2 h-4 w-4" />
+                                    طباعة / تصدير PDF
+                                </Button>
+                            </CardFooter>
+                        </div>
                     </div>
                  </div>
             )}
