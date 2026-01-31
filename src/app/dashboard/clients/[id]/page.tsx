@@ -477,10 +477,9 @@ export default function ClientProfilePage() {
         </Card>
 
         <Tabs defaultValue="transactions" dir="rtl">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="transactions">المعاملات ({transactions.length})</TabsTrigger>
                 <TabsTrigger value="quotations">عروض الأسعار</TabsTrigger>
-                <TabsTrigger value="statement">كشف الحساب</TabsTrigger>
                 <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
             </TabsList>
             <TabsContent value="transactions" className="mt-6">
@@ -490,10 +489,18 @@ export default function ClientProfilePage() {
                             <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
                             <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
                         </div>
-                        <Button onClick={() => setIsFormOpen(true)}>
-                            <PlusCircle className="ml-2 h-4 w-4" />
-                            إضافة معاملة
-                        </Button>
+                         <div className="flex gap-2">
+                             <Button asChild variant="outline">
+                                <Link href={`/dashboard/clients/${id}/statement`}>
+                                    <Printer className="ml-2 h-4 w-4" />
+                                    كشف الحساب
+                                </Link>
+                            </Button>
+                            <Button onClick={() => setIsFormOpen(true)}>
+                                <PlusCircle className="ml-2 h-4 w-4" />
+                                إضافة معاملة
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {transactionsLoading && <Skeleton className="h-24 w-full" />}
@@ -576,22 +583,6 @@ export default function ClientProfilePage() {
 
             <TabsContent value="quotations" className="mt-6">
                 <ClientQuotationsList clientId={id} clientName={client.nameAr} />
-            </TabsContent>
-            
-            <TabsContent value="statement" className="mt-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>كشف الحساب</CardTitle>
-                        <CardDescription>عرض تفصيلي لجميع الحركات المالية للعميل.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                        <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <p className="mt-4">لعرض كشف حساب تفصيلي، الرجاء الذهاب إلى قسم المحاسبة.</p>
-                        <Button asChild className="mt-4">
-                            <Link href={`/dashboard/clients/${id}/statement`}>الذهاب إلى كشف الحساب</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
             </TabsContent>
 
             <TabsContent value="history" className="mt-6">
