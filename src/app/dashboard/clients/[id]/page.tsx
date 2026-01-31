@@ -29,12 +29,6 @@ import type { Client, ClientTransaction, Employee, Quotation } from '@/lib/types
 import { format } from 'date-fns';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -464,10 +458,6 @@ export default function ClientProfilePage() {
         clientName={(client as any).nameAr}
     />
     <div className='space-y-6' dir='rtl'>
-        <div className='flex justify-end items-center no-print'>
-            <div className='flex gap-2'>
-            </div>
-        </div>
         <Card>
             <CardHeader className='flex-row items-center gap-6'>
                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -489,129 +479,122 @@ export default function ClientProfilePage() {
             </CardHeader>
         </Card>
 
-        <Tabs defaultValue="profile" dir="rtl">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
-            <TabsTrigger value="quotations">عروض الأسعار</TabsTrigger>
-            <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
-          </TabsList>
-          <TabsContent value="profile" className="mt-6 space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                    <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
-                    <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
-                    <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
-                    <InfoRow icon={<User />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader className="flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
-                        <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button asChild variant="outline">
-                            <Link href={`/dashboard/clients/${id}/statement`}>
-                                <Printer className="ml-2 h-4 w-4" />
-                                كشف حساب
-                            </Link>
-                        </Button>
-                        <Button onClick={() => setIsFormOpen(true)}>
-                            <PlusCircle className="ml-2 h-4 w-4" />
-                            إضافة معاملة
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {transactionsLoading && <Skeleton className="h-24 w-full" />}
-                    {!transactionsLoading && transactions.length === 0 && (
-                        <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                            <Files className="mx-auto h-12 w-12 text-muted-foreground" />
-                            <h3 className="mt-4 text-lg font-medium">لا توجد معاملات بعد</h3>
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                قم بإضافة معاملة جديدة لتظهر هنا.
-                            </p>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+            <div className="xl:col-span-2 space-y-6">
+                <Card>
+                    <CardHeader className="flex-row items-center justify-between">
+                        <div>
+                            <CardTitle className='flex items-center gap-2'><Files className='text-primary'/> المعاملات الداخلية</CardTitle>
+                            <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
                         </div>
-                    )}
-                     {!transactionsLoading && transactions.length > 0 && (
-                         <div className="border rounded-lg">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>رقم المعاملة</TableHead>
-                                        <TableHead>نوع المعاملة</TableHead>
-                                        <TableHead>المهندس المسؤول</TableHead>
-                                        <TableHead>الحالة</TableHead>
-                                        <TableHead>تاريخ الإنشاء</TableHead>
-                                        <TableHead>الإجراءات</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {transactions.map(tx => (
-                                        <TableRow key={tx.id}>
-                                            <TableCell className="font-mono">{tx.transactionNumber || '-'}</TableCell>
-                                            <TableCell className="font-medium">
-                                                <Link href={`/dashboard/clients/${id}/transactions/${tx.id!}`} className="hover:underline">
-                                                    {tx.transactionType}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className={transactionStatusColors[tx.status]}>
-                                                    {transactionStatusTranslations[tx.status]}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>{formatDate(tx.createdAt)}</TableCell>
-                                            <TableCell>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" disabled={isProcessing}><MoreHorizontal className="h-4 w-4" /></Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent dir="rtl">
-                                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}><Eye className="ml-2 h-4 w-4"/> عرض التفاصيل</DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}/edit`)}><Pencil className="ml-2 h-4 w-4"/> تعديل</DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        {tx.contract ? (
-                                                            <>
-                                                                <DropdownMenuItem onClick={() => setContractTransaction(tx)}>تعديل العقد</DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => setTransactionToCancel(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">إلغاء العقد</DropdownMenuItem>
-                                                            </>
-                                                        ) : (
-                                                            <DropdownMenuItem onClick={() => setContractTransaction(tx)}>إنشاء عقد</DropdownMenuItem>
-                                                        )}
-                                                         <DropdownMenuItem onClick={() => handleToggleFreeze(tx)}>
-                                                            {tx.status === 'on-hold' ? <FolderOpen className="ml-2 h-4 w-4"/> : <FolderLock className="ml-2 h-4 w-4"/>}
-                                                            {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد'}
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => setTransactionToDelete(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                           <Trash2 className="ml-2 h-4 w-4" /> حذف المعاملة
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
+                        <div className="flex gap-2">
+                            <Button asChild variant="outline">
+                                <Link href={`/dashboard/clients/${id}/statement`}>
+                                    <Printer className="ml-2 h-4 w-4" />
+                                    كشف حساب
+                                </Link>
+                            </Button>
+                            <Button onClick={() => setIsFormOpen(true)}>
+                                <PlusCircle className="ml-2 h-4 w-4" />
+                                إضافة معاملة
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {transactionsLoading && <Skeleton className="h-24 w-full" />}
+                        {!transactionsLoading && transactions.length === 0 && (
+                            <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                                <Files className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h3 className="mt-4 text-lg font-medium">لا توجد معاملات بعد</h3>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    قم بإضافة معاملة جديدة لتظهر هنا.
+                                </p>
+                            </div>
+                        )}
+                        {!transactionsLoading && transactions.length > 0 && (
+                            <div className="border rounded-lg">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>رقم المعاملة</TableHead>
+                                            <TableHead>نوع المعاملة</TableHead>
+                                            <TableHead>المهندس المسؤول</TableHead>
+                                            <TableHead>الحالة</TableHead>
+                                            <TableHead>تاريخ الإنشاء</TableHead>
+                                            <TableHead>الإجراءات</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                         </div>
-                     )}
-                </CardContent>
-            </Card>
-          </TabsContent>
-           <TabsContent value="quotations" className="mt-6">
+                                    </TableHeader>
+                                    <TableBody>
+                                        {transactions.map(tx => (
+                                            <TableRow key={tx.id}>
+                                                <TableCell className="font-mono">{tx.transactionNumber || '-'}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    <Link href={`/dashboard/clients/${id}/transactions/${tx.id!}`} className="hover:underline">
+                                                        {tx.transactionType}
+                                                    </Link>
+                                                </TableCell>
+                                                <TableCell>{tx.assignedEngineerId ? (employeesMap.get(tx.assignedEngineerId) || '...') : <span className='text-muted-foreground'>-</span>}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className={transactionStatusColors[tx.status]}>
+                                                        {transactionStatusTranslations[tx.status]}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>{formatDate(tx.createdAt)}</TableCell>
+                                                <TableCell>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" disabled={isProcessing}><MoreHorizontal className="h-4 w-4" /></Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent dir="rtl">
+                                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)}><Eye className="ml-2 h-4 w-4"/> عرض التفاصيل</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}/edit`)}><Pencil className="ml-2 h-4 w-4"/> تعديل</DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            {tx.contract ? (
+                                                                <>
+                                                                    <DropdownMenuItem onClick={() => setContractTransaction(tx)}>تعديل العقد</DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => setTransactionToCancel(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">إلغاء العقد</DropdownMenuItem>
+                                                                </>
+                                                            ) : (
+                                                                <DropdownMenuItem onClick={() => setContractTransaction(tx)}>إنشاء عقد</DropdownMenuItem>
+                                                            )}
+                                                            <DropdownMenuItem onClick={() => handleToggleFreeze(tx)}>
+                                                                {tx.status === 'on-hold' ? <FolderOpen className="ml-2 h-4 w-4"/> : <FolderLock className="ml-2 h-4 w-4"/>}
+                                                                {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد'}
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem onClick={() => setTransactionToDelete(tx)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                            <Trash2 className="ml-2 h-4 w-4" /> حذف المعاملة
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
                 <ClientQuotationsList clientId={id} clientName={client.nameAr} />
-           </TabsContent>
-          <TabsContent value="history" className="mt-6">
-            <ClientHistoryTimeline clientId={id} />
-          </TabsContent>
-        </Tabs>
+            </div>
+
+            <div className="xl:col-span-1 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className='flex items-center gap-2'><BadgeInfo className='text-primary'/> المعلومات الأساسية</CardTitle>
+                    </CardHeader>
+                    <CardContent className='space-y-4'>
+                        <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>غير محدد</span>} />
+                        <InfoRow icon={<Phone />} label="رقم الجوال" value={client.mobile} />
+                        <InfoRow icon={<Home />} label="العنوان" value={clientAddress} />
+                        <InfoRow icon={<Calendar />} label="تاريخ إنشاء الملف" value={formatDate(client.createdAt)} />
+                    </CardContent>
+                </Card>
+                <ClientHistoryTimeline clientId={id} />
+            </div>
+        </div>
     </div>
      <AlertDialog open={!!transactionToCancel} onOpenChange={(open) => !open && setTransactionToCancel(null)}>
         <AlertDialogContent dir="rtl">
