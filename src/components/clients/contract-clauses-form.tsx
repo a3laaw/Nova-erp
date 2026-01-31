@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -163,10 +164,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
   const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[], templates: ContractTemplate[], employees: Employee[], departments: Department[] }>({ stages: [], templates: [], employees: [], departments: [] });
   const [loadingRefData, setLoadingRefData] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   // This effect resets the entire component's state when the dialog is closed.
   useEffect(() => {
@@ -290,12 +291,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             }
         } else { // New contract from quotation
             if (clientId) {
-                // Fetch all transactions for the client and filter client-side.
-                // This is more robust than `where('contract', '==', null)` which can sometimes have issues with nested objects.
                 const txQuery = query(collection(firestore, 'clients', clientId, 'transactions'));
                 const txSnap = await getDocs(txQuery);
                 const allTx = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-                const availableTx = allTx.filter(tx => !tx.contract);
+                const availableTx = allTx.filter(tx => !tx.contract || !tx.contract.clauses || tx.contract.clauses.length === 0);
                 
                 setClientTransactions(availableTx);
                 populateFormFromQuotation();
@@ -796,7 +795,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             <DialogFooter className="pt-4 border-t">
               <Button variant="outline" type="button" onClick={onClose} disabled={isSaving}>إلغاء</Button>
               <Button type="button" onClick={handleSubmit} disabled={isSaving}>
-                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                 {transaction?.contract ? 'حفظ التعديلات' : 'إنشاء العقد والقيد المحاسبي'}
               </Button>
             </DialogFooter>
