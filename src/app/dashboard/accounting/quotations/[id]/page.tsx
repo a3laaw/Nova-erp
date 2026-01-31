@@ -1,12 +1,11 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, getDocs, collection, query, limit } from 'firebase/firestore';
-import type { Quotation, Company, ClientTransaction } from '@/lib/types';
+import { doc } from 'firebase/firestore';
+import type { Quotation, ClientTransaction } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -61,6 +60,7 @@ export default function ViewQuotationPage() {
       description: quotation.templateDescription || '',
       contract: {
         totalAmount: quotation.totalAmount,
+        financialsType: 'fixed',
         clauses: quotation.items.map(item => ({
             id: item.id || '',
             name: item.description,
@@ -115,6 +115,9 @@ export default function ViewQuotationPage() {
         </div>
       );
   }
+  
+  // Total logic remains the same
+  const totalAmount = quotation.items.reduce((sum, item) => sum + item.total, 0);
 
   return (
     <>
@@ -128,77 +131,73 @@ export default function ViewQuotationPage() {
             quotationIdToUpdate={quotation.id}
         />
     )}
-    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
-            <div id="printable-area" className="p-8 md:p-12 printable-content">
-                 {branding?.letterhead_image_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                        src={branding.letterhead_image_url} 
-                        alt={`${branding.company_name || ''} Letterhead`}
-                        className="w-full h-auto object-contain mb-4"
-                    />
+    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:p-0 print:bg-white" dir="rtl">
+        <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg print:shadow-none print:border-none">
+             <div className="p-6 bg-muted/50 rounded-t-lg flex justify-end gap-2 no-print">
+                {quotation.status !== 'accepted' && (
+                    <Button onClick={() => setIsContractFormOpen(true)} disabled={!quotation.id}>
+                        <FileSignature className="ml-2 h-4 w-4" />
+                        تحويل إلى عقد
+                    </Button>
                 )}
-                <header className="pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                    <div className="flex justify-between items-start">
-                         <div className="text-left flex-shrink-0">
-                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">عرض سعر</h2>
-                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Quotation</p>
-                            <div className='flex items-center gap-2 mt-2'>
-                               <p className="font-mono text-sm text-muted-foreground">{quotation.quotationNumber} : <span className='font-sans'>رقم العرض</span></p>
-                                <Badge variant="outline" className={statusColors[quotation.status]}>{statusTranslations[quotation.status]}</Badge>
-                            </div>
-                        </div>
-                         <div className="flex items-center gap-4">
-                           <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                            <div>
-                               <h1 className="font-bold text-lg">{branding?.company_name}</h1>
-                               <p className="text-sm text-muted-foreground">{branding?.nameEn}</p>
-                               <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                            </div>
-                        </div>
+                {quotation.status === 'draft' && (
+                  <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)}>
+                      <Pencil className="ml-2 h-4 w-4" />
+                      تعديل
+                  </Button>
+                )}
+                <Button onClick={handlePrint}>
+                    <Printer className="ml-2 h-4 w-4" />
+                    طباعة / PDF
+                </Button>
+            </div>
+
+            <div id="printable-area" className="p-8 md:p-12 printable-content">
+                {/* Header Section */}
+                <header className="flex justify-between items-start pb-6 mb-8 border-b-2 border-blue-600">
+                    <div>
+                        <Logo className="h-20 w-20 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                        <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-200 mt-2">{branding?.company_name || 'Nova ERP'}</h1>
+                    </div>
+                    <div className="text-left">
+                        <h2 className="text-4xl font-bold text-blue-700 dark:text-blue-400">عرض سعر</h2>
+                        <p className="font-mono mt-2 text-gray-500 dark:text-gray-400">{quotation.quotationNumber}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">التاريخ: {formatDate(quotation.date)}</p>
                     </div>
                 </header>
 
-                <main className="py-8 space-y-8">
-                     <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                {/* Client Info Section */}
+                <section className="mb-8">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                             <p className='font-semibold'>إلى السيد/السادة:</p>
-                             <p className='text-muted-foreground'>{quotation.clientName}</p>
+                            <p className='font-semibold text-gray-500'>عرض سعر لـ:</p>
+                            <p className='text-lg font-bold text-gray-800'>{quotation.clientName}</p>
+                            {/* You can add more client details here if available */}
                         </div>
                         <div className='text-left'>
-                             <p>التاريخ: {formatDate(quotation.date)}</p>
-                             <p>صالح حتى: {formatDate(quotation.validUntil)}</p>
-                        </div>
-                        <div className='col-span-2'>
-                            <p><span className='font-semibold'>الموضوع:</span> {quotation.subject}</p>
+                            <p className='font-semibold text-gray-500'>الموضوع:</p>
+                            <p className='text-lg font-bold text-gray-800'>{quotation.subject}</p>
                         </div>
                     </div>
-
+                </section>
+                
+                {/* Items Table */}
+                <section>
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[50px]">#</TableHead>
-                                <TableHead className="w-2/5">الوصف</TableHead>
-                                <TableHead className="text-center">الكمية</TableHead>
-                                <TableHead className="text-center">سعر الوحدة</TableHead>
-                                <TableHead className="text-left">الإجمالي</TableHead>
+                            <TableRow className="bg-blue-700 hover:bg-blue-700/90">
+                                <TableHead className="w-[50px] text-white">#</TableHead>
+                                <TableHead className="w-2/5 text-white">الوصف</TableHead>
+                                <TableHead className="text-center text-white">الكمية</TableHead>
+                                <TableHead className="text-center text-white">سعر الوحدة</TableHead>
+                                <TableHead className="text-left text-white">الإجمالي</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {quotation.items.map((item, index) => (
                                 <TableRow key={item.id || index}>
                                     <TableCell>{index + 1}</TableCell>
-                                    <TableCell className="font-medium">
-                                        <div className="flex flex-col gap-1">
-                                            <span>{item.description}</span>
-                                            {item.condition && (
-                                                <div className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
-                                                    - شرط الاستحقاق: {item.condition}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </TableCell>
+                                    <TableCell className="font-medium">{item.description}</TableCell>
                                     <TableCell className="text-center font-mono">{item.quantity}</TableCell>
                                     <TableCell className="text-center font-mono">{formatCurrency(item.unitPrice)}</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(item.total)}</TableCell>
@@ -206,52 +205,36 @@ export default function ViewQuotationPage() {
                             ))}
                         </TableBody>
                         <TableFooter>
-                            <TableRow className="font-bold bg-muted/50 text-lg">
-                                <TableCell colSpan={4}>الإجمالي</TableCell>
-                                <TableCell className="text-left font-mono">{formatCurrency(quotation.totalAmount)}</TableCell>
+                            <TableRow className="font-bold text-base bg-gray-50">
+                                <TableCell colSpan={4} className="text-left">الإجمالي الفرعي</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(totalAmount)}</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold text-xl bg-blue-600 text-white">
+                                <TableCell colSpan={4} className="text-left">المجموع الإجمالي</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(totalAmount)}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
-                    
-                    {quotation.notes && (
-                        <div className="pt-4">
-                            <h4 className="font-semibold mb-2">ملاحظات وبنود إضافية:</h4>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quotation.notes}</p>
+                </section>
+
+                {/* Terms and Notes Section */}
+                {quotation.notes && (
+                    <section className="mt-8 pt-6 border-t">
+                        <h4 className="font-bold mb-2 text-gray-700">الشروط والملاحظات</h4>
+                        <div className="text-sm text-gray-600 whitespace-pre-wrap p-4 bg-gray-50 rounded-md">
+                            {quotation.notes}
                         </div>
-                    )}
-                </main>
-                
-                 <footer className="pt-16">
-                    <div className="text-center">
-                        <p className="font-semibold">مع خالص الشكر والتقدير</p>
-                        <div className="border-t-2 border-gray-300 w-48 mx-auto mt-12 pt-2">
-                            <p className="font-semibold">التوقيع</p>
-                        </div>
-                    </div>
-                </footer>
-            </div>
-             <div className="p-6 bg-muted/50 rounded-b-lg flex justify-end gap-2 no-print">
-                {quotation.transactionId ? (
-                    <Button variant="outline" disabled>تم تحويله إلى عقد</Button>
-                ) : (
-                    <Button onClick={() => setIsContractFormOpen(true)}>
-                        <FileSignature className="ml-2 h-4 w-4" />
-                        تحويل إلى عقد
-                    </Button>
+                    </section>
                 )}
-                <Button variant="outline" onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)}>
-                    <Pencil className="ml-2 h-4 w-4" />
-                    تعديل
-                </Button>
-                <Button onClick={handlePrint}>
-                    <Printer className="ml-2 h-4 w-4" />
-                    طباعة / PDF
-                </Button>
+                
+                {/* Footer Section */}
+                <footer className="mt-12 pt-4 border-t-2 border-blue-600 text-center text-xs text-gray-500">
+                    <p>إذا كان لديك أي استفسار بخصوص عرض السعر هذا، يرجى التواصل معنا.</p>
+                    <p className="font-bold mt-2">{branding?.company_name || 'Nova ERP'}</p>
+                </footer>
             </div>
         </div>
     </div>
     </>
   );
 }
-
-    
