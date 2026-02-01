@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -278,6 +279,13 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
+        let isFirstReceiptForProject = false;
+        if (selectedProjectId) {
+            const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
+            const receiptsSnap = await getDocs(receiptsForProjectQuery);
+            isFirstReceiptForProject = receiptsSnap.empty;
+        }
+
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
@@ -295,15 +303,10 @@ export default function NewCashReceiptPage() {
                 : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
             if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
 
-            let isFirstReceiptForProject = false;
             let transactionRef, transactionSnap, currentStages;
             if(selectedProjectId) {
                 transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
-                const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
-                
-                const [receiptsSnap, txSnap] = await Promise.all([getDocs(receiptsForProjectQuery), transaction_fs.get(transactionRef)]);
-                isFirstReceiptForProject = receiptsSnap.empty;
-                transactionSnap = txSnap;
+                transactionSnap = await transaction_fs.get(transactionRef);
                 currentStages = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
             }
             
