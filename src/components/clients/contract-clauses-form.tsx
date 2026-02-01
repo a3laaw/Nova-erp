@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -321,8 +320,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     
     const calculatedClauses = (financials.milestones || []).map(milestone => {
         const amount = isPercentage
-            ? ((milestone.value || 0) / 100) * totalAmount
-            : milestone.value || 0;
+            ? ((Number(milestone.value) || 0) / 100) * totalAmount
+            : (Number(milestone.value) || 0);
         
         return {
             id: milestone.id,
@@ -330,7 +329,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             condition: milestone.condition,
             amount: amount,
             status: 'غير مستحقة' as const,
-            ...(isPercentage && { percentage: milestone.value || 0 }),
+            ...(isPercentage && { percentage: Number(milestone.value) || 0 }),
         };
     });
     
@@ -433,34 +432,43 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         
         let existingDebtJournalEntryId: string | null = null;
         if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
-            const jeQuery = query(
-                collection(firestore, 'journalEntries'), 
-                where('transactionId', '==', selectedTransactionId)
-            );
+            const jeQuery = query(collection(firestore, 'journalEntries'), where('transactionId', '==', selectedTransactionId));
             const jeSnapshot = await getDocs(jeQuery);
             if (!jeSnapshot.empty) {
-                const debtProofEntry = jeSnapshot.docs.find(doc => doc.data().narration?.includes('إثبات مديونية'));
-                if (debtProofEntry) {
-                    existingDebtJournalEntryId = debtProofEntry.id;
-                }
+                jeSnapshot.docs.forEach(doc => {
+                    if (doc.data().narration?.includes('إثبات مديونية')) {
+                        existingDebtJournalEntryId = doc.id;
+                    }
+                });
             }
         }
         
         // --- TRANSACTION STARTS ---
         await runTransaction(firestore, async (transaction_firestore) => {
-            const isNewContractCreation = !transaction.contract;
+            const currentYear = new Date().getFullYear();
+
+            // --- ALL READS ---
             const clientRef = doc(firestore, 'clients', clientId);
-            const clientSnap = await transaction_firestore.get(clientRef);
+            const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
+            const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
+
+            const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
+                transaction_firestore.get(clientRef),
+                transaction_firestore.get(coaClientCounterRef),
+                transaction_firestore.get(journalEntryCounterRef),
+            ]);
+
             if (!clientSnap.exists()) throw new Error("Client not found.");
-            const clientData = clientSnap.data() as Client;
+
+            // --- ALL LOGIC & WRITES ---
             
+            const isNewContractCreation = !transaction.contract;
+            const clientData = clientSnap.data() as Client;
             let clientAccountId = clientAccountSnap.empty ? null : clientAccountSnap.docs[0].id;
 
             if (!clientAccountId) {
                 const parentAccountData = parentAccountSnap.docs[0].data();
                 const parentAccountCode = parentAccountData.code as string;
-                const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
-                const coaClientCounterDoc = await transaction_firestore.get(coaClientCounterRef);
                 const nextClientCodeNumber = (coaClientCounterDoc.data()?.lastNumber || 0) + 1;
                 
                 const newAccountData: Omit<Account, 'id'> = {
@@ -536,9 +544,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 const jeRef = doc(firestore, 'journalEntries', existingDebtJournalEntryId);
                 transaction_firestore.update(jeRef, jePayload);
             } else {
-                const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
-                const journalEntryCounterDoc = await transaction_firestore.get(journalEntryCounterRef);
-                const currentYear = new Date().getFullYear();
                 const nextJournalEntryNumber = ((journalEntryCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const newEntryNumber = `JV-${currentYear}-${String(nextJournalEntryNumber).padStart(4, '0')}`;
                 
