@@ -16,9 +16,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
@@ -143,6 +143,27 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         let newTransactionRefId = '';
 
         try {
+            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
+            const departmentId = selectedType?.parentDeptId;
+
+            let initialStages: Partial<TransactionStage>[] = [];
+            if (departmentId) {
+                const stagesQuery = query(collection(firestore, `departments/${departmentId}/workStages`), orderBy('order'));
+                const stagesSnapshot = await getDocs(stagesQuery);
+                initialStages = stagesSnapshot.docs.map(doc => {
+                    const stageData = doc.data() as WorkStage;
+                    return {
+                        stageId: doc.id,
+                        name: stageData.name,
+                        status: 'pending',
+                        allowedRoles: stageData.allowedRoles || [],
+                        trackingType: stageData.trackingType || 'duration',
+                        expectedDurationDays: stageData.expectedDurationDays || null,
+                        maxOccurrences: stageData.maxOccurrences || null,
+                    };
+                });
+            }
+
             await runTransaction(firestore, async (transaction_firestore) => {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await transaction_firestore.get(clientRef);
@@ -162,8 +183,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
                 let engineerForTransactionId: string | null = assignedEngineerId || null;
 
-                const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-
                 if (transactionTypeName.includes('بلدية') && transactionTypeName.includes('سكن خاص')) {
                     if (clientData.assignedEngineer) {
                         engineerForTransactionId = clientData.assignedEngineer;
@@ -179,12 +198,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     clientId,
                     transactionType: transactionTypeName,
                     description,
-                    departmentId: selectedType?.parentDeptId,
+                    departmentId: departmentId,
                     transactionTypeId: selectedType?.id,
                     assignedEngineerId: engineerForTransactionId,
                     status: 'new',
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
+                    stages: initialStages,
                 };
 
                 transaction_firestore.set(newTransactionRef, newTransactionData);
