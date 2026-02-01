@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -278,13 +279,12 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
-        // --- CORRECTED LOGIC: Perform read OUTSIDE the transaction ---
+        // --- Perform read OUTSIDE the transaction ---
         let isFirstReceiptForProject = false;
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(
                 collection(firestore, 'cashReceipts'), 
-                where('projectId', '==', selectedProjectId),
-                limit(1)
+                where('projectId', '==', selectedProjectId)
             );
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
@@ -385,18 +385,6 @@ export default function NewCashReceiptPage() {
             };
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (selectedProjectId && description) {
-                const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
-                transaction_fs.set(timelineCommentRef, {
-                    type: 'comment',
-                    content: `[سند قبض رقم: ${newVoucherNumber}]\n${description}`,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                });
-            }
-
             if (isFirstReceiptForProject && selectedProjectId && transactionRef && transactionSnap?.exists()) {
                 const currentStages = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
                 const contractStageIndex = currentStages?.findIndex(s => s.name === 'توقيع العقد');
@@ -419,6 +407,19 @@ export default function NewCashReceiptPage() {
                     });
                 }
             }
+
+            if (selectedProjectId && description) {
+                const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
+                transaction_fs.set(timelineCommentRef, {
+                    type: 'comment',
+                    content: `[سند قبض رقم: ${newVoucherNumber}]\n${description}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                });
+            }
+
         });
         
         // Post-transaction logic
@@ -564,3 +565,6 @@ export default function NewCashReceiptPage() {
     </Card>
   );
 }
+
+      
+    

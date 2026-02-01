@@ -36,6 +36,7 @@ import { ContractClausesForm } from '@/components/clients/contract-clauses-form'
 import type { Client, ClientTransaction, Employee, Quotation, TransactionStage, WorkStage, UserRole, Department, TransactionAssignment } from '@/lib/types';
 import { format, differenceInDays, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import {
   DropdownMenu,
@@ -665,15 +666,8 @@ export default function TransactionDetailPage() {
                 />
             </TabsContent>
             <TabsContent value="history" className="mt-6">
-                <TransactionTimeline
+                <ClientHistoryTimeline
                   clientId={clientId}
-                  transactionId={transactionId}
-                  filterType="log"
-                  showInput={false}
-                  title="سجل التغييرات"
-                  icon={<History className="text-primary" />}
-                  client={client}
-                  transaction={transaction}
                 />
             </TabsContent>
         </Tabs>
@@ -682,3 +676,6 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+      
+    
