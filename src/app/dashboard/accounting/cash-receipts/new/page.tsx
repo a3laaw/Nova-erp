@@ -278,13 +278,6 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
-        let isFirstReceiptForProject = false;
-        if (selectedProjectId) {
-            const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
-            const receiptsSnap = await getDocs(receiptsForProjectQuery);
-            isFirstReceiptForProject = receiptsSnap.empty;
-        }
-
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
@@ -303,7 +296,13 @@ export default function NewCashReceiptPage() {
             if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
 
             let transactionRef, transactionSnap, currentStages;
-            if(selectedProjectId) {
+            let isFirstReceiptForProject = false;
+            
+            if (selectedProjectId) {
+                const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
+                const receiptsSnap = await transaction_fs.get(receiptsForProjectQuery);
+                isFirstReceiptForProject = receiptsSnap.empty;
+
                 transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
                 transactionSnap = await transaction_fs.get(transactionRef);
                 currentStages = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
@@ -559,5 +558,3 @@ export default function NewCashReceiptPage() {
     </Card>
   );
 }
-
-    
