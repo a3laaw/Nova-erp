@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -65,7 +66,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 
 
 // Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[]}>({
+function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel'}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -111,9 +112,12 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const [itemMaxOccurrences, setItemMaxOccurrences] = useState<number | ''>('');
   const [itemAllowManualCompletion, setItemAllowManualCompletion] = useState(false);
   const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
+  const [itemAllowedDuringStages, setItemAllowedDuringStages] = useState<string[]>([]);
+
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
+  const [allSequentialStages, setAllSequentialStages] = useState<MultiSelectOption[]>([]);
   const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(false);
   
@@ -198,15 +202,17 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
         setAllJobs(Array.from(uniqueJobs.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
 
         const stagesSnapshot = await getDocs(query(collectionGroup(firestore, 'workStages')));
-        const uniqueStages = new Map<string, { value: string; label: string }>();
+        const uniqueStages = new Map<string, WorkStage>();
         stagesSnapshot.forEach(doc => {
-            const stageName = doc.data().name;
             const stageId = doc.id;
-            if (stageName && !uniqueStages.has(stageId)) {
-                uniqueStages.set(stageId, { value: stageId, label: stageName });
+            if (!uniqueStages.has(stageId)) {
+                 uniqueStages.set(stageId, {id: stageId, ...doc.data()} as WorkStage);
             }
         });
-        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
+        const allStagesData = Array.from(uniqueStages.values());
+        setAllWorkStages(allStagesData.sort((a,b) => a.name.localeCompare(b.label, 'ar')).map(s => ({ value: s.id, label: s.name })));
+        setAllSequentialStages(allStagesData.filter(s => s.stageType !== 'parallel').sort((a,b) => a.name.localeCompare(b.label, 'ar')).map(s => ({ value: s.id, label: s.name })));
+
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية للنموذج.' });
     } finally {
@@ -233,6 +239,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
         setItemMaxOccurrences(item?.maxOccurrences ?? '');
         setItemAllowManualCompletion(item?.allowManualCompletion || false);
         setItemNextStageIds(item?.nextStageIds || []);
+        setItemAllowedDuringStages(item?.allowedDuringStages || []);
     }
     if (type === 'primary') setIsPrimaryDialogOpen(true);
     else setIsSecondaryDialogOpen(true);
@@ -250,6 +257,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setItemMaxOccurrences('');
     setItemAllowManualCompletion(false);
     setItemNextStageIds([]);
+    setItemAllowedDuringStages([]);
   }
   
   const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
@@ -298,6 +306,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
           dataToSave.trackingType = itemTrackingType;
           dataToSave.nextStageIds = itemNextStageIds;
           dataToSave.allowManualCompletion = itemAllowManualCompletion;
+          dataToSave.allowedDuringStages = itemAllowedDuringStages;
           
           if (itemTrackingType === 'duration') {
               dataToSave.expectedDurationDays = Number(itemDuration) || null;
@@ -477,6 +486,19 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                               </SelectContent>
                           </Select>
                         </div>
+                        
+                        {itemStageType === 'parallel' && (
+                            <div className="grid gap-2">
+                                <Label>يظهر فقط أثناء المراحل التالية (اختياري)</Label>
+                                <MultiSelect
+                                    options={allSequentialStages.filter(s => s.value !== editingItem?.id)}
+                                    selected={itemAllowedDuringStages}
+                                    onChange={setItemAllowedDuringStages}
+                                    placeholder="اتركه فارغًا ليظهر دائماً..."
+                                    disabled={refDataLoading}
+                                />
+                            </div>
+                        )}
 
                         <div className="grid gap-2">
                             <Label>نوع التتبع</Label>
@@ -725,5 +747,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
-    

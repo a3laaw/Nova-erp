@@ -368,6 +368,7 @@ export interface TransactionStage {
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
+  allowedDuringStages?: string[];
   trackingType: 'duration' | 'occurrence' | 'none';
   expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
@@ -451,6 +452,7 @@ export interface WorkStage {
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
+  allowedDuringStages?: string[]; // For parallel stages only
   trackingType: 'duration' | 'occurrence' | 'none';
   expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
