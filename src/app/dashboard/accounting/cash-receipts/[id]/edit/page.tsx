@@ -254,7 +254,7 @@ export default function EditCashReceiptPage() {
 
   const debitAccountOptions = useMemo(() => {
     return accounts
-      .filter(acc => acc.type === 'asset' && (acc.name.includes('بنك') || acc.name.includes('صندوق')))
+      .filter(acc => acc.type === 'asset' && acc.isPayable)
       .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
   }, [accounts]);
 

@@ -74,6 +74,7 @@ export default function NewCashReceiptPage() {
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [reference, setReference] = useState('');
+  const [debitAccountId, setDebitAccountId] = useState('');
 
   const [voucherNumber, setVoucherNumber] = useState('جاري التوليد...');
   const [isGeneratingVoucher, setIsGeneratingVoucher] = useState(true);
@@ -255,6 +256,12 @@ export default function NewCashReceiptPage() {
         label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
     }
   }), [clientProjects]);
+  
+  const debitAccountOptions = useMemo(() => {
+    return accounts
+      .filter(acc => acc.type === 'asset' && acc.isPayable)
+      .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+  }, [accounts]);
 
   const handleSave = async () => {
     if (!firestore || !currentUser) {
@@ -262,11 +269,11 @@ export default function NewCashReceiptPage() {
         return;
     }
     
-    if (!selectedClientId || !amount || !date || !paymentMethod) {
+    if (!selectedClientId || !amount || !date || !paymentMethod || !debitAccountId) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
-            description: 'الرجاء تعبئة حقول العميل، المبلغ، التاريخ، وطريقة الدفع.',
+            description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).',
         });
         return;
     }
@@ -278,14 +285,17 @@ export default function NewCashReceiptPage() {
 
     setIsSaving(true);
     let newReceiptId = '';
-    
+    let isFirstReceiptForProject = false;
+    let transactionRef: any = null;
+
     try {
         // --- PRE-TRANSACTION READS ---
-        let isFirstReceiptForProject = false;
         if (selectedProjectId) {
-            const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId));
+            const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
+
+            transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
         }
 
         // --- ATOMIC TRANSACTION ---
@@ -301,10 +311,8 @@ export default function NewCashReceiptPage() {
             const clientAccount = accounts.find(acc => acc.name === selectedClient.nameAr);
             if (!clientAccount) throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient.nameAr}. تأكد من إنشاء عقد له أولاً.`);
             
-            const debitAccount = paymentMethod === 'Cash'
-                ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('الصندوق'))
-                : accounts.find(acc => acc.type === 'asset' && acc.name.includes('البنك'));
-            if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
+            const debitAccount = accounts.find(acc => acc.id === debitAccountId);
+            if (!debitAccount) throw new Error('حساب الاستلام المختار غير صالح.');
             
             // --- WRITES within transaction ---
             let nextNumber = 1;
@@ -364,9 +372,8 @@ export default function NewCashReceiptPage() {
             };
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (selectedProjectId && isFirstReceiptForProject) {
-                const transactionRefForUpdate = doc(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}`);
-                const txSnap = await transaction_fs.get(transactionRefForUpdate); // Read inside transaction
+            if (transactionRef && isFirstReceiptForProject) {
+                const txSnap = await transaction_fs.get(transactionRef);
                 if (txSnap.exists()) {
                     const txData = txSnap.data() as ClientTransaction;
                     const currentStages: TransactionStage[] = [...(txData.stages || [])];
@@ -375,7 +382,7 @@ export default function NewCashReceiptPage() {
                     if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
                         currentStages[contractStageIndex].status = 'completed';
                         currentStages[contractStageIndex].endDate = new Date() as any; // Firestore will convert this
-                        transaction_fs.update(transactionRefForUpdate, { stages: currentStages });
+                        transaction_fs.update(transactionRef, { stages: currentStages });
                     }
                 }
             }
@@ -385,8 +392,8 @@ export default function NewCashReceiptPage() {
         toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
         
         if (selectedProjectId) {
-            const transactionRef = doc(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}`);
-            const transactionDoc = await getDoc(transactionRef);
+            const txRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
+            const transactionDoc = await getDoc(txRef);
             if (!transactionDoc.exists()) throw new Error('Transaction not found for post-processing');
             const transactionData = transactionDoc.data() as ClientTransaction;
 
@@ -411,7 +418,7 @@ export default function NewCashReceiptPage() {
                     accumulatedAmount += clause.amount;
                     return newClause;
                 });
-                 postTransactionBatch.update(transactionRef, { 'contract.clauses': updatedClauses });
+                 postTransactionBatch.update(txRef, { 'contract.clauses': updatedClauses });
             }
             
             await postTransactionBatch.commit();
@@ -509,7 +516,7 @@ export default function NewCashReceiptPage() {
                 <Label htmlFor="description">وذلك عن</Label>
                 <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
@@ -523,6 +530,16 @@ export default function NewCashReceiptPage() {
                             <SelectItem value="K-Net">كي-نت</SelectItem>
                         </SelectContent>
                     </Select>
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="debitAccountId">حساب الاستلام <span className="text-destructive">*</span></Label>
+                    <InlineSearchList 
+                        value={debitAccountId}
+                        onSelect={setDebitAccountId}
+                        options={debitAccountOptions}
+                        placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
+                        disabled={accountsLoading || isSaving}
+                    />
                 </div>
                 <div className="grid gap-2">
                 <Label htmlFor="reference">رقم الشيك/المرجع</Label>
