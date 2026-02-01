@@ -278,13 +278,13 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
-        // --- PRE-TRANSACTION READ ---
+        // --- CORRECTED LOGIC: Perform read OUTSIDE the transaction ---
         let isFirstReceiptForProject = false;
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(
                 collection(firestore, 'cashReceipts'), 
                 where('projectId', '==', selectedProjectId),
-                limit(1) // We only need to know if at least one exists
+                limit(1)
             );
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
@@ -294,7 +294,7 @@ export default function NewCashReceiptPage() {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
             
-            // --- All Transactional Reads First ---
+            // --- Transactional Reads ---
             const counterDoc = await transaction_fs.get(counterRef);
             const selectedClient = clients.find(c => c.id === selectedClientId);
             if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
@@ -313,7 +313,7 @@ export default function NewCashReceiptPage() {
                 transactionSnap = await transaction_fs.get(transactionRef);
             }
             
-            // --- All Writes Second ---
+            // --- All Writes ---
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
