@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -519,7 +520,7 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                         </div>
                         <div className="grid gap-2">
                             <Label>المراحل التالية المحتملة</Label>
-                             <MultiSelect
+                            <MultiSelect
                                 options={allWorkStages.filter(s => s.value !== editingItem?.id)}
                                 selected={itemNextStageIds}
                                 onChange={setItemNextStageIds}
@@ -724,3 +725,5 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
+
+    
