@@ -490,7 +490,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     status: 'in-progress',
                     updatedAt: serverTimestamp(),
                 };
-                 if (assignedEngineerId && assignedEngineerId !== originalTransaction.assignedEngineerId) {
+                if (assignedEngineerId && assignedEngineerId !== originalTransaction.assignedEngineerId) {
                     transactionPayload.assignedEngineerId = assignedEngineerId;
                 }
                 transaction_firestore.update(transactionRef, cleanFirestoreData(transactionPayload));

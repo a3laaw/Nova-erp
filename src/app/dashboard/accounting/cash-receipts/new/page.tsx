@@ -34,13 +34,15 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
-const getTotalPaidForProject = async (projectId: string, db: any) => {
+const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
     if (!projectId || !db) return total;
     const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
     const receiptsSnap = await getDocs(receiptsQuery);
     receiptsSnap.forEach(doc => {
-        total += doc.data().amount || 0;
+        if (doc.id !== excludeReceiptId) {
+            total += doc.data().amount || 0;
+        }
     });
     return total;
 };
@@ -300,8 +302,8 @@ export default function NewCashReceiptPage() {
             if (!clientAccount) throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient.nameAr}. تأكد من إنشاء عقد له أولاً.`);
             
             const debitAccount = paymentMethod === 'Cash'
-                ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('صندوق'))
-                : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
+                ? accounts.find(acc => acc.type === 'asset' && acc.name.includes('الصندوق'))
+                : accounts.find(acc => acc.type === 'asset' && acc.name.includes('البنك'));
             if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
             
             // --- WRITES within transaction ---
@@ -362,13 +364,20 @@ export default function NewCashReceiptPage() {
             };
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (selectedProjectId && description) {
-                const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
-                transaction_fs.set(timelineCommentRef, {
-                    type: 'comment', content: `[سند قبض رقم: ${newVoucherNumber}]\n${description}`,
-                    userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                });
+            if (selectedProjectId && isFirstReceiptForProject) {
+                const transactionRefForUpdate = doc(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}`);
+                const txSnap = await transaction_fs.get(transactionRefForUpdate); // Read inside transaction
+                if (txSnap.exists()) {
+                    const txData = txSnap.data() as ClientTransaction;
+                    const currentStages: TransactionStage[] = [...(txData.stages || [])];
+                    const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+
+                    if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
+                        currentStages[contractStageIndex].status = 'completed';
+                        currentStages[contractStageIndex].endDate = new Date() as any; // Firestore will convert this
+                        transaction_fs.update(transactionRefForUpdate, { stages: currentStages });
+                    }
+                }
             }
         });
         
@@ -383,18 +392,7 @@ export default function NewCashReceiptPage() {
 
             const postTransactionBatch = writeBatch(firestore);
             
-            // 1. Update contract stages if it's the first receipt
-            if (isFirstReceiptForProject) {
-                const currentStages: TransactionStage[] = [...(transactionData.stages || [])];
-                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
-                if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
-                    currentStages[contractStageIndex].status = 'completed';
-                    currentStages[contractStageIndex].endDate = new Date() as any;
-                    postTransactionBatch.update(transactionRef, { stages: currentStages });
-                }
-            }
-
-            // 2. Update all contract clauses statuses
+            // Update all contract clauses statuses
             if (transactionData.contract?.clauses) {
                 const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
                 let accumulatedAmount = 0;
