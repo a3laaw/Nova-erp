@@ -313,13 +313,11 @@ export default function NewCashReceiptPage() {
     
     // --- PRE-TRANSACTION READS ---
     let isFirstReceiptForProject = false;
-    let transactionRef: any;
     try {
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
-            transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
         }
     } catch(err) {
         console.error("Pre-transaction read failed:", err);
@@ -333,7 +331,18 @@ export default function NewCashReceiptPage() {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
             
+            // --- ALL TRANSACTION READS FIRST ---
             const counterDoc = await transaction_fs.get(counterRef);
+            let txSnap;
+            let transactionRef;
+            if (selectedProjectId) {
+                transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
+                txSnap = await transaction_fs.get(transactionRef);
+            }
+            // --- END OF READS ---
+
+
+            // --- ALL LOGIC & WRITES LAST ---
             const selectedClient = clients.find(c => c.id === selectedClientId);
             if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
             
@@ -348,9 +357,8 @@ export default function NewCashReceiptPage() {
                 const counts = counterDoc.data()?.counts || {};
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
-            transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-            const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
             
+            const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             newReceiptId = newReceiptRef.id;
 
@@ -385,33 +393,32 @@ export default function NewCashReceiptPage() {
                 newReceiptData.projectNameAr = selectedProject.transactionType;
             }
 
-            transaction_fs.set(newReceiptRef, newReceiptData);
-            
             const journalEntryData = {
                 entryNumber: `CRV-JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
                 narration: description || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
                 lines: [
                     { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
-                    { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
+                    { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
                 ],
                 clientId: selectedClientId, transactionId: selectedProjectId || null,
                 createdAt: serverTimestamp(), createdBy: currentUser.id,
             };
+
+            // Now, perform all writes
+            transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            transaction_fs.set(newReceiptRef, newReceiptData);
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (selectedProjectId && isFirstReceiptForProject) {
-                const txSnap = await transaction_fs.get(transactionRef);
-                if (txSnap.exists()) {
-                    const txData = txSnap.data() as ClientTransaction;
-                    const currentStages: TransactionStage[] = [...(txData.stages || [])];
-                    const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+            if (selectedProjectId && isFirstReceiptForProject && txSnap?.exists()) {
+                const txData = txSnap.data() as ClientTransaction;
+                const currentStages: TransactionStage[] = [...(txData.stages || [])];
+                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
 
-                    if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
-                        currentStages[contractStageIndex].status = 'completed';
-                        currentStages[contractStageIndex].endDate = new Date() as any;
-                        transaction_fs.update(transactionRef, { stages: currentStages });
-                    }
+                if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
+                    currentStages[contractStageIndex].status = 'completed';
+                    currentStages[contractStageIndex].endDate = new Date() as any;
+                    transaction_fs.update(transactionRef!, { stages: currentStages });
                 }
             }
         });

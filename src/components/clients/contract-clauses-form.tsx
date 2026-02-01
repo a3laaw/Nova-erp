@@ -447,7 +447,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         await runTransaction(firestore, async (transaction_firestore) => {
             const currentYear = new Date().getFullYear();
 
-            // --- ALL READS ---
+            // --- ALL TRANSACTION READS FIRST ---
             const clientRef = doc(firestore, 'clients', clientId);
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
@@ -459,9 +459,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
+            // --- END OF TRANSACTION READS ---
 
-            // --- ALL LOGIC & WRITES ---
-            
+            // --- ALL LOGIC & WRITES LAST ---
             const isNewContractCreation = !transaction.contract;
             const clientData = clientSnap.data() as Client;
             let clientAccountId = clientAccountSnap.empty ? null : clientAccountSnap.docs[0].id;
