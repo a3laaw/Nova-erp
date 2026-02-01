@@ -23,7 +23,6 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
   const handleChange = (newSelected: MultiValue<MultiSelectOption>) => {
     const values = newSelected ? newSelected.map(opt => opt.value) : [];
     onChange(values);
-    console.log("تم اختيار:", values);
   };
 
   const selectedOptions = options.filter(opt => selected.includes(opt.value));

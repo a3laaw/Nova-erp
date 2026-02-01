@@ -210,8 +210,8 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
             }
         });
         const allStagesData = Array.from(uniqueStages.values());
-        setAllWorkStages(allStagesData.sort((a,b) => a.name.localeCompare(b.label, 'ar')).map(s => ({ value: s.id, label: s.name })));
-        setAllSequentialStages(allStagesData.filter(s => s.stageType !== 'parallel').sort((a,b) => a.name.localeCompare(b.label, 'ar')).map(s => ({ value: s.id, label: s.name })));
+        setAllWorkStages(allStagesData.sort((a,b) => a.name.localeCompare(b.name, 'ar')).map(s => ({ value: s.id, label: s.name })));
+        setAllSequentialStages(allStagesData.filter(s => s.stageType !== 'parallel').sort((a,b) => a.name.localeCompare(b.name, 'ar')).map(s => ({ value: s.id, label: s.name })));
 
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية للنموذج.' });
