@@ -249,92 +249,80 @@ export default function TransactionDetailPage() {
     if (!firestore || !transaction || !currentUser || !client) return;
 
     const originalProgress = [...(transaction.stages || [])];
-    const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
-    
-    const currentIndexInUI = stages.findIndex(s => s.stageId === stageId);
-    const templateStageInfo = stages[currentIndexInUI];
-    if (!templateStageInfo) {
+    const stageTemplateInfo = stages.find(s => s.stageId === stageId);
+    if (!stageTemplateInfo) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
         return;
     }
     
+    // --- Initial Validation ---
     if (newStatus === 'in-progress') {
-        const contractStage = stages.find(s => s.name === 'توقيع العقد');
-        
-        let canStart = false;
-        let errorMessage = "الرجاء إكمال المرحلة السابقة أولاً.";
-
-        if (['توقيع العقد', 'تعديلات ومناقشات', 'الاستفسارات والتواصل المبدئي'].includes(templateStageInfo.name)) {
-            canStart = true;
-        } else if (['ارسال فحص التربه', 'الانتهاء من السرداب'].includes(templateStageInfo.name)) {
-            if (contractStage?.status === 'completed') {
-                canStart = true;
-            } else {
-                errorMessage = 'يجب إكمال مرحلة "توقيع العقد" أولاً.';
-            }
-        } else if (templateStageInfo.name === 'استلام فحص التربه') {
-            errorMessage = 'هذه المرحلة تبدأ تلقائيًا.';
-        } else { // Default sequential check
-            if (currentIndexInUI > 0) {
-                let prevIndex = currentIndexInUI - 1;
-                let actualPreviousStage = stages[prevIndex];
-                // If the immediate previous stage is 'Amendments', skip it and check the one before that.
-                if (actualPreviousStage?.name === 'تعديلات ومناقشات' && prevIndex > 0) {
-                    actualPreviousStage = stages[prevIndex - 1];
-                }
-                
-                if (actualPreviousStage?.status === 'completed') {
-                    canStart = true;
-                } else {
-                    errorMessage = `الرجاء إكمال المرحلة السابقة: "${actualPreviousStage?.name || 'غير معروفة'}".`;
-                }
-            } else {
-                canStart = true; // First stage in list (that is not special)
-            }
-        }
-        
-        if (!canStart) {
-            toast({ variant: 'destructive', title: 'لا يمكن بدء المرحلة', description: errorMessage });
+        const canStart = canStartStage(stageTemplateInfo, stages);
+        if (!canStart.allowed) {
+            toast({ variant: 'destructive', title: 'لا يمكن بدء المرحلة', description: canStart.reason });
             return;
         }
     }
-
-
+    
+    const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
     let updatedProgress: Partial<TransactionStage>;
 
     if (stageProgressIndex > -1) {
         updatedProgress = { ...originalProgress[stageProgressIndex] };
     } else {
-        updatedProgress = {
-            stageId: stageId,
-            name: templateStageInfo.name,
-            allowedRoles: templateStageInfo.allowedRoles,
-            trackingType: templateStageInfo.trackingType,
-        };
+        updatedProgress = { stageId: stageId, name: stageTemplateInfo.name, allowedRoles: stageTemplateInfo.allowedRoles, trackingType: stageTemplateInfo.trackingType, };
     }
     
     const oldStatus = updatedProgress.status || 'pending';
-    if(oldStatus === newStatus) return;
-
-    updatedProgress.status = newStatus;
+    if(oldStatus === newStatus && stageTemplateInfo.trackingType !== 'occurrence') return; // Allow re-completing occurrence stages
+    
     const now = new Date();
     
-    if (newStatus === 'in-progress') {
-        if (oldStatus === 'pending') {
-            updatedProgress.startDate = now;
-             if (templateStageInfo.trackingType === 'duration' && templateStageInfo.expectedDurationDays) {
-                updatedProgress.expectedEndDate = addDays(now, templateStageInfo.expectedDurationDays);
-            }
-        }
-    } else if (newStatus === 'completed') {
-        if (!updatedProgress.startDate) updatedProgress.startDate = now;
-        updatedProgress.endDate = now;
-    } else { 
-        updatedProgress.startDate = updatedProgress.startDate || null;
-        updatedProgress.endDate = null;
-        updatedProgress.expectedEndDate = null;
-    }
+    // --- Logic for different action types ---
+    let logContent = '';
+    let isFinallyCompleted = false;
 
+    if (newStatus === 'completed' && stageTemplateInfo.trackingType === 'occurrence') {
+        // This is an occurrence log, not a simple status change
+        const newCount = (updatedProgress.completedCount || 0) + 1;
+        updatedProgress.completedCount = newCount;
+        const maxOccurrences = stageTemplateInfo.maxOccurrences || 1;
+        
+        logContent = `قام ${currentUser.fullName} بتسجيل إنجاز للمرحلة "${updatedProgress.name}" (${newCount}/${maxOccurrences}).`;
+
+        if (newCount >= maxOccurrences) {
+            updatedProgress.status = 'completed';
+            if (!updatedProgress.startDate) updatedProgress.startDate = now;
+            updatedProgress.endDate = now;
+            isFinallyCompleted = true;
+            logContent = `قام ${currentUser.fullName} بإكمال المرحلة "${updatedProgress.name}" (وصل للحد الأقصى ${maxOccurrences} إنجازات).`;
+        } else {
+            updatedProgress.status = 'in-progress';
+        }
+    } else {
+        // This is a standard status change for 'duration' or 'none' types
+        logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${stageTemplateInfo.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+        updatedProgress.status = newStatus;
+
+        if (newStatus === 'in-progress') {
+            if (oldStatus === 'pending') {
+                updatedProgress.startDate = now;
+                if (stageTemplateInfo.trackingType === 'duration' && stageTemplateInfo.expectedDurationDays) {
+                    updatedProgress.expectedEndDate = addDays(now, stageTemplateInfo.expectedDurationDays);
+                }
+            }
+        } else if (newStatus === 'completed') {
+            if (!updatedProgress.startDate) updatedProgress.startDate = now;
+            updatedProgress.endDate = now;
+            isFinallyCompleted = true;
+        } else {
+            // For 'pending', 'skipped', 'awaiting-review'
+            updatedProgress.endDate = null;
+            updatedProgress.expectedEndDate = null;
+        }
+    }
+    
+    // --- Update stages array ---
     let newProgressForFirestore;
     if (stageProgressIndex > -1) {
         newProgressForFirestore = [...originalProgress];
@@ -342,129 +330,101 @@ export default function TransactionDetailPage() {
     } else {
         newProgressForFirestore = [...originalProgress, updatedProgress as TransactionStage];
     }
-    
-    const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-    const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
-    
-    try {
-        const batch = writeBatch(firestore);
-        
-        const completedStage = newStatus === 'completed' ? stages.find(s => s.stageId === stageId) : null;
-        
-        let shouldStartNextStage = false;
-        let nextStageInTemplate: WorkStage | undefined = undefined;
 
-        if (newStatus === 'completed' && completedStage) {
-            if (completedStage.name === 'ارسال فحص التربه') {
-                nextStageInTemplate = stages.find(s => s.name === 'استلام فحص التربه') as WorkStage | undefined;
-            } else {
-                const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
-                if (completedStageOrderIndex > -1 && (completedStageOrderIndex + 1) < stages.length) {
-                    let potentialNext = stages[completedStageOrderIndex + 1];
-                    // if next stage is 'amendments', skip to the one after
-                    if (potentialNext?.name === 'تعديلات ومناقشات' && (completedStageOrderIndex + 2) < stages.length) {
-                        potentialNext = stages[completedStageOrderIndex + 2];
-                    }
-                    if (potentialNext && !['ارسال فحص التربه', 'توقيع العقد'].includes(potentialNext.name)) {
-                        nextStageInTemplate = potentialNext as WorkStage;
-                    }
-                }
-            }
-        }
-
-
-        if (nextStageInTemplate) {
-            const nextStageId = nextStageInTemplate.id!;
-            const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
-
-            if (!isDiscussionStage) {
-                const nextStageIndexInProg = newProgressForFirestore.findIndex(s => s.stageId === nextStageId);
-                let stageToStart: Partial<TransactionStage>;
-                if (nextStageIndexInProg !== -1) {
-                    stageToStart = { ...newProgressForFirestore[nextStageIndexInProg] };
-                } else {
-                    stageToStart = {
-                        stageId: nextStageId,
-                        name: nextStageInTemplate.name,
-                        allowedRoles: nextStageInTemplate.allowedRoles,
-                        trackingType: nextStageInTemplate.trackingType,
-                    };
-                }
-
+    // --- Side Effects (Start next stage, etc.) ---
+    let nextStageInTemplate: WorkStage | undefined = undefined;
+    if (isFinallyCompleted) {
+        const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageId);
+        if (completedStageOrderIndex > -1 && (completedStageOrderIndex + 1) < stages.length) {
+            nextStageInTemplate = stages[completedStageOrderIndex + 1] as WorkStage;
+            if (nextStageInTemplate) {
+                logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+                const nextStageIndexInProg = newProgressForFirestore.findIndex(s => s.stageId === nextStageInTemplate!.id);
+                
+                const stageToStart: Partial<TransactionStage> = nextStageIndexInProg > -1
+                    ? { ...newProgressForFirestore[nextStageIndexInProg] }
+                    : { stageId: nextStageInTemplate.id!, name: nextStageInTemplate.name, ... };
+                
                 if (stageToStart.status === 'pending') {
                     stageToStart.status = 'in-progress';
-                    stageToStart.startDate = now as any;
-                    if (nextStageInTemplate.trackingType === 'duration' && nextStageInTemplate.expectedDurationDays) {
+                    stageToStart.startDate = now;
+                     if (nextStageInTemplate.trackingType === 'duration' && nextStageInTemplate.expectedDurationDays) {
                         stageToStart.expectedEndDate = addDays(now, nextStageInTemplate.expectedDurationDays);
                     }
-
-                    if(nextStageIndexInProg !== -1) {
-                        newProgressForFirestore[nextStageIndexInProg] = stageToStart as TransactionStage;
-                    } else {
-                        newProgressForFirestore.push(stageToStart as TransactionStage);
-                    }
-                    shouldStartNextStage = true;
+                    if (nextStageIndexInProg > -1) newProgressForFirestore[nextStageIndexInProg] = stageToStart as TransactionStage;
+                    else newProgressForFirestore.push(stageToStart as TransactionStage);
                 }
             }
         }
-        
-        let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${updatedProgress.name}" إلى "${stageStatusTranslations[newStatus]}".`;
-        if (shouldStartNextStage && nextStageInTemplate) {
-            logContent += ` وتم بدء المرحلة التالية تلقائياً: "${nextStageInTemplate.name}".`;
+    }
+
+    // --- Database Write & Notifications ---
+    try {
+        const batch = writeBatch(firestore);
+        const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+
+        let commentContent = logContent;
+        if(isFinallyCompleted) {
+             const contractClauses = transaction.contract?.clauses || [];
+             const completedStageNames = new Set(newProgressForFirestore.filter(s => s.status === 'completed').map(s => s.name));
+             const newContractClauses = contractClauses.map(clause => (clause.condition && completedStageNames.has(clause.condition) && clause.status === 'غير مستحقة') ? { ...clause, status: 'مستحقة' as const } : clause);
+             const totalAmountNowDue = newContractClauses.filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة').reduce((sum, c) => sum + c.amount, 0);
+             const totalPaid = await getTotalPaidForProject(transactionId, firestore);
+             const outstandingBalance = totalAmountNowDue - totalPaid;
+
+             if(outstandingBalance > 0) {
+                 commentContent += `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+             }
+             batch.update(transactionRefDoc, { 'contract.clauses': newContractClauses });
         }
-
-        let commentContent = `تم تغيير حالة المرحلة: ${updatedProgress.name} إلى ${stageStatusTranslations[newStatus]}.`;
-
-        const completedStageNames = new Set(
-            newProgressForFirestore.filter(s => s.status === 'completed').map(s => s.name)
-        );
-
-        let contractClauses = transaction.contract ? [...transaction.contract.clauses] : [];
-        const newContractClauses = contractClauses.map(clause => {
-            if (clause.condition && completedStageNames.has(clause.condition) && clause.status === 'غير مستحقة') {
-                return { ...clause, status: 'مستحقة' as const };
-            }
-            return clause;
-        });
-
-        let outstandingBalance = 0;
-        const totalAmountNowDue = newContractClauses
-            .filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة')
-            .reduce((sum, c) => sum + c.amount, 0);
         
-        const totalPaid = await getTotalPaidForProject(transactionId, firestore);
-        outstandingBalance = totalAmountNowDue - totalPaid;
+        const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
+        const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
 
-        if (newStatus === 'completed' && outstandingBalance > 0) {
-            const paymentNotificationText = `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
-            commentContent += paymentNotificationText;
+        batch.set(doc(timelineCollectionRef), { type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, createdAt: serverTimestamp() });
+        batch.set(doc(historyCollectionRef), { type: 'log', content: `[${transaction.transactionType}] ${logContent}`, userId: currentUser.id, userName: currentUser.fullName, createdAt: serverTimestamp() });
+        if(commentContent !== logContent) {
+            batch.set(doc(timelineCollectionRef), { type: 'comment', content: commentContent, userId: 'system', userName: 'النظام', createdAt: serverTimestamp() });
         }
-
-        batch.set(doc(timelineCollectionRef), {
-            type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
-        });
         
-        batch.set(doc(timelineCollectionRef), {
-            type: 'comment', content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp(),
-        });
-        
-        const updateData: any = { 
-            stages: newProgressForFirestore,
-            'contract.clauses': newContractClauses,
-        };
-
-        batch.update(transactionRefDoc, cleanFirestoreData(updateData));
+        batch.update(transactionRefDoc, { stages: newProgressForFirestore });
         
         await batch.commit();
-
-        toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة بنجاح.` });
-    
+        toast({ title: 'نجاح', description: 'تم تحديث حالة المرحلة بنجاح.' });
     } catch (e) {
         console.error("Failed to update stage status:", e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' });
     }
   };
 
+  const canStartStage = (stage: TransactionStage, allStages: TransactionStage[]) => {
+    const specialStartStages = ['توقيع العقد', 'الاستفسارات والتواصل المبدئي'];
+    if (specialStartStages.includes(stage.name)) {
+        return { allowed: true };
+    }
+
+    const contractStage = allStages.find(s => s.name === 'توقيع العقد');
+    if (!contractStage || contractStage.status !== 'completed') {
+        return { allowed: false, reason: 'يجب إكمال مرحلة "توقيع العقد" أولاً.' };
+    }
+
+    const currentIndex = allStages.findIndex(s => s.stageId === stage.stageId);
+    if (currentIndex > 0) {
+        let prevIndex = currentIndex - 1;
+        let prevStage = allStages[prevIndex];
+        
+        // Skip 'discussion' stages when checking sequential dependency
+        if (prevStage?.name === 'تعديلات ومناقشات' && prevIndex > 0) {
+            prevStage = allStages[prevIndex - 1];
+        }
+
+        if (prevStage && prevStage.status !== 'completed') {
+            return { allowed: false, reason: `الرجاء إكمال المرحلة السابقة: "${prevStage.name}".` };
+        }
+    }
+    
+    return { allowed: true };
+  }
 
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
@@ -619,50 +579,45 @@ export default function TransactionDetailPage() {
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
-                                {stages.map((stage, index) => {
+                                {stages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
-                                    
                                     return (
-                                        <div key={stage.stageId || index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                        <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
-                                                <StageCountdown stage={stage} />
-                                                {stage.allowedRoles?.map(role => (
-                                                    <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
-                                                ))}
+                                                {stage.trackingType === 'duration' && <StageCountdown stage={stage} />}
+                                                {stage.trackingType === 'occurrence' && stage.maxOccurrences && (
+                                                    <Badge variant="secondary">الإنجاز: {stage.completedCount || 0} / {stage.maxOccurrences}</Badge>
+                                                )}
                                             </div>
                                             <div className="flex gap-2">
                                                 {stage.status === 'pending' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract}>
-                                                        <Play className="ml-2 h-4 w-4" />
-                                                        بدء
+                                                        <Play className="ml-2 h-4 w-4" /> بدء
                                                     </Button>
                                                 )}
                                                 {stage.status === 'in-progress' && (
                                                     <>
-                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
+                                                         <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
                                                             <Check className="ml-2 h-4 w-4" />
-                                                            إكمال
+                                                            {stage.trackingType === 'occurrence' ? 'تسجيل إنجاز' : 'إكمال'}
                                                         </Button>
                                                         <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => handleStageStatusChange(stage.stageId, 'awaiting-review')} disabled={!canInteract}>
                                                             <Pause className="ml-2 h-4 w-4" />
-                                                            إيقاف للمراجعة
                                                         </Button>
                                                     </>
                                                 )}
                                                 {stage.status === 'awaiting-review' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract}>
-                                                        <Play className="ml-2 h-4 w-4" />
-                                                        استئناف العمل
+                                                        <Play className="ml-2 h-4 w-4" /> استئناف
                                                     </Button>
                                                 )}
-                                                {stage.status === 'completed' && (
+                                                {stage.status === 'completed' && stage.endDate && (
                                                     <div className="text-sm text-green-600 flex items-center gap-2">
-                                                        <Check className="h-4 w-4" />
-                                                        مكتملة في {formatDate(stage.endDate)}
+                                                        <Check className="h-4 w-4" /> مكتملة في {formatDate(stage.endDate)}
                                                     </div>
                                                 )}
                                             </div>
@@ -704,3 +659,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
