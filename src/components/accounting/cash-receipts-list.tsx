@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -98,39 +99,58 @@ export function CashReceiptsList() {
     try {
         const batch = writeBatch(firestore);
         const receiptRef = doc(firestore, 'cashReceipts', receiptToDelete.id!);
-        batch.delete(receiptRef); // Stage the deletion
-
-        // Recalculate contract statuses if linked to a project
-        if (receiptToDelete.projectId) {
+        
+        if (receiptToDelete.projectId && receiptToDelete.clientId) {
             const projectRef = doc(firestore, 'clients', receiptToDelete.clientId, 'transactions', receiptToDelete.projectId);
-            const projectSnap = await getDoc(projectRef); // Need to get it before batching update
+            const projectSnap = await getDoc(projectRef);
 
-            if (projectSnap.exists() && projectSnap.data()?.contract?.clauses) {
-                // Calculate the total paid amount *after* deletion
-                const totalPaidAfterDeletion = await getTotalPaidForProject(receiptToDelete.projectId, firestore, receiptToDelete.id);
-
+            if (projectSnap.exists()) {
                 const transactionData = projectSnap.data();
-                let accumulatedAmount = 0;
-                let dueClauseFound = false;
-                const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
-                    const newClause = { ...clause };
-                    if (totalPaidAfterDeletion >= accumulatedAmount + clause.amount) {
-                        newClause.status = 'مدفوعة';
-                    } else if (totalPaidAfterDeletion > accumulatedAmount && !dueClauseFound) {
-                        newClause.status = 'مستحقة';
-                        dueClauseFound = true;
-                    } else {
-                        newClause.status = 'غير مستحقة';
-                    }
-                    accumulatedAmount += clause.amount;
-                    return newClause;
-                });
+                
+                const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', receiptToDelete.projectId), limit(2));
+                const receiptsSnap = await getDocs(receiptsForProjectQuery);
+                const isLastReceipt = receiptsSnap.docs.length === 1 && receiptsSnap.docs[0].id === receiptToDelete.id;
 
-                batch.update(projectRef, { 'contract.clauses': updatedClauses });
+                const updates: any = {};
+
+                if (transactionData.contract?.clauses) {
+                    const totalPaidAfterDeletion = await getTotalPaidForProject(receiptToDelete.projectId, firestore, receiptToDelete.id!);
+                    let accumulatedAmount = 0;
+                    let dueClauseFound = false;
+                    const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                        const newClause = { ...clause };
+                        if (totalPaidAfterDeletion >= accumulatedAmount + clause.amount) {
+                            newClause.status = 'مدفوعة';
+                        } else if (totalPaidAfterDeletion > accumulatedAmount && !dueClauseFound) {
+                            newClause.status = 'مستحقة';
+                            dueClauseFound = true;
+                        } else {
+                            newClause.status = 'غير مستحقة';
+                        }
+                        accumulatedAmount += clause.amount;
+                        return newClause;
+                    });
+                    updates['contract.clauses'] = updatedClauses;
+                }
+                
+                if (isLastReceipt) {
+                    const currentStages = transactionData.stages || [];
+                    const contractStageIndex = currentStages.findIndex((s: any) => s.name === 'توقيع العقد');
+                    if (contractStageIndex !== -1 && currentStages[contractStageIndex].status === 'completed') {
+                        currentStages[contractStageIndex].status = 'pending';
+                        currentStages[contractStageIndex].endDate = null;
+                        updates['stages'] = currentStages;
+                    }
+                }
+                
+                if (Object.keys(updates).length > 0) {
+                    batch.update(projectRef, updates);
+                }
             }
         }
         
-        await batch.commit(); // Commit both deletion and update together
+        batch.delete(receiptRef);
+        await batch.commit();
 
         toast({ title: 'نجاح', description: 'تم حذف سند القبض وتحديث حالة العقد.' });
     } catch (error) {
@@ -292,7 +312,7 @@ export function CashReceiptsList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيتم حذف السند رقم "{receiptToDelete?.voucherNumber}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
+                        سيتم حذف السند رقم "{receiptToDelete?.voucherNumber}" بشكل دائم. سيؤثر هذا على حالة دفعات العقد المرتبط.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
