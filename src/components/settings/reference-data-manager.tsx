@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Skeleton } from '../ui/skeleton';
+import { Checkbox } from '../ui/checkbox';
 
 // --- NEW StatCard Component ---
 function StatCard({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) {
@@ -102,13 +103,17 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   
   const [itemName, setItemName] = useState('');
   const [itemRoles, setItemRoles] = useState<string[]>([]);
+  const [itemStageType, setItemStageType] = useState<'sequential' | 'parallel'>('sequential');
   const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
   const [itemDuration, setItemDuration] = useState<number | ''>('');
   const [itemMaxOccurrences, setItemMaxOccurrences] = useState<number | ''>('');
+  const [itemAllowManualCompletion, setItemAllowManualCompletion] = useState(false);
+  const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
-  const [jobs, setJobs] = useState<{ value: string; label: string }[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(false);
+  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
+  const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
+  const [refDataLoading, setRefDataLoading] = useState(false);
   
   const primaryQueryConstraints = useMemo(() => [orderBy('name')], []);
   const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
@@ -173,52 +178,46 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   }, [selectedPrimary, firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
 
 
-  const fetchAllJobs = useCallback(async () => {
+  const fetchReferenceDataForDialog = useCallback(async () => {
     if (!firestore) return;
-    setJobsLoading(true);
+    setRefDataLoading(true);
     try {
         const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
         const uniqueJobs = new Map<string, { value: string; label: string }>();
-
-        const normalize = (str: string) => {
-            if (!str) return '';
-            return str
-                .trim()
-                .replace(/[أإآ]/g, 'ا')
-                .replace(/ى/g, 'ي')
-                .replace(/ة/g, 'ه')
-                .replace(/\s+/g, ' ')
-                .replace(/ا$/, '');
-        };
-
         jobsSnapshot.forEach(doc => {
             const jobName = doc.data().name;
             if (jobName && typeof jobName === 'string') {
                 const trimmedName = jobName.trim();
-                if (trimmedName) {
-                    const normalizedName = normalize(trimmedName);
-                    if (normalizedName && !uniqueJobs.has(normalizedName)) {
-                        uniqueJobs.set(normalizedName, { value: trimmedName, label: trimmedName });
-                    }
+                if (trimmedName && !uniqueJobs.has(trimmedName)) {
+                    uniqueJobs.set(trimmedName, { value: trimmedName, label: trimmedName });
                 }
             }
         });
-        
-        const sortedJobs = Array.from(uniqueJobs.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar'));
-        setJobs(sortedJobs);
+        setAllJobs(Array.from(uniqueJobs.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
+
+        const stagesSnapshot = await getDocs(query(collectionGroup(firestore, 'workStages')));
+        const uniqueStages = new Map<string, { value: string; label: string }>();
+        stagesSnapshot.forEach(doc => {
+            const stageName = doc.data().name;
+            const stageId = doc.id;
+            if (stageName && !uniqueStages.has(stageId)) {
+                uniqueStages.set(stageId, { value: stageId, label: stageName });
+            }
+        });
+        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
     } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الوظائف.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية للنموذج.' });
     } finally {
-        setJobsLoading(false);
+        setRefDataLoading(false);
     }
   }, [firestore, toast]);
 
 
   useEffect(() => {
     if (isWorkStageView && (isSecondaryDialogOpen || isPrimaryDialogOpen)) {
-      fetchAllJobs();
+      fetchReferenceDataForDialog();
     }
-  }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchAllJobs]);
+  }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchReferenceDataForDialog]);
 
 
   const openDialog = (type: 'primary' | 'secondary', item: any | null = null) => {
@@ -226,9 +225,12 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setItemName(item?.name || '');
     if (isWorkStageView && type === 'secondary') {
         setItemRoles(item?.allowedRoles || []);
+        setItemStageType(item?.stageType || 'sequential');
         setItemTrackingType(item?.trackingType || 'duration');
         setItemDuration(item?.expectedDurationDays ?? '');
         setItemMaxOccurrences(item?.maxOccurrences ?? '');
+        setItemAllowManualCompletion(item?.allowManualCompletion || false);
+        setItemNextStageIds(item?.nextStageIds || []);
     }
     if (type === 'primary') setIsPrimaryDialogOpen(true);
     else setIsSecondaryDialogOpen(true);
@@ -240,9 +242,12 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setEditingItem(null);
     setItemName('');
     setItemRoles([]);
+    setItemStageType('sequential');
     setItemTrackingType('duration');
     setItemDuration('');
     setItemMaxOccurrences('');
+    setItemAllowManualCompletion(false);
+    setItemNextStageIds([]);
   }
   
   const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
@@ -286,8 +291,12 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     try {
       const dataToSave: any = { name: itemName };
        if (isWorkStageView && type === 'secondary') {
+          dataToSave.stageType = itemStageType;
           dataToSave.allowedRoles = itemRoles;
           dataToSave.trackingType = itemTrackingType;
+          dataToSave.nextStageIds = itemNextStageIds;
+          dataToSave.allowManualCompletion = itemAllowManualCompletion;
+          
           if (itemTrackingType === 'duration') {
               dataToSave.expectedDurationDays = Number(itemDuration) || null;
               dataToSave.maxOccurrences = null;
@@ -431,7 +440,8 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
-             onInteractOutside={(e) => {
+            className="sm:max-w-lg"
+            onInteractOutside={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[role="dialog"]')) {
                   e.preventDefault();
@@ -444,52 +454,83 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
               {`أدخل اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle} الجديد.`}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className='grid gap-2'>
-                <Label htmlFor="item-name">الاسم</Label>
-                <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+          <ScrollArea className="max-h-[70vh]">
+            <div className="grid gap-4 py-4 px-6">
+                <div className='grid gap-2'>
+                    <Label htmlFor="item-name">الاسم</Label>
+                    <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+                </div>
+
+                {isWorkStageView && !isPrimaryDialogOpen && (
+                    <>
+                        <Separator className="my-4" />
+                        <h4 className="font-semibold">إعدادات سير العمل</h4>
+                        <div className="grid gap-2">
+                          <Label>نوع المرحلة</Label>
+                          <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="sequential">تسلسلية (خطوة أساسية في سير العمل)</SelectItem>
+                                  <SelectItem value="parallel">موازية (خدمية مثل التعديلات)</SelectItem>
+                              </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>نوع التتبع</Label>
+                            <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="duration">بالمدة الزمنية</SelectItem>
+                                    <SelectItem value="occurrence">بعدَد مرات الحدوث</SelectItem>
+                                    <SelectItem value="none">لا شيء (حدث واحد)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {itemTrackingType === 'duration' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
+                                <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
+                            </div>
+                        )}
+                        {itemTrackingType === 'occurrence' && (
+                          <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
+                                <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="allowManualCompletion" checked={itemAllowManualCompletion} onCheckedChange={(checked) => setItemAllowManualCompletion(!!checked)} />
+                              <Label htmlFor="allowManualCompletion">السماح بالإكمال اليدوي قبل الوصول للحد الأقصى</Label>
+                            </div>
+                          </>
+                        )}
+                        <div className="grid gap-2">
+                            <Label>الأدوار المسؤولة (المسميات الوظيفية)</Label>
+                            <MultiSelect
+                                options={allJobs}
+                                selected={itemRoles}
+                                onChange={setItemRoles}
+                                placeholder="اختر دورًا أو أكثر..."
+                                disabled={refDataLoading}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>المراحل التالية المحتملة</Label>
+                             <MultiSelect
+                                options={allWorkStages.filter(s => s.value !== editingItem?.id)}
+                                selected={itemNextStageIds}
+                                onChange={setItemNextStageIds}
+                                placeholder="اختر مرحلة أو أكثر للانتقال إليها..."
+                                disabled={refDataLoading}
+                            />
+                        </div>
+                    </>
+                )}
             </div>
-
-            {isWorkStageView && !isPrimaryDialogOpen && (
-                <>
-                    <div className="grid gap-2">
-                        <Label>نوع التتبع</Label>
-                        <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="duration">بالمدة الزمنية</SelectItem>
-                                <SelectItem value="occurrence">بعدَد مرات الحدوث</SelectItem>
-                                <SelectItem value="none">لا شيء (حدث واحد)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {itemTrackingType === 'duration' && (
-                        <div className="grid gap-2">
-                            <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
-                            <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
-                        </div>
-                    )}
-                    {itemTrackingType === 'occurrence' && (
-                        <div className="grid gap-2">
-                            <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
-                            <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
-                        </div>
-                    )}
-                    <div className="grid gap-2">
-                        <Label htmlFor="item-role">الأدوار المسؤولة (المسميات الوظيفية)</Label>
-                        <MultiSelect
-                            options={jobs}
-                            selected={itemRoles}
-                            onChange={setItemRoles}
-                            placeholder="اختر دورًا أو أكثر..."
-                            disabled={jobsLoading}
-                        />
-                    </div>
-                </>
-            )}
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="pt-4 border-t">
             <Button variant="outline" onClick={closeDialog}>إلغاء</Button>
             <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')}>حفظ</Button>
           </DialogFooter>

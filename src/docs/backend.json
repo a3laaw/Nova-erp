@@ -637,37 +637,24 @@
     },
     "WorkStage": {
       "title": "Work Stage",
-      "description": "Represents a standard work stage that can be associated with a department.",
+      "description": "Represents a standard work stage that can be associated with a department. Defines a step in a workflow.",
       "type": "object",
       "properties": {
-        "name": {
+        "name": { "type": "string", "description": "The name of the work stage." },
+        "order": { "type": "number", "description": "The display and logical order of the stage." },
+        "stageType": {
           "type": "string",
-          "description": "The name of the work stage."
+          "enum": ["sequential", "parallel"],
+          "description": "'sequential' for main workflow steps, 'parallel' for service stages like modifications that can run alongside."
         },
-        "order": {
-            "type": "number",
-            "description": "The display and logical order of the stage."
-        },
-        "allowedRoles": {
-            "type": "array",
-            "description": "A list of job titles responsible for this stage.",
-            "items": { "type": "string" }
-        },
-        "trackingType": {
-            "type": "string",
-            "enum": ["duration", "occurrence", "none"],
-            "description": "How to track progress: by time, occurrences, or as a single event."
-        },
-        "expectedDurationDays": {
-            "type": ["number", "null"],
-            "description": "The expected duration in days for this stage (if trackingType is 'duration')."
-        },
-        "maxOccurrences": {
-            "type": ["number", "null"],
-            "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')."
-        }
+        "allowedRoles": { "type": "array", "description": "A list of job titles responsible for this stage.", "items": { "type": "string" } },
+        "nextStageIds": { "type": "array", "description": "A list of possible next stage IDs to transition to from this stage.", "items": { "type": "string" } },
+        "trackingType": { "type": "string", "enum": ["duration", "occurrence", "none"], "description": "How to track progress: by time, occurrences, or as a single event." },
+        "expectedDurationDays": { "type": ["number", "null"], "description": "The expected duration in days for this stage (if trackingType is 'duration')." },
+        "maxOccurrences": { "type": ["number", "null"], "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')." },
+        "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." }
       },
-      "required": ["name", "order", "trackingType"]
+      "required": ["name", "order", "stageType", "trackingType"]
     },
     "Appointment": {
       "title": "Appointment",
