@@ -153,6 +153,22 @@ export default function NewCashReceiptPage() {
     fetchInitialData();
   }, [firestore, toast]);
   
+  // Effect to set default receiving account
+  useEffect(() => {
+    if (accounts.length > 0 && !debitAccountId) {
+      const cashAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('الصندوق'));
+      if (cashAccount) {
+        setDebitAccountId(cashAccount.id!);
+        return;
+      }
+      const bankAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('البنك'));
+      if (bankAccount) {
+        setDebitAccountId(bankAccount.id!);
+        return;
+      }
+    }
+  }, [accounts, debitAccountId]);
+
   // Effect to fetch client's projects (transactions) when a client is selected
   useEffect(() => {
     if (!firestore || !selectedClientId) {
@@ -285,25 +301,19 @@ export default function NewCashReceiptPage() {
 
     setIsSaving(true);
     let newReceiptId = '';
-    let isFirstReceiptForProject = false;
-    let transactionRef: any = null;
-
+    
     try {
-        // --- PRE-TRANSACTION READS ---
+        let isFirstReceiptForProject = false;
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
-
-            transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
         }
 
-        // --- ATOMIC TRANSACTION ---
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
             
-            // READS within transaction (only get() on DocumentReference is allowed)
             const counterDoc = await transaction_fs.get(counterRef);
             const selectedClient = clients.find(c => c.id === selectedClientId);
             if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
@@ -314,7 +324,6 @@ export default function NewCashReceiptPage() {
             const debitAccount = accounts.find(acc => acc.id === debitAccountId);
             if (!debitAccount) throw new Error('حساب الاستلام المختار غير صالح.');
             
-            // --- WRITES within transaction ---
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -372,7 +381,8 @@ export default function NewCashReceiptPage() {
             };
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (transactionRef && isFirstReceiptForProject) {
+            if (selectedProjectId && isFirstReceiptForProject) {
+                const transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
                 const txSnap = await transaction_fs.get(transactionRef);
                 if (txSnap.exists()) {
                     const txData = txSnap.data() as ClientTransaction;
@@ -381,14 +391,13 @@ export default function NewCashReceiptPage() {
 
                     if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
                         currentStages[contractStageIndex].status = 'completed';
-                        currentStages[contractStageIndex].endDate = new Date() as any; // Firestore will convert this
+                        currentStages[contractStageIndex].endDate = new Date() as any;
                         transaction_fs.update(transactionRef, { stages: currentStages });
                     }
                 }
             }
         });
         
-        // --- POST-TRANSACTION LOGIC ---
         toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
         
         if (selectedProjectId) {
@@ -399,7 +408,6 @@ export default function NewCashReceiptPage() {
 
             const postTransactionBatch = writeBatch(firestore);
             
-            // Update all contract clauses statuses
             if (transactionData.contract?.clauses) {
                 const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
                 let accumulatedAmount = 0;
@@ -424,7 +432,6 @@ export default function NewCashReceiptPage() {
             await postTransactionBatch.commit();
         }
         
-        // Post-transaction notifications
          if (selectedProjectId) {
             const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
             if (selectedProject?.assignedEngineerId) {
