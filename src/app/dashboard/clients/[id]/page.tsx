@@ -97,7 +97,7 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
 
   const quotationsQuery = useMemo(() => {
     if (!firestore || !clientId) return null;
-    return [where('clientId', '==', clientId)];
+    return [where('clientId', '==', clientId), orderBy('date', 'desc')];
   }, [firestore, clientId]);
 
   const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, quotationsQuery ? 'quotations' : null, quotationsQuery || []);
