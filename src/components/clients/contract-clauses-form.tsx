@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -434,12 +435,14 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
             const jeQuery = query(
                 collection(firestore, 'journalEntries'), 
-                where('transactionId', '==', selectedTransactionId),
-                where('narration', 'like', '%إثبات مديونية%')
+                where('transactionId', '==', selectedTransactionId)
             );
             const jeSnapshot = await getDocs(jeQuery);
             if (!jeSnapshot.empty) {
-                existingDebtJournalEntryId = jeSnapshot.docs[0].id;
+                const debtProofEntry = jeSnapshot.docs.find(doc => doc.data().narration?.includes('إثبات مديونية'));
+                if (debtProofEntry) {
+                    existingDebtJournalEntryId = debtProofEntry.id;
+                }
             }
         }
         
@@ -516,6 +519,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 ...(department && { auto_dept_id: department.id }),
             };
             
+            const revenueAccountId = revenueAccountSnap.docs[0].id;
+            const revenueAccountName = revenueAccountSnap.docs[0].data().name;
+
             const jePayload = {
                 narration: `إثبات مديونية ${clientName} عن عقد "${transaction.transactionType}"`,
                 totalDebit: totalAmount, totalCredit: totalAmount,
