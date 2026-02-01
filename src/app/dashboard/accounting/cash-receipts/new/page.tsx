@@ -153,21 +153,21 @@ export default function NewCashReceiptPage() {
     fetchInitialData();
   }, [firestore, toast]);
   
-  // Effect to set default receiving account
+  // Effect to set default receiving account based on payment method
   useEffect(() => {
-    if (accounts.length > 0 && !debitAccountId) {
-      const cashAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('الصندوق'));
-      if (cashAccount) {
-        setDebitAccountId(cashAccount.id!);
-        return;
+    if (accounts.length > 0 && paymentMethod) {
+      if (paymentMethod === 'Cash') {
+        const cashAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('الصندوق'));
+        setDebitAccountId(cashAccount?.id || ''); // Set to first cash account or clear
+      } else { // Cheque, Bank Transfer, K-Net
+        const bankAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('البنك'));
+        setDebitAccountId(bankAccount?.id || ''); // Set to first bank account or clear
       }
-      const bankAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('البنك'));
-      if (bankAccount) {
-        setDebitAccountId(bankAccount.id!);
-        return;
-      }
+    } else if (!paymentMethod) {
+        setDebitAccountId(''); // Clear if no payment method
     }
-  }, [accounts, debitAccountId]);
+  }, [accounts, paymentMethod]);
+
 
   // Effect to fetch client's projects (transactions) when a client is selected
   useEffect(() => {
@@ -274,10 +274,19 @@ export default function NewCashReceiptPage() {
   }), [clientProjects]);
   
   const debitAccountOptions = useMemo(() => {
-    return accounts
-      .filter(acc => acc.type === 'asset' && acc.isPayable)
-      .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-  }, [accounts]);
+    if (!paymentMethod) return []; // No options if no method is selected
+
+    if (paymentMethod === 'Cash') {
+        return accounts
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('الصندوق'))
+            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+    } else { // Cheque, Bank Transfer, K-Net
+        return accounts
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('البنك'))
+            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+    }
+  }, [accounts, paymentMethod]);
+
 
   const handleSave = async () => {
     if (!firestore || !currentUser) {
@@ -302,14 +311,24 @@ export default function NewCashReceiptPage() {
     setIsSaving(true);
     let newReceiptId = '';
     
+    // --- PRE-TRANSACTION READS ---
+    let isFirstReceiptForProject = false;
+    let transactionRef: any;
     try {
-        let isFirstReceiptForProject = false;
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
+            transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
         }
-
+    } catch(err) {
+        console.error("Pre-transaction read failed:", err);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التحقق من بيانات المشروع. يرجى المحاولة مرة أخرى.' });
+        setIsSaving(false);
+        return;
+    }
+    
+    try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
@@ -382,7 +401,6 @@ export default function NewCashReceiptPage() {
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
             if (selectedProjectId && isFirstReceiptForProject) {
-                const transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
                 const txSnap = await transaction_fs.get(transactionRef);
                 if (txSnap.exists()) {
                     const txData = txSnap.data() as ClientTransaction;
@@ -544,8 +562,8 @@ export default function NewCashReceiptPage() {
                         value={debitAccountId}
                         onSelect={setDebitAccountId}
                         options={debitAccountOptions}
-                        placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
-                        disabled={accountsLoading || isSaving}
+                        placeholder={accountsLoading ? 'تحميل...' : !paymentMethod ? 'اختر طريقة الدفع أولاً' : 'اختر حساب...'}
+                        disabled={accountsLoading || isSaving || !paymentMethod}
                     />
                 </div>
                 <div className="grid gap-2">

@@ -154,7 +154,7 @@ export default function EditCashReceiptPage() {
     } else {
         setJournalEntryIsPosted(false);
     }
- }, [receipt, firestore, accounts, paymentMethod]);
+ }, [receipt, firestore, accounts]);
   
 
   useEffect(() => {
@@ -253,10 +253,42 @@ export default function EditCashReceiptPage() {
   }), [clientProjects]);
 
   const debitAccountOptions = useMemo(() => {
-    return accounts
-      .filter(acc => acc.type === 'asset' && acc.isPayable)
-      .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-  }, [accounts]);
+    if (!paymentMethod) return []; // No options if no method is selected
+    
+    if (paymentMethod === 'Cash') {
+        return accounts
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('الصندوق'))
+            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+    } else { // Cheque, Bank Transfer, K-Net
+        return accounts
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('البنك'))
+            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+    }
+  }, [accounts, paymentMethod]);
+  
+  // This effect runs when payment method changes, to ensure the selected account is still valid.
+  useEffect(() => {
+    if (accounts.length > 0 && debitAccountId && paymentMethod) {
+      const selectedAcc = accounts.find(a => a.id === debitAccountId);
+      if (!selectedAcc) return; // Can't validate if account isn't found
+      
+      const isCash = paymentMethod === 'Cash';
+      const isBank = ['Cheque', 'Bank Transfer', 'K-Net'].includes(paymentMethod);
+
+      const accountIsCash = selectedAcc.name.includes('الصندوق');
+      const accountIsBank = selectedAcc.name.includes('البنك');
+
+      if ((isCash && !accountIsCash) || (isBank && !accountIsBank)) {
+        setDebitAccountId(''); // Invalidate selection
+        toast({
+            title: 'تم تغيير طريقة الدفع',
+            description: 'الرجاء اختيار حساب استلام جديد متوافق مع الطريقة الجديدة.',
+            variant: 'default',
+        });
+      }
+    }
+  }, [paymentMethod, debitAccountId, accounts, toast]);
+
 
  const handleSave = async () => {
     if (!firestore || !currentUser || !id || !originalReceipt) return;
