@@ -1,4 +1,5 @@
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -357,14 +358,14 @@ export interface TransactionStage {
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
   allowedRoles?: string[];
-  trackingType?: 'duration' | 'occurrence' | 'none';
+  trackingType: 'duration' | 'occurrence' | 'none';
   startDate: any | null;
   endDate: any | null;
   notes?: string;
   order?: number;
-  expectedEndDate?: any;
+  expectedEndDate?: any | null;
   completedCount?: number;
-  maxOccurrences?: number;
+  maxOccurrences?: number | null;
 }
       
 export type ClientTransaction = {

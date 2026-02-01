@@ -41,6 +41,11 @@
             "format": "uri",
             "description": "URL to the company's full letterhead image."
         },
+        "system_background_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL for the background image of the system pages."
+        },
         "financial_statement_notes": {
             "type": "string",
             "description": "The full text content for the notes to the financial statements."
@@ -208,14 +213,14 @@
             "clientId": { "type": "string", "description": "The ID of the client this transaction belongs to." },
             "transactionType": { "type": "string", "description": "The type of transaction, e.g., 'Municipality Design', 'Electricity Design'." },
             "description": { "type": "string", "description": "A brief description of the transaction." },
-            "departmentId": { "type": "string", "description": "The ID of the department this transaction belongs to." },
+            "departmentId": { "type": "string", "description": "The ID of the primary department for this transaction." },
             "transactionTypeId": { "type": "string", "description": "The ID of the transaction type." },
             "status": {
                 "type": "string",
                 "description": "The current status of the transaction.",
                 "enum": ["new", "in-progress", "completed", "submitted", "on-hold"]
             },
-            "assignedEngineerId": { "type": "string", "description": "The ID of the engineer assigned to this transaction." },
+            "assignedEngineerId": { "type": "string", "description": "The ID of the primary engineer assigned to this transaction." },
             "createdAt": { "type": "string", "format": "date-time" },
             "updatedAt": { "type": "string", "format": "date-time" },
             "stages": {
@@ -263,7 +268,47 @@
                 "required": ["clauses", "totalAmount"]
             }
         },
-        "required": ["transactionNumber", "clientId", "transactionType", "departmentId", "status", "createdAt"]
+        "required": ["transactionNumber", "clientId", "transactionType", "status", "createdAt"]
+    },
+    "TransactionAssignment": {
+        "title": "Transaction Assignment",
+        "description": "Represents an assignment or forwarding of a transaction to a specific department and engineer.",
+        "type": "object",
+        "properties": {
+            "transactionId": {
+                "type": "string",
+                "description": "The ID of the parent ClientTransaction."
+            },
+            "clientId": {
+                "type": "string",
+                "description": "The ID of the client."
+            },
+            "departmentId": { "type": "string" },
+            "departmentName": { "type": "string" },
+            "engineerId": { "type": "string" },
+            "notes": { "type": "string" },
+            "status": {
+                "type": "string",
+                "enum": ["pending", "in-progress", "completed"]
+            },
+            "createdAt": {
+                "type": "string",
+                "format": "date-time"
+            },
+            "createdBy": {
+                "type": "string",
+                "description": "The ID of the user who created the assignment."
+            }
+        },
+        "required": [
+            "transactionId",
+            "clientId",
+            "departmentId",
+            "departmentName",
+            "status",
+            "createdAt",
+            "createdBy"
+        ]
     },
     "TransactionTimelineEvent": {
       "title": "Transaction Timeline Event",
@@ -316,10 +361,16 @@
             "description": "The job titles responsible for this stage, copied from the WorkStage template.",
             "items": { "type": "string" }
         },
-        "startDate": { "type": "string", "format": "date-time", "description": "When the stage started." },
-        "endDate": { "type": "string", "format": "date-time", "description": "When the stage was completed." },
-        "expectedEndDate": { "type": "string", "format": "date-time", "description": "The expected completion date for countdowns." },
-        "notes": { "type": "string", "description": "Notes specific to this stage." }
+        "trackingType": {
+          "type": "string",
+          "enum": ["duration", "occurrence", "none"],
+          "description": "The tracking type of the stage, copied from the template."
+        },
+        "startDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage started." },
+        "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
+        "expectedEndDate": { "type": ["string", "null"], "format": "date-time", "description": "The expected completion date for countdowns." },
+        "notes": { "type": ["string", "null"], "description": "Notes specific to this stage." },
+        "completedCount": { "type": ["number", "null"], "description": "How many times this stage has been completed (if trackingType is 'occurrence')."}
       },
       "required": ["stageId", "name", "status"]
     },
@@ -602,12 +653,21 @@
             "description": "A list of job titles responsible for this stage.",
             "items": { "type": "string" }
         },
+        "trackingType": {
+            "type": "string",
+            "enum": ["duration", "occurrence", "none"],
+            "description": "How to track progress: by time, occurrences, or as a single event."
+        },
         "expectedDurationDays": {
-            "type": "number",
-            "description": "The expected duration in days for this stage."
+            "type": ["number", "null"],
+            "description": "The expected duration in days for this stage (if trackingType is 'duration')."
+        },
+        "maxOccurrences": {
+            "type": ["number", "null"],
+            "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')."
         }
       },
-      "required": ["name"]
+      "required": ["name", "order", "trackingType"]
     },
     "Appointment": {
       "title": "Appointment",
@@ -1112,6 +1172,12 @@
         },
         "description": "Stores internal transactions/services for a specific client."
     },
+    "/transaction_assignments/{assignmentId}": {
+        "schema": {
+            "$ref": "#/entities/TransactionAssignment"
+        },
+        "description": "Stores individual assignments of a transaction to different departments."
+    },
     "/clients/{clientId}/transactions/{transactionId}/timelineEvents/{eventId}": {
       "schema": {
         "$ref": "#/entities/TransactionTimelineEvent"
@@ -1248,5 +1314,3 @@
     }
   }
 }
-
-    
