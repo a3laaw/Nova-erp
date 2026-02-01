@@ -1,5 +1,5 @@
 
-'use client';
+      'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -36,7 +36,7 @@ import { ContractClausesForm } from '@/components/clients/contract-clauses-form'
 import type { Client, ClientTransaction, Employee, Quotation, TransactionStage, WorkStage, UserRole, Department, TransactionAssignment } from '@/lib/types';
 import { format, differenceInDays, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ClientHistoryTimeline } from '@/components/clients/transaction-timeline';
+import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -392,7 +392,7 @@ export default function TransactionDetailPage() {
          const outstandingBalance = totalAmountNowDue - totalPaid;
 
          if(outstandingBalance > 0) {
-             commentContent += `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+             commentContent += `\\n\\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
          }
          await updateDoc(transactionRef!, { 'contract.clauses': newContractClauses });
     }
@@ -682,5 +682,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
-    
