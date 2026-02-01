@@ -37,6 +37,7 @@ import { Badge } from '../ui/badge';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '../ui/checkbox';
+import { Separator } from '../ui/separator';
 
 // --- NEW StatCard Component ---
 function StatCard({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) {
@@ -723,5 +724,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
-    
