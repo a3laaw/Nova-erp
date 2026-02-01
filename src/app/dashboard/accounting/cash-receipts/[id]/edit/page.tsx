@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -274,77 +273,74 @@ export default function EditCashReceiptPage() {
     setIsSaving(true);
     
     try {
-        const batch = writeBatch(firestore);
-
-        const receiptRefDoc = doc(firestore, 'cashReceipts', id);
+        await runTransaction(firestore, async (transaction_fs) => {
+            const receiptRefDoc = doc(firestore, 'cashReceipts', id);
         
-        const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
-        const selectedDebitAccount = accounts.find(acc => acc.id === debitAccountId);
+            const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
+            const selectedDebitAccount = accounts.find(acc => acc.id === debitAccountId);
 
-        if (!clientAccount || !selectedDebitAccount) {
-            throw new Error("الحسابات المطلوبة (العميل أو حساب الاستلام) غير موجودة.");
-        }
+            if (!clientAccount || !selectedDebitAccount) {
+                throw new Error("الحسابات المطلوبة (العميل أو حساب الاستلام) غير موجودة.");
+            }
 
-        const receiptUpdatePayload = {
-            receiptDate: new Date(date),
-            projectId: selectedProjectId || null,
-            amount: parseFloat(amount),
-            amountInWords: amountInWords,
-            description: description,
-            paymentMethod: paymentMethod,
-            reference: reference,
-        };
-        batch.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
-
-        const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
-        let autoTags = {};
-        if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
-            const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
-            const department = departments.find(d => d.name === engineer?.department);
-            
-            autoTags = {
-                clientId: originalReceipt.clientId,
-                transactionId: selectedProjectId,
-                auto_profit_center: selectedProjectId,
-                auto_resource_id: selectedProject.assignedEngineerId,
-                ...(department && { auto_dept_id: department.id }),
+            const receiptUpdatePayload = {
+                receiptDate: new Date(date),
+                projectId: selectedProjectId || null,
+                amount: parseFloat(amount),
+                amountInWords: amountInWords,
+                description: description,
+                paymentMethod: paymentMethod,
+                reference: reference,
             };
-        }
+            transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
 
-        const newLines = [
-            { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
-            { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
-        ];
+            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+            let autoTags = {};
+            if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
+                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
+                const department = departments.find(d => d.name === engineer?.department);
+                
+                autoTags = {
+                    clientId: originalReceipt.clientId,
+                    transactionId: selectedProjectId,
+                    auto_profit_center: selectedProjectId,
+                    auto_resource_id: selectedProject.assignedEngineerId,
+                    ...(department && { auto_dept_id: department.id }),
+                };
+            }
 
-        const jeUpdatePayload = {
-            date: Timestamp.fromDate(new Date(date)),
-            lines: newLines,
-            totalDebit: parseFloat(amount),
-            totalCredit: parseFloat(amount),
-            narration: description || `تحديث سند قبض رقم ${originalReceipt.voucherNumber}`,
-            transactionId: selectedProjectId || null,
-            clientId: originalReceipt.clientId,
-        };
+            const newLines = [
+                { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
+                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
+            ];
 
-        if (originalReceipt.journalEntryId) {
-            const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
-            batch.update(jeRef, jeUpdatePayload);
-        } else {
-            // This logic is a fallback in case a JE was never created.
-            const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-            batch.set(newJournalEntryRef, {
-                ...jeUpdatePayload,
-                status: 'posted',
-                createdAt: serverTimestamp(),
-                createdBy: currentUser.id,
-                entryNumber: `CRV-JE-${originalReceipt.voucherNumber}`,
-            });
-            batch.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
-        }
-        
-        await batch.commit();
+            const jeUpdatePayload = {
+                date: Timestamp.fromDate(new Date(date)),
+                lines: newLines,
+                totalDebit: parseFloat(amount),
+                totalCredit: parseFloat(amount),
+                narration: description || `تحديث سند قبض رقم ${originalReceipt.voucherNumber}`,
+                transactionId: selectedProjectId || null,
+                clientId: originalReceipt.clientId,
+            };
 
-        // Update contract clauses after the main writes
+            if (originalReceipt.journalEntryId) {
+                const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
+                transaction_fs.update(jeRef, jeUpdatePayload);
+            } else {
+                const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
+                transaction_fs.set(newJournalEntryRef, {
+                    ...jeUpdatePayload,
+                    status: 'posted',
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUser.id,
+                    entryNumber: `CRV-JE-${originalReceipt.voucherNumber}`,
+                });
+                transaction_fs.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
+            }
+        });
+
+        // Update contract clauses after the main transaction
         if (originalReceipt.projectId) {
             const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore);
             const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);

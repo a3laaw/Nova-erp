@@ -276,24 +276,22 @@ export default function NewCashReceiptPage() {
 
     setIsSaving(true);
     let newReceiptId = '';
-    let newVoucherNumberForLog = '';
     
     try {
+        // --- PRE-TRANSACTION READS ---
         let isFirstReceiptForProject = false;
         if (selectedProjectId) {
-            const receiptsForProjectQuery = query(
-                collection(firestore, 'cashReceipts'), 
-                where('projectId', '==', selectedProjectId),
-                limit(1)
-            );
+            const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId));
             const receiptsSnap = await getDocs(receiptsForProjectQuery);
             isFirstReceiptForProject = receiptsSnap.empty;
         }
 
+        // --- ATOMIC TRANSACTION ---
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
             
+            // READS within transaction (only get() on DocumentReference is allowed)
             const counterDoc = await transaction_fs.get(counterRef);
             const selectedClient = clients.find(c => c.id === selectedClientId);
             if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
@@ -306,6 +304,7 @@ export default function NewCashReceiptPage() {
                 : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
             if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
             
+            // --- WRITES within transaction ---
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -313,7 +312,6 @@ export default function NewCashReceiptPage() {
             }
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-            newVoucherNumberForLog = newVoucherNumber;
             
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             newReceiptId = newReceiptRef.id;
@@ -337,19 +335,10 @@ export default function NewCashReceiptPage() {
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
             const newReceiptData: any = { 
-                voucherNumber: newVoucherNumber,
-                voucherSequence: nextNumber,
-                voucherYear: currentYear,
-                clientId: selectedClientId,
-                clientNameAr: selectedClient?.nameAr || '',
-                clientNameEn: selectedClient?.nameEn || '',
-                amount: parseFloat(amount),
-                amountInWords: amountInWords,
-                receiptDate: Timestamp.fromDate(new Date(date)),
-                paymentMethod: paymentMethod,
-                description: description,
-                reference: reference,
-                journalEntryId: newJournalEntryRef.id,
+                voucherNumber: newVoucherNumber, voucherSequence: nextNumber, voucherYear: currentYear,
+                clientId: selectedClientId, clientNameAr: selectedClient?.nameAr || '', clientNameEn: selectedClient?.nameEn || '',
+                amount: parseFloat(amount), amountInWords: amountInWords, receiptDate: Timestamp.fromDate(new Date(date)),
+                paymentMethod: paymentMethod, description: description, reference: reference, journalEntryId: newJournalEntryRef.id,
                 createdAt: serverTimestamp(),
             };
             
@@ -361,76 +350,53 @@ export default function NewCashReceiptPage() {
             transaction_fs.set(newReceiptRef, newReceiptData);
             
             const journalEntryData = {
-                entryNumber: `CRV-JE-${newVoucherNumber}`,
-                date: newReceiptData.receiptDate,
+                entryNumber: `CRV-JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
                 narration: description || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
-                totalDebit: parseFloat(amount),
-                totalCredit: parseFloat(amount),
-                status: 'posted' as const,
+                totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
                 lines: [
                     { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
                     { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
                 ],
-                clientId: selectedClientId,
-                transactionId: selectedProjectId || null,
-                createdAt: serverTimestamp(),
-                createdBy: currentUser.id,
+                clientId: selectedClientId, transactionId: selectedProjectId || null,
+                createdAt: serverTimestamp(), createdBy: currentUser.id,
             };
             transaction_fs.set(newJournalEntryRef, journalEntryData);
-
-            if (isFirstReceiptForProject && selectedProjectId) {
-                const transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
-                const transactionSnap = await transaction_fs.get(transactionRef);
-                
-                if (transactionSnap.exists()) {
-                    const currentStages: TransactionStage[] = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
-                    const contractStageIndex = currentStages?.findIndex(s => s.name === 'توقيع العقد');
-                    if (contractStageIndex !== -1 && currentStages?.[contractStageIndex]?.status !== 'completed') {
-                        const now = new Date();
-                        currentStages[contractStageIndex].status = 'completed';
-                        currentStages[contractStageIndex].endDate = now as any;
-                        if (!currentStages[contractStageIndex].startDate) {
-                            currentStages[contractStageIndex].startDate = now as any;
-                        }
-                        transaction_fs.update(transactionRef, { stages: currentStages });
-
-                        const timelineLogRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
-                        transaction_fs.set(timelineLogRef, {
-                            type: 'log',
-                            content: `تم إكمال مرحلة "توقيع العقد" تلقائيًا بعد استلام أول دفعة عبر السند رقم ${newVoucherNumber}.`,
-                            userId: 'system',
-                            userName: 'النظام',
-                            createdAt: serverTimestamp(),
-                        });
-                    }
-                }
-            }
 
             if (selectedProjectId && description) {
                 const timelineCommentRef = doc(collection(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`));
                 transaction_fs.set(timelineCommentRef, {
-                    type: 'comment',
-                    content: `[سند قبض رقم: ${newVoucherNumber}]\n${description}`,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
+                    type: 'comment', content: `[سند قبض رقم: ${newVoucherNumber}]\n${description}`,
+                    userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 });
             }
-
         });
         
+        // --- POST-TRANSACTION LOGIC ---
         toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
-
-        // Post-transaction logic to update clause statuses
+        
         if (selectedProjectId) {
             const transactionRef = doc(firestore, `clients/${selectedClientId}/transactions/${selectedProjectId}`);
             const transactionDoc = await getDoc(transactionRef);
+            if (!transactionDoc.exists()) throw new Error('Transaction not found for post-processing');
+            const transactionData = transactionDoc.data() as ClientTransaction;
 
-            if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
-                const transactionData = transactionDoc.data();
+            const postTransactionBatch = writeBatch(firestore);
+            
+            // 1. Update contract stages if it's the first receipt
+            if (isFirstReceiptForProject) {
+                const currentStages: TransactionStage[] = [...(transactionData.stages || [])];
+                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+                if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
+                    currentStages[contractStageIndex].status = 'completed';
+                    currentStages[contractStageIndex].endDate = new Date() as any;
+                    postTransactionBatch.update(transactionRef, { stages: currentStages });
+                }
+            }
+
+            // 2. Update all contract clauses statuses
+            if (transactionData.contract?.clauses) {
                 const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
-                
                 let accumulatedAmount = 0;
                 let dueClauseFound = false;
                 
@@ -447,11 +413,10 @@ export default function NewCashReceiptPage() {
                     accumulatedAmount += clause.amount;
                     return newClause;
                 });
-
-                if (JSON.stringify(updatedClauses) !== JSON.stringify(transactionData.contract.clauses)) {
-                    await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
-                }
+                 postTransactionBatch.update(transactionRef, { 'contract.clauses': updatedClauses });
             }
+            
+            await postTransactionBatch.commit();
         }
         
         // Post-transaction notifications
@@ -463,13 +428,12 @@ export default function NewCashReceiptPage() {
                      await createNotification(firestore, {
                         userId: targetUserId,
                         title: `دفعة جديدة لمعاملة`,
-                        body: `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لمعاملة "${selectedProject.transactionType}" للعميل ${selectedClient?.nameAr}.`,
+                        body: `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لمعاملة "${selectedProject.transactionType}" للعميل ${clients.find(c => c.id === selectedClientId)?.nameAr}.`,
                         link: `/dashboard/clients/${selectedClientId}/transactions/${selectedProjectId}`
                     });
                 }
             }
         }
-
 
         router.push(`/dashboard/accounting/cash-receipts/${newReceiptId}`);
 
