@@ -272,9 +272,10 @@ export default function EditCashReceiptPage() {
     }
 
     setIsSaving(true);
-    const batch = writeBatch(firestore);
-
+    
     try {
+        const batch = writeBatch(firestore);
+
         const receiptRefDoc = doc(firestore, 'cashReceipts', id);
         
         const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
@@ -340,6 +341,8 @@ export default function EditCashReceiptPage() {
             });
             batch.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
         }
+        
+        await batch.commit();
 
         // Update contract clauses after the main writes
         if (originalReceipt.projectId) {
@@ -364,12 +367,10 @@ export default function EditCashReceiptPage() {
                     accumulatedAmount += clause.amount;
                     return newClause;
                 });
-                batch.update(transactionRef, { 'contract.clauses': updatedClauses });
+                await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
             }
         }
         
-        await batch.commit();
-
         toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي بنجاح.' });
         router.push(`/dashboard/accounting/cash-receipts/${id}`);
 
@@ -506,7 +507,3 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
-
-    
-
-    
