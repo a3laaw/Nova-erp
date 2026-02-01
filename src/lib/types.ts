@@ -357,15 +357,21 @@ export interface TransactionStage {
   stageId: string;
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
-  allowedRoles?: string[];
-  trackingType: 'duration' | 'occurrence' | 'none';
   startDate: any | null;
   endDate: any | null;
   notes?: string;
-  order?: number;
   expectedEndDate?: any | null;
   completedCount?: number;
+  
+  // Properties inherited from WorkStage template
+  order?: number;
+  stageType?: 'sequential' | 'parallel';
+  allowedRoles?: string[];
+  nextStageIds?: string[];
+  trackingType: 'duration' | 'occurrence' | 'none';
+  expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
+  allowManualCompletion?: boolean;
 }
       
 export type ClientTransaction = {
@@ -442,10 +448,13 @@ export interface WorkStage {
   id: string;
   name: string;
   order?: number;
+  stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
+  nextStageIds?: string[];
   trackingType: 'duration' | 'occurrence' | 'none';
   expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
+  allowManualCompletion?: boolean;
 }
 
 export type ContractClause = {
