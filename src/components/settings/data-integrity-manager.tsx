@@ -174,6 +174,10 @@ export function DataIntegrityManager() {
     // State for deleting appointments
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
     const [isAppointmentsConfirmOpen, setIsAppointmentsConfirmOpen] = useState(false);
+
+    // NEW: State for deleting clients
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
+    const [isClientsConfirmOpen, setIsClientsConfirmOpen] = useState(false);
     
     // NEW: State for fixing contract stages
     const [isFixingContracts, setIsFixingContracts] = useState(false);
@@ -424,6 +428,59 @@ export function DataIntegrityManager() {
             setIsAppointmentsConfirmOpen(false);
         }
     };
+
+    const handleDeleteAllClients = async () => {
+        if (!firestore) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+            return;
+        }
+        setIsLoadingClients(true);
+        let deletedClientsCount = 0;
+    
+        try {
+            const clientsSnapshot = await getDocs(collection(firestore, 'clients'));
+            if (clientsSnapshot.empty) {
+                toast({ title: 'لا يوجد عملاء', description: 'لا يوجد عملاء لحذفهم.' });
+            } else {
+                for (const clientDoc of clientsSnapshot.docs) {
+                    const batch = writeBatch(firestore);
+                    
+                    const historySnapshot = await getDocs(collection(firestore, `clients/${clientDoc.id}/history`));
+                    historySnapshot.forEach(doc => batch.delete(doc.ref));
+    
+                    const transactionsSnapshot = await getDocs(collection(firestore, `clients/${clientDoc.id}/transactions`));
+                    for (const txDoc of transactionsSnapshot.docs) {
+                        const timelineSnapshot = await getDocs(collection(firestore, `clients/${clientDoc.id}/transactions/${txDoc.id}/timelineEvents`));
+                        timelineSnapshot.forEach(doc => batch.delete(doc.ref));
+                        batch.delete(txDoc.ref);
+                    }
+    
+                    batch.delete(clientDoc.ref);
+    
+                    await batch.commit();
+                    deletedClientsCount++;
+                }
+                
+                const countersBatch = writeBatch(firestore);
+                const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
+                const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
+                countersBatch.delete(clientFileCounterRef);
+                countersBatch.delete(coaClientCounterRef);
+                await countersBatch.commit();
+                
+                toast({
+                    title: 'نجاح!',
+                    description: `تم حذف ${deletedClientsCount} عميل وجميع بياناتهم الفرعية بنجاح.`,
+                });
+            }
+        } catch (error) {
+            console.error("Error deleting all clients:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العملاء.' });
+        } finally {
+            setIsLoadingClients(false);
+            setIsClientsConfirmOpen(false);
+        }
+    };
     
     // --- NEW: Contract Stage Fix Logic ---
     const handleFixContractStages = async () => {
@@ -635,6 +692,13 @@ export function DataIntegrityManager() {
                             حذف المواعيد
                         </Button>
                     </div>
+                    <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-lg flex justify-between items-center">
+                        <p className="font-medium">حذف جميع العملاء وجميع بياناتهم المرتبطة.</p>
+                        <Button onClick={() => setIsClientsConfirmOpen(true)} disabled={isLoadingClients} variant="destructive">
+                            {isLoadingClients ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
+                            حذف جميع العملاء
+                        </Button>
+                    </div>
                 </div>
 
             </CardContent>
@@ -650,6 +714,22 @@ export function DataIntegrityManager() {
                         <AlertDialogCancel disabled={isLoadingAppointments}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteAllAppointments} disabled={isLoadingAppointments} className="bg-destructive hover:bg-destructive/90">
                             {isLoadingAppointments ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف كل المواعيد'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+             <AlertDialog open={isClientsConfirmOpen} onOpenChange={setIsClientsConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا من هذا الإجراء؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيتم حذف <strong className="text-destructive">جميع العملاء</strong> و <strong className="text-destructive">جميع معاملاتهم وسجلاتهم</strong> بشكل دائم. هذا الإجراء لا يمكن التراجع عنه وهو مخصص للبدء من جديد.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isLoadingClients}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAllClients} disabled={isLoadingClients} className="bg-destructive hover:bg-destructive/90">
+                            {isLoadingClients ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف كل العملاء'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
