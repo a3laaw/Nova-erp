@@ -1,11 +1,10 @@
 
-
       'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy, where, collectionGroup } from 'firebase/firestore';
+import { doc, getDocs, collection, writeBatch, serverTimestamp, updateDoc, query, orderBy, where, collectionGroup, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -16,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare } from 'lucide-react';
+import { ArrowRight, BadgeInfo, Calendar, User, History, MessageSquare, Save, Loader2, FileText, Pencil, Printer, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, FolderLock, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -31,6 +30,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/auth-context';
@@ -43,6 +44,19 @@ import { createNotification, findUserIdByEmployeeId } from '@/services/notificat
 import { toFirestoreDate } from '@/services/date-converter';
 import { TransactionAssignmentDialog } from '@/components/clients/transaction-assignment-dialog';
 import { Separator } from '@/components/ui/separator';
+import { ClientQuotationsList } from '@/app/dashboard/clients/[id]/page';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { deleteDoc } from 'firebase/firestore';
+
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
     let total = 0;
@@ -73,7 +87,7 @@ const transactionStatusColors: Record<string, string> = {
   'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
-const stageStatusColors: Record<string, string> = {
+const stageStatusColors: Record<string, string> {
   pending: 'bg-gray-100 text-gray-800',
   'in-progress': 'bg-blue-100 text-blue-800',
   completed: 'bg-green-100 text-green-800',
@@ -214,6 +228,7 @@ export default function TransactionDetailPage() {
                     stageType: template.stageType || 'sequential',
                     allowedRoles: template.allowedRoles,
                     nextStageIds: template.nextStageIds,
+                    allowedDuringStages: template.allowedDuringStages,
                     trackingType: template.trackingType,
                     expectedDurationDays: template.expectedDurationDays,
                     maxOccurrences: template.maxOccurrences,
@@ -253,17 +268,19 @@ export default function TransactionDetailPage() {
     if (!firestore || !transaction || !currentUser || !client) return;
 
     const originalProgress = [...(transaction.stages || [])];
+    const newProgressForFirestore = JSON.parse(JSON.stringify(originalProgress));
+
     const stageTemplateInfo = stages.find(s => s.stageId === stageId);
     if (!stageTemplateInfo) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
         return;
     }
     
-    const stageProgressIndex = originalProgress.findIndex(s => s.stageId === stageId);
+    const stageProgressIndex = newProgressForFirestore.findIndex((s: TransactionStage) => s.stageId === stageId);
     let updatedProgress: Partial<TransactionStage>;
 
     if (stageProgressIndex > -1) {
-        updatedProgress = { ...originalProgress[stageProgressIndex] };
+        updatedProgress = { ...newProgressForFirestore[stageProgressIndex] };
     } else {
         updatedProgress = { stageId: stageId, name: stageTemplateInfo.name };
     }
@@ -313,18 +330,50 @@ export default function TransactionDetailPage() {
         }
     }
     
-    let newProgressForFirestore;
     if (stageProgressIndex > -1) {
-        newProgressForFirestore = [...originalProgress];
         newProgressForFirestore[stageProgressIndex] = updatedProgress as TransactionStage;
     } else {
-        newProgressForFirestore = [...originalProgress, updatedProgress as TransactionStage];
+        newProgressForFirestore.push(updatedProgress as TransactionStage);
+    }
+    
+    const completedStageOrderIndex = workStages.findIndex(s => s.id === stageTemplateInfo.id);
+    const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
+    let shouldStartNextStage = false;
+
+    if (isFinallyCompleted && nextStageInTemplate) {
+        const nextStageId = nextStageInTemplate.id!;
+        const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
+        
+        if (!isDiscussionStage) {
+            const nextStageIndexInProg = newProgressForFirestore.findIndex((s: TransactionStage) => s.stageId === nextStageId);
+            
+            const stageToStart: Partial<TransactionStage> = nextStageIndexInProg > -1
+                ? { ...newProgressForFirestore[nextStageIndexInProg] }
+                : { stageId: nextStageInTemplate.id!, name: nextStageInTemplate.name, status: 'pending' };
+
+            if (stageToStart.status === 'pending') {
+                stageToStart.status = 'in-progress';
+                stageToStart.startDate = now as any;
+                
+                const templateForNextStage = workStages.find(ws => ws.id === stageToStart.stageId);
+                if (templateForNextStage?.trackingType === 'duration' && templateForNextStage?.expectedDurationDays) {
+                    stageToStart.expectedEndDate = addDays(now, templateForNextStage.expectedDurationDays) as any;
+                }
+
+                if (nextStageIndexInProg > -1) {
+                    newProgressForFirestore[nextStageIndexInProg] = stageToStart as TransactionStage;
+                } else {
+                    newProgressForFirestore.push(stageToStart as TransactionStage);
+                }
+                shouldStartNextStage = true;
+            }
+        }
     }
     
     let commentContent = logContent;
     if(isFinallyCompleted) {
          const contractClauses = transaction.contract?.clauses || [];
-         const completedStageNames = new Set(newProgressForFirestore.filter(s => s.status === 'completed').map(s => s.name));
+         const completedStageNames = new Set(newProgressForFirestore.filter((s: TransactionStage) => s.status === 'completed').map((s: TransactionStage) => s.name));
          const newContractClauses = contractClauses.map(clause => (clause.condition && completedStageNames.has(clause.condition) && clause.status === 'غير مستحقة') ? { ...clause, status: 'مستحقة' as const } : clause);
          const totalAmountNowDue = newContractClauses.filter(c => c.status === 'مدفوعة' || c.status === 'مستحقة').reduce((sum, c) => sum + c.amount, 0);
          const totalPaid = await getTotalPaidForProject(transactionId, firestore);
@@ -361,13 +410,26 @@ export default function TransactionDetailPage() {
 
   const canStartStage = (stage: TransactionStage, allStages: TransactionStage[]) => {
     if (stage.status !== 'pending') return { allowed: false, reason: `المرحلة حالياً "${stageStatusTranslations[stage.status]}".`};
-    if (stage.stageType === 'parallel') return { allowed: true };
+    if (stage.stageType === 'parallel') {
+        if (!stage.allowedDuringStages || stage.allowedDuringStages.length === 0) {
+            return { allowed: true }; // Can start anytime if not restricted
+        }
+        const anAllowedStageIsActive = allStages.some(s => 
+            stage.allowedDuringStages?.includes(s.stageId) && s.status === 'in-progress'
+        );
+        return anAllowedStageIsActive 
+            ? { allowed: true } 
+            : { allowed: false, reason: 'يمكن بدء هذه المرحلة فقط أثناء المراحل المحددة لها.' };
+    }
 
     const aSequentialStageIsInProgress = allStages.some(s => s.stageType !== 'parallel' && s.status === 'in-progress');
     if (aSequentialStageIsInProgress) return { allowed: false, reason: 'توجد مرحلة تسلسلية أخرى قيد التنفيذ.'};
 
     const predecessors = allStages.filter(s => s.nextStageIds?.includes(stage.stageId));
-    if (predecessors.length === 0) return { allowed: !aSequentialStageIsInProgress };
+    if (predecessors.length === 0) {
+        const isFirstSequential = allStages.filter(s => s.stageType !== 'parallel' && s.status !== 'pending').length === 0;
+        return isFirstSequential ? { allowed: true } : { allowed: false, reason: 'لا توجد مرحلة سابقة لها.'};
+    }
     
     const canBeTriggered = predecessors.some(p => p.status === 'completed');
     if (!canBeTriggered) {
@@ -380,7 +442,11 @@ export default function TransactionDetailPage() {
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
   const sequentialStages = useMemo(() => stages.filter(s => s.stageType !== 'parallel'), [stages]);
-  const parallelStages = useMemo(() => stages.filter(s => s.stageType === 'parallel'), [stages]);
+  const parallelStages = useMemo(() => stages.filter(s => {
+    if (s.status !== 'pending') return true; // Always show if in progress or completed
+    const canStartResult = canStartStage(s, stages);
+    return canStartResult.allowed;
+  }), [stages]);
 
   if (isLoading || loadingStages) {
     return (
@@ -413,6 +479,7 @@ export default function TransactionDetailPage() {
         <ContractClausesForm
             isOpen={isContractFormOpen}
             onClose={() => setIsContractFormOpen(false)}
+            onSaveSuccess={() => {}}
             transaction={transaction}
             clientId={clientId}
             clientName={(client as any).nameAr}
@@ -467,6 +534,10 @@ export default function TransactionDetailPage() {
                             إنشاء عقد
                         </Button>
                     )}
+                     <Button variant="outline" size="sm" onClick={() => setIsAssignmentDialogOpen(true)}>
+                        <Users className="ml-2 h-4 w-4" />
+                        تحويل / إسناد
+                    </Button>
                 </div>
             </CardHeader>
             <CardContent>
@@ -598,3 +669,4 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
