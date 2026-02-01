@@ -253,15 +253,15 @@ export default function EditCashReceiptPage() {
   }), [clientProjects]);
 
   const debitAccountOptions = useMemo(() => {
-    if (!paymentMethod) return []; // No options if no method is selected
+    if (!paymentMethod) return [];
     
     if (paymentMethod === 'Cash') {
         return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('الصندوق'))
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('صندوق'))
             .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
     } else { // Cheque, Bank Transfer, K-Net
         return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('البنك'))
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('بنك'))
             .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
     }
   }, [accounts, paymentMethod]);
@@ -275,8 +275,8 @@ export default function EditCashReceiptPage() {
       const isCash = paymentMethod === 'Cash';
       const isBank = ['Cheque', 'Bank Transfer', 'K-Net'].includes(paymentMethod);
 
-      const accountIsCash = selectedAcc.name.includes('الصندوق');
-      const accountIsBank = selectedAcc.name.includes('البنك');
+      const accountIsCash = selectedAcc.name.includes('صندوق');
+      const accountIsBank = selectedAcc.name.includes('بنك');
 
       if ((isCash && !accountIsCash) || (isBank && !accountIsBank)) {
         setDebitAccountId(''); // Invalidate selection

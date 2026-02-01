@@ -157,10 +157,10 @@ export default function NewCashReceiptPage() {
   useEffect(() => {
     if (accounts.length > 0 && paymentMethod) {
       if (paymentMethod === 'Cash') {
-        const cashAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('الصندوق'));
+        const cashAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('صندوق'));
         setDebitAccountId(cashAccount?.id || ''); // Set to first cash account or clear
       } else { // Cheque, Bank Transfer, K-Net
-        const bankAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('البنك'));
+        const bankAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('بنك'));
         setDebitAccountId(bankAccount?.id || ''); // Set to first bank account or clear
       }
     } else if (!paymentMethod) {
@@ -274,15 +274,15 @@ export default function NewCashReceiptPage() {
   }), [clientProjects]);
   
   const debitAccountOptions = useMemo(() => {
-    if (!paymentMethod) return []; // No options if no method is selected
+    if (!paymentMethod) return [];
 
     if (paymentMethod === 'Cash') {
         return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('الصندوق'))
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('صندوق'))
             .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
     } else { // Cheque, Bank Transfer, K-Net
         return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('البنك'))
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('بنك'))
             .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
     }
   }, [accounts, paymentMethod]);
