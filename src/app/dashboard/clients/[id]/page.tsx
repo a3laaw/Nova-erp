@@ -97,13 +97,15 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
 
   const quotationsQuery = useMemo(() => {
     if (!firestore || !clientId) return null;
-    return [where('clientId', '==', clientId), orderBy('date', 'desc')];
+    // Removed orderBy to avoid needing a composite index. Sorting is now done client-side.
+    return [where('clientId', '==', clientId)];
   }, [firestore, clientId]);
 
   const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, quotationsQuery ? 'quotations' : null, quotationsQuery || []);
   
   const sortedQuotations = useMemo(() => {
     if (!quotations) return [];
+    // Sort descending by date on the client side
     return [...quotations].sort((a,b) => {
         const dateB = toFirestoreDate(b.date);
         const dateA = toFirestoreDate(a.date);
@@ -628,3 +630,4 @@ export default function ClientProfilePage() {
     </>
   );
 }
+
