@@ -23,7 +23,7 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy, writeBatch, limit } from 'firebase/firestore';
 import type { Client, Company, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -278,11 +278,23 @@ export default function NewCashReceiptPage() {
     let newReceiptId = '';
     
     try {
+        // --- PRE-TRANSACTION READ ---
+        let isFirstReceiptForProject = false;
+        if (selectedProjectId) {
+            const receiptsForProjectQuery = query(
+                collection(firestore, 'cashReceipts'), 
+                where('projectId', '==', selectedProjectId),
+                limit(1) // We only need to know if at least one exists
+            );
+            const receiptsSnap = await getDocs(receiptsForProjectQuery);
+            isFirstReceiptForProject = receiptsSnap.empty;
+        }
+
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
             
-            // --- All Reads First ---
+            // --- All Transactional Reads First ---
             const counterDoc = await transaction_fs.get(counterRef);
             const selectedClient = clients.find(c => c.id === selectedClientId);
             if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
@@ -295,17 +307,10 @@ export default function NewCashReceiptPage() {
                 : accounts.find(acc => acc.type === 'asset' && acc.name.includes('بنك'));
             if (!debitAccount) throw new Error('لم يتم العثور على حساب افتراضي للصندوق أو البنك.');
 
-            let transactionRef, transactionSnap, currentStages;
-            let isFirstReceiptForProject = false;
-            
+            let transactionRef, transactionSnap;
             if (selectedProjectId) {
-                const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId));
-                const receiptsSnap = await transaction_fs.get(receiptsForProjectQuery);
-                isFirstReceiptForProject = receiptsSnap.empty;
-
                 transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
                 transactionSnap = await transaction_fs.get(transactionRef);
-                currentStages = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
             }
             
             // --- All Writes Second ---
@@ -393,6 +398,7 @@ export default function NewCashReceiptPage() {
             }
 
             if (isFirstReceiptForProject && selectedProjectId && transactionRef && transactionSnap?.exists()) {
+                const currentStages = [...((transactionSnap.data() as ClientTransaction)?.stages || [])];
                 const contractStageIndex = currentStages?.findIndex(s => s.name === 'توقيع العقد');
                 if (contractStageIndex !== -1 && currentStages?.[contractStageIndex]?.status !== 'completed') {
                     const now = new Date();
