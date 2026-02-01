@@ -547,8 +547,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     ...jePayload,
                     entryNumber: newEntryNumber,
                     status: 'draft',
-                    createdAt: serverTimestamp(),
                     createdBy: currentUser!.id,
+                    createdAt: serverTimestamp(),
                 });
                 transaction_firestore.set(journalEntryCounterRef, { counts: { [currentYear]: nextJournalEntryNumber } }, { merge: true });
             }
@@ -713,7 +713,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                         </SelectContent>
                                     </Select>
                                     <div className="col-span-3 flex items-center gap-1">
-                                        <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-left"/>
+                                        <Input type="number" value={m.value} onChange={e => {
+                                            const num = parseFloat(e.target.value);
+                                            updateMilestone(m.id, 'value', isNaN(num) ? 0 : num)
+                                        }} className="dir-ltr text-left"/>
                                         <span className="text-sm">{financials.type === 'fixed' ? 'د.ك' : '%'}</span>
                                     </div>
                                     <Button variant="ghost" size="icon" type="button" onClick={() => removeMilestone(m.id)} className="col-span-1"><Trash2 className="text-destructive h-4 w-4"/></Button>
