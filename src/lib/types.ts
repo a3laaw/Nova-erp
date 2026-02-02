@@ -452,7 +452,7 @@ export interface WorkStage {
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
-  allowedDuringStages?: string[]; // For parallel stages only
+  allowedDuringStages?: string[];
   trackingType: 'duration' | 'occurrence' | 'none';
   expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
@@ -651,4 +651,3 @@ export interface PurchaseOrder {
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
-
