@@ -618,11 +618,17 @@ export default function AppointmentDetailsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {client ? (
+                    {appointment.clientId ? (
                         <InfoRow 
                             icon={<User />} 
                             label="العميل" 
-                            value={<Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link>} 
+                            value={
+                                client ? (
+                                    <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link>
+                                ) : (
+                                    <Skeleton className="h-5 w-32" />
+                                )
+                            } 
                         />
                     ) : (
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
@@ -644,6 +650,7 @@ export default function AppointmentDetailsPage() {
                             </div>
                         </div>
                     )}
+
                     <InfoRow icon={<User />} label="المهندس المسؤول" value={engineer?.fullName} />
                     <InfoRow icon={<Calendar />} label="تاريخ الموعد" value={safeAppointmentDate ? format(safeAppointmentDate, "eeee, dd MMMM yyyy", { locale: ar }) : ''} />
                     <InfoRow icon={<Clock />} label="وقت الموعد" value={safeAppointmentDate ? format(safeAppointmentDate, "p", { locale: ar }) : ''} />
