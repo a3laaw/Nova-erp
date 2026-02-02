@@ -275,7 +275,7 @@ export default function NewCashReceiptPage() {
   
   const debitAccountOptions = useMemo(() => {
     if (!paymentMethod) return [];
-
+    
     if (paymentMethod === 'Cash') {
         return accounts
             .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('صندوق'))
@@ -311,13 +311,25 @@ export default function NewCashReceiptPage() {
     setIsSaving(true);
     let newReceiptId = '';
     
-    // --- PRE-TRANSACTION READS ---
+    // --- PRE-TRANSACTION READS AND LOGIC ---
     let isFirstReceiptForProject = false;
+    let transactionDataForCheck: ClientTransaction | null = null;
+    let transactionRefForUpdate: any = null;
+    
     try {
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
-            const receiptsSnap = await getDocs(receiptsForProjectQuery);
+            transactionRefForUpdate = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
+            
+            const [receiptsSnap, txSnap] = await Promise.all([
+                getDocs(receiptsForProjectQuery),
+                getDoc(transactionRefForUpdate)
+            ]);
+            
             isFirstReceiptForProject = receiptsSnap.empty;
+            if (txSnap.exists()) {
+                transactionDataForCheck = { id: txSnap.id, ...txSnap.data() } as ClientTransaction;
+            }
         }
     } catch(err) {
         console.error("Pre-transaction read failed:", err);
@@ -325,23 +337,16 @@ export default function NewCashReceiptPage() {
         setIsSaving(false);
         return;
     }
+    // --- END OF PRE-TRANSACTION READS ---
     
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
             
-            // --- ALL TRANSACTION READS FIRST ---
+            // This is the only read inside the transaction, required for atomicity.
             const counterDoc = await transaction_fs.get(counterRef);
-            let txSnap;
-            let transactionRef;
-            if (selectedProjectId) {
-                transactionRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
-                txSnap = await transaction_fs.get(transactionRef);
-            }
-            // --- END OF READS ---
-
-
+            
             // --- ALL LOGIC & WRITES LAST ---
             const selectedClient = clients.find(c => c.id === selectedClientId);
             if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
@@ -410,35 +415,30 @@ export default function NewCashReceiptPage() {
             transaction_fs.set(newReceiptRef, newReceiptData);
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (selectedProjectId && isFirstReceiptForProject && txSnap?.exists()) {
-                const txData = txSnap.data() as ClientTransaction;
-                const currentStages: TransactionStage[] = [...(txData.stages || [])];
+            if (selectedProjectId && isFirstReceiptForProject && transactionDataForCheck) {
+                const currentStages: TransactionStage[] = [...(transactionDataForCheck.stages || [])];
                 const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
 
                 if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
                     currentStages[contractStageIndex].status = 'completed';
                     currentStages[contractStageIndex].endDate = new Date() as any;
-                    transaction_fs.update(transactionRef!, { stages: currentStages });
+                    transaction_fs.update(transactionRefForUpdate, { stages: currentStages });
                 }
             }
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
         
-        if (selectedProjectId) {
-            const txRef = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
-            const transactionDoc = await getDoc(txRef);
-            if (!transactionDoc.exists()) throw new Error('Transaction not found for post-processing');
-            const transactionData = transactionDoc.data() as ClientTransaction;
-
+        if (selectedProjectId && transactionDataForCheck) {
             const postTransactionBatch = writeBatch(firestore);
             
-            if (transactionData.contract?.clauses) {
+            // 1. Update contract clauses status
+            if (transactionDataForCheck.contract?.clauses) {
                 const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
                 let accumulatedAmount = 0;
                 let dueClauseFound = false;
                 
-                const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                const updatedClauses = transactionDataForCheck.contract.clauses.map((clause: any) => {
                     const newClause = { ...clause };
                     if (totalPaid >= accumulatedAmount + clause.amount) {
                         newClause.status = 'مدفوعة';
@@ -451,9 +451,30 @@ export default function NewCashReceiptPage() {
                     accumulatedAmount += clause.amount;
                     return newClause;
                 });
-                 postTransactionBatch.update(txRef, { 'contract.clauses': updatedClauses });
+                 postTransactionBatch.update(transactionRefForUpdate, { 'contract.clauses': updatedClauses });
             }
             
+            // 2. Add Timeline Comment
+            const timelineCollectionRef = collection(transactionRefForUpdate, 'timelineEvents');
+            const historyCollectionRef = collection(firestore, `clients/${selectedClientId}/history`);
+            
+            const commentContent = `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. رقم السند: ${voucherNumber}`;
+            const commentData = {
+                type: 'comment' as const,
+                content: commentContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp()
+            };
+            postTransactionBatch.set(doc(timelineCollectionRef), commentData);
+            
+            // 3. Add to Client History Log
+             postTransactionBatch.set(doc(historyCollectionRef), {
+                ...commentData,
+                content: `[${transactionDataForCheck.transactionType}] ${commentContent}`
+            });
+
             await postTransactionBatch.commit();
         }
         

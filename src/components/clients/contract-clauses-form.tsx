@@ -359,17 +359,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
+  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
-    setTerms(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
-  const removeTerm = (id: string) => setTerms(prev => prev.filter(term => term.id !== id));
+  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
-    const newTerms = [...terms];
+    const newTerms = [...termsAndConditions];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newTerms.length) return;
     [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-    setTerms(newTerms);
+    setTermsAndConditions(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
@@ -421,33 +421,28 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
     try {
         // --- PRE-TRANSACTION READS ---
-        const [revenueAccountSnap, parentAccountSnap, clientAccountSnap] = await Promise.all([
+        const [revenueAccountSnap, parentAccountSnap, clientAccountSnap, jeQuerySnap] = await Promise.all([
             getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'إيرادات استشارات هندسية'), limit(1))),
             getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', 'العملاء'), limit(1))),
-            getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1)))
+            getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientName), limit(1))),
+            selectedTransactionId && selectedTransactionId !== '__NEW__'
+                ? getDocs(query(collection(firestore, 'journalEntries'), where('transactionId', '==', selectedTransactionId)))
+                : Promise.resolve(null)
         ]);
 
         if (revenueAccountSnap.empty) throw new Error("حساب 'إيرادات استشارات هندسية' غير موجود.");
         if (parentAccountSnap.empty) throw new Error("حساب 'العملاء' الرئيسي غير موجود.");
         
         let existingDebtJournalEntryId: string | null = null;
-        if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
-            const jeQuery = query(collection(firestore, 'journalEntries'), where('transactionId', '==', selectedTransactionId));
-            const jeSnapshot = await getDocs(jeQuery);
-            if (!jeSnapshot.empty) {
-                jeSnapshot.docs.forEach(doc => {
-                    if (doc.data().narration?.includes('إثبات مديونية')) {
-                        existingDebtJournalEntryId = doc.id;
-                    }
-                });
+        jeQuerySnap?.docs.forEach(doc => {
+            if (doc.data().narration?.includes('إثبات مديونية')) {
+                existingDebtJournalEntryId = doc.id;
             }
-        }
+        });
         
         // --- TRANSACTION STARTS ---
         await runTransaction(firestore, async (transaction_firestore) => {
             const currentYear = new Date().getFullYear();
-
-            // --- ALL TRANSACTION READS FIRST ---
             const clientRef = doc(firestore, 'clients', clientId);
             const coaClientCounterRef = doc(firestore, 'counters', 'coa_clients');
             const journalEntryCounterRef = doc(firestore, 'counters', 'journalEntries');
@@ -459,11 +454,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
-            // --- END OF TRANSACTION READS ---
-
-            // --- ALL LOGIC & WRITES LAST ---
-            const isNewContractCreation = !transaction.contract;
             const clientData = clientSnap.data() as Client;
+            
+            // --- ALL WRITES ---
+            const isNewContractCreation = !transaction.contract;
             let clientAccountId = clientAccountSnap.empty ? null : clientAccountSnap.docs[0].id;
 
             if (!clientAccountId) {
