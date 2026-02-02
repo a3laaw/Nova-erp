@@ -1,37 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, collectionGroup } from 'firebase/firestore';
 import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account } from '@/lib/types';
 import { useToast } from './use-toast';
+import { useSmartCache } from './use-smart-cache';
 
-export function useAnalyticalData() {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<{
+// The shape of the data that the hook will return
+interface AnalyticalData {
     journalEntries: JournalEntry[];
     clients: Client[];
     transactions: (ClientTransaction & { clientId: string })[];
     employees: Employee[];
     departments: Department[];
     accounts: Account[];
-  }>({
-    journalEntries: [],
-    clients: [],
-    transactions: [],
-    employees: [],
-    departments: [],
-    accounts: [],
-  });
+}
 
-  useEffect(() => {
-    if (!firestore) return;
+export function useAnalyticalData() {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
 
-    const fetchData = async () => {
-      setLoading(true);
-      try {
+  const fetchAnalyticalData = async (): Promise<AnalyticalData> => {
+    if (!firestore) {
+      throw new Error("Firestore is not available.");
+    }
+    
+    try {
         const [
           entriesSnap,
           clientsSnap,
@@ -54,24 +48,37 @@ export function useAnalyticalData() {
             return { id: doc.id, clientId, ...doc.data() } as ClientTransaction & { clientId: string };
         });
 
-        setData({
+        return {
           journalEntries: entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)),
           clients: clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)),
           transactions,
           employees: employeesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)),
           departments: departmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)),
           accounts: accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)),
-        });
-      } catch (error) {
+        };
+    } catch (error) {
         console.error("Error fetching analytical data:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات التحليلية.' });
-      } finally {
-        setLoading(false);
-      }
-    };
+        // Re-throw to be caught by useSmartCache
+        throw error;
+    }
+  };
+  
+  // Use the smart cache hook to manage fetching and caching
+  const { data, loading, error } = useSmartCache<AnalyticalData>(
+    'analytical_data_cache', // Unique key for this data
+    fetchAnalyticalData,
+    10 * 60 * 1000 // Cache for 10 minutes
+  );
 
-    fetchData();
-  }, [firestore, toast]);
-
-  return { ...data, loading };
+  return { 
+    journalEntries: data?.journalEntries || [],
+    clients: data?.clients || [],
+    transactions: data?.transactions || [],
+    employees: data?.employees || [],
+    departments: data?.departments || [],
+    accounts: data?.accounts || [],
+    loading, 
+    error 
+  };
 }
