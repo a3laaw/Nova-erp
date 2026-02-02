@@ -335,6 +335,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(newItems);
   };
 
+
   const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
     setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
@@ -426,7 +427,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterDoc),
+                transaction_firestore.get(journalEntryCounterRef),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -789,3 +790,5 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   )
 }
+
+    
