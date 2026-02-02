@@ -12,7 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 import type { PaymentVoucher } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -93,8 +93,17 @@ export function PaymentVouchersList() {
     if (!voucherToDelete || !firestore) return;
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(firestore, 'paymentVouchers', voucherToDelete.id!));
-        toast({ title: 'نجاح', description: 'تم حذف سند الصرف بنجاح.' });
+        const batch = writeBatch(firestore);
+        const voucherRef = doc(firestore, 'paymentVouchers', voucherToDelete.id!);
+        batch.delete(voucherRef);
+
+        if (voucherToDelete.journalEntryId) {
+            const jeRef = doc(firestore, 'journalEntries', voucherToDelete.journalEntryId);
+            batch.delete(jeRef);
+        }
+        
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم حذف سند الصرف والقيد المرتبط به بنجاح.' });
     } catch (error) {
         console.error('Error deleting payment voucher:', error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف سند الصرف.' });
@@ -249,7 +258,7 @@ export function PaymentVouchersList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيتم حذف السند رقم "{voucherToDelete?.voucherNumber}" بشكل دائم.
+                        سيتم حذف السند رقم "{voucherToDelete?.voucherNumber}" والقيد المحاسبي المرتبط به بشكل دائم.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

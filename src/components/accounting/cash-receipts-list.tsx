@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -149,9 +149,13 @@ export function CashReceiptsList() {
         }
         
         batch.delete(receiptRef);
+        if (receiptToDelete.journalEntryId) {
+            batch.delete(doc(firestore, 'journalEntries', receiptToDelete.journalEntryId));
+        }
+
         await batch.commit();
 
-        toast({ title: 'نجاح', description: 'تم حذف سند القبض وتحديث حالة العقد.' });
+        toast({ title: 'نجاح', description: 'تم حذف سند القبض والقيد المرتبط به.' });
     } catch (error) {
         console.error('Error deleting cash receipt:', error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف سند القبض.' });
@@ -311,7 +315,7 @@ export function CashReceiptsList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيتم حذف السند رقم "{receiptToDelete?.voucherNumber}" بشكل دائم. سيؤثر هذا على حالة دفعات العقد المرتبط.
+                        سيتم حذف السند رقم "{receiptToDelete?.voucherNumber}" والقيد المحاسبي المرتبط به بشكل دائم. سيؤثر هذا على حالة دفعات العقد المرتبط.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
