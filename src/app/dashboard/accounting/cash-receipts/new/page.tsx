@@ -455,25 +455,30 @@ export default function NewCashReceiptPage() {
                  postTransactionBatch.update(transactionRefForUpdate, { 'contract.clauses': updatedClauses });
             }
             
-            // 2. Add Timeline Log
+            // 2. Add Timeline Comment
             const timelineCollectionRef = collection(transactionRefForUpdate, 'timelineEvents');
             const historyCollectionRef = collection(firestore, `clients/${selectedClientId}/history`);
             
-            const logContent = `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. رقم السند: ${voucherNumber}`;
-            const logData = {
-                type: 'log' as const,
-                content: logContent,
+            const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. (سند قبض رقم: ${voucherNumber})`;
+            const commentData = {
+                type: 'comment' as const,
+                content: commentContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp()
             };
-            postTransactionBatch.set(doc(timelineCollectionRef), logData);
+            postTransactionBatch.set(doc(timelineCollectionRef), commentData);
             
-            // 3. Add to Client History Log
-             postTransactionBatch.set(doc(historyCollectionRef), {
-                ...logData,
-                content: `[${transactionDataForCheck.transactionType}] ${logContent}`
+            // 3. Add concise log to Client History
+            const historyLogContent = `[${transactionDataForCheck.transactionType}] قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))}.`;
+            postTransactionBatch.set(doc(historyCollectionRef), {
+                type: 'log' as const,
+                content: historyLogContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp()
             });
 
             await postTransactionBatch.commit();

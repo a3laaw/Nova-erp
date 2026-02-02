@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -147,7 +148,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   // Form data state
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
   const [clauses, setClauses] = useState<ContractClause[]>([]);
-  const [terms, setTerms] = useState<ContractTerm[]>([]);
+  const [termsAndConditions, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
   
   const [financials, setFinancials] = useState<ContractTemplate['financials']>({
@@ -359,17 +360,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
+  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
-    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+    setTerms(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
-  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
+  const removeTerm = (id: string) => setTerms(prev => prev.filter(term => term.id !== id));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
     const newTerms = [...termsAndConditions];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newTerms.length) return;
     [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-    setTermsAndConditions(newTerms);
+    setTerms(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
@@ -559,6 +560,20 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             if (quotationIdToUpdate) {
                 transaction_firestore.update(doc(firestore, 'quotations', quotationIdToUpdate), { transactionId: finalTransactionId, status: 'accepted' });
             }
+
+            const finalTransactionType = originalTransaction.transactionType || transaction.transactionType;
+
+            const commentContent = `**[إشعار مالي]**\nقام ${currentUser!.fullName} بإنشاء عقد لهذه المعاملة بقيمة إجمالية ${formatCurrency(totalAmount)}.`;
+            const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
+
+            const logContentForHistory = `قام ${currentUser!.fullName} بإنشاء عقد لمعاملة "${finalTransactionType}" بقيمة إجمالية ${formatCurrency(totalAmount)}.`;
+            const logDataForHistory = { type: 'log' as const, content: logContentForHistory, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
+            
+            const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
+            const transactionTimelineRef = collection(firestore, `clients/${clientId}/transactions/${finalTransactionId!}/timelineEvents`);
+
+            transaction_firestore.set(doc(historyCollectionRef), logDataForHistory);
+            transaction_firestore.set(doc(transactionTimelineRef), commentData);
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ العقد والقيد المحاسبي بنجاح.' });
@@ -663,13 +678,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             <h3 className="font-semibold">الشروط والأحكام</h3>
                             <Button size="sm" variant="outline" type="button" onClick={addTerm}><PlusCircle className="ml-2"/> إضافة شرط</Button>
                         </div>
-                         {terms.map((term, index) => (
+                         {termsAndConditions.map((term, index) => (
                             <div key={term.id} className="flex items-center gap-2">
                                <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
                                <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow"/>
                                <div className="flex flex-col">
                                 <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
-                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === terms.length - 1}><ArrowDown className="h-4 w-4"/></Button>
+                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderTerm(index, 'down')} disabled={index === termsAndConditions.length - 1}><ArrowDown className="h-4 w-4"/></Button>
                                </div>
                                <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
                             </div>

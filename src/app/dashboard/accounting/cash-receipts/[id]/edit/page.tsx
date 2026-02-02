@@ -419,23 +419,27 @@ export default function EditCashReceiptPage() {
             }
             
             // 2. Add Timeline log for the edit
-            const logContent = `قام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`;
-            const logData = {
-                type: 'log' as const,
-                content: logContent,
+            const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`;
+            const commentData = {
+                type: 'comment' as const,
+                content: commentContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp()
             };
             const timelineRef = doc(collection(txRef, 'timelineEvents'));
-            batch.set(timelineRef, logData);
-
-            // 3. Add to Client History Log as well
+            batch.set(timelineRef, commentData);
+            
+            // 3. Add to Client History Log as a 'log' event
             const historyRef = doc(collection(firestore, `clients/${originalReceipt.clientId}/history`));
             batch.set(historyRef, {
-                ...logData,
-                content: `[${transactionDataForCheck.transactionType}] ${logContent}`
+                type: 'log' as const,
+                content: `[${transactionDataForCheck.transactionType}] قام ${currentUser.fullName} بتعديل سند قبض. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
             });
 
             await batch.commit();
