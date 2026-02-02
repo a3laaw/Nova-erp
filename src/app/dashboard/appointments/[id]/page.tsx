@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -75,15 +76,25 @@ export default function AppointmentDetailsPage() {
     const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
 
     const clientTransactionsQuery = useMemo(() => {
-        if (!appointment?.clientId || appointment?.transactionId) return null;
-        return [orderBy('createdAt', 'desc')];
+        if (!appointment?.clientId || appointment.transactionId) return null;
+        // Fetch all transactions for the client if the appointment is not yet linked.
+        return [];
     }, [appointment?.clientId, appointment?.transactionId]);
 
-    const { data: clientTransactions = [], loading: clientTransactionsLoading } = useSubscription<ClientTransaction>(
+    const { data: rawClientTransactions = [], loading: clientTransactionsLoading } = useSubscription<ClientTransaction>(
         firestore, 
         clientTransactionsQuery ? `clients/${appointment.clientId}/transactions` : null, 
         clientTransactionsQuery || []
     );
+    
+    const clientTransactions = useMemo(() => {
+      if (!rawClientTransactions) return [];
+      return [...rawClientTransactions].sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
+    }, [rawClientTransactions]);
     
     // --- State for one-time fetched or derived data ---
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
