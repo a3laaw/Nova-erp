@@ -74,8 +74,16 @@ export default function AppointmentDetailsPage() {
     const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null, [appointment?.clientId, appointment?.transactionId]);
     const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
 
-    const clientTransactionsPath = useMemo(() => (appointment?.clientId && !appointment?.transactionId) ? `clients/${appointment.clientId}/transactions` : null, [appointment?.clientId, appointment?.transactionId]);
-    const { data: clientTransactions = [], loading: clientTransactionsLoading } = useSubscription<ClientTransaction>(firestore, clientTransactionsPath, clientTransactionsPath ? [] : undefined);
+    const clientTransactionsQuery = useMemo(() => {
+        if (!appointment?.clientId || appointment?.transactionId) return null;
+        return [orderBy('createdAt', 'desc')];
+    }, [appointment?.clientId, appointment?.transactionId]);
+
+    const { data: clientTransactions = [], loading: clientTransactionsLoading } = useSubscription<ClientTransaction>(
+        firestore, 
+        clientTransactionsQuery ? `clients/${appointment.clientId}/transactions` : null, 
+        clientTransactionsQuery || []
+    );
     
     // --- State for one-time fetched or derived data ---
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
@@ -567,16 +575,12 @@ export default function AppointmentDetailsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {appointment.clientId ? (
+                    {appointment.clientId && client ? (
                         <InfoRow 
                             icon={<User />} 
                             label="العميل" 
                             value={
-                                client ? (
-                                    <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link>
-                                ) : (
-                                    <Skeleton className="h-5 w-32" />
-                                )
+                                <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-primary hover:underline">{client.nameAr}</Link>
                             } 
                         />
                     ) : (
@@ -590,12 +594,14 @@ export default function AppointmentDetailsPage() {
                                     <p className="text-sm text-muted-foreground">{appointment.clientName}</p>
                                     <p className="text-xs text-muted-foreground font-mono dir-ltr">{appointment.clientMobile}</p>
                                 </div>
-                                <Button asChild size="sm" disabled={isAutoLinking}>
-                                    <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${appointment.engineerId}&fromAppointmentId=${appointment.id}`}>
-                                        <UserPlus className="ml-2 h-4 w-4" />
-                                        إنشاء ملف عميل
-                                    </Link>
-                                </Button>
+                                { !appointment.clientId && (
+                                    <Button asChild size="sm" disabled={isAutoLinking}>
+                                        <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${appointment.engineerId}&fromAppointmentId=${appointment.id}`}>
+                                            <UserPlus className="ml-2 h-4 w-4" />
+                                            إنشاء ملف عميل
+                                        </Link>
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     )}
