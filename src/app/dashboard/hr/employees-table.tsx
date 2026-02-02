@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -479,3 +480,4 @@ export function EmployeesTable() {
         </>
     );
 }
+
