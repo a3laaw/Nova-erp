@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -418,18 +417,19 @@ export default function EditCashReceiptPage() {
                 batch.update(txRef, { 'contract.clauses': updatedClauses });
             }
             
-            // 2. Add Timeline log for the edit
+            // 2. Add Timeline log & comment for the edit
+            const timelineRef = collection(txRef, 'timelineEvents');
             const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`;
             const commentData = {
-                type: 'comment' as const,
-                content: commentContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp()
+                type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
             };
-            const timelineRef = doc(collection(txRef, 'timelineEvents'));
-            batch.set(timelineRef, commentData);
+            batch.set(doc(timelineRef), commentData);
+
+            const logContent = `عدّل ${currentUser.fullName} سند قبض ${originalReceipt.voucherNumber}.`;
+            const logData = {
+                type: 'log' as const, content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
+            };
+            batch.set(doc(timelineRef), logData);
             
             // 3. Add to Client History Log as a 'log' event
             const historyRef = doc(collection(firestore, `clients/${originalReceipt.clientId}/history`));

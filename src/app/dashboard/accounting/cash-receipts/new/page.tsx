@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -24,14 +23,14 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy, writeBatch, limit } from 'firebase/firestore';
-import type { Client, Company, ClientTransaction, Account, Employee, Department, TransactionStage } from '@/lib/types';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy, writeBatch, limit, collectionGroup } from 'firebase/firestore';
+import type { Client, Company, ClientTransaction, Account, Employee, Department, TransactionStage, WorkStage } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
@@ -316,7 +315,8 @@ export default function NewCashReceiptPage() {
     let isFirstReceiptForProject = false;
     let transactionDataForCheck: ClientTransaction | null = null;
     let transactionRefForUpdate: any = null;
-    
+    let workStages: WorkStage[] = [];
+
     try {
         if (selectedProjectId) {
             const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
@@ -330,6 +330,11 @@ export default function NewCashReceiptPage() {
             isFirstReceiptForProject = receiptsSnap.empty;
             if (txSnap.exists()) {
                 transactionDataForCheck = { id: txSnap.id, ...txSnap.data() } as ClientTransaction;
+                if (transactionDataForCheck?.departmentId) {
+                    const stagesQuery = query(collection(firestore, `departments/${transactionDataForCheck.departmentId}/workStages`), orderBy('order', 'asc'));
+                    const stagesSnap = await getDocs(stagesQuery);
+                    workStages = stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
+                }
             }
         }
     } catch(err) {
@@ -416,13 +421,25 @@ export default function NewCashReceiptPage() {
             transaction_fs.set(newReceiptRef, newReceiptData);
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
-            if (selectedProjectId && isFirstReceiptForProject && transactionDataForCheck) {
+            if (selectedProjectId && isFirstReceiptForProject && transactionDataForCheck && transactionRefForUpdate) {
                 const currentStages: TransactionStage[] = [...(transactionDataForCheck.stages || [])];
                 const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
 
                 if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
                     currentStages[contractStageIndex].status = 'completed';
                     currentStages[contractStageIndex].endDate = new Date() as any;
+                    
+                    const contractWorkStage = workStages.find(ws => ws.name === 'توقيع العقد');
+                    if (contractWorkStage && contractWorkStage.order !== undefined) {
+                        const nextStageInTemplate = workStages.find(ws => ws.order === contractWorkStage.order! + 1);
+                        if (nextStageInTemplate) {
+                            const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageInTemplate.id);
+                            if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'pending') {
+                                currentStages[nextStageIndexInProg].status = 'in-progress';
+                                currentStages[nextStageIndexInProg].startDate = new Date() as any;
+                            }
+                        }
+                    }
                     transaction_fs.update(transactionRefForUpdate, { stages: currentStages });
                 }
             }
@@ -455,30 +472,26 @@ export default function NewCashReceiptPage() {
                  postTransactionBatch.update(transactionRefForUpdate, { 'contract.clauses': updatedClauses });
             }
             
-            // 2. Add Timeline Comment
+            // 2. Add Timeline Comment & Log
             const timelineCollectionRef = collection(transactionRefForUpdate, 'timelineEvents');
             const historyCollectionRef = collection(firestore, `clients/${selectedClientId}/history`);
             
             const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. (سند قبض رقم: ${voucherNumber})`;
             const commentData = {
-                type: 'comment' as const,
-                content: commentContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp()
+                type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
             };
             postTransactionBatch.set(doc(timelineCollectionRef), commentData);
             
+            const logContent = `سجل ${currentUser.fullName} دفعة بقيمة ${formatCurrency(parseFloat(amount))}.`;
+            const logData = {
+                type: 'log' as const, content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
+            };
+            postTransactionBatch.set(doc(timelineCollectionRef), logData);
+
             // 3. Add concise log to Client History
             const historyLogContent = `[${transactionDataForCheck.transactionType}] قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))}.`;
             postTransactionBatch.set(doc(historyCollectionRef), {
-                type: 'log' as const,
-                content: historyLogContent,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp()
+                type: 'log' as const, content: historyLogContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
             });
 
             await postTransactionBatch.commit();

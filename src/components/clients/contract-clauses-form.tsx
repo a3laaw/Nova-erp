@@ -450,7 +450,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef),
+                transaction_firestore.get(journalEntryCounterDoc),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -562,8 +562,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
             const finalTransactionType = originalTransaction.transactionType || transaction.transactionType;
 
-            const commentContent = `**[إشعار مالي]**\nقام ${currentUser!.fullName} بإنشاء عقد لهذه المعاملة بقيمة إجمالية ${formatCurrency(totalAmount)}.`;
+            const milestonesText = clauses.map(c => `- دفعة "${c.name}": ${formatCurrency(c.amount)}`).join('\n');
+            const commentContent = `**[إشعار مالي]**\nقام ${currentUser!.fullName} بإنشاء عقد لهذه المعاملة بقيمة إجمالية ${formatCurrency(totalAmount)}.\n\n**تفاصيل الدفعات:**\n${milestonesText}`;
             const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
+            
+            const logContentForTimeline = `أنشأ ${currentUser!.fullName} العقد للمعاملة.`;
+            const logDataForTimeline = { type: 'log' as const, content: logContentForTimeline, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
 
             const logContentForHistory = `قام ${currentUser!.fullName} بإنشاء عقد لمعاملة "${finalTransactionType}" بقيمة إجمالية ${formatCurrency(totalAmount)}.`;
             const logDataForHistory = { type: 'log' as const, content: logContentForHistory, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
@@ -573,6 +577,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
             transaction_firestore.set(doc(historyCollectionRef), logDataForHistory);
             transaction_firestore.set(doc(transactionTimelineRef), commentData);
+            transaction_firestore.set(doc(transactionTimelineRef), logDataForTimeline);
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ العقد والقيد المحاسبي بنجاح.' });
