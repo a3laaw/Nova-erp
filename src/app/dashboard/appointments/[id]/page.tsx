@@ -628,7 +628,15 @@ export default function AppointmentDetailsPage() {
                     <CardTitle>إجراءات الزيارة</CardTitle>
                 </CardHeader>
                  <CardContent>
-                    {!appointment.transactionId ? (
+                    {!appointment.clientId ? (
+                        <Alert variant="default">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>زيارة عميل محتمل</AlertTitle>
+                            <AlertDescription>
+                                للمتابعة، يمكنك إنشاء ملف للعميل من الأعلى. إذا لم يكن هناك إجراء آخر، يمكنك إغلاق الزيارة.
+                            </AlertDescription>
+                        </Alert>
+                    ) : !appointment.transactionId ? (
                         <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>زيارة غير مرتبطة بمعاملة</AlertTitle>
@@ -718,13 +726,13 @@ export default function AppointmentDetailsPage() {
 
             <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
                 <Button 
-                    disabled={!appointment.workStageUpdated}
+                    disabled={!appointment.workStageUpdated && !!appointment.clientId}
                     onClick={() => router.push('/dashboard/appointments')}
                 >
                     <ArrowRight className="ml-2 h-4 w-4" />
                     إغلاق الزيارة والعودة للتقويم
                 </Button>
-                {!appointment.workStageUpdated && appointment.transactionId && (
+                {!appointment.workStageUpdated && !!appointment.clientId && (
                         <Alert variant="destructive" className="w-full">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>إجراء مطلوب</AlertTitle>
@@ -737,4 +745,3 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
-    
