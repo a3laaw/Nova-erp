@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction, TransactionStage } from '@/lib/types';
@@ -61,32 +61,35 @@ export default function AppointmentDetailsPage() {
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-
-    // Data states
-    const [client, setClient] = useState<Client | null>(null);
-    const [engineer, setEngineer] = useState<Employee | null>(null);
-    const [workStages, setWorkStages] = useState<WorkStage[]>([]);
-    const [transaction, setTransaction] = useState<ClientTransaction | null>(null);
-    const [progressDoc, setProgressDoc] = useState<DocumentSnapshot | null>(null);
+    // --- Real-time Data Hooks ---
+    const appointmentPath = useMemo(() => (id ? `appointments/${id}` : null), [id]);
+    const { data: appointment, loading: appointmentLoading, error: appointmentError } = useDocument<Appointment>(firestore, appointmentPath);
     
-    // UI states
-    const [loading, setLoading] = useState(true);
+    const clientPath = useMemo(() => appointment?.clientId ? `clients/${appointment.clientId}` : null, [appointment?.clientId]);
+    const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
+
+    const engineerPath = useMemo(() => appointment?.engineerId ? `employees/${appointment.engineerId}` : null, [appointment?.engineerId]);
+    const { data: engineer, loading: engineerLoading } = useDocument<Employee>(firestore, engineerPath);
+
+    const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null, [appointment?.clientId, appointment?.transactionId]);
+    const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
+
+    const clientTransactionsPath = useMemo(() => (appointment?.clientId && !appointment?.transactionId) ? `clients/${appointment.clientId}/transactions` : null, [appointment?.clientId, appointment?.transactionId]);
+    const { data: clientTransactions = [], loading: clientTransactionsLoading } = useSubscription<ClientTransaction>(firestore, clientTransactionsPath, clientTransactionsPath ? [] : undefined);
+    
+    // --- State for one-time fetched or derived data ---
+    const [workStages, setWorkStages] = useState<WorkStage[]>([]);
+    const [progressDoc, setProgressDoc] = useState<DocumentSnapshot | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [selectedStageId, setSelectedStageId] = useState('');
     const [isEditingStage, setIsEditingStage] = useState(false);
     const [minutesContent, setMinutesContent] = useState('');
     const [isSavingMinutes, setIsSavingMinutes] = useState(false);
-
-    // For manual linking
-    const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
     const [selectedTransactionToLink, setSelectedTransactionToLink] = useState('');
     const [isLinking, setIsLinking] = useState(false);
     const [isAutoLinking, setIsAutoLinking] = useState(false);
 
-
-    // Fetch main appointment data
-    const appointmentPath = useMemo(() => (id ? `appointments/${id}` : null), [id]);
-    const { data: appointment, loading: appointmentLoading, error: appointmentError } = useDocument<Appointment>(firestore, appointmentPath);
+    const loading = appointmentLoading || clientLoading || engineerLoading || transactionLoading || clientTransactionsLoading;
 
     useEffect(() => {
         if (!appointmentLoading && !appointment && id) {
@@ -138,55 +141,18 @@ export default function AppointmentDetailsPage() {
                 }
             } catch (error) {
                 console.error("Failed to auto-link client:", error);
-                // Do not toast error to user, it's a background process
-            } finally {
-                 // No need to set isAutoLinking to false, this should only run once per appointment load until clientId is present.
             }
         };
 
         checkAndLinkClient();
     }, [appointment, firestore, id, toast, isAutoLinking]);
 
-    // Fetch related data once appointment is loaded
+    // Fetch one-time data like work stages
     useEffect(() => {
-        if (!appointment || !firestore) return;
+        if (!firestore || !appointment) return;
 
-        const fetchRelatedData = async () => {
-            setLoading(true);
-            try {
-                if (appointment.clientId) {
-                    const clientRef = doc(firestore, 'clients', appointment.clientId);
-                    const clientSnap = await getDoc(clientRef);
-                    if (clientSnap.exists()) {
-                        setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
-                    }
-                }
-
-                if (appointment.engineerId) {
-                    const engineerRef = doc(firestore, 'employees', appointment.engineerId);
-                    const engineerSnap = await getDoc(engineerRef);
-                    if (engineerSnap.exists()) {
-                        setEngineer(engineerSnap.data() as Employee);
-                    }
-                }
-
-                // If transaction is already linked, fetch it.
-                if (appointment.transactionId && appointment.clientId) {
-                    const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
-                    const transactionSnap = await getDoc(transactionRef);
-                    if (transactionSnap.exists()) {
-                        setTransaction(transactionSnap.data() as ClientTransaction);
-                    }
-                    setClientTransactions([]); // Clear other transactions since one is linked
-                } 
-                // If no transaction is linked but there is a client, fetch all transactions for linking.
-                else if (appointment.clientId) {
-                    const transQuery = query(collection(firestore, `clients/${appointment.clientId}/transactions`));
-                    const transSnap = await getDocs(transQuery);
-                    setClientTransactions(transSnap.docs.map(d => ({id: d.id, ...d.data()} as ClientTransaction)));
-                }
-
-                // Fetch architectural department work stages
+        const fetchWorkStages = async () => {
+             try {
                 const deptQuery = query(collection(firestore, 'departments'), where('name', '==', 'القسم المعماري'), limit(1));
                 const deptSnap = await getDocs(deptQuery);
                 if (!deptSnap.empty) {
@@ -195,17 +161,12 @@ export default function AppointmentDetailsPage() {
                     const stagesSnap = await getDocs(stagesQuery);
                     setWorkStages(stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage)));
                 }
-
-            } catch (error) {
-                console.error("Error fetching related data:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل البيانات المرتبطة بالموعد.' });
-            } finally {
-                setLoading(false);
-            }
+             } catch(e) {
+                console.error("Error fetching work stages:", e)
+             }
         };
-
-        fetchRelatedData();
-    }, [appointment, firestore, toast]);
+        fetchWorkStages();
+    }, [appointment, firestore]);
 
     // Fetch the specific progress document for this visit
     useEffect(() => {
@@ -271,7 +232,6 @@ export default function AppointmentDetailsPage() {
             const apptRef = doc(firestore, 'appointments', appointment.id);
             batch.update(apptRef, { transactionId: selectedTransactionToLink });
 
-            // Log the event
             const selectedTx = clientTransactions.find(tx => tx.id === selectedTransactionToLink);
             const logContent = `قام ${currentUser.fullName} بربط هذا الموعد بالمعاملة: "${selectedTx?.transactionType || 'غير معروف'}".`;
             const logData = {
@@ -329,7 +289,6 @@ export default function AppointmentDetailsPage() {
             let contractClauses = transactionData.contract ? [...transactionData.contract.clauses] : [];
             const now = new Date();
             
-            // --- ROLLBACK LOGIC (if editing as Admin) ---
             if (isEditing && currentUser?.role === 'Admin' && appointment.workStageProgressId) {
                 const progressDocRef = doc(firestore, 'work_stages_progress', appointment.workStageProgressId);
                 const progressSnap = await getDoc(progressDocRef);
@@ -358,7 +317,6 @@ export default function AppointmentDetailsPage() {
             }
 
 
-            // --- FORWARD LOGIC (for new selection) ---
             const completedStageIndex = currentStages.findIndex(s => s.stageId === selectedStage.id);
             if (completedStageIndex !== -1) {
                 const stageToUpdate = { ...currentStages[completedStageIndex] };
@@ -378,29 +336,26 @@ export default function AppointmentDetailsPage() {
             const nextStageInTemplate = workStages[completedStageOrderIndex + 1];
             let shouldStartNextStage = false;
 
-            if (nextStageInTemplate) {
+            if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
                 const nextStageId = nextStageInTemplate.id!;
                 
-                if (nextStageInTemplate.stageType !== 'parallel') {
-                    const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
-                    if (nextStageIndexInProg > -1) {
-                        const stageToStart = { ...currentStages[nextStageIndexInProg] };
-                        if (stageToStart.status === 'pending') {
-                            stageToStart.status = 'in-progress';
-                            stageToStart.startDate = now as any;
-                            currentStages[nextStageIndexInProg] = stageToStart;
-                            shouldStartNextStage = true;
-                        }
-                    } else {
-                        currentStages.push({
-                            stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now as any, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
-                        });
+                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+                if (nextStageIndexInProg > -1) {
+                    const stageToStart = { ...currentStages[nextStageIndexInProg] };
+                    if (stageToStart.status === 'pending') {
+                        stageToStart.status = 'in-progress';
+                        stageToStart.startDate = now as any;
+                        currentStages[nextStageIndexInProg] = stageToStart;
                         shouldStartNextStage = true;
                     }
+                } else {
+                    currentStages.push({
+                        stageId: nextStageId, name: nextStageInTemplate.name, status: 'in-progress', startDate: now as any, endDate: null, allowedRoles: nextStageInTemplate.allowedRoles,
+                    });
+                    shouldStartNextStage = true;
                 }
             }
 
-            // --- SMART PAYMENT DUE LOGIC ---
             let logContent = isEditing
                 ? `قام ${currentUser.fullName} (مدير) بتعديل مرحلة الزيارة رقم ${appointment.visitCount || ''} إلى: "${selectedStage.name}".`
                 : `قام ${currentUser.fullName} بإكمال مرحلة العمل "${selectedStage.name}" خلال الزيارة رقم ${appointment.visitCount || ''}.`;
@@ -433,7 +388,6 @@ export default function AppointmentDetailsPage() {
                 commentContent += paymentNotificationText;
             }
 
-            // --- Write to Batch ---
             const logData = {
                 type: 'log', content: logContent, userId: currentUser.id || 'system', userName: currentUser.fullName || 'System', userAvatar: currentUser.avatarUrl || '', createdAt: serverTimestamp(),
             };
@@ -466,11 +420,9 @@ export default function AppointmentDetailsPage() {
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'تحديث'} مرحلة العمل إلى: ${selectedStage.name}` });
             
-            // --- Notification Logic (Revised) ---
             const recipientsToNotify = new Set<string>();
             const link = `/dashboard/clients/${appointment.clientId}/transactions/${appointment.transactionId}`;
 
-            // Notify the engineer assigned to the TRANSACTION, if they are not the current user
             if (transactionData.assignedEngineerId && transactionData.assignedEngineerId !== currentUser?.employeeId) {
                 const assigneeUserId = await findUserIdByEmployeeId(firestore, transactionData.assignedEngineerId);
                 if (assigneeUserId) {
@@ -478,7 +430,6 @@ export default function AppointmentDetailsPage() {
                 }
             }
 
-            // Send notifications to the gathered recipients
             for (const recipientId of recipientsToNotify) {
                 const body = `${currentUser.fullName} أنجز مرحلة "${selectedStage.name}" لمعاملة العميل ${client?.nameAr}.` + 
                              (outstandingBalance > 0 ? ` نتج عن ذلك رصيد مستحق بقيمة ${formatCurrency(outstandingBalance)}.` : '');
@@ -491,7 +442,6 @@ export default function AppointmentDetailsPage() {
                 });
             }
 
-            // Notify accountants separately if a payment is due and they are not the current user
             if (outstandingBalance > 0) {
                 const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
                 const accountantsSnap = await getDocs(accountantsQuery);
@@ -566,7 +516,6 @@ export default function AppointmentDetailsPage() {
     
             toast({ title: 'نجاح', description: 'تم حفظ ملخص الزيارة وإضافته لسجل المعاملة.' });
     
-            // Notifications
             if (transaction.assignedEngineerId && transaction.assignedEngineerId !== currentUser.employeeId) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
                 if(targetUserId) {
@@ -586,7 +535,7 @@ export default function AppointmentDetailsPage() {
         }
     };
     
-    if (loading || appointmentLoading) {
+    if (loading) {
         return (
             <Card className="max-w-2xl mx-auto" dir="rtl">
                 <CardHeader>
