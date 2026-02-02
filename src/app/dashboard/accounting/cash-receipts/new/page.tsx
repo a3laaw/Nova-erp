@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -454,25 +455,25 @@ export default function NewCashReceiptPage() {
                  postTransactionBatch.update(transactionRefForUpdate, { 'contract.clauses': updatedClauses });
             }
             
-            // 2. Add Timeline Comment
+            // 2. Add Timeline Log
             const timelineCollectionRef = collection(transactionRefForUpdate, 'timelineEvents');
             const historyCollectionRef = collection(firestore, `clients/${selectedClientId}/history`);
             
-            const commentContent = `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. رقم السند: ${voucherNumber}`;
-            const commentData = {
-                type: 'comment' as const,
-                content: commentContent,
+            const logContent = `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. رقم السند: ${voucherNumber}`;
+            const logData = {
+                type: 'log' as const,
+                content: logContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp()
             };
-            postTransactionBatch.set(doc(timelineCollectionRef), commentData);
+            postTransactionBatch.set(doc(timelineCollectionRef), logData);
             
             // 3. Add to Client History Log
              postTransactionBatch.set(doc(historyCollectionRef), {
-                ...commentData,
-                content: `[${transactionDataForCheck.transactionType}] ${commentContent}`
+                ...logData,
+                content: `[${transactionDataForCheck.transactionType}] ${logContent}`
             });
 
             await postTransactionBatch.commit();

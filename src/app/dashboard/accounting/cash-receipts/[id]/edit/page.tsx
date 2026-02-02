@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -304,6 +305,26 @@ export default function EditCashReceiptPage() {
 
     setIsSaving(true);
     
+    // --- PRE-TRANSACTION READS AND LOGIC ---
+    let transactionDataForCheck: ClientTransaction | null = null;
+    const projectId = selectedProjectId || originalReceipt.projectId || null;
+
+    try {
+        if (projectId) {
+            const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', projectId);
+            const txSnap = await getDoc(transactionRef);
+            if (txSnap.exists()) {
+                transactionDataForCheck = { id: txSnap.id, ...txSnap.data() } as ClientTransaction;
+            }
+        }
+    } catch (err) {
+        console.error("Pre-transaction read failed for edit:", err);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التحقق من بيانات المشروع المرتبط. يرجى المحاولة مرة أخرى.' });
+        setIsSaving(false);
+        return;
+    }
+    // --- END OF PRE-TRANSACTION READS ---
+
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
@@ -325,18 +346,17 @@ export default function EditCashReceiptPage() {
                 reference: reference,
             };
             transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
-
-            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+            
             let autoTags = {};
-            if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
-                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
+            if (projectId && transactionDataForCheck?.assignedEngineerId) {
+                const engineer = employees.find(e => e.id === transactionDataForCheck.assignedEngineerId);
                 const department = departments.find(d => d.name === engineer?.department);
                 
                 autoTags = {
                     clientId: originalReceipt.clientId,
-                    transactionId: selectedProjectId,
-                    auto_profit_center: selectedProjectId,
-                    auto_resource_id: selectedProject.assignedEngineerId,
+                    transactionId: projectId,
+                    auto_profit_center: projectId,
+                    auto_resource_id: transactionDataForCheck.assignedEngineerId,
                     ...(department && { auto_dept_id: department.id }),
                 };
             }
@@ -352,7 +372,7 @@ export default function EditCashReceiptPage() {
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
                 narration: description || `تحديث سند قبض رقم ${originalReceipt.voucherNumber}`,
-                transactionId: selectedProjectId || null,
+                transactionId: projectId,
                 clientId: originalReceipt.clientId,
             };
 
@@ -372,17 +392,17 @@ export default function EditCashReceiptPage() {
             }
         });
 
-        // Update contract clauses after the main transaction
-        if (originalReceipt.projectId) {
-            const totalPaid = await getTotalPaidForProject(originalReceipt.projectId, firestore);
-            const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', originalReceipt.projectId);
-            const transactionDoc = await getDoc(transactionRef);
+        // --- POST-TRANSACTION WRITES (Batch) ---
+        if (projectId && transactionDataForCheck) {
+            const batch = writeBatch(firestore);
+            const txRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', projectId);
 
-            if (transactionDoc.exists() && transactionDoc.data().contract?.clauses) {
-                const transactionData = transactionDoc.data();
+            // 1. Update contract clauses
+            if (transactionDataForCheck.contract?.clauses) {
+                const totalPaid = await getTotalPaidForProject(projectId, firestore);
                 let accumulatedAmount = 0;
                 let dueClauseFound = false;
-                const updatedClauses = transactionData.contract.clauses.map((clause: any) => {
+                const updatedClauses = transactionDataForCheck.contract.clauses.map((clause: any) => {
                     const newClause = {...clause};
                     if (totalPaid >= accumulatedAmount + clause.amount) {
                         newClause.status = 'مدفوعة';
@@ -395,8 +415,30 @@ export default function EditCashReceiptPage() {
                     accumulatedAmount += clause.amount;
                     return newClause;
                 });
-                await updateDoc(transactionRef, { 'contract.clauses': updatedClauses });
+                batch.update(txRef, { 'contract.clauses': updatedClauses });
             }
+            
+            // 2. Add Timeline log for the edit
+            const logContent = `قام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`;
+            const logData = {
+                type: 'log' as const,
+                content: logContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp()
+            };
+            const timelineRef = doc(collection(txRef, 'timelineEvents'));
+            batch.set(timelineRef, logData);
+
+            // 3. Add to Client History Log as well
+            const historyRef = doc(collection(firestore, `clients/${originalReceipt.clientId}/history`));
+            batch.set(historyRef, {
+                ...logData,
+                content: `[${transactionDataForCheck.transactionType}] ${logContent}`
+            });
+
+            await batch.commit();
         }
         
         toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي بنجاح.' });

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -81,7 +82,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
 
     try {
       const timelineCollection = collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`);
-      const historyCollection = collection(firestore, `clients/${clientId}/history`);
       const commentData = {
           type: 'comment' as const,
           content: newComment,
@@ -91,11 +91,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
           createdAt: serverTimestamp(),
       };
 
-      const batch = writeBatch(firestore);
-      const newDocRef = doc(timelineCollection);
-      batch.set(newDocRef, commentData);
-      batch.set(doc(historyCollection), commentData);
-      await batch.commit();
+      await addDoc(timelineCollection, commentData);
       
       const clientName = client?.nameAr || 'عميل';
       const transactionType = transaction?.transactionType || 'معاملة';

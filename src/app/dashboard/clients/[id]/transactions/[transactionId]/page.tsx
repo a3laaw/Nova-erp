@@ -2,9 +2,9 @@
       'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, collectionGroup } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -571,7 +571,7 @@ export default function TransactionDetailPage() {
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stages">مراحل المعاملة</TabsTrigger>
                 <TabsTrigger value="comments">التعليقات والمتابعة</TabsTrigger>
-                <TabsTrigger value="history">سجل التغييرات</TabsTrigger>
+                <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
                 <Card>
@@ -666,8 +666,15 @@ export default function TransactionDetailPage() {
                 />
             </TabsContent>
             <TabsContent value="history" className="mt-6">
-                <ClientHistoryTimeline
+                <TransactionTimeline
                   clientId={clientId}
+                  transactionId={transactionId}
+                  filterType="log"
+                  showInput={false}
+                  title="سجل الأحداث"
+                  icon={<History className='text-primary'/>}
+                  client={client}
+                  transaction={transaction}
                 />
             </TabsContent>
         </Tabs>
@@ -676,6 +683,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
       
     
