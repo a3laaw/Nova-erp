@@ -157,7 +157,7 @@ export default function NewQuotationPage() {
     name: "items",
   });
 
-  const watchedItems = watch("items");
+  const watchedItems = useWatch({ control, name: "items" });
   const selectedDepartmentId = watch("departmentId");
   const selectedTransactionTypeId = watch("transactionTypeId");
 
@@ -477,14 +477,14 @@ export default function NewQuotationPage() {
                         </TableHeader>
                         <TableBody>
                             {fields.map((field, index) => {
-                                const item = watchedItems[index];
+                                const item = watchedItems?.[index] || {};
                                 const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
                                         <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..."/>
                                         {errors.items?.[index]?.description && <p className="text-xs text-destructive mt-1">{errors.items?.[index]?.description?.message}</p>}
-                                        {watchedItems[index]?.condition && (
+                                        {watchedItems?.[index]?.condition && (
                                             <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
                                                 <span className="font-semibold">شرط الاستحقاق:</span> {watchedItems[index].condition}
                                             </div>
