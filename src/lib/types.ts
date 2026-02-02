@@ -369,7 +369,7 @@ export interface TransactionStage {
   allowedRoles?: string[];
   nextStageIds?: string[];
   allowedDuringStages?: string[];
-  trackingType: 'duration' | 'occurrence' | 'none';
+  trackingType?: 'duration' | 'occurrence' | 'none';
   expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
   allowManualCompletion?: boolean;
@@ -652,4 +652,3 @@ export interface PurchaseOrder {
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
 
-    
