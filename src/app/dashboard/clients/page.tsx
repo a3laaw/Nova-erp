@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Loader2, Calendar } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -278,7 +278,16 @@ export default function ClientsPage() {
                 return (
                     <TableRow key={client.id} className={cn(isOptimistic && 'opacity-50')}>
                         <TableCell className="font-mono">{isOptimistic ? <Loader2 className="h-4 w-4 animate-spin"/> : client.fileId}</TableCell>
-                        <TableCell className="font-medium"><Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link></TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                              <Link href={`/dashboard/appointments/new?clientId=${client.id}&engineerId=${client.assignedEngineer || ''}`}>
+                                  <Calendar className="h-4 w-4 text-primary" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </TableCell>
                         <TableCell>{client.assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
                         <TableCell>{client.mobile}</TableCell>
                         <TableCell>

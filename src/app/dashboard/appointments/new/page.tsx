@@ -59,11 +59,17 @@ export default function NewArchitecturalAppointmentPage() {
         const nameFromUrl = searchParams.get('nameAr');
         const mobileFromUrl = searchParams.get('mobile');
         const engineerFromUrl = searchParams.get('engineerId');
-        if (nameFromUrl || mobileFromUrl) {
+        const clientIdFromUrl = searchParams.get('clientId');
+
+        if (clientIdFromUrl) {
+            setClientId(clientIdFromUrl);
+            setIsNewClient(false);
+        } else if (nameFromUrl || mobileFromUrl) {
             setIsNewClient(true);
             setNewClientName(nameFromUrl || '');
             setNewClientMobile(mobileFromUrl || '');
         }
+
         if(engineerFromUrl) {
             setEngineerId(engineerFromUrl);
         }
