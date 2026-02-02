@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, limit, type DocumentSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import type { Appointment, Client, Employee, WorkStage, Department, ClientTransaction, TransactionStage } from '@/lib/types';
 import {
   Card,
@@ -81,6 +81,7 @@ export default function AppointmentDetailsPage() {
     const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
     const [selectedTransactionToLink, setSelectedTransactionToLink] = useState('');
     const [isLinking, setIsLinking] = useState(false);
+    const [isAutoLinking, setIsAutoLinking] = useState(false);
 
 
     // Fetch main appointment data
@@ -97,6 +98,44 @@ export default function AppointmentDetailsPage() {
              router.push('/dashboard/appointments');
         }
     }, [appointment, appointmentLoading, appointmentError, id, router, toast]);
+
+    // Auto-link prospective client if a real client file now exists
+    useEffect(() => {
+        if (!firestore || !appointment || !id || isAutoLinking || appointment.clientId || !appointment.clientMobile) {
+            return;
+        }
+
+        const checkAndLinkClient = async () => {
+            setIsAutoLinking(true);
+            try {
+                const q = query(collection(firestore, 'clients'), where('mobile', '==', appointment.clientMobile), limit(1));
+                const clientSnap = await getDocs(q);
+
+                if (!clientSnap.empty) {
+                    const foundClient = clientSnap.docs[0];
+                    const appointmentRef = doc(firestore, 'appointments', id);
+                    
+                    await updateDoc(appointmentRef, {
+                        clientId: foundClient.id,
+                        clientName: deleteField(),
+                        clientMobile: deleteField()
+                    });
+
+                    toast({
+                        title: 'تم الربط التلقائي',
+                        description: `تم ربط هذا الموعد بملف العميل "${foundClient.data().nameAr}" بناءً على تطابق رقم الهاتف.`,
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to auto-link client:", error);
+                // Do not toast error to user, it's a background process
+            } finally {
+                 // No need to set isAutoLinking to false, this should only run once per appointment load until clientId is present.
+            }
+        };
+
+        checkAndLinkClient();
+    }, [appointment, firestore, id, toast, isAutoLinking]);
 
     // Fetch related data once appointment is loaded
     useEffect(() => {
@@ -579,11 +618,14 @@ export default function AppointmentDetailsPage() {
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                             <div className="flex justify-between items-center">
                                 <div className="space-y-1">
-                                    <p className="font-semibold flex items-center gap-2"><User /> عميل محتمل (غير مسجل)</p>
+                                    <p className="font-semibold flex items-center gap-2">
+                                        {isAutoLinking && <Loader2 className="h-4 w-4 animate-spin" />}
+                                        {isAutoLinking ? "جاري البحث عن ملف للعميل..." : "عميل محتمل (غير مسجل)"}
+                                    </p>
                                     <p className="text-sm text-muted-foreground">{appointment.clientName}</p>
                                     <p className="text-xs text-muted-foreground font-mono dir-ltr">{appointment.clientMobile}</p>
                                 </div>
-                                <Button asChild size="sm">
+                                <Button asChild size="sm" disabled={isAutoLinking}>
                                     <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${appointment.engineerId}&fromAppointmentId=${appointment.id}`}>
                                         <UserPlus className="ml-2 h-4 w-4" />
                                         إنشاء ملف عميل

@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Client } from '@/lib/types';
@@ -39,6 +39,22 @@ export default function NewClientPage() {
         let newClientId = '';
 
         try {
+            // --- NEW VALIDATION LOGIC ---
+            if (newClientData.mobile) {
+                const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', newClientData.mobile));
+                const mobileSnapshot = await getDocs(mobileQuery);
+                if (!mobileSnapshot.empty) {
+                    throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
+                }
+                
+                const prospectiveClientQuery = query(collection(firestore, 'appointments'), where('clientMobile', '==', newClientData.mobile));
+                const prospectiveSnapshot = await getDocs(prospectiveClientQuery);
+                if (!prospectiveSnapshot.empty) {
+                    throw new Error('رقم الهاتف هذا مستخدم لموعد عميل محتمل. الرجاء إنشاء ملف العميل من داخل الموعد.');
+                }
+            }
+            // --- END OF VALIDATION ---
+
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = String(new Date().getFullYear());
                 const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
