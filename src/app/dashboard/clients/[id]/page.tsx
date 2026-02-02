@@ -456,7 +456,15 @@ export default function ClientProfilePage() {
         <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                    <CardTitle className="text-2xl font-bold">{client.nameAr}</CardTitle>
+                    <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                        {client.nameAr}
+                        <Button variant="outline" size="icon" className="h-8 w-8 text-primary border-primary/50 hover:bg-primary/5 hover:text-primary" asChild>
+                            <Link href={`/dashboard/appointments/new?clientId=${client.id}&engineerId=${client.assignedEngineer || ''}`} title="حجز موعد جديد لهذا العميل">
+                                <Calendar className="h-4 w-4" />
+                                <span className="sr-only">حجز موعد</span>
+                            </Link>
+                        </Button>
+                    </CardTitle>
                     <CardDescription>{client.nameEn}</CardDescription>
                     <div className="mt-2 flex items-center gap-4">
                         <Badge variant="secondary" className="font-mono text-sm">{client.fileId}</Badge>
@@ -631,3 +639,6 @@ export default function ClientProfilePage() {
   );
 }
 
+
+
+    
