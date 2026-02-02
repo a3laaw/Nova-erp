@@ -16,6 +16,7 @@ import { Logo } from '@/components/layout/logo';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { useBranding } from '@/context/branding-context';
+import { toFirestoreDate } from '@/services/date-converter';
 
 
 const paymentMethodTranslations: Record<string, string> = {
@@ -63,9 +64,10 @@ export default function ViewPaymentVoucherPage() {
   };
   
   const formattedDate = useMemo(() => {
-      if (!voucher?.paymentDate) return '';
+      const date = toFirestoreDate(voucher?.paymentDate);
+      if (!date) return '';
       try {
-          return format(voucher.paymentDate.toDate(), 'dd / MM / yyyy');
+          return format(date, 'dd / MM / yyyy');
       } catch {
           return '';
       }

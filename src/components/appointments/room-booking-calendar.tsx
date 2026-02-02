@@ -37,6 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { Checkbox } from '../ui/checkbox';
+import { toFirestoreDate } from '@/services/date-converter';
 
 // --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
@@ -159,12 +160,17 @@ export function RoomBookingCalendar() {
         });
 
         appointments.forEach(appt => {
-            if (!appt || !appt.meetingRoom || !grid[appt.meetingRoom] || !appt.appointmentDate?.toDate) {
+            if (!appt || !appt.meetingRoom || !grid[appt.meetingRoom]) {
                 return; 
+            }
+            
+            const startTime = toFirestoreDate(appt.appointmentDate);
+            if (!startTime) {
+                console.error("Could not process appointment with invalid date:", appt);
+                return;
             }
 
             try {
-                const startTime = appt.appointmentDate.toDate();
                 const timeKey = format(startTime, 'HH:mm');
 
                 if (timeKey in grid[appt.meetingRoom]) {
@@ -184,7 +190,7 @@ export function RoomBookingCalendar() {
         if (data.id) { // Editing existing appointment
             setDialogData({
                 ...data,
-                appointmentDate: data.appointmentDate.toDate()
+                appointmentDate: toFirestoreDate(data.appointmentDate)
             });
         } else { // Creating new
             const { hours, minutes } = parseTime(data.time!);
@@ -298,10 +304,11 @@ export function RoomBookingCalendar() {
                             <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
+                                const appointmentDate = booking ? toFirestoreDate(booking.appointmentDate) : null;
                                 return (
                                     <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
-                                        {booking ? (
-                                            isPast(booking.appointmentDate.toDate()) ? (
+                                        {booking && appointmentDate ? (
+                                            isPast(appointmentDate) ? (
                                                 <div 
                                                     className="flex flex-col items-center justify-center text-center opacity-75 cursor-not-allowed"
                                                     style={{
@@ -489,7 +496,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
 
     useEffect(() => {
         if (isOpen && dialogData) {
-             const appointmentDate = dialogData.appointmentDate;
+             const appointmentDate = toFirestoreDate(dialogData.appointmentDate);
             if (isEditing && appointmentDate instanceof Date) {
                 setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
                 setNewTime(format(appointmentDate, 'HH:mm'));
@@ -558,14 +565,16 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
             
             const roomHasConflict = latestDayAppointments.some((appt: any) => {
                 if (isEditing && appt.id === dialogData.id) return false;
-                return appt.meetingRoom === roomName && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
+                const apptDate = toFirestoreDate(appt.appointmentDate);
+                return appt.meetingRoom === roomName && apptDate && apptDate >= windowStart && apptDate <= windowEnd;
             });
             if (roomHasConflict) throw new Error('قاعة الاجتماعات محجوزة في هذا الوقت.');
 
             if (formData.engineerId) {
                 const engineerHasConflict = latestDayAppointments.some((appt: any) => {
                     if (isEditing && appt.id === dialogData.id) return false;
-                    return appt.engineerId === formData.engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
+                    const apptDate = toFirestoreDate(appt.appointmentDate);
+                    return appt.engineerId === formData.engineerId && apptDate && apptDate >= windowStart && apptDate <= windowEnd;
                 });
                 if (engineerHasConflict) throw new Error('المهندس لديه موعد آخر في نفس الوقت.');
             }
@@ -574,7 +583,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
             if (checkClientId) {
                 const clientHasConflict = latestDayAppointments.some((appt: any) => {
                     if (isEditing && appt.id === dialogData.id) return false;
-                    return appt.clientId === checkClientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd;
+                    const apptDate = toFirestoreDate(appt.appointmentDate);
+                    return appt.clientId === checkClientId && apptDate && apptDate >= windowStart && apptDate <= windowEnd;
                 });
                 if (clientHasConflict) throw new Error('العميل لديه موعد آخر في نفس الوقت.');
             }

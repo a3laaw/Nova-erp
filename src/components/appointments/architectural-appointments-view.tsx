@@ -38,6 +38,7 @@ import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
+import { toFirestoreDate } from '@/services/date-converter';
 
 // --- Constants & Helpers ---
 const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
@@ -154,8 +155,9 @@ export function ArchitecturalAppointmentsView() {
         });
 
         appointments.forEach(appt => {
-            if(!appt.appointmentDate) return;
-            const time = format(appt.appointmentDate.toDate(), 'HH:mm');
+            const appointmentDate = toFirestoreDate(appt.appointmentDate);
+            if(!appointmentDate) return;
+            const time = format(appointmentDate, 'HH:mm');
             if (grid[appt.engineerId] && time in grid[appt.engineerId]) {
                 grid[appt.engineerId][time] = appt;
             }
@@ -196,7 +198,7 @@ export function ArchitecturalAppointmentsView() {
             clientId: appointment.clientId,
             clientName: appointment.clientName,
             clientMobile: appointment.clientMobile,
-            appointmentDate: appointment.appointmentDate.toDate(),
+            appointmentDate: toFirestoreDate(appointment.appointmentDate),
             title: appointment.title,
             transactionId: appointment.transactionId,
         });
@@ -336,7 +338,7 @@ export function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                            (booking.workStageUpdated || (booking.appointmentDate && isPast(booking.appointmentDate.toDate()))) ? (
+                                            (booking.workStageUpdated || (booking.appointmentDate && isPast(toFirestoreDate(booking.appointmentDate)!))) ? (
                                                 <div
                                                     className="relative h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-75"
                                                     style={{ backgroundColor: booking.color }}
@@ -513,12 +515,14 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     useEffect(() => {
         if (isOpen && dialogData) {
              if(isEditing) {
-                const apptDate = dialogData.appointmentDate; // This is already a Date object
+                const apptDate = toFirestoreDate(dialogData.appointmentDate); // This is already a Date object
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title || '');
                 setSelectedTransactionId(dialogData.transactionId || '');
-                setNewDate(format(apptDate, 'yyyy-MM-dd'));
-                setNewTime(format(apptDate, 'HH:mm'));
+                if (apptDate) {
+                  setNewDate(format(apptDate, 'yyyy-MM-dd'));
+                  setNewTime(format(apptDate, 'HH:mm'));
+                }
                 setIsNewClient(!dialogData.clientId);
                 if (!dialogData.clientId) {
                     setNewClientName(dialogData.clientName || '');

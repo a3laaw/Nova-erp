@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import Link from 'next/link';
 import { useBranding } from '@/context/branding-context';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -50,9 +51,10 @@ export default function ViewCashReceiptPage() {
   };
   
   const formattedDate = useMemo(() => {
-      if (!receipt?.receiptDate) return '';
+      const date = toFirestoreDate(receipt?.receiptDate);
+      if (!date) return '';
       try {
-          return format(receipt.receiptDate.toDate(), 'dd / MM / yyyy');
+          return format(date, 'dd / MM / yyyy');
       } catch {
           return '';
       }

@@ -26,6 +26,7 @@ import { useLanguage } from '@/context/language-context';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { useSubscription } from '@/hooks/use-subscription';
+import { toFirestoreDate } from '@/services/date-converter';
 
 export function UpcomingAppointments() {
   const { language } = useLanguage();
@@ -90,8 +91,10 @@ export function UpcomingAppointments() {
     { title: 'Upcoming Appointments', description: 'Your next scheduled site visits and meetings.', viewAll: 'View All', client: 'Client', engineer: 'Engineer', dateTime: 'Date & Time', purpose: 'Purpose', noAppointments: 'No upcoming appointments.' };
   
   const formatDate = (dateValue: any) => {
-    if (!dateValue) return '';
-    const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+    const date = toFirestoreDate(dateValue);
+    if (!date) {
+        return '';
+    }
     if(language === 'ar') {
         return format(date, "EEE, dd MMM yyyy 'الساعة' h:mm a", { locale: ar });
     }

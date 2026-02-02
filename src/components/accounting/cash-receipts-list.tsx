@@ -84,12 +84,9 @@ export function CashReceiptsList() {
 
 
   const formatDate = (dateValue: any) => {
-    if (!dateValue) return '-';
-    try {
-      return format(dateValue.toDate(), 'dd/MM/yyyy');
-    } catch (e) {
-      return '-';
-    }
+    const date = toFirestoreDate(dateValue);
+    if (!date) return '-';
+    return format(date, 'dd/MM/yyyy');
   };
   
   const handleDelete = async () => {

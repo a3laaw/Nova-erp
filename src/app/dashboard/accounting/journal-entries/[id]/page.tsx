@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useBranding } from '@/context/branding-context';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -81,9 +82,10 @@ export default function ViewJournalEntryPage() {
   };
   
   const formattedDate = useMemo(() => {
-      if (!entry?.date) return '';
+      const date = toFirestoreDate(entry?.date);
+      if (!date) return '';
       try {
-          return format(entry.date.toDate(), 'dd / MM / yyyy');
+          return format(date, 'dd / MM / yyyy');
       } catch {
           return '';
       }
