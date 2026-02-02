@@ -183,6 +183,10 @@ export function DataIntegrityManager() {
     const [isFixingContracts, setIsFixingContracts] = useState(false);
     const [fixContractResults, setFixContractResults] = useState<{fixed: number, reverted: number} | null>(null);
 
+    // NEW: State for deleting financial data
+    const [isLoadingFinancial, setIsLoadingFinancial] = useState(false);
+    const [isFinancialConfirmOpen, setIsFinancialConfirmOpen] = useState(false);
+
 
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
@@ -555,6 +559,57 @@ export function DataIntegrityManager() {
             setIsFixingContracts(false);
         }
     };
+    
+    // NEW handler for deleting all financial data
+    const handleDeleteAllFinancialData = async () => {
+        if (!firestore) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+            return;
+        }
+        setIsLoadingFinancial(true);
+        try {
+            const batch = writeBatch(firestore);
+            
+            const collectionsToDelete = [
+                'chartOfAccounts',
+                'journalEntries',
+                'paymentVouchers',
+                'cashReceipts',
+                'quotations',
+                'payroll',
+            ];
+            
+            let totalDeleted = 0;
+
+            for (const collectionName of collectionsToDelete) {
+                const snapshot = await getDocs(collection(firestore, collectionName));
+                snapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                totalDeleted += snapshot.size;
+            }
+
+            // Also delete counters
+            const countersToDelete = ['journalEntries', 'paymentVouchers', 'cashReceipts', 'quotations', 'coa_clients'];
+            for (const counterId of countersToDelete) {
+                 const counterRef = doc(firestore, 'counters', counterId);
+                 batch.delete(counterRef);
+            }
+
+            await batch.commit();
+
+            toast({
+                title: 'نجاح!',
+                description: `تم حذف جميع البيانات المالية (${totalDeleted} سجل) والعدادات المرتبطة بها.`,
+            });
+        } catch (error) {
+            console.error("Error deleting all financial data:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف البيانات المالية.' });
+        } finally {
+            setIsLoadingFinancial(false);
+            setIsFinancialConfirmOpen(false);
+        }
+    };
 
 
     return (
@@ -699,6 +754,16 @@ export function DataIntegrityManager() {
                             حذف جميع العملاء
                         </Button>
                     </div>
+                    <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-lg flex justify-between items-center">
+                        <div>
+                            <p className="font-medium">حذف جميع البيانات المالية</p>
+                            <p className="text-xs text-muted-foreground">يشمل: شجرة الحسابات، قيود اليومية، السندات، عروض الأسعار، الرواتب.</p>
+                        </div>
+                        <Button onClick={() => setIsFinancialConfirmOpen(true)} disabled={isLoadingFinancial} variant="destructive">
+                            {isLoadingFinancial ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
+                            حذف البيانات المالية
+                        </Button>
+                    </div>
                 </div>
 
             </CardContent>
@@ -730,6 +795,22 @@ export function DataIntegrityManager() {
                         <AlertDialogCancel disabled={isLoadingClients}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteAllClients} disabled={isLoadingClients} className="bg-destructive hover:bg-destructive/90">
                             {isLoadingClients ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف كل العملاء'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={isFinancialConfirmOpen} onOpenChange={setIsFinancialConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا من هذا الإجراء؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيتم حذف <strong className="text-destructive">جميع البيانات المالية</strong> بشكل دائم، بما في ذلك شجرة الحسابات، القيود، السندات، والفواتير. هذا الإجراء لا يمكن التراجع عنه وهو مخصص للبدء من جديد.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isLoadingFinancial}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAllFinancialData} disabled={isLoadingFinancial} className="bg-destructive hover:bg-destructive/90">
+                            {isLoadingFinancial ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف كل البيانات المالية'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
