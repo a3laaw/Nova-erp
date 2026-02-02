@@ -146,7 +146,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   // Form data state
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
-  const [clauses, setClauses] = useState<ContractClause[]>([]);
   const [termsAndConditions, setTermsAndConditions] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
   
@@ -172,7 +171,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   useEffect(() => {
     if (!isOpen) {
       setScopeOfWork([]);
-      setClauses([]);
       setTermsAndConditions([]);
       setOpenClauses([]);
       setIsSaving(false);
@@ -314,28 +312,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchAllReferenceData();
   }, [isOpen, firestore, transaction, clientId, toast, populateFormFromExistingContract, populateFormFromTemplate, populateFormFromQuotation]);
 
-  useEffect(() => {
-    const totalAmount = financials.totalAmount || 0;
-    const isPercentage = financials.type === 'percentage';
-    
-    const calculatedClauses = (financials.milestones || []).map(milestone => {
-        const amount = isPercentage
-            ? ((Number(milestone.value) || 0) / 100) * totalAmount
-            : (Number(milestone.value) || 0);
-        
-        return {
-            id: milestone.id,
-            name: milestone.name,
-            condition: milestone.condition,
-            amount: amount,
-            status: 'غير مستحقة' as const,
-            ...(isPercentage && { percentage: Number(milestone.value) || 0 }),
-        };
-    });
-    
-    setClauses(calculatedClauses);
-  }, [financials]);
-
   const handleSelectTransaction = (txId: string) => {
     setSelectedTransactionId(txId);
     setStep('edit-contract');
@@ -450,7 +426,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterDoc),
+                transaction_firestore.get(journalEntryCounterRef),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -483,7 +459,19 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 throw new Error('يجب إسناد مهندس مسؤول لملف العميل أولاً قبل إنشاء عقد سكن خاص.');
             }
 
-            const contractPayload = { clauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: financials.type };
+            // Recalculate clauses right before saving to prevent state race conditions
+            const finalClauses = (financials.milestones || []).map(milestone => {
+                const amount = financials.type === 'percentage'
+                    ? ((Number(milestone.value) || 0) / 100) * (financials.totalAmount || 0)
+                    : (Number(milestone.value) || 0);
+                return {
+                    id: milestone.id, name: milestone.name, condition: milestone.condition,
+                    amount: amount, status: 'غير مستحقة' as const,
+                    ...(financials.type === 'percentage' && { percentage: Number(milestone.value) || 0 }),
+                };
+            });
+
+            const contractPayload = { clauses: finalClauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: financials.type };
             
             if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
                 finalTransactionId = selectedTransactionId;
@@ -562,7 +550,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
             const finalTransactionType = originalTransaction.transactionType || transaction.transactionType;
 
-            const milestonesText = clauses.map(c => `- دفعة "${c.name}": ${formatCurrency(c.amount)}`).join('\n');
+            const milestonesText = finalClauses.map(c => `- دفعة "${c.name}": ${formatCurrency(c.amount)}`).join('\n');
             const commentContent = `**[إشعار مالي]**\nقام ${currentUser!.fullName} بإنشاء عقد لهذه المعاملة بقيمة إجمالية ${formatCurrency(totalAmount)}.\n\n**تفاصيل الدفعات:**\n${milestonesText}`;
             const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
             

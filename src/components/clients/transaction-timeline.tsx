@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -16,6 +15,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
+import { cn } from '@/lib/utils';
 
 interface TimelineEvent {
   id: string;

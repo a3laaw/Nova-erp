@@ -420,27 +420,24 @@ export default function EditCashReceiptPage() {
             // 2. Add Timeline log & comment for the edit
             const timelineRef = collection(txRef, 'timelineEvents');
             const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`;
-            const commentData = {
-                type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
-            };
+            const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
             batch.set(doc(timelineRef), commentData);
 
             const logContent = `عدّل ${currentUser.fullName} سند قبض ${originalReceipt.voucherNumber}.`;
-            const logData = {
-                type: 'log' as const, content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp()
-            };
+            const logData = { type: 'log' as const, content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
             batch.set(doc(timelineRef), logData);
             
             // 3. Add to Client History Log as a 'log' event
-            const historyRef = doc(collection(firestore, `clients/${originalReceipt.clientId}/history`));
-            batch.set(historyRef, {
+            const historyRef = collection(firestore, `clients/${originalReceipt.clientId}/history`);
+            const historyLogData = {
                 type: 'log' as const,
                 content: `[${transactionDataForCheck.transactionType}] قام ${currentUser.fullName} بتعديل سند قبض. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
-            });
+            };
+            batch.set(doc(historyRef), historyLogData);
 
             await batch.commit();
         }
