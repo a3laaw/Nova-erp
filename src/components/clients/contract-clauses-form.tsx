@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -148,7 +147,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   // Form data state
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
   const [clauses, setClauses] = useState<ContractClause[]>([]);
-  const [termsAndConditions, setTerms] = useState<ContractTerm[]>([]);
+  const [termsAndConditions, setTermsAndConditions] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
   
   const [financials, setFinancials] = useState<ContractTemplate['financials']>({
@@ -174,7 +173,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     if (!isOpen) {
       setScopeOfWork([]);
       setClauses([]);
-      setTerms([]);
+      setTermsAndConditions([]);
       setOpenClauses([]);
       setIsSaving(false);
       setStep('loading');
@@ -190,7 +189,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   const populateFormFromExistingContract = useCallback((contract: NonNullable<ClientTransaction['contract']>) => {
     setScopeOfWork(JSON.parse(JSON.stringify(contract.scopeOfWork || [])));
-    setTerms(JSON.parse(JSON.stringify(contract.termsAndConditions || [])));
+    setTermsAndConditions(JSON.parse(JSON.stringify(contract.termsAndConditions || [])));
     setOpenClauses(JSON.parse(JSON.stringify(contract.openClauses || [])));
     
     setFinancials({
@@ -210,7 +209,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
       setScopeOfWork(template?.scopeOfWork || []);
-      setTerms(template?.termsAndConditions || []);
+      setTermsAndConditions(template?.termsAndConditions || []);
       setOpenClauses(template?.openClauses || []);
       setFinancials(template?.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
       setChosenTemplate(template);
@@ -221,7 +220,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     const contractData = transaction.contract;
     
     setScopeOfWork(contractData.scopeOfWork || []);
-    setTerms(contractData.termsAndConditions || []);
+    setTermsAndConditions(contractData.termsAndConditions || []);
     setOpenClauses(contractData.openClauses || []);
     
     setFinancials({
@@ -360,17 +359,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       setScopeOfWork(newItems);
   };
 
-  const addTerm = () => setTerms(prev => [...prev, { id: generateId(), text: '' }]);
+  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
-    setTerms(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
+    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
   };
-  const removeTerm = (id: string) => setTerms(prev => prev.filter(term => term.id !== id));
+  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
   const reorderTerm = (index: number, direction: 'up' | 'down') => {
     const newTerms = [...termsAndConditions];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= newTerms.length) return;
     [newTerms[index], newTerms[newIndex]] = [newTerms[newIndex], newTerms[index]];
-    setTerms(newTerms);
+    setTermsAndConditions(newTerms);
   };
 
   const addOpenClause = () => setOpenClauses(prev => [...prev, { id: generateId(), text: '' }]);
@@ -484,7 +483,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 throw new Error('يجب إسناد مهندس مسؤول لملف العميل أولاً قبل إنشاء عقد سكن خاص.');
             }
 
-            const contractPayload = { clauses, scopeOfWork, termsAndConditions: terms, openClauses, totalAmount, financialsType: financials.type };
+            const contractPayload = { clauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: financials.type };
             
             if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
                 finalTransactionId = selectedTransactionId;
