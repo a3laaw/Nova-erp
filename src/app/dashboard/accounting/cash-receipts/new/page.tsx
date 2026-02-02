@@ -406,7 +406,7 @@ export default function NewCashReceiptPage() {
 
             const journalEntryData = {
                 entryNumber: `CRV-JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
-                narration: description || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
+                narration: `[إشعار مالي] ${description}` || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
                 lines: [
                     { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
@@ -432,7 +432,7 @@ export default function NewCashReceiptPage() {
                     const contractWorkStage = workStages.find(ws => ws.name === 'توقيع العقد');
                     if (contractWorkStage?.order !== undefined) {
                         const nextStageInTemplate = workStages.find(ws => ws.order === contractWorkStage.order! + 1);
-                        if (nextStageInTemplate && nextStageInTemplate.name !== 'تعديلات ومناقشات') {
+                        if (nextStageInTemplate) {
                             const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageInTemplate.id);
                             if (nextStageIndexInProg > -1) {
                                 if(currentStages[nextStageIndexInProg].status === 'pending') {

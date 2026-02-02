@@ -426,7 +426,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const [clientSnap, coaClientCounterDoc, journalEntryCounterDoc] = await Promise.all([
                 transaction_firestore.get(clientRef),
                 transaction_firestore.get(coaClientCounterRef),
-                transaction_firestore.get(journalEntryCounterRef),
+                transaction_firestore.get(journalEntryCounterDoc),
             ]);
 
             if (!clientSnap.exists()) throw new Error("Client not found.");
@@ -459,10 +459,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 throw new Error('يجب إسناد مهندس مسؤول لملف العميل أولاً قبل إنشاء عقد سكن خاص.');
             }
 
-            // Recalculate clauses right before saving to prevent state race conditions
+            const finalTotalAmount = financials.type === 'fixed'
+              ? financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0)
+              : financials.totalAmount;
+        
             const finalClauses = (financials.milestones || []).map(milestone => {
                 const amount = financials.type === 'percentage'
-                    ? ((Number(milestone.value) || 0) / 100) * (financials.totalAmount || 0)
+                    ? ((Number(milestone.value) || 0) / 100) * (finalTotalAmount || 0)
                     : (Number(milestone.value) || 0);
                 return {
                     id: milestone.id, name: milestone.name, condition: milestone.condition,
@@ -471,7 +474,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 };
             });
 
-            const contractPayload = { clauses: finalClauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: financials.type };
+            const contractPayload = { clauses: finalClauses, scopeOfWork, termsAndConditions, openClauses, totalAmount: finalTotalAmount, financialsType: financials.type };
             
             if (selectedTransactionId && selectedTransactionId !== '__NEW__') {
                 finalTransactionId = selectedTransactionId;
@@ -514,10 +517,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
             const jePayload = {
                 narration: `إثبات مديونية ${clientName} عن عقد "${transaction.transactionType}"`,
-                totalDebit: totalAmount, totalCredit: totalAmount,
+                totalDebit: finalTotalAmount, totalCredit: finalTotalAmount,
                 lines: [
-                    { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0, ...autoTags },
-                    { accountId: revenueAccountId, accountName: revenueAccountName, debit: 0, credit: totalAmount, ...autoTags }
+                    { accountId: clientAccountId, accountName: clientName, debit: finalTotalAmount, credit: 0, ...autoTags },
+                    { accountId: revenueAccountId, accountName: revenueAccountName, debit: 0, credit: finalTotalAmount, ...autoTags }
                 ],
                 clientId, transactionId: finalTransactionId, date: serverTimestamp(),
             };
@@ -551,13 +554,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const finalTransactionType = originalTransaction.transactionType || transaction.transactionType;
 
             const milestonesText = finalClauses.map(c => `- دفعة "${c.name}": ${formatCurrency(c.amount)}`).join('\n');
-            const commentContent = `**[إشعار مالي]**\nقام ${currentUser!.fullName} بإنشاء عقد لهذه المعاملة بقيمة إجمالية ${formatCurrency(totalAmount)}.\n\n**تفاصيل الدفعات:**\n${milestonesText}`;
+            const commentContent = `**[إشعار مالي]**\nقام ${currentUser!.fullName} بإنشاء عقد لهذه المعاملة بقيمة إجمالية ${formatCurrency(finalTotalAmount)}.\n\n**تفاصيل الدفعات:**\n${milestonesText}`;
             const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
             
             const logContentForTimeline = `أنشأ ${currentUser!.fullName} العقد للمعاملة.`;
             const logDataForTimeline = { type: 'log' as const, content: logContentForTimeline, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
 
-            const logContentForHistory = `قام ${currentUser!.fullName} بإنشاء عقد لمعاملة "${finalTransactionType}" بقيمة إجمالية ${formatCurrency(totalAmount)}.`;
+            const logContentForHistory = `قام ${currentUser!.fullName} بإنشاء عقد لمعاملة "${finalTransactionType}" بقيمة إجمالية ${formatCurrency(finalTotalAmount)}.`;
             const logDataForHistory = { type: 'log' as const, content: logContentForHistory, userId: currentUser!.id, userName: currentUser!.fullName, userAvatar: currentUser!.avatarUrl, createdAt: serverTimestamp() };
             
             const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
