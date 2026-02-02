@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, updateDoc, query, where, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Client } from '@/lib/types';
@@ -84,19 +84,43 @@ export default function NewClientPage() {
                 newClientId = newClientRef.id;
                 transaction.set(newClientRef, finalClientData);
 
+                // This logic is now superseded by the global appointment update below,
+                // but we leave it inside the transaction for the `fromAppointmentId` case.
                 const fromAppointmentId = searchParams.get('fromAppointmentId');
                 if(fromAppointmentId) {
                     const apptRef = doc(firestore, 'appointments', fromAppointmentId);
                     transaction.update(apptRef, {
                         clientId: newClientId,
-                        clientName: null,
-                        clientMobile: null,
+                        clientName: deleteField(),
+                        clientMobile: deleteField(),
                     });
                 }
             });
 
             toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
 
+            // After successful client creation, find and update all prospective appointments
+            if (newClientData.mobile && newClientId) {
+                const appointmentsRef = collection(firestore, 'appointments');
+                const q = query(appointmentsRef, where('clientMobile', '==', newClientData.mobile));
+                const appointmentsToUpdateSnap = await getDocs(q);
+
+                if (!appointmentsToUpdateSnap.empty) {
+                    const updateBatch = writeBatch(firestore);
+                    appointmentsToUpdateSnap.forEach(apptDoc => {
+                        const apptRef = doc(firestore, 'appointments', apptDoc.id);
+                        updateBatch.update(apptRef, {
+                            clientId: newClientId,
+                            clientName: deleteField(),
+                            clientMobile: deleteField()
+                        });
+                    });
+                    await updateBatch.commit();
+                    toast({ title: 'تحديث تلقائي', description: `تم ربط ${appointmentsToUpdateSnap.size} مواعيد محتملة بملف العميل الجديد.` });
+                }
+            }
+            
+            // Notification logic
             if (newClientData.assignedEngineer) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, newClientData.assignedEngineer);
                 if (targetUserId && targetUserId !== currentUser.id) {

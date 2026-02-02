@@ -108,23 +108,33 @@ export default function AppointmentDetailsPage() {
         const checkAndLinkClient = async () => {
             setIsAutoLinking(true);
             try {
-                const q = query(collection(firestore, 'clients'), where('mobile', '==', appointment.clientMobile), limit(1));
-                const clientSnap = await getDocs(q);
+                const clientQuery = query(collection(firestore, 'clients'), where('mobile', '==', appointment.clientMobile), limit(1));
+                const clientSnap = await getDocs(clientQuery);
 
                 if (!clientSnap.empty) {
                     const foundClient = clientSnap.docs[0];
-                    const appointmentRef = doc(firestore, 'appointments', id);
                     
-                    await updateDoc(appointmentRef, {
-                        clientId: foundClient.id,
-                        clientName: deleteField(),
-                        clientMobile: deleteField()
-                    });
+                    const appointmentsRef = collection(firestore, 'appointments');
+                    const allProspectiveApptsQuery = query(appointmentsRef, where('clientMobile', '==', appointment.clientMobile));
+                    const prospectiveApptsSnap = await getDocs(allProspectiveApptsQuery);
 
-                    toast({
-                        title: 'تم الربط التلقائي',
-                        description: `تم ربط هذا الموعد بملف العميل "${foundClient.data().nameAr}" بناءً على تطابق رقم الهاتف.`,
-                    });
+                    if (!prospectiveApptsSnap.empty) {
+                        const batch = writeBatch(firestore);
+                        prospectiveApptsSnap.forEach(apptDoc => {
+                            const apptRef = doc(firestore, 'appointments', apptDoc.id);
+                            batch.update(apptRef, {
+                                clientId: foundClient.id,
+                                clientName: deleteField(),
+                                clientMobile: deleteField()
+                            });
+                        });
+                        await batch.commit();
+
+                        toast({
+                            title: 'تم الربط التلقائي',
+                            description: `تم ربط ${prospectiveApptsSnap.size} مواعيد بملف العميل "${foundClient.data().nameAr}" بناءً على تطابق رقم الهاتف.`,
+                        });
+                    }
                 }
             } catch (error) {
                 console.error("Failed to auto-link client:", error);

@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy, limit, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, orderBy, limit, updateDoc, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -126,6 +126,27 @@ export default function EditClientPage() {
             });
 
             await batch.commit();
+
+            if (updatePayload.mobile) {
+                const appointmentsRef = collection(firestore, 'appointments');
+                const q = query(appointmentsRef, where('clientMobile', '==', updatePayload.mobile));
+                const appointmentsToUpdateSnap = await getDocs(q);
+
+                if (!appointmentsToUpdateSnap.empty) {
+                    const linkBatch = writeBatch(firestore);
+                    appointmentsToUpdateSnap.forEach(apptDoc => {
+                        const apptRef = doc(firestore, 'appointments', apptDoc.id);
+                        linkBatch.update(apptRef, {
+                            clientId: id, // the id of the client being edited
+                            clientName: deleteField(),
+                            clientMobile: deleteField()
+                        });
+                    });
+                    await linkBatch.commit();
+                    toast({ title: 'تحديث تلقائي', description: `تم ربط ${appointmentsToUpdateSnap.size} مواعيد محتملة بهذا العميل بعد تعديل رقم الهاتف.` });
+                }
+            }
+
             toast({ title: 'نجاح', description: 'تم تحديث بيانات العميل بنجاح.' });
             router.push(`/dashboard/clients/${id}`);
         } catch (error) {
