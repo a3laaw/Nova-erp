@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -432,7 +432,8 @@ export default function NewCashReceiptPage() {
                     const contractWorkStage = workStages.find(ws => ws.name === 'توقيع العقد');
                     if (contractWorkStage?.order !== undefined) {
                         const nextStageInTemplate = workStages.find(ws => ws.order === contractWorkStage.order! + 1);
-                        if (nextStageInTemplate) {
+                        
+                        if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
                             const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageInTemplate.id);
                             if (nextStageIndexInProg > -1) {
                                 if(currentStages[nextStageIndexInProg].status === 'pending') {
@@ -440,7 +441,6 @@ export default function NewCashReceiptPage() {
                                     (currentStages[nextStageIndexInProg] as any).startDate = new Date();
                                 }
                             } else {
-                                // Add the stage if it doesn't exist
                                 currentStages.push({
                                     stageId: nextStageInTemplate.id,
                                     name: nextStageInTemplate.name,

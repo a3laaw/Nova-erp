@@ -331,11 +331,10 @@ export default function AppointmentDetailsPage() {
 
             if (nextStageInTemplate) {
                 const nextStageId = nextStageInTemplate.id!;
-                const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
-
-                if (!isDiscussionStage) {
+                
+                if (nextStageInTemplate.stageType !== 'parallel') {
                     const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
-                    if (nextStageIndexInProg !== -1) {
+                    if (nextStageIndexInProg > -1) {
                         const stageToStart = { ...currentStages[nextStageIndexInProg] };
                         if (stageToStart.status === 'pending') {
                             stageToStart.status = 'in-progress';

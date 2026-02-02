@@ -354,9 +354,8 @@ export default function TransactionDetailPage() {
             
             if (nextStageInTemplate) {
                 const nextStageId = nextStageInTemplate.stageId;
-                const isDiscussionStage = nextStageInTemplate.name === 'تعديلات ومناقشات';
                 
-                if (!isDiscussionStage) {
+                if (nextStageInTemplate.stageType !== 'parallel') {
                     const nextStageIndexInProg = newProgressForFirestore.findIndex((s: TransactionStage) => s.stageId === nextStageId);
                     
                     const stageToStart: Partial<TransactionStage> = nextStageIndexInProg > -1
@@ -393,7 +392,7 @@ export default function TransactionDetailPage() {
          const outstandingBalance = totalAmountNowDue - totalPaid;
 
          if(outstandingBalance > 0) {
-             commentContent += `\\n\\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
+             commentContent += `\n\n**[إشعار مالي]** بناءً على ذلك، أصبح هناك رصيد مستحق للدفع بقيمة **${formatCurrency(outstandingBalance)}**.`;
          }
          await updateDoc(transactionRef!, { 'contract.clauses': newContractClauses });
     }
