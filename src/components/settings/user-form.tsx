@@ -18,7 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { InlineSearchList } from '../ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 interface UserFormProps {

@@ -24,7 +24,7 @@ import { useLeaveCalculator } from '@/hooks/useLeaveCalculator';
 import { cn } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { InlineSearchList } from '../ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 interface LeaveRequestFormProps {

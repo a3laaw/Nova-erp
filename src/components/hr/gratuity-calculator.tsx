@@ -27,14 +27,14 @@ import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { intervalToDuration } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { InlineSearchList } from '../ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 
 
 export function GratuityCalculator() {
-  const firestore = useFirestore();
+  const firestore = useFirebase();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -126,7 +126,7 @@ export function GratuityCalculator() {
     // After 5 years: 1 month pay for each year
     if (yearsOfService > 5) {
         const remainingYears = yearsOfService - 5;
-        gratuity += basicSalary * remainingYears;
+        gratuity += basicSalary * (remainingYears - 5);
     }
     
     // From Article 52 - rules for resignation

@@ -45,11 +45,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { InlineSearchList } from '../ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 import { cn } from '@/lib/utils';
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
+
+interface ClientWithEmployee extends Client {
+  assignedEngineerName?: string;
+}
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -153,10 +157,8 @@ export function EmployeesTable() {
     }
 
     setIsTerminating(true);
-    
-    // Optimistic UI Update
-    setEmployees(prev => prev.map(emp => emp.id === employeeToTerminate.id ? {...emp, status: 'terminated'} : emp));
     const originalEmployees = [...employees];
+    setEmployees(prev => prev.map(emp => emp.id === employeeToTerminate.id ? {...emp, status: 'terminated'} : emp));
     setEmployeeToTerminate(null);
 
     const employeeRef = doc(firestore, 'employees', employeeToTerminate.id);
@@ -217,7 +219,7 @@ export function EmployeesTable() {
         await updateDoc(employeeRef, updateData);
          toast({ title: 'نجاح', description: `تمت إعادة خدمة الموظف ${employeeToRehire.fullName} بنجاح.` });
     } catch (err) {
-         setEmployees(originalEmployees); // Revert on failure
+         setEmployees(originalEmployees);
          console.error(err);
          toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم تتم إعادة خدمة الموظف. تم التراجع.' });
     } finally {
@@ -289,7 +291,13 @@ export function EmployeesTable() {
               </TableRow>
           </TableHeader>
           <TableBody>
-              {loading && <TableRow><TableCell colSpan={6}><Skeleton className="h-40 w-full" /></TableCell></TableRow>}
+              {loading && filteredEmployees.length === 0 && Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={`skel-${i}`}>
+                      <TableCell colSpan={6}>
+                          <Skeleton className="h-8 w-full" />
+                      </TableCell>
+                  </TableRow>
+              ))}
               {error && (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-destructive">
@@ -342,8 +350,8 @@ export function EmployeesTable() {
                                 </DropdownMenuItem>
                                 {employee.status !== 'terminated' && (
                                         <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
-                                    </DropdownMenuItem>
+                                          <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
+                                      </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
                                 {employee.status !== 'terminated' ? (

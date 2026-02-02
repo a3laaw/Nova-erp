@@ -83,7 +83,7 @@ const formatDateForDisplay = (dateValue: any): string => {
 
 
 export default function LeaveReportsPage() {
-    const firestore = useFirebase();
+    const { firestore } = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
     const [isFetching, setIsFetching] = useState(true);
@@ -340,5 +340,3 @@ export default function LeaveReportsPage() {
     </div>
   );
 }
-
-    

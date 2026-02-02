@@ -41,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
