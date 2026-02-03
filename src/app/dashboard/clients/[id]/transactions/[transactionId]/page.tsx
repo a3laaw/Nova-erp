@@ -308,15 +308,22 @@ export default function TransactionDetailPage() {
 
         // 2. Revert the next sequential stage if it was auto-started
         const revertedStageTemplate = stages.find(s => s.stageId === stageIdToRevert);
-        if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
-             const nextStageTemplate = stages.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
-             if (nextStageTemplate) {
-                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageTemplate.stageId);
+        if (revertedStageTemplate?.nextStageIds) {
+            for (const nextStageId of revertedStageTemplate.nextStageIds) {
+                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
+                // If the next stage was auto-started from this one, revert it.
                 if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
-                    currentStages[nextStageIndexInProg].status = 'pending';
-                    currentStages[nextStageIndexInProg].startDate = null;
+                    // Check if the only predecessor was the one we are reverting
+                    const predecessorsOfNextStage = stages.filter(s => s.nextStageIds?.includes(nextStageId));
+                    const otherCompletedPredecessors = predecessorsOfNextStage.some(p => p.stageId !== stageIdToRevert && currentStages.find(cs => cs.stageId === p.stageId)?.status === 'completed');
+                    
+                    if (!otherCompletedPredecessors) {
+                        currentStages[nextStageIndexInProg].status = 'pending';
+                        currentStages[nextStageIndexInProg].startDate = null;
+                        currentStages[nextStageIndexInProg].expectedEndDate = null;
+                    }
                 }
-             }
+            }
         }
         
         batch.update(transactionRef, { stages: currentStages });
@@ -386,8 +393,8 @@ export default function TransactionDetailPage() {
     const originalProgress = [...(transaction.stages || [])];
     const newProgressForFirestore = JSON.parse(JSON.stringify(originalProgress));
 
-    const stageTemplateInfo = stages.find(s => s.stageId === stageId);
-    if (!stageTemplateInfo) {
+    const selectedStageTemplate = stages.find(s => s.stageId === stageId);
+    if (!selectedStageTemplate) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
         return;
     }
@@ -398,22 +405,22 @@ export default function TransactionDetailPage() {
     if (stageProgressIndex > -1) {
         updatedProgress = { ...newProgressForFirestore[stageProgressIndex] };
     } else {
-        updatedProgress = { stageId: stageId, name: stageTemplateInfo.name };
+        updatedProgress = { stageId: stageId, name: selectedStageTemplate.name };
     }
     
     const oldStatus = updatedProgress.status || 'pending';
-    if(oldStatus === newStatus && stageTemplateInfo.trackingType !== 'occurrence') return;
+    if(oldStatus === newStatus && selectedStageTemplate.trackingType !== 'occurrence') return;
     
     const now = new Date();
     
-    let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${stageTemplateInfo.name}" إلى "${stageStatusTranslations[newStatus]}".`;
-    let commentContent = `قام ${currentUser.fullName} بتحديث حالة المرحلة **"${stageTemplateInfo.name}"** إلى **"${stageStatusTranslations[newStatus]}"**.`;
+    let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${selectedStageTemplate.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+    let commentContent = `قام ${currentUser.fullName} بتحديث حالة المرحلة **"${selectedStageTemplate.name}"** إلى **"${stageStatusTranslations[newStatus]}"**.`;
     let isFinallyCompleted = false;
 
-    if (newStatus === 'completed' && stageTemplateInfo.trackingType === 'occurrence') {
+    if (newStatus === 'completed' && selectedStageTemplate.trackingType === 'occurrence') {
         const newCount = (updatedProgress.completedCount || 0) + 1;
         updatedProgress.completedCount = newCount;
-        const maxOccurrences = stageTemplateInfo.maxOccurrences || 1;
+        const maxOccurrences = selectedStageTemplate.maxOccurrences || 1;
         
         const logAndCommentText = `قام ${currentUser.fullName} بتسجيل إنجاز للمرحلة "${updatedProgress.name}" (${newCount}/${maxOccurrences}).`;
         logContent = logAndCommentText;
@@ -435,8 +442,8 @@ export default function TransactionDetailPage() {
         if (newStatus === 'in-progress') {
             if (oldStatus === 'pending') {
                 updatedProgress.startDate = now as any;
-                if (stageTemplateInfo.trackingType === 'duration' && stageTemplateInfo.expectedDurationDays) {
-                    updatedProgress.expectedEndDate = addDays(now, stageTemplateInfo.expectedDurationDays) as any;
+                if (selectedStageTemplate.trackingType === 'duration' && selectedStageTemplate.expectedDurationDays) {
+                    updatedProgress.expectedEndDate = addDays(now, selectedStageTemplate.expectedDurationDays) as any;
                 }
             }
         } else if (newStatus === 'completed') {
@@ -456,19 +463,19 @@ export default function TransactionDetailPage() {
     }
     
     if (isFinallyCompleted) {
-        const completedStageOrderIndex = stages.findIndex(s => s.stageId === stageTemplateInfo.stageId);
-        if (completedStageOrderIndex !== -1) {
-            const nextStageInTemplate = stages[completedStageOrderIndex + 1];
-            
-            if (nextStageInTemplate) {
-                const nextStageId = nextStageInTemplate.stageId;
+        if (selectedStageTemplate?.nextStageIds && selectedStageTemplate.nextStageIds.length > 0) {
+            for (const nextStageId of selectedStageTemplate.nextStageIds) {
+                const nextStageInTemplate = stages.find(s => s.stageId === nextStageId);
                 
-                if (nextStageInTemplate.stageType !== 'parallel') {
+                if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
                     const nextStageIndexInProg = newProgressForFirestore.findIndex((s: TransactionStage) => s.stageId === nextStageId);
                     
-                    const stageToStart: Partial<TransactionStage> = nextStageIndexInProg > -1
-                        ? { ...newProgressForFirestore[nextStageIndexInProg] }
-                        : { stageId: nextStageInTemplate.stageId, name: nextStageInTemplate.name, status: 'pending' };
+                    let stageToStart: Partial<TransactionStage>;
+                    if (nextStageIndexInProg > -1) {
+                        stageToStart = { ...newProgressForFirestore[nextStageIndexInProg] };
+                    } else {
+                        stageToStart = { stageId: nextStageInTemplate.id, name: nextStageInTemplate.name, status: 'pending' };
+                    }
 
                     if (stageToStart.status === 'pending') {
                         stageToStart.status = 'in-progress';
