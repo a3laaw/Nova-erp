@@ -275,39 +275,36 @@ export default function ChartOfAccountsPage() {
 
     const displayedAccounts = useMemo(() => {
         if (accounts.length === 0) return [];
-        
-        const sortedAccounts = [...accounts].sort((a, b) => {
-            if (a.code && b.code) {
-                return a.code.localeCompare(b.code, 'en'); // 'en' for numeric sort
+    
+        const accountMap = new Map(accounts.map(acc => [acc.code, acc]));
+        const childrenMap = new Map<string | null, Account[]>();
+    
+        accounts.forEach(acc => {
+            const parentKey = acc.parentCode || null;
+            if (!childrenMap.has(parentKey)) {
+                childrenMap.set(parentKey, []);
             }
-            return 0;
+            childrenMap.get(parentKey)!.push(acc);
         });
-
-        const accountMap = new Map(sortedAccounts.map(acc => [acc.code, acc]));
-        const childrenMap = new Map<string, Account[]>();
-        sortedAccounts.forEach(acc => {
-            if (acc.parentCode) {
-                if (!childrenMap.has(acc.parentCode)) {
-                    childrenMap.set(acc.parentCode, []);
-                }
-                childrenMap.get(acc.parentCode)!.push(acc);
-            }
-        });
-
-        const roots = sortedAccounts.filter(a => a.level === 0);
+    
+        // Use a numeric-aware sort for account codes
+        const sortAccounts = (a: Account, b: Account) => a.code.localeCompare(b.code, undefined, { numeric: true });
+    
+        // Sort children within the map
+        childrenMap.forEach((children) => children.sort(sortAccounts));
+    
+        const roots = childrenMap.get(null) || [];
         
         const finalDisplayedList: Account[] = [];
-        function buildDisplayList(accountCode: string) {
-            const account = accountMap.get(accountCode);
-            if (!account) return;
+        function buildDisplayList(account: Account) {
             finalDisplayedList.push(account);
-            if (openAccounts.has(accountCode)) {
-                const children = childrenMap.get(accountCode) || [];
-                children.forEach(child => buildDisplayList(child.code));
+            if (openAccounts.has(account.code)) {
+                const children = childrenMap.get(account.code) || [];
+                children.forEach(child => buildDisplayList(child));
             }
         }
-
-        roots.forEach(root => buildDisplayList(root.code));
+    
+        roots.forEach(root => buildDisplayList(root));
         return finalDisplayedList;
     }, [accounts, openAccounts]);
 
