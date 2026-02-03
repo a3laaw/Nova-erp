@@ -106,7 +106,6 @@ export default function AppointmentDetailsPage() {
     const [selectedTransactionToLink, setSelectedTransactionToLink] = useState('');
     const [isLinking, setIsLinking] = useState(false);
     const [isAutoLinking, setIsAutoLinking] = useState(false);
-    const isCheckingRef = useRef(false);
 
     const loading = appointmentLoading || clientLoading || engineerLoading || transactionLoading || clientTransactionsLoading;
 
@@ -123,54 +122,57 @@ export default function AppointmentDetailsPage() {
 
     // Auto-link prospective client if a real client file now exists
     useEffect(() => {
-        if (!firestore || !appointment || !id || appointment.clientId || !appointment.clientMobile) {
-            return;
-        }
-
-        if (isCheckingRef.current) return;
+        let isMounted = true;
 
         const checkAndLinkClient = async () => {
-            isCheckingRef.current = true;
-            setIsAutoLinking(true);
+            if (!firestore || !appointment || !appointment.clientMobile || appointment.clientId) {
+                return;
+            }
+
+            if (isMounted) setIsAutoLinking(true);
+            
             try {
                 const clientQuery = query(collection(firestore, 'clients'), where('mobile', '==', appointment.clientMobile), limit(1));
                 const clientSnap = await getDocs(clientQuery);
 
-                if (!clientSnap.empty) {
-                    const foundClient = clientSnap.docs[0];
-                    
-                    const appointmentsRef = collection(firestore, 'appointments');
-                    const allProspectiveApptsQuery = query(appointmentsRef, where('clientMobile', '==', appointment.clientMobile));
-                    const prospectiveApptsSnap = await getDocs(allProspectiveApptsQuery);
+                if (clientSnap.empty) {
+                    if (isMounted) setIsAutoLinking(false);
+                    return;
+                }
+                
+                const foundClient = clientSnap.docs[0];
+                const appointmentsRef = collection(firestore, 'appointments');
+                const prospectiveApptsQuery = query(appointmentsRef, where('clientMobile', '==', appointment.clientMobile));
+                const prospectiveApptsSnap = await getDocs(prospectiveApptsQuery);
 
-                    if (!prospectiveApptsSnap.empty) {
-                        const batch = writeBatch(firestore);
-                        prospectiveApptsSnap.forEach(apptDoc => {
-                            const apptRef = doc(firestore, 'appointments', apptDoc.id);
-                            batch.update(apptRef, {
-                                clientId: foundClient.id,
-                                clientName: deleteField(),
-                                clientMobile: deleteField()
-                            });
+                if (!prospectiveApptsSnap.empty) {
+                    const batch = writeBatch(firestore);
+                    prospectiveApptsSnap.forEach(apptDoc => {
+                        const apptRef = doc(firestore, 'appointments', apptDoc.id);
+                        batch.update(apptRef, {
+                            clientId: foundClient.id,
+                            clientName: deleteField(),
+                            clientMobile: deleteField()
                         });
-                        await batch.commit();
-
-                        toast({
-                            title: 'تم الربط التلقائي',
-                            description: `تم ربط ${prospectiveApptsSnap.size} مواعيد بملف العميل "${foundClient.data().nameAr}" بناءً على تطابق رقم الهاتف.`,
-                        });
-                    }
+                    });
+                    await batch.commit();
                 }
             } catch (error) {
                 console.error("Failed to auto-link client:", error);
-            } finally {
-                setIsAutoLinking(false);
-                isCheckingRef.current = false;
+                 if (isMounted) setIsAutoLinking(false);
             }
+            // No need for a finally block to set isAutoLinking to false.
+            // The update triggers the useDocument hook, which causes a re-render.
+            // On re-render, appointment.clientId will exist, and this entire effect will bail out,
+            // removing the loading UI.
         };
-
+        
         checkAndLinkClient();
-    }, [appointment, firestore, id, toast]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [appointment, firestore, id]);
 
 
     // Fetch one-time data like work stages
