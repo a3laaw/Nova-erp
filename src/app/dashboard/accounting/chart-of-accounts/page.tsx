@@ -276,25 +276,27 @@ export default function ChartOfAccountsPage() {
     const displayedAccounts = useMemo(() => {
         if (accounts.length === 0) return [];
     
-        const accountMap = new Map(accounts.map(acc => [acc.code, acc]));
-        const childrenMap = new Map<string | null, Account[]>();
-    
+        const childrenMap = new Map<string, Account[]>();
+        const roots: Account[] = [];
+
+        // Partition into roots and children, handling various "empty" parentCode cases
         accounts.forEach(acc => {
-            const parentKey = acc.parentCode || null;
-            if (!childrenMap.has(parentKey)) {
-                childrenMap.set(parentKey, []);
+            if (acc.parentCode) {
+                if (!childrenMap.has(acc.parentCode)) {
+                    childrenMap.set(acc.parentCode, []);
+                }
+                childrenMap.get(acc.parentCode)!.push(acc);
+            } else {
+                roots.push(acc);
             }
-            childrenMap.get(parentKey)!.push(acc);
         });
     
-        // Use a numeric-aware sort for account codes
         const sortAccounts = (a: Account, b: Account) => a.code.localeCompare(b.code, undefined, { numeric: true });
     
-        // Sort children within the map
+        // Sort roots and all children lists
+        roots.sort(sortAccounts);
         childrenMap.forEach((children) => children.sort(sortAccounts));
     
-        const roots = childrenMap.get(null) || [];
-        
         const finalDisplayedList: Account[] = [];
         function buildDisplayList(account: Account) {
             finalDisplayedList.push(account);
