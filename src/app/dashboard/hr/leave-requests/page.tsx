@@ -140,10 +140,15 @@ export default function LeaveRequestsPage() {
         const getSafeTimestamp = (date: any): number => {
             if (!date) return 0;
             if (typeof date.toMillis === 'function') return date.toMillis();
-            return new Date(date).getTime();
+            const d = new Date(date);
+            return isNaN(d.getTime()) ? 0 : d.getTime();
         };
         const data = [...requestsData]; // Create a mutable copy
-        data.sort((a, b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
+        data.sort((a, b) => {
+            const timeB = getSafeTimestamp(b.createdAt);
+            const timeA = getSafeTimestamp(a.createdAt);
+            return timeB - timeA;
+        });
         return data;
     }, [requestsData]);
 

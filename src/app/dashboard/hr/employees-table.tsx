@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -104,10 +103,26 @@ export function EmployeesTable() {
 
   const processedEmployees = useMemo(() => {
     if (!employees) return [];
-    return employees.map(emp => ({
+    const getSafeTimestamp = (date: any): number => {
+        if (!date) return 0;
+        if (typeof date.toMillis === 'function') return date.toMillis();
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+    const employeeList = employees.map(emp => ({
         ...emp,
         annualLeaveBalance: calculateAnnualLeaveBalance(emp)
     }));
+    // Sort by creation date descending, with a fallback for items without a date.
+    return employeeList.sort((a, b) => {
+        const timeB = getSafeTimestamp(b.createdAt);
+        const timeA = getSafeTimestamp(a.createdAt);
+        if (timeB !== timeA) {
+            return timeB - timeA; // Sort by date primarily
+        }
+        // Fallback sort by name if dates are the same or not present
+        return a.fullName.localeCompare(b.fullName, 'ar');
+    });
   }, [employees]);
 
   const filteredEmployees = useMemo(() => {
