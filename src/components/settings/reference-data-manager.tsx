@@ -28,7 +28,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { cn } from '@/lib/utils';
