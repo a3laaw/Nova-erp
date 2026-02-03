@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage, Department } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -82,11 +82,17 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 transTypesSnap.forEach((doc) => {
                     const data = doc.data() as TransactionType;
                     const parentDeptId = doc.ref.parent.parent?.id;
+                    
                     if (data.name && parentDeptId && !uniqueNames.has(data.name)) {
-                        fetchedTypes.push({ id: doc.id, name: data.name, parentDeptId: parentDeptId });
+                        fetchedTypes.push({
+                            id: doc.id,
+                            name: data.name,
+                            parentDeptId: parentDeptId
+                        });
                         uniqueNames.add(data.name);
                     }
                 });
+                
                 fetchedTypes.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
                 setTransactionTypes(fetchedTypes);
 
@@ -137,9 +143,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const primaryDepartmentId = selectedType?.parentDeptId;
             
-            const structuralDepartment = departments.find(d => d.name === 'القسم الإنشائي');
-            const structuralDepartmentId = structuralDepartment?.id;
-
             const allStages: Partial<TransactionStage>[] = [];
             const stageIds = new Set<string>();
 
@@ -164,9 +167,16 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 });
             };
 
-            await fetchStagesForDept(primaryDepartmentId);
-            if (structuralDepartmentId) {
-                await fetchStagesForDept(structuralDepartmentId);
+            // Always fetch architectural and structural stages
+            const archDept = departments.find(d => d.name === 'القسم المعماري');
+            const structDept = departments.find(d => d.name === 'القسم الإنشائي');
+            
+            if(archDept?.id) await fetchStagesForDept(archDept.id);
+            if(structDept?.id) await fetchStagesForDept(structDept.id);
+
+            // Also fetch from the transaction's primary department if it's different
+            if (primaryDepartmentId && primaryDepartmentId !== archDept?.id && primaryDepartmentId !== structDept?.id) {
+                await fetchStagesForDept(primaryDepartmentId);
             }
 
             await runTransaction(firestore, async (transaction_firestore) => {
@@ -359,3 +369,5 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
+
+    

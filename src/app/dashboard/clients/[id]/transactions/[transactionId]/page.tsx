@@ -222,6 +222,7 @@ export default function TransactionDetailPage() {
             const stageIds = new Set<string>();
             const departmentsCollection = collection(firestore, 'departments');
 
+            // Function to fetch stages for a given department ID
             const fetchStagesForDept = async (deptId: string) => {
                 if (!deptId) return;
                 const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order', 'asc'));
@@ -234,17 +235,21 @@ export default function TransactionDetailPage() {
                 });
             };
 
-            // 1. Fetch stages from the primary department
-            if (transaction.departmentId) {
-                await fetchStagesForDept(transaction.departmentId);
-            }
+            // Fetch stages from Architectural and Structural departments always
+            const [archDeptSnap, structDeptSnap] = await Promise.all([
+                getDocs(query(departmentsCollection, where('name', '==', 'القسم المعماري'), limit(1))),
+                getDocs(query(departmentsCollection, where('name', '==', 'القسم الإنشائي'), limit(1)))
+            ]);
 
-            // 2. Fetch stages from the structural department
-            const structuralDeptQuery = query(departmentsCollection, where('name', '==', 'القسم الإنشائي'), limit(1));
-            const structuralDeptSnap = await getDocs(structuralDeptQuery);
-            if (!structuralDeptSnap.empty) {
-                const structuralDeptId = structuralDeptSnap.docs[0].id;
-                await fetchStagesForDept(structuralDeptId);
+            const archDeptId = archDeptSnap.empty ? null : archDeptSnap.docs[0].id;
+            const structDeptId = structDeptSnap.empty ? null : structDeptSnap.docs[0].id;
+            
+            if (archDeptId) await fetchStagesForDept(archDeptId);
+            if (structDeptId) await fetchStagesForDept(structDeptId);
+
+            // Also fetch from the transaction's primary department if it's different
+            if (transaction.departmentId && transaction.departmentId !== archDeptId && transaction.departmentId !== structDeptId) {
+                await fetchStagesForDept(transaction.departmentId);
             }
             
             const progressData = transaction.stages || [];
@@ -843,4 +848,6 @@ export default function TransactionDetailPage() {
   );
 }
       
+    
+
     
