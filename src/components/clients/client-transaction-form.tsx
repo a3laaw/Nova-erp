@@ -139,44 +139,40 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         let newTransactionRefId = '';
 
         try {
-            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-            const primaryDepartmentId = selectedType?.parentDeptId;
-            
+            // --- NEW ROBUST STAGE FETCHING LOGIC ---
             const allStages: Partial<TransactionStage>[] = [];
             const stageIds = new Set<string>();
 
-            const fetchStagesForDept = async (deptId: string | undefined) => {
-                if (!deptId || !firestore) return;
-                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`));
-                const stagesSnapshot = await getDocs(stagesQuery);
-                stagesSnapshot.forEach(doc => {
-                    if (!stageIds.has(doc.id)) {
-                        const stageData = doc.data() as WorkStage;
-                        // Save all relevant properties from the template
-                        allStages.push({
-                            stageId: doc.id,
-                            name: stageData.name,
-                            status: 'pending',
-                            order: stageData.order,
-                            stageType: stageData.stageType,
-                            allowedRoles: stageData.allowedRoles || [],
-                            nextStageIds: stageData.nextStageIds || [],
-                            allowedDuringStages: stageData.allowedDuringStages || [],
-                            trackingType: stageData.trackingType || 'duration',
-                            expectedDurationDays: stageData.expectedDurationDays || null,
-                            maxOccurrences: stageData.maxOccurrences || null,
-                            allowManualCompletion: stageData.allowManualCompletion || false,
-                        });
-                        stageIds.add(doc.id);
-                    }
-                });
-            };
+            for (const dept of departments) {
+                if (dept.id && (dept.name === 'القسم المعماري' || dept.name === 'القسم الإنشائي')) {
+                    const stagesQuery = query(collection(firestore, `departments/${dept.id}/workStages`));
+                    const stagesSnapshot = await getDocs(stagesQuery);
+                    stagesSnapshot.forEach(doc => {
+                        if (!stageIds.has(doc.id)) {
+                            const stageData = doc.data() as WorkStage;
+                            allStages.push({
+                                stageId: doc.id,
+                                name: stageData.name,
+                                status: 'pending',
+                                order: stageData.order,
+                                stageType: stageData.stageType,
+                                allowedRoles: stageData.allowedRoles || [],
+                                nextStageIds: stageData.nextStageIds || [],
+                                allowedDuringStages: stageData.allowedDuringStages || [],
+                                trackingType: stageData.trackingType || 'duration',
+                                expectedDurationDays: stageData.expectedDurationDays || null,
+                                maxOccurrences: stageData.maxOccurrences || null,
+                                allowManualCompletion: stageData.allowManualCompletion || false,
+                            });
+                            stageIds.add(doc.id);
+                        }
+                    });
+                }
+            }
+            // --- END OF NEW LOGIC ---
 
-            const archDept = departments.find(d => d.name === 'القسم المعماري');
-            const structDept = departments.find(d => d.name === 'القسم الإنشائي');
-            
-            if (archDept?.id) await fetchStagesForDept(archDept.id);
-            if (structDept?.id) await fetchStagesForDept(structDept.id);
+            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
+            const primaryDepartmentId = selectedType?.parentDeptId;
 
             await runTransaction(firestore, async (transaction_firestore) => {
                 const clientRef = doc(firestore, 'clients', clientId);

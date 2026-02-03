@@ -165,8 +165,6 @@ export default function TransactionDetailPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [stages, setStages] = useState<TransactionStage[]>([]);
-  const [loadingStages, setLoadingStages] = useState(true);
   const [isParallelStageMenuOpen, setIsParallelStageMenuOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -209,18 +207,6 @@ export default function TransactionDetailPage() {
     fetchRefData();
   }, [firestore, toast]);
   
-  // This is the corrected logic: it relies solely on the stages saved in the transaction document.
-  useEffect(() => {
-    if (transaction?.stages) {
-        const sortedStages = [...transaction.stages].sort((a: any, b: any) => (a.order ?? 99) - (b.order ?? 99));
-        setStages(sortedStages as TransactionStage[]);
-    } else {
-        setStages([]);
-    }
-    setLoadingStages(false);
-  }, [transaction]);
-
-    
 
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
@@ -232,7 +218,7 @@ export default function TransactionDetailPage() {
   const handleRevertStage = async (stageIdToRevert: string) => {
     if (!firestore || !currentUser || currentUser.role !== 'Admin' || !transaction) return;
 
-    const stageTemplate = stages.find(s => s.stageId === stageIdToRevert);
+    const stageTemplate = (transaction.stages || []).find(s => s.stageId === stageIdToRevert);
     if (!stageTemplate) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
         return;
@@ -260,15 +246,21 @@ export default function TransactionDetailPage() {
         (currentStages[stageToRevertIndex] as any).endDate = null;
 
         // 2. Revert the next sequential stage if it was auto-started
-        const revertedStageTemplate = stages.find(s => s.stageId === stageIdToRevert);
+        const revertedStageTemplate = (transaction.stages || []).find(s => s.stageId === stageIdToRevert);
         if (revertedStageTemplate?.nextStageIds) {
             for (const nextStageId of revertedStageTemplate.nextStageIds) {
                 const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
-                // If the next stage was auto-started from this one, revert it.
+                
                 if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
-                    // Check if the only predecessor was the one we are reverting
-                    const predecessorsOfNextStage = stages.filter(s => s.nextStageIds?.includes(nextStageId));
-                    const otherCompletedPredecessors = predecessorsOfNextStage.some(p => p.stageId !== stageIdToRevert && currentStages.find(cs => cs.stageId === p.stageId)?.status === 'completed');
+                    const allStagesInTemplate: WorkStage[] = [];
+                    const depts = await getDocs(collection(firestore, 'departments'));
+                    for(const deptDoc of depts.docs) {
+                        const stagesSnap = await getDocs(collection(deptDoc.ref, 'workStages'));
+                        stagesSnap.forEach(sDoc => allStagesInTemplate.push({id: sDoc.id, ...sDoc.data()} as WorkStage));
+                    }
+                    
+                    const predecessorsOfNextStage = allStagesInTemplate.filter(s => s.nextStageIds?.includes(nextStageId));
+                    const otherCompletedPredecessors = predecessorsOfNextStage.some(p => p.id !== stageIdToRevert && currentStages.find(cs => cs.stageId === p.id)?.status === 'completed');
                     
                     if (!otherCompletedPredecessors) {
                         currentStages[nextStageIndexInProg].status = 'pending';
@@ -346,7 +338,7 @@ export default function TransactionDetailPage() {
     const originalProgress = [...(transaction.stages || [])];
     const newProgressForFirestore = JSON.parse(JSON.stringify(originalProgress));
 
-    const selectedStageTemplate = stages.find(s => s.stageId === stageId);
+    const selectedStageTemplate = (transaction.stages || []).find(s => s.stageId === stageId);
     if (!selectedStageTemplate) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
         return;
@@ -416,9 +408,16 @@ export default function TransactionDetailPage() {
     }
     
     if (isFinallyCompleted) {
+        const allStagesInTemplate: WorkStage[] = [];
+        const depts = await getDocs(collection(firestore, 'departments'));
+        for(const deptDoc of depts.docs) {
+            const stagesSnap = await getDocs(collection(deptDoc.ref, 'workStages'));
+            stagesSnap.forEach(sDoc => allStagesInTemplate.push({id: sDoc.id, ...sDoc.data()} as WorkStage));
+        }
+        
         if (selectedStageTemplate?.nextStageIds && selectedStageTemplate.nextStageIds.length > 0) {
             for (const nextStageId of selectedStageTemplate.nextStageIds) {
-                const nextStageInTemplate = stages.find(s => s.stageId === nextStageId);
+                const nextStageInTemplate = allStagesInTemplate.find(s => s.id === nextStageId);
                 
                 if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
                     const nextStageIndexInProg = newProgressForFirestore.findIndex((s: TransactionStage) => s.stageId === nextStageId);
@@ -434,7 +433,7 @@ export default function TransactionDetailPage() {
                         stageToStart.status = 'in-progress';
                         (stageToStart as any).startDate = now as any;
                         
-                        const templateForNextStage = stages.find(ws => ws.stageId === stageToStart.stageId);
+                        const templateForNextStage = allStagesInTemplate.find(ws => ws.id === stageToStart.stageId);
                         if (templateForNextStage?.trackingType === 'duration' && templateForNextStage?.expectedDurationDays) {
                             (stageToStart as any).expectedEndDate = addDays(now, templateForNextStage.expectedDurationDays) as any;
                         }
@@ -538,15 +537,18 @@ export default function TransactionDetailPage() {
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
-  const sequentialStages = useMemo(() => stages.filter(s => s.stageType !== 'parallel'), [stages]);
-  const parallelStages = useMemo(() => stages.filter(s => {
-    if (s.stageType !== 'parallel') return false; // Ensure it's parallel
-    if (s.status !== 'pending') return true; // Always show if in progress or completed
-    const canStartResult = canStartStage(s, stages);
-    return canStartResult.allowed;
-  }), [stages]);
+  const sequentialStages = useMemo(() => (transaction?.stages || []).filter(s => s.stageType !== 'parallel').sort((a,b) => (a.order || 99) - (b.order || 99)), [transaction?.stages]);
+  const parallelStages = useMemo(() => {
+    const allStages = transaction?.stages || [];
+    return allStages.filter(s => {
+        if (s.stageType !== 'parallel') return false; // Ensure it's parallel
+        if (s.status !== 'pending') return true; // Always show if in progress or completed
+        const canStartResult = canStartStage(s, allStages as TransactionStage[]);
+        return canStartResult.allowed;
+    });
+  }, [transaction?.stages]);
 
-  if (isLoading || loadingStages) {
+  if (isLoading) {
     return (
         <div className="space-y-6" dir="rtl">
              <Card>
@@ -682,13 +684,13 @@ export default function TransactionDetailPage() {
                         <CardDescription>تتبع التقدم في كل مرحلة من مراحل المعاملة.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {loadingStages ? <Skeleton className="h-48 w-full" /> : stages.length === 0 ? (
+                        {loading ? <Skeleton className="h-48 w-full" /> : !transaction.stages || transaction.stages.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
                                 {sequentialStages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
-                                    const canStart = canStartStage(stage, stages);
+                                    const canStart = canStartStage(stage, transaction.stages as TransactionStage[]);
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
