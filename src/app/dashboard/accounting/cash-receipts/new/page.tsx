@@ -443,25 +443,27 @@ export default function NewCashReceiptPage() {
                     stagesHaveChanged = true;
 
                     const contractWorkStage = workStages.find(ws => ws.name === 'توقيع العقد');
-                    if (contractWorkStage?.order !== undefined) {
-                        const nextStageInTemplate = workStages.find(ws => ws.order === contractWorkStage.order! + 1);
-                        
-                        if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
-                            const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageInTemplate.id);
-                            if (nextStageIndexInProg > -1) {
-                                if(currentStages[nextStageIndexInProg].status === 'pending') {
-                                    currentStages[nextStageIndexInProg].status = 'in-progress';
-                                    (currentStages[nextStageIndexInProg] as any).startDate = new Date();
+                    if (contractWorkStage?.nextStageIds && contractWorkStage.nextStageIds.length > 0) {
+                        for (const nextStageId of contractWorkStage.nextStageIds) {
+                            const nextStageInTemplate = workStages.find(ws => ws.id === nextStageId);
+                            
+                            if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
+                                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageInTemplate.id);
+                                if (nextStageIndexInProg > -1) {
+                                    if(currentStages[nextStageIndexInProg].status === 'pending') {
+                                        currentStages[nextStageIndexInProg].status = 'in-progress';
+                                        (currentStages[nextStageIndexInProg] as any).startDate = new Date();
+                                    }
+                                } else {
+                                    currentStages.push({
+                                        stageId: nextStageInTemplate.id,
+                                        name: nextStageInTemplate.name,
+                                        status: 'in-progress',
+                                        startDate: new Date() as any,
+                                        endDate: null,
+                                        allowedRoles: nextStageInTemplate.allowedRoles || []
+                                    });
                                 }
-                            } else {
-                                currentStages.push({
-                                    stageId: nextStageInTemplate.id,
-                                    name: nextStageInTemplate.name,
-                                    status: 'in-progress',
-                                    startDate: new Date() as any,
-                                    endDate: null,
-                                    allowedRoles: nextStageInTemplate.allowedRoles || []
-                                });
                             }
                         }
                     }
