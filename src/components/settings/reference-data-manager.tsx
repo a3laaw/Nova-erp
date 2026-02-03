@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -402,9 +403,9 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex items-center gap-3">
-            <div className="h-6 w-6 text-primary">{icon}</div>
-            <CardTitle>إدارة {primaryTitle} {secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
+        <div className="flex items-center gap-3 overflow-hidden">
+            <div className="h-6 w-6 flex-shrink-0 text-primary">{icon}</div>
+            <CardTitle className="whitespace-nowrap truncate">إدارة {primaryTitle} {secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
         </div>
         <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
