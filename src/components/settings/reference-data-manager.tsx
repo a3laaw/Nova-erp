@@ -132,18 +132,18 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     if (!firestore) return;
     setLoadingPrimary(true);
     try {
-        let snapshot;
-        try {
-            snapshot = await getDocs(query(collection(firestore, primaryCollectionName), orderBy('order')));
-        } catch (e) {
-            // Fallback if 'order' field doesn't exist
-            try {
-                snapshot = await getDocs(query(collection(firestore, primaryCollectionName), orderBy('name')));
-            } catch (e2) {
-                snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
+        const snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
+        let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+        
+        // Client-side sorting
+        if (items.length > 0) {
+            if (items[0].hasOwnProperty('order') && items.every(i => typeof i.order === 'number')) {
+                items.sort((a, b) => (a.order || 0) - (b.order || 0));
+            } else if (items[0].hasOwnProperty('name')) {
+                items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             }
         }
-        setPrimaryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
+        setPrimaryItems(items);
     } catch (e) {
         console.error("Error fetching primary items:", e);
         toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}` });
@@ -163,19 +163,19 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     }
     setLoadingSecondary(true);
     try {
-        let snapshot;
         const collectionPath = `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`;
-        try {
-            snapshot = await getDocs(query(collection(firestore, collectionPath), orderBy('order')));
-        } catch (e) {
-            // Fallback
-            try {
-                snapshot = await getDocs(query(collection(firestore, collectionPath), orderBy('name')));
-            } catch (e2) {
-                snapshot = await getDocs(query(collection(firestore, collectionPath)));
+        const snapshot = await getDocs(query(collection(firestore, collectionPath)));
+        let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
+
+        if (items.length > 0) {
+            if (items[0].hasOwnProperty('order') && items.every(i => typeof i.order === 'number')) {
+                items.sort((a, b) => (a.order || 0) - (b.order || 0));
+            } else if (items[0].hasOwnProperty('name')) {
+                items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             }
         }
-        setSecondaryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S)));
+        
+        setSecondaryItems(items);
     } catch (e) {
         console.error("Error fetching secondary items:", e);
         toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
@@ -188,7 +188,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const handleSelectPrimary = (item: T) => {
     setSelectedPrimary(item);
   };
-
+  
   useEffect(() => {
     const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
     if (!primaryExists && primaryItems.length > 0) {
@@ -393,9 +393,11 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-3 overflow-hidden">
             <div className="h-6 w-6 flex-shrink-0 text-primary">{icon}</div>
-            <CardTitle className="whitespace-nowrap truncate">إدارة {primaryTitle} {secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
+            <div className="flex-1 min-w-0">
+                <CardTitle className="whitespace-nowrap truncate">{`إدارة ${primaryTitle}`}{secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
+            </div>
         </div>
-        <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
+        <Button onClick={onBack} variant="outline" className="flex-shrink-0"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
       <CardContent className={cn("grid grid-cols-1 gap-6", secondaryTitle && "md:grid-cols-2")}>
         {/* Primary List */}
