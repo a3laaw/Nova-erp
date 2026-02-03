@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -486,7 +487,7 @@ export default function NewEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             <div className="grid gap-2 md:col-span-3">
                                 <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
-                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary || ''} onChange={handleInputChange} placeholder="0.000" required />
+                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary} onChange={handleInputChange} placeholder="0.000" required />
                             </div>
 
                             <div className="items-center flex space-x-2 space-y-2">
@@ -499,7 +500,7 @@ export default function NewEmployeePage() {
                             {includeHousing && (
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="housingAllowance">قيمة بدل السكن</Label>
-                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance || ''} onChange={handleInputChange} placeholder="0.000" />
+                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance} onChange={handleInputChange} placeholder="0.000" />
                                 </div>
                             )}
 
@@ -513,7 +514,7 @@ export default function NewEmployeePage() {
                             {includeTransport && (
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="transportAllowance">قيمة بدل النقل</Label>
-                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance || ''} onChange={handleInputChange} placeholder="0.000" />
+                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance} onChange={handleInputChange} placeholder="0.000" />
                                 </div>
                             )}
                             
