@@ -510,6 +510,11 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
                                     <SelectItem value="none">لا شيء (حدث واحد)</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <p className="text-xs text-muted-foreground">
+                                {itemTrackingType === 'duration' && 'تتبع المرحلة بالوقت، مفيد للمهام التي تستغرق وقتاً محدداً.'}
+                                {itemTrackingType === 'occurrence' && 'تتبع المرحلة بعدد المرات التي تكتمل فيها، مثل عدد الزيارات أو التعديلات.'}
+                                {itemTrackingType === 'none' && 'مرحلة بسيطة تكتمل مرة واحدة فقط وتنتقل للتالية.'}
+                            </p>
                         </div>
 
                         {itemTrackingType === 'duration' && (
