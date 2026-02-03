@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2 } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2, ArrowUp, ArrowDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -331,6 +331,44 @@ export default function TransactionDetailPage() {
     }
   };
 
+  const sequentialStages = useMemo(() => (transaction?.stages || []).filter(s => s.stageType !== 'parallel').sort((a,b) => (a.order || 99) - (b.order || 99)), [transaction?.stages]);
+
+  const handleReorderStage = useCallback(async (index: number, direction: 'up' | 'down') => {
+    if (!firestore || !transaction) return;
+    setIsProcessing(true);
+
+    const currentSequentialStages = sequentialStages;
+    const currentParallelStages = transaction.stages?.filter(s => s.stageType === 'parallel') || [];
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= currentSequentialStages.length) {
+        setIsProcessing(false);
+        return;
+    };
+
+    const reorderedList = [...currentSequentialStages];
+    [reorderedList[index], reorderedList[newIndex]] = [reorderedList[newIndex], reorderedList[index]];
+    
+    const listWithNewOrder = reorderedList.map((stage, idx) => ({
+      ...stage,
+      order: idx,
+    }));
+
+    const finalStagesArray = [...listWithNewOrder, ...currentParallelStages];
+
+    try {
+        const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+        await updateDoc(transactionRef, { stages: finalStagesArray });
+        toast({ title: 'نجاح', description: 'تم تحديث ترتيب المراحل.' });
+    } catch (e) {
+        console.error("Error reordering stages:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
+    } finally {
+        setIsProcessing(false);
+    }
+  }, [firestore, transaction, sequentialStages, clientId, transactionId, toast]);
+
+
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser || !client) return;
@@ -537,10 +575,9 @@ export default function TransactionDetailPage() {
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
-  const sequentialStages = useMemo(() => (transaction?.stages || []).filter(s => s.stageType !== 'parallel').sort((a,b) => (a.order || 99) - (b.order || 99)), [transaction?.stages]);
   const parallelStages = useMemo(() => {
     const allStages = transaction?.stages || [];
-    return allStages.filter(s => {
+    return allStages.filter((s: TransactionStage) => {
         if (s.stageType !== 'parallel') return false; // Ensure it's parallel
         if (s.status !== 'pending') return true; // Always show if in progress or completed
         const canStartResult = canStartStage(s, allStages as TransactionStage[]);
@@ -670,12 +707,12 @@ export default function TransactionDetailPage() {
                                     <Button variant="outline"><ChevronsUpDown className="ml-2 h-4 w-4"/>بدء مرحلة خدمية</Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
-                                {parallelStages.filter(s => s.status === 'pending').map(stage => (
+                                {parallelStages.filter((s: TransactionStage) => s.status === 'pending').map((stage: TransactionStage) => (
                                     <DropdownMenuItem key={stage.stageId} onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')}>
                                         {stage.name}
                                     </DropdownMenuItem>
                                 ))}
-                                {parallelStages.filter(s => s.status === 'pending').length === 0 && (
+                                {parallelStages.filter((s: TransactionStage) => s.status === 'pending').length === 0 && (
                                     <DropdownMenuItem disabled>لا توجد مراحل خدمية متاحة</DropdownMenuItem>
                                 )}
                                 </DropdownMenuContent>
@@ -688,7 +725,7 @@ export default function TransactionDetailPage() {
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
-                                {sequentialStages.map((stage) => {
+                                {sequentialStages.map((stage, index) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
                                     const canStart = canStartStage(stage, transaction.stages as TransactionStage[]);
                                     return (
@@ -707,7 +744,7 @@ export default function TransactionDetailPage() {
                                                     <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                                                 ))}
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 items-center">
                                                 {stage.status === 'pending' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || !canStart.allowed} title={!canStart.allowed ? canStart.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
@@ -738,6 +775,16 @@ export default function TransactionDetailPage() {
                                                                 <Undo2 className="ml-1 h-4 w-4" /> تراجع
                                                             </Button>
                                                         )}
+                                                    </div>
+                                                )}
+                                                 {currentUser?.role === 'Admin' && (
+                                                    <div className="flex flex-col -my-2 border-l pl-1 ml-1 rtl:border-r rtl:border-l-0 rtl:pr-1 rtl:mr-1">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleReorderStage(index, 'up')} disabled={index === 0 || isProcessing}>
+                                                            <ArrowUp className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleReorderStage(index, 'down')} disabled={index === sequentialStages.length - 1 || isProcessing}>
+                                                            <ArrowDown className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
                                                 )}
                                             </div>
