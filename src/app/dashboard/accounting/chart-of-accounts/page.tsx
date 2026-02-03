@@ -275,39 +275,36 @@ export default function ChartOfAccountsPage() {
 
     const displayedAccounts = useMemo(() => {
         if (accounts.length === 0) return [];
-    
+        
         const childrenMap = new Map<string, Account[]>();
-        const roots: Account[] = [];
-
-        // Partition into roots and children, handling various "empty" parentCode cases
         accounts.forEach(acc => {
             if (acc.parentCode) {
                 if (!childrenMap.has(acc.parentCode)) {
                     childrenMap.set(acc.parentCode, []);
                 }
                 childrenMap.get(acc.parentCode)!.push(acc);
-            } else {
-                roots.push(acc);
             }
         });
-    
-        const sortAccounts = (a: Account, b: Account) => a.code.localeCompare(b.code, undefined, { numeric: true });
-    
-        // Sort roots and all children lists
-        roots.sort(sortAccounts);
-        childrenMap.forEach((children) => children.sort(sortAccounts));
-    
-        const finalDisplayedList: Account[] = [];
-        function buildDisplayList(account: Account) {
-            finalDisplayedList.push(account);
+        
+        const sortAccounts = (a: Account, b: Account) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true });
+        
+        childrenMap.forEach(childList => childList.sort(sortAccounts));
+        
+        // Use level === 0 to find roots, which is more robust
+        const roots = accounts.filter(acc => acc.level === 0).sort(sortAccounts);
+
+        const result: Account[] = [];
+        function addChildren(account: Account) {
+            result.push(account);
             if (openAccounts.has(account.code)) {
                 const children = childrenMap.get(account.code) || [];
-                children.forEach(child => buildDisplayList(child));
+                children.forEach(addChildren);
             }
         }
-    
-        roots.forEach(root => buildDisplayList(root));
-        return finalDisplayedList;
+        
+        roots.forEach(addChildren);
+        
+        return result;
     }, [accounts, openAccounts]);
 
     const toggleAccount = (code: string) => {
