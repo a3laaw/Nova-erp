@@ -47,8 +47,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
+import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';
+
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
 
@@ -82,15 +83,11 @@ export function EmployeesTable() {
   const [searchQuery, setSearchQuery] = useState('');
   
   const { 
-    items: employees, 
-    setItems: setEmployees, 
+    data: employees, 
+    setData: setEmployees, 
     loading, 
     error,
-    hasMore,
-    loaderRef,
-    loadingMore,
-    fetchItems: refreshData, // Use the fetchItems function for manual refresh
-  } = useInfiniteScroll<Employee>('employees');
+  } = useSubscription<Employee>('employees');
   
   const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
   const [isTerminating, setIsTerminating] = useState(false);
@@ -313,64 +310,60 @@ export function EmployeesTable() {
                       </TableCell>
                   </TableRow>
               )}
-              {filteredEmployees.map((employee, index) => {
-                  const isLastItem = index === filteredEmployees.length - 1;
-                  return (
-                    <TableRow key={employee.id} ref={isLastItem ? loaderRef : null} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
-                        <TableCell className="font-medium">
-                            {employee.fullName}
-                            <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
-                            <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
-                        </TableCell>
-                        <TableCell>{employee.department}</TableCell>
-                        <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
-                        <TableCell className='font-medium'>
-                            {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
-                        </TableCell>
-                        <TableCell>
-                            <Badge variant={'outline'} className={statusColors[employee.status]}>
-                                {statusTranslations[employee.status]}
-                            </Badge>
-                        </TableCell>
-                        <TableCell>
-                            <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                aria-haspopup="true"
-                                size="icon"
-                                variant="ghost"
-                                >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" dir="rtl">
-                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+              {filteredEmployees.map((employee) => (
+                  <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
+                  <TableCell className="font-medium">
+                      {employee.fullName}
+                      <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
+                      <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
+                  </TableCell>
+                  <TableCell>{employee.department}</TableCell>
+                  <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
+                  <TableCell className='font-medium'>
+                      {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
+                  </TableCell>
+                  <TableCell>
+                      <Badge variant={'outline'} className={statusColors[employee.status]}>
+                          {statusTranslations[employee.status]}
+                      </Badge>
+                  </TableCell>
+                  <TableCell>
+                      <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <Button
+                          aria-haspopup="true"
+                          size="icon"
+                          variant="ghost"
+                          >
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Toggle menu</span>
+                          </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" dir="rtl">
+                          <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
+                          </DropdownMenuItem>
+                          {employee.status !== 'terminated' && (
                                 <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
-                                </DropdownMenuItem>
-                                {employee.status !== 'terminated' && (
-                                        <DropdownMenuItem asChild>
-                                          <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
-                                      </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                {employee.status !== 'terminated' ? (
-                                    <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
-                                        إنهاء الخدمة
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
-                                        إعادة خدمة
-                                    </DropdownMenuItem>
-                                )}
-                            </DropdownMenuContent>
-                            </DropdownMenu>
-                        </TableCell>
-                    </TableRow>
-                  );
-              })}
-              {loadingMore && <TableRow><TableCell colSpan={6} className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>}
+                                  <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
+                              </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          {employee.status !== 'terminated' ? (
+                              <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
+                                  إنهاء الخدمة
+                              </DropdownMenuItem>
+                          ) : (
+                              <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
+                                  إعادة خدمة
+                              </DropdownMenuItem>
+                          )}
+                      </DropdownMenuContent>
+                      </DropdownMenu>
+                  </TableCell>
+                  </TableRow>
+              ))}
           </TableBody>
           </Table>
       </div>
@@ -480,4 +473,3 @@ export function EmployeesTable() {
         </>
     );
 }
-

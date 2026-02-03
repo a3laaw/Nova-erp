@@ -420,53 +420,6 @@ export function DataIntegrityManager() {
                     onApplyCorrections={handleApplyDepartmentCorrections}
                     itemCountLabel="موظفين"
                 />
-
-                <Separator />
-
-                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="font-semibold">فحص الحسابات في سندات الصرف</h3>
-                            <p className="text-sm text-muted-foreground">فحص أسماء الحسابات المستخدمة في سندات الصرف ومقارنتها بشجرة الحسابات.</p>
-                        </div>
-                        <Button onClick={handleAnalyzeVoucherAccounts} disabled={isLoadingVoucherAccounts} variant="outline" size="sm">
-                            {isLoadingVoucherAccounts ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Microscope className="ml-2 h-4 w-4" />}
-                            فحص حسابات السندات
-                        </Button>
-                    </div>
-                    {isLoadingVoucherAccounts && (
-                        <div className="text-center p-8 text-muted-foreground"><Loader2 className="mx-auto h-8 w-8 animate-spin" /><p className="mt-2">جاري فحص السندات...</p></div>
-                    )}
-                    {voucherAccountAnalysisResults && !isLoadingVoucherAccounts && (
-                        <div>
-                            {voucherAccountAnalysisResults.length === 0 ? (
-                                <div className="text-center p-8 text-green-600 bg-green-50 rounded-lg border border-green-200">
-                                    <ShieldCheck className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">البيانات سليمة</h3><p className="mt-2 text-sm">لم يتم العثور على أي بيانات غير متطابقة.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg"><h3 className="font-semibold text-yellow-800 flex items-center gap-2"><AlertTriangle />تم العثور على {voucherAccountAnalysisResults.length} أسماء حسابات غير متطابقة</h3></div>
-                                    <div className="space-y-2">
-                                        {voucherAccountAnalysisResults.map(res => (
-                                            <div key={res.nonStandardName} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-2 border-b">
-                                                <div className="md:col-span-1"><p className="font-semibold text-destructive">{res.nonStandardName}</p><p className="text-xs text-muted-foreground">{res.count} سجلات</p></div>
-                                                <div className="md:col-span-2">
-                                                    <InlineSearchList
-                                                        placeholder="اختر الحساب الصحيح..."
-                                                        options={allAccountsOptions}
-                                                        value={voucherAccountCorrections[res.nonStandardName] || ''}
-                                                        onSelect={(value) => setVoucherAccountCorrections(prev => ({ ...prev, [res.nonStandardName]: value }))}
-                                                    />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex justify-end pt-4"><Button onClick={handleApplyVoucherAccountCorrections}>تطبيق التصحيحات</Button></div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
             </CardContent>
         </Card>
     );

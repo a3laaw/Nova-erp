@@ -456,7 +456,8 @@
         "emergencyLeaveUsed": { "type": "number" },
         "maxEmergencyLeave": { "type": "number" },
         "lastLeaveResetDate": { "type": "string", "format": "date-time" },
-        "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." }
+        "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
         "employeeNumber",
@@ -611,6 +612,10 @@
         "name": {
           "type": "string",
           "description": "The name of the department."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -623,6 +628,10 @@
         "name": {
           "type": "string",
           "description": "The name of the job."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -635,6 +644,10 @@
         "name": {
           "type": "string",
           "description": "The name of the governorate."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -647,6 +660,10 @@
         "name": {
           "type": "string",
           "description": "The name of the area."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -1339,4 +1356,3 @@
     }
   }
 }
-
