@@ -684,7 +684,7 @@ export default function TransactionDetailPage() {
                         <CardDescription>تتبع التقدم في كل مرحلة من مراحل المعاملة.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {loading ? <Skeleton className="h-48 w-full" /> : !transaction.stages || transaction.stages.length === 0 ? (
+                        {isLoading ? <Skeleton className="h-48 w-full" /> : !transaction.stages || transaction.stages.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
