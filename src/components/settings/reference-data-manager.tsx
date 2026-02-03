@@ -131,21 +131,31 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const primaryQueryConstraints = useMemo(() => [orderBy('order')], []);
   const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
   
-   useEffect(() => {
+  useEffect(() => {
     setLoadingPrimary(primaryLoading);
-    if(primaryError) {
-        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: "قد يكون السبب أن حقل 'order' غير موجود. حاول إعادة ترتيب العناصر مرة لحل المشكلة." });
+    if (primaryError) {
+        toast({
+            variant: 'destructive',
+            title: `فشل جلب ${primaryTitle}`,
+            description: "قد يكون السبب أن حقل 'order' غير موجود. حاول إعادة ترتيب العناصر مرة لحل المشكلة."
+        });
         
-        // Fallback to fetch without ordering
         const fetchWithoutOrder = async () => {
              if(!firestore) return;
-             const fallbackSnap = await getDocs(query(collection(firestore, primaryCollectionName)));
-             setPrimaryItems(fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
-             setLoadingPrimary(false);
+             try {
+                // To maintain consistency, try to order by name as a fallback.
+                const fallbackSnap = await getDocs(query(collection(firestore, primaryCollectionName), orderBy('name')));
+                setPrimaryItems(fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
+             } catch (e) {
+                // If ordering by name also fails, fetch without any order.
+                const finalFallbackSnap = await getDocs(query(collection(firestore, primaryCollectionName)));
+                setPrimaryItems(finalFallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
+             } finally {
+                setLoadingPrimary(false);
+             }
         }
         fetchWithoutOrder();
-    }
-    if (primaryData) {
+    } else if (primaryData) {
       setPrimaryItems(primaryData);
     }
   }, [primaryData, primaryLoading, primaryError, primaryTitle, primaryCollectionName, firestore, toast]);
