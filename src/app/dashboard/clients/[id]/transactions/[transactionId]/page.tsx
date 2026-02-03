@@ -169,11 +169,6 @@ export default function TransactionDetailPage() {
   const [isParallelStageMenuOpen, setIsParallelStageMenuOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // New state for inline editing of stage order
-  const [stageOrders, setStageOrders] = useState<Record<string, number>>({});
-  const [isOrderChanged, setIsOrderChanged] = useState(false);
-
-
   // --- Data Fetching ---
   const transactionRef = useMemo(() => {
     if (!firestore || !clientId || !transactionId) return null;
@@ -212,20 +207,6 @@ export default function TransactionDetailPage() {
     fetchRefData();
   }, [firestore, toast]);
   
-  // NEW: Initialize local state for orders
-  useEffect(() => {
-    if (transaction?.stages) {
-        const initialOrders: Record<string, number> = {};
-        transaction.stages.forEach(stage => {
-            if (stage.stageId) {
-                initialOrders[stage.stageId] = stage.order ?? 99;
-            }
-        });
-        setStageOrders(initialOrders);
-        setIsOrderChanged(false); // Reset changed state
-    }
-  }, [transaction?.stages]);
-
 
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
@@ -350,52 +331,6 @@ export default function TransactionDetailPage() {
     }
   };
   
-    // NEW: handler for local order state
-    const handleOrderChange = (stageId: string, newOrderValue: string) => {
-        const numOrder = newOrderValue === '' ? 999 : parseInt(newOrderValue, 10);
-        setStageOrders(prev => ({
-            ...prev,
-            [stageId]: isNaN(numOrder) ? 999 : numOrder,
-        }));
-        setIsOrderChanged(true);
-    };
-
-    // NEW: handler to save the new order
-    const handleSaveOrder = async () => {
-        if (!firestore || !transaction?.stages) return;
-        setIsProcessing(true);
-    
-        try {
-            // Create a sortable array from the local state
-            const sortableArray = Object.entries(stageOrders)
-                                      .map(([stageId, order]) => ({ stageId, order }))
-                                      .sort((a, b) => a.order - b.order);
-            
-            // Create a map for the new order: { stageId: newIndex }
-            const newOrderMap = new Map(sortableArray.map((item, index) => [item.stageId, index]));
-
-            // Update the full stages array with the new correct order
-            const newStages = transaction.stages.map(stage => {
-                if (stage.stageId && newOrderMap.has(stage.stageId)) {
-                    return { ...stage, order: newOrderMap.get(stage.stageId) };
-                }
-                return stage; // Return parallel stages or stages without ID unchanged
-            });
-    
-            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-            await updateDoc(transactionRef, { stages: newStages });
-    
-            toast({ title: 'نجاح', description: 'تم تحديث ترتيب المراحل بنجاح.' });
-            setIsOrderChanged(false);
-        } catch (e) {
-            console.error("Error saving new order:", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser || !client) return;
 
@@ -731,12 +666,6 @@ export default function TransactionDetailPage() {
                         <div className="flex justify-between items-center">
                             <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> سير العمل</CardTitle>
                              <div className="flex items-center gap-2">
-                                {isOrderChanged && (
-                                    <Button size="sm" onClick={handleSaveOrder} disabled={isProcessing}>
-                                        {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                                        حفظ الترتيب
-                                    </Button>
-                                )}
                                 <DropdownMenu open={isParallelStageMenuOpen} onOpenChange={setIsParallelStageMenuOpen}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline"><ChevronsUpDown className="ml-2 h-4 w-4"/>بدء مرحلة خدمية</Button>
@@ -767,15 +696,6 @@ export default function TransactionDetailPage() {
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                {currentUser?.role === 'Admin' && (
-                                                    <Input
-                                                        type="number"
-                                                        value={stageOrders[stage.stageId] ?? ''}
-                                                        onChange={(e) => handleOrderChange(stage.stageId, e.target.value)}
-                                                        className="w-16 h-8 text-center"
-                                                        disabled={isProcessing}
-                                                    />
-                                                )}
                                                 <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
@@ -865,4 +785,5 @@ export default function TransactionDetailPage() {
     
 
     
+
 

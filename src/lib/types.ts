@@ -356,6 +356,7 @@ export type Payslip = {
 export interface TransactionStage {
   stageId: string;
   name: string;
+  order?: number;
   status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
   startDate: any | null;
   endDate: any | null;
@@ -364,7 +365,6 @@ export interface TransactionStage {
   completedCount?: number;
   
   // Properties inherited from WorkStage template
-  order?: number;
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
@@ -427,18 +427,22 @@ export type TransactionTimelineEvent = {
 export interface Department {
     id: string;
     name: string;
+    order?: number;
 }
 export interface Job {
     id: string;
     name: string;
+    order?: number;
 }
 export interface Governorate {
     id: string;
     name: string;
+    order?: number;
 }
 export interface Area {
     id: string;
     name: string;
+    order?: number;
 }
 export interface TransactionType {
     id: string;

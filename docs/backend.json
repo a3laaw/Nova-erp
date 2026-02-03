@@ -351,6 +351,7 @@
       "properties": {
         "stageId": { "type": "string", "description": "The ID of the reference WorkStage document from the department's workStages subcollection." },
         "name": { "type": "string", "description": "Name of the stage, stored for convenience. The name in the reference data is the source of truth." },
+        "order": { "type": "number", "description": "The display and logical order of the stage, copied from the template." },
         "status": {
           "type": "string",
           "enum": ["pending", "in-progress", "completed", "skipped", "awaiting-review"],
