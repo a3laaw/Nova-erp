@@ -137,7 +137,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         
         // Client-side sorting
         if (items.length > 0) {
-            if (items[0].hasOwnProperty('order') && items.every(i => typeof i.order === 'number')) {
+            if (items.every(i => i.hasOwnProperty('order') && typeof i.order === 'number')) {
                 items.sort((a, b) => (a.order || 0) - (b.order || 0));
             } else if (items[0].hasOwnProperty('name')) {
                 items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
@@ -168,7 +168,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
 
         if (items.length > 0) {
-            if (items[0].hasOwnProperty('order') && items.every(i => typeof i.order === 'number')) {
+            if (items.every(i => i.hasOwnProperty('order') && typeof i.order === 'number')) {
                 items.sort((a, b) => (a.order || 0) - (b.order || 0));
             } else if (items[0].hasOwnProperty('name')) {
                 items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
@@ -391,7 +391,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex items-center gap-3 overflow-hidden">
+         <div className="flex items-center gap-3 overflow-hidden">
             <div className="h-6 w-6 flex-shrink-0 text-primary">{icon}</div>
             <div className="flex-1 min-w-0">
                 <CardTitle className="whitespace-nowrap truncate">{`إدارة ${primaryTitle}`}{secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
@@ -633,22 +633,30 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       const [typesSnap, deptsSnap] = await Promise.all([
-        getDocs(query(collection(firestore, 'transactionTypes'), orderBy('order'))),
+        getDocs(query(collection(firestore, 'transactionTypes'))),
         getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
       ]);
       
-      const typesData = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
+      let typesData = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
+      
+      // Client-side sorting
+      if (typesData.length > 0) {
+        if (typesData.every(i => i.hasOwnProperty('order') && typeof i.order === 'number')) {
+            typesData.sort((a, b) => (a.order || 0) - (b.order || 0));
+        } else {
+            typesData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+        }
+      }
       
       setTransactionTypes(typesData);
       setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
     } catch (e) {
-      // Fallback if order fails
-      const typesSnap = await getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')));
-      setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
+      console.error("Error fetching transaction types:", e);
+      toast({ variant: 'destructive', title: `فشل جلب أنواع المعاملات` });
     } finally {
       setLoading(false);
     }
-  }, [firestore]);
+  }, [firestore, toast]);
   
   useEffect(() => {
     fetchData();
