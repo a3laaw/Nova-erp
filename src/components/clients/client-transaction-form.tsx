@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -33,10 +34,6 @@ interface ClientTransactionFormProps {
   fromAppointmentId?: string | null;
 }
 
-interface FetchedTransactionType extends TransactionType {
-    parentDeptId: string;
-}
-
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -45,9 +42,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
-    const [transactionTypes, setTransactionTypes] = useState<FetchedTransactionType[]>([]);
+    const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
     const [typesLoading, setTypesLoading] = useState(true);
-    const [departments, setDepartments] = useState<Department[]>([]);
 
     const [transactionTypeName, setTransactionTypeName] = useState('');
     const [description, setDescription] = useState('');
@@ -61,10 +57,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             setEngineersLoading(true);
             setTypesLoading(true);
             try {
-                const [engSnap, transTypesSnap, deptsSnap] = await Promise.all([
+                const [engSnap, transTypesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
-                    getDocs(query(collectionGroup(firestore, 'transactionTypes'))),
-                    getDocs(query(collection(firestore, 'departments'))),
+                    getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name'))),
                 ]);
 
                 const fetchedEngineers: Employee[] = [];
@@ -76,26 +71,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 });
                 setEngineers(fetchedEngineers);
 
-                const fetchedTypes: FetchedTransactionType[] = [];
-                const uniqueNames = new Set<string>();
-                transTypesSnap.forEach((doc) => {
-                    const data = doc.data() as TransactionType;
-                    const parentDeptId = doc.ref.parent.parent?.id;
-                    
-                    if (data.name && parentDeptId && !uniqueNames.has(data.name)) {
-                        fetchedTypes.push({
-                            id: doc.id,
-                            name: data.name,
-                            parentDeptId: parentDeptId
-                        });
-                        uniqueNames.add(data.name);
-                    }
-                });
-                
-                fetchedTypes.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+                const fetchedTypes = transTypesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
                 setTransactionTypes(fetchedTypes);
-
-                setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
 
             } catch (error) {
                 console.error("Failed to fetch reference data:", error);
@@ -139,42 +116,32 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         let newTransactionRefId = '';
 
         try {
-            // --- NEW ROBUST STAGE FETCHING LOGIC ---
-            const allStages: Partial<TransactionStage>[] = [];
-            const stageIds = new Set<string>();
+            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
+            const departmentIds = selectedType?.departmentIds || [];
 
-            for (const dept of departments) {
-                if (dept.id && (dept.name === 'القسم المعماري' || dept.name === 'القسم الإنشائي')) {
-                    const stagesQuery = query(collection(firestore, `departments/${dept.id}/workStages`));
-                    const stagesSnapshot = await getDocs(stagesQuery);
+            await runTransaction(firestore, async (transaction_firestore) => {
+                const allStages: Partial<TransactionStage>[] = [];
+                const stageIds = new Set<string>();
+
+                for (const deptId of departmentIds) {
+                    const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`));
+                    const stagesSnapshot = await transaction_firestore.get(stagesQuery);
                     stagesSnapshot.forEach(doc => {
                         if (!stageIds.has(doc.id)) {
                             const stageData = doc.data() as WorkStage;
                             allStages.push({
-                                stageId: doc.id,
-                                name: stageData.name,
-                                status: 'pending',
-                                order: stageData.order,
-                                stageType: stageData.stageType,
-                                allowedRoles: stageData.allowedRoles || [],
-                                nextStageIds: stageData.nextStageIds || [],
-                                allowedDuringStages: stageData.allowedDuringStages || [],
-                                trackingType: stageData.trackingType || 'duration',
-                                expectedDurationDays: stageData.expectedDurationDays || null,
-                                maxOccurrences: stageData.maxOccurrences || null,
+                                stageId: doc.id, name: stageData.name, status: 'pending',
+                                order: stageData.order, stageType: stageData.stageType,
+                                allowedRoles: stageData.allowedRoles || [], nextStageIds: stageData.nextStageIds || [],
+                                allowedDuringStages: stageData.allowedDuringStages || [], trackingType: stageData.trackingType || 'duration',
+                                expectedDurationDays: stageData.expectedDurationDays || null, maxOccurrences: stageData.maxOccurrences || null,
                                 allowManualCompletion: stageData.allowManualCompletion || false,
                             });
                             stageIds.add(doc.id);
                         }
                     });
                 }
-            }
-            // --- END OF NEW LOGIC ---
-
-            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-            const primaryDepartmentId = selectedType?.parentDeptId;
-
-            await runTransaction(firestore, async (transaction_firestore) => {
+                
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await transaction_firestore.get(clientRef);
                 if (!clientSnap.exists()) {
@@ -204,16 +171,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const engineer = engineers.find(e => e.id === engineerForTransactionId);
 
                 const newTransactionData: Omit<ClientTransaction, 'id'> = {
-                    transactionNumber,
-                    clientId,
-                    transactionType: transactionTypeName,
-                    description,
-                    departmentId: primaryDepartmentId,
-                    transactionTypeId: selectedType?.id,
-                    assignedEngineerId: engineerForTransactionId,
-                    status: 'new',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
+                    transactionNumber, clientId, transactionType: transactionTypeName,
+                    description, departmentId: departmentIds[0] || null, // Primary dept
+                    transactionTypeId: selectedType?.id, assignedEngineerId: engineerForTransactionId,
+                    status: 'new', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                     stages: allStages,
                 };
 
@@ -222,6 +183,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
                 const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
 
+                // Detailed log for transaction timeline
                 let detailedLogContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
                 if (engineer) {
                     detailedLogContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
@@ -234,22 +196,17 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 }
                 
                 const detailedLogEventData = {
-                    type: 'log' as const,
-                    content: detailedLogContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
+                    type: 'log' as const, content: detailedLogContent, userId: currentUser.id,
+                    userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 };
                 transaction_firestore.set(doc(timelineCollectionRef), detailedLogEventData);
 
+                // Concise log for main client history
                 const conciseLogContent = `تم إنشاء معاملة جديدة: "${transactionTypeName}".`;
                 const conciseLogEventData = {
-                    type: 'log' as const,
-                    content: conciseLogContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
+                    type: 'log' as const, content: conciseLogContent, userId: currentUser.id,
+                    userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 };
                 transaction_firestore.set(doc(historyCollectionRef), conciseLogEventData);

@@ -584,7 +584,6 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   );
 }
 
-
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
     const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages'>('dashboard');
@@ -601,22 +600,14 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments'));
-                const govsQuery = query(collection(firestore, 'governorates'));
-                const companiesQuery = query(collection(firestore, 'companies'));
-                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
-                const areasQuery = query(collectionGroup(firestore, 'areas'));
-                const transTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
-                const workStagesQuery = query(collectionGroup(firestore, 'workStages'));
-                
                 const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap, workStagesSnap] = await Promise.all([
-                    getDocs(deptsQuery),
-                    getDocs(govsQuery),
-                    getDocs(jobsQuery),
-                    getDocs(areasQuery),
-                    getDocs(transTypesQuery),
-                    getDocs(companiesQuery),
-                    getDocs(workStagesQuery),
+                    getDocs(query(collection(firestore, 'departments'))),
+                    getDocs(query(collection(firestore, 'governorates'))),
+                    getDocs(query(collection(firestore, 'companies'))),
+                    getDocs(query(collectionGroup(firestore, 'jobs'))),
+                    getDocs(query(collectionGroup(firestore, 'areas'))),
+                    getDocs(query(collection(firestore, 'transactionTypes'))),
+                    getDocs(query(collectionGroup(firestore, 'workStages'))),
                 ]);
 
                 setCounts({
@@ -668,22 +659,12 @@ export function ReferenceDataManager() {
     }
     
     if (view === 'transTypes') {
-         return <ManagerView
-            primaryTitle="أنواع المعاملات حسب القسم"
-            primarySingularTitle="قسم"
-            primaryCollectionName="departments"
-            secondaryTitle="أنواع المعاملات"
-            secondarySingularTitle="نوع معاملة"
-            secondaryCollectionName="transactionTypes"
-            icon={<FileText className="h-full w-full" />}
-            disablePrimaryActions={true}
-            onBack={() => setView('dashboard')}
-        />
+         return <TransactionTypeManager onBack={() => setView('dashboard')} />
     }
 
     if (view === 'workStages') {
         return <ManagerView
-            primaryTitle="مراحل العمل حسب القسم"
+            primaryTitle="أقسام العمل"
             primarySingularTitle="قسم"
             primaryCollectionName="departments"
             secondaryTitle="مراحل العمل"
@@ -751,4 +732,175 @@ export function ReferenceDataManager() {
             </CardContent>
         </Card>
     );
+}
+
+// --- NEW TransactionTypeManager Component ---
+function TransactionTypeManager({ onBack }: { onBack: () => void }) {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+
+  const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<TransactionType | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<TransactionType | null>(null);
+
+  const [itemName, setItemName] = useState('');
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  
+  const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
+  const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
+
+
+  const fetchData = useCallback(async () => {
+    if (!firestore) return;
+    setLoading(true);
+    try {
+      const [typesSnap, deptsSnap] = await Promise.all([
+        getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name'))),
+        getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
+      ]);
+      setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
+      setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات.' });
+    } finally {
+      setLoading(false);
+    }
+  }, [firestore, toast]);
+  
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const openDialog = (item: TransactionType | null = null) => {
+    setEditingItem(item);
+    setItemName(item?.name || '');
+    setSelectedDepartments(item?.departmentIds || []);
+    setIsDialogOpen(true);
+  };
+  
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingItem(null);
+    setItemName('');
+    setSelectedDepartments([]);
+  };
+
+  const handleSave = async () => {
+    if (!firestore || !itemName.trim()) return;
+    try {
+        const dataToSave = { name: itemName, departmentIds: selectedDepartments };
+        if (editingItem) {
+            await updateDoc(doc(firestore, 'transactionTypes', editingItem.id), dataToSave);
+            toast({ title: 'نجاح', description: 'تم تحديث نوع المعاملة.' });
+        } else {
+            await addDoc(collection(firestore, 'transactionTypes'), dataToSave);
+            toast({ title: 'نجاح', description: 'تمت إضافة نوع المعاملة.' });
+        }
+        fetchData();
+        closeDialog();
+    } catch(e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ نوع المعاملة.' });
+    }
+  };
+  
+  const handleDelete = async () => {
+    if (!firestore || !itemToDelete) return;
+    try {
+        await deleteDoc(doc(firestore, 'transactionTypes', itemToDelete.id));
+        toast({ title: 'نجاح', description: 'تم حذف نوع المعاملة.' });
+        fetchData();
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف نوع المعاملة.' });
+    } finally {
+        setItemToDelete(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FileText className="h-6 w-6" />
+          <CardTitle>إدارة أنواع المعاملات</CardTitle>
+        </div>
+        <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
+      </CardHeader>
+      <CardContent>
+        <div className="flex justify-end mb-4">
+          <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
+        </div>
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>اسم نوع المعاملة</TableHead>
+                <TableHead>الأقسام المرتبطة</TableHead>
+                <TableHead className="w-[100px]"><span className="sr-only">الإجراءات</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-6 w-full" /></TableCell></TableRow>)}
+              {!loading && transactionTypes.length === 0 && <TableRow><TableCell colSpan={3} className="text-center h-24">لا توجد بيانات</TableCell></TableRow>}
+              {!loading && transactionTypes.map(item => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-semibold">{item.name}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {item.departmentIds?.map(id => <Badge key={id} variant="secondary">{departmentsMap.get(id) || 'قسم محذوف'}</Badge>) || '-'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog(item)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setItemToDelete(item)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+      
+       <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
+        <DialogContent dir="rtl">
+            <DialogHeader>
+                <DialogTitle>{editingItem ? 'تعديل نوع معاملة' : 'إضافة نوع معاملة جديد'}</DialogTitle>
+            </DialogHeader>
+             <div className="grid gap-4 py-4">
+                <div className='grid gap-2'>
+                    <Label htmlFor="item-name">اسم نوع المعاملة</Label>
+                    <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                    <Label>الأقسام المرتبطة</Label>
+                    <MultiSelect options={departmentOptions} selected={selectedDepartments} onChange={setSelectedDepartments} placeholder="اختر الأقسام..." />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={closeDialog}>إلغاء</Button>
+                <Button onClick={handleSave}>حفظ</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                <AlertDialogDescription>سيتم حذف "{itemToDelete?.name}" بشكل دائم.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">نعم، حذف</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+    </Card>
+  );
 }

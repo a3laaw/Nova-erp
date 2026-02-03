@@ -1,5 +1,6 @@
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -443,6 +444,7 @@ export interface Area {
 export interface TransactionType {
     id: string;
     name: string;
+    departmentIds?: string[];
 }
 
 export interface WorkStage {

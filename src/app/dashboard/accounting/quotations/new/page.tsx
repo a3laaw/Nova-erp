@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -121,7 +120,6 @@ export default function NewQuotationPage() {
   const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
-  const [transactionTypesLoading, setTransactionTypesLoading] = useState(false);
 
   // Form-related states
   const [quotationNumber, setQuotationNumber] = useState('جاري التوليد...');
@@ -158,7 +156,6 @@ export default function NewQuotationPage() {
   });
 
   const watchedItems = useWatch({ control, name: "items" });
-  const selectedDepartmentId = watch("departmentId");
   const selectedTransactionTypeId = watch("transactionTypeId");
 
   const totalAmount = useMemo(() =>
@@ -172,15 +169,17 @@ export default function NewQuotationPage() {
     const fetchRefData = async () => {
       setRefDataLoading(true);
       try {
-        const [clientsSnapshot, departmentsSnapshot, templatesSnapshot] = await Promise.all([
+        const [clientsSnapshot, departmentsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), orderBy('nameAr'))),
           getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
-          getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title')))
+          getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
+          getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')))
         ]);
 
         setClients(clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
         setDepartments(departmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
         setTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
+        setTransactionTypes(transTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
 
       } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
@@ -191,26 +190,6 @@ export default function NewQuotationPage() {
     fetchRefData();
   }, [firestore, toast]);
   
-  // Fetch transaction types when department changes
-  useEffect(() => {
-      if (!selectedDepartmentId || !firestore) {
-          setTransactionTypes([]);
-          return;
-      }
-      const fetchTransactionTypes = async () => {
-          setTransactionTypesLoading(true);
-          try {
-              const typesQuery = query(collection(firestore, `departments/${selectedDepartmentId}/transactionTypes`), orderBy('name'));
-              const typesSnapshot = await getDocs(typesQuery);
-              setTransactionTypes(typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
-          } catch(e) {
-              toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب أنواع المعاملات.' });
-          } finally {
-              setTransactionTypesLoading(false);
-          }
-      };
-      fetchTransactionTypes();
-  }, [selectedDepartmentId, firestore, toast]);
 
   // Use a callback to populate form from a template
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
@@ -278,6 +257,12 @@ export default function NewQuotationPage() {
         populateFormFromTemplate(templateToUse);
         setStep('form');
     }
+    
+    // Also set the primary department
+    if (transType.departmentIds && transType.departmentIds.length > 0) {
+        setValue('departmentId', transType.departmentIds[0], { shouldValidate: true });
+    }
+
   }, [selectedTransactionTypeId, transactionTypes, templates, setValue, populateFormFromTemplate]);
 
   // Generate Quotation Number
@@ -308,7 +293,6 @@ export default function NewQuotationPage() {
     clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile }))
   , [clients]);
   
-  const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
   const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id, label: t.name })), [transactionTypes]);
 
   const onSubmit = async (data: QuotationFormValues) => {
@@ -385,8 +369,8 @@ export default function NewQuotationPage() {
         <DialogContent>
           <TemplateSelectionView
             templates={availableTemplates}
-            onSelect={(template) => {
-              populateFormFromTemplate(template);
+            onSelect={(selected) => {
+              populateFormFromTemplate(selected);
               setStep('form');
             }}
             onContinueWithout={() => {
@@ -414,7 +398,7 @@ export default function NewQuotationPage() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid gap-2">
                         <Label>العميل <span className="text-destructive">*</span></Label>
                         <Controller
@@ -426,19 +410,10 @@ export default function NewQuotationPage() {
                         {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
                     </div>
                      <div className="grid gap-2">
-                        <Label>القسم <span className="text-destructive">*</span></Label>
-                        <Controller control={control} name="departmentId"
-                            render={({ field }) => (
-                                <InlineSearchList value={field.value} onSelect={field.onChange} options={departmentOptions} placeholder={refDataLoading ? 'تحميل...' : 'اختر القسم...'} disabled={refDataLoading} />
-                            )}
-                        />
-                        {errors.departmentId && <p className="text-xs text-destructive">{errors.departmentId.message}</p>}
-                    </div>
-                     <div className="grid gap-2">
                         <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
                         <Controller control={control} name="transactionTypeId"
                             render={({ field }) => (
-                                <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionTypeOptions} placeholder={transactionTypesLoading ? 'تحميل...' : 'اختر نوع المعاملة...'} disabled={!selectedDepartmentId || transactionTypesLoading}/>
+                                <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionTypeOptions} placeholder={refDataLoading ? 'تحميل...' : 'اختر نوع المعاملة...'} disabled={refDataLoading}/>
                             )}
                         />
                         {errors.transactionTypeId && <p className="text-xs text-destructive">{errors.transactionTypeId.message}</p>}
