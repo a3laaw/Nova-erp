@@ -290,7 +290,6 @@ export default function ChartOfAccountsPage() {
         
         childrenMap.forEach(childList => childList.sort(sortAccounts));
         
-        // Use level === 0 to find roots, which is more robust
         const roots = accounts.filter(acc => acc.level === 0).sort(sortAccounts);
 
         const result: Account[] = [];
@@ -565,9 +564,9 @@ export default function ChartOfAccountsPage() {
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
-                            <p className="font-bold text-destructive">تحذير: هذا الإجراء سيقوم بمسح جميع الحسابات الحالية واستبدالها بشجرة حسابات أساسية. لا يمكن التراجع عن هذا الإجراء.</p>
-                            <p>للتأكيد، يرجى كتابة كلمة <span className="font-mono font-bold text-destructive">مسح</span> في المربع أدناه.</p>
+                        <AlertDialogDescription>
+                          <span className="block font-bold text-destructive">تحذير: هذا الإجراء سيقوم بمسح جميع الحسابات الحالية واستبدالها بشجرة حسابات أساسية. لا يمكن التراجع عن هذا الإجراء.</span>
+                          <span className="block mt-4">للتأكيد، يرجى كتابة كلمة <span className="font-mono font-bold text-destructive">مسح</span> في المربع أدناه.</span>
                         </AlertDialogDescription>
                          <Input
                             id="confirm-seed-text"
@@ -588,5 +587,7 @@ export default function ChartOfAccountsPage() {
         </div>
     );
 }
+
+    
 
     
