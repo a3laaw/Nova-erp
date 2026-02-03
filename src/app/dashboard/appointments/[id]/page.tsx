@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -160,6 +159,8 @@ export default function AppointmentDetailsPage() {
                 }
             } catch (error) {
                 console.error("Failed to auto-link client:", error);
+            } finally {
+                setIsAutoLinking(false);
             }
         };
 
