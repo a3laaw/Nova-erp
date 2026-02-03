@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, limit } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -321,8 +321,29 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRef, { stages: currentStages });
         
-        // 3. Log the action
-        const logContent = `تراجع المدير ${currentUser.fullName} عن إكمال مرحلة: "${stageTemplate.name}".`;
+        const progressQuery = query(
+            collection(firestore, 'work_stages_progress'),
+            where('transactionId', '==', transaction.id),
+            where('stageId', '==', stageIdToRevert)
+        );
+        const progressSnap = await getDocs(progressQuery);
+        let logContent = `تراجع المدير ${currentUser.fullName} عن إكمال مرحلة: "${stageTemplate.name}".`;
+
+        if (!progressSnap.empty) {
+            const progressDoc = progressSnap.docs[0];
+            const visitId = progressDoc.data().visitId;
+
+            if (visitId) {
+                const apptRef = doc(firestore, 'appointments', visitId);
+                batch.update(apptRef, {
+                    workStageUpdated: false,
+                    workStageProgressId: deleteField()
+                });
+                batch.delete(progressDoc.ref);
+                logContent += ` (تم إلغاء ربط الزيارة المتعلقة بهذا الإجراء).`;
+            }
+        }
+
         const logData = {
             type: 'log' as const,
             content: logContent,
@@ -331,15 +352,24 @@ export default function TransactionDetailPage() {
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
         };
-        const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
-        batch.set(timelineRef, logData);
+        const commentData = {
+            type: 'comment' as const,
+            content: `**[إجراء إداري]**\n${logContent}`,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        };
+        const timelineRef = collection(transactionRef, 'timelineEvents');
+        batch.set(doc(timelineRef), logData);
+        batch.set(doc(timelineRef), commentData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
         batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}` });
         
         await batch.commit();
         
-        toast({ title: 'نجاح', description: `تم التراجع عن مرحلة "${stageTemplate.name}".`});
+        toast({ title: 'نجاح', description: `تم التراجع عن مرحلة "${stageTemplate.name}" والإجراءات المرتبطة بها.`});
 
     } catch (error) {
         console.error("Error reverting stage:", error);
