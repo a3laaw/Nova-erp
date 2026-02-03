@@ -22,6 +22,7 @@ import { ar } from 'date-fns/locale';
 interface ProspectiveClient {
   name: string;
   mobile: string;
+  engineerId: string;
   engineerName: string;
   lastAppointmentDate: Date;
   visitCount: number;
@@ -63,11 +64,13 @@ export function ProspectiveClientsList() {
         if (appointmentDate > existing.lastAppointmentDate) {
           existing.lastAppointmentDate = appointmentDate;
           existing.engineerName = engineersMap.get(appt.engineerId) || 'غير معروف';
+          existing.engineerId = appt.engineerId;
         }
       } else {
         clientsMap.set(appt.clientMobile, {
           name: appt.clientName,
           mobile: appt.clientMobile,
+          engineerId: appt.engineerId,
           engineerName: engineersMap.get(appt.engineerId) || 'غير معروف',
           lastAppointmentDate: appointmentDate,
           visitCount: 1,
@@ -129,7 +132,7 @@ export function ProspectiveClientsList() {
                               <TableCell className="text-center">{client.visitCount}</TableCell>
                               <TableCell className="text-center">
                                   <Button asChild variant="outline" size="sm">
-                                      <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}`}>
+                                      <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}&engineerId=${encodeURIComponent(client.engineerId)}`}>
                                           <UserPlus className="ml-2 h-4 w-4" />
                                           إنشاء ملف
                                       </Link>
