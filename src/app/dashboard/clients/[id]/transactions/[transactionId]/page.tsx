@@ -153,6 +153,8 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
     );
 }
 
+const EMPTY_ARRAY_FOR_SUBSCRIPTION: DocumentData[] = [];
+
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -188,7 +190,7 @@ export default function TransactionDetailPage() {
     return [where('transactionId', '==', transactionId)];
   }, [firestore, transactionId]);
 
-  const { data: assignments, loading: assignmentsLoading } = useSubscription<TransactionAssignment>(firestore, 'transaction_assignments', assignmentsQuery || []);
+  const { data: assignments, loading: assignmentsLoading } = useSubscription<TransactionAssignment>(firestore, 'transaction_assignments', assignmentsQuery || EMPTY_ARRAY_FOR_SUBSCRIPTION);
 
   useEffect(() => {
     if (!firestore) return;
@@ -317,7 +319,7 @@ export default function TransactionDetailPage() {
         batch.set(doc(timelineRef), commentData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
-        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}` });
+        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
         await batch.commit();
         
@@ -785,5 +787,6 @@ export default function TransactionDetailPage() {
     
 
     
+
 
 

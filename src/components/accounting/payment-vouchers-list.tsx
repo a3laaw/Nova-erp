@@ -56,12 +56,8 @@ export function PaymentVouchersList() {
   const [dateTo, setDateTo] = useState('');
 
 
-  const vouchersQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'paymentVouchers'), orderBy('paymentDate', 'desc'));
-  }, [firestore]);
-
-  const { data: vouchers, loading, error } = useSubscription<PaymentVoucher>(firestore, 'paymentVouchers', vouchersQuery ? [orderBy('paymentDate', 'desc')] : []);
+  const vouchersQueryConstraints = useMemo(() => [orderBy('paymentDate', 'desc')], []);
+  const { data: vouchers, loading, error } = useSubscription<PaymentVoucher>(firestore, 'paymentVouchers', vouchersQueryConstraints);
 
   const filteredVouchers = useMemo(() => {
     const dateFiltered = vouchers.filter(voucher => {

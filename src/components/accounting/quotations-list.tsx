@@ -57,12 +57,8 @@ export function QuotationsList() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const quotationsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'quotations'), orderBy('date', 'desc'));
-  }, [firestore]);
-
-  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, 'quotations', quotationsQuery ? [orderBy('date', 'desc')] : []);
+  const quotationsQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
+  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, 'quotations', quotationsQueryConstraints);
 
   const filteredQuotations = useMemo(() => {
     const dateFiltered = quotations.filter(quotation => {

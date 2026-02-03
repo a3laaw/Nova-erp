@@ -219,6 +219,8 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
     );
 }
 
+const EMPTY_ARRAY_FOR_SUBSCRIPTION: DocumentData[] = [];
+
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -246,7 +248,7 @@ export default function ClientProfilePage() {
     return [orderBy('createdAt', 'desc')];
   }, [firestore, id]);
 
-  const { data: transactions, loading: transactionsLoading, error: transactionsError } = useSubscription<ClientTransaction>(firestore, `clients/${id}/transactions`, transactionsQuery || []);
+  const { data: transactions, loading: transactionsLoading, error: transactionsError } = useSubscription<ClientTransaction>(firestore, `clients/${id}/transactions`, transactionsQuery || EMPTY_ARRAY_FOR_SUBSCRIPTION);
   
   useEffect(() => {
     if (!firestore) return;
