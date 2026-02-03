@@ -418,7 +418,7 @@ export default function NewCashReceiptPage() {
 
             // Now, perform all writes
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-            transaction_fs.set(newReceiptRef, newReceiptData);
+            transaction_fs.set(newReceiptRef, cleanFirestoreData(newReceiptData));
             transaction_fs.set(newJournalEntryRef, journalEntryData);
 
             if (selectedProjectId && isFirstReceiptForProject && transactionDataForCheck && transactionRefForUpdate) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { cn } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { InlineSearchList } from '../ui/inline-search-list';
 
@@ -183,7 +183,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     transactionType: transactionTypeName,
                     description,
                     departmentId: departmentIds[0] || null, // Primary dept
-                    transactionTypeId: selectedType?.id,
+                    transactionTypeId: selectedType?.id || null,
                     assignedEngineerId: engineerForTransactionId,
                     status: 'new',
                     createdAt: serverTimestamp(),
@@ -191,7 +191,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     stages: allStages,
                 };
 
-                transaction_firestore.set(newTransactionRef, newTransactionData);
+                transaction_firestore.set(newTransactionRef, cleanFirestoreData(newTransactionData));
 
                 const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
                 const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
