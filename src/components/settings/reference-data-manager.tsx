@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown, PlusCircle, DownloadCloud } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -121,6 +121,12 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
   const [itemAllowedDuringStages, setItemAllowedDuringStages] = useState<string[]>([]);
 
+  // States for numerical ordering
+  const [primaryOrderValues, setPrimaryOrderValues] = useState<Record<string, string>>({});
+  const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = useState(false);
+  const [secondaryOrderValues, setSecondaryOrderValues] = useState<Record<string, string>>({});
+  const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = useState(false);
+
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
@@ -136,13 +142,12 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
         
         // Client-side sorting
-        if (items.length > 0) {
-            if (items.every(i => i.hasOwnProperty('order') && typeof i.order === 'number')) {
-                items.sort((a, b) => (a.order || 0) - (b.order || 0));
-            } else if (items[0].hasOwnProperty('name')) {
-                items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            }
-        }
+        items.sort((a, b) => {
+            const orderA = a.order ?? Infinity;
+            const orderB = b.order ?? Infinity;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.name.localeCompare(b.name, 'ar');
+        });
         setPrimaryItems(items);
     } catch (e) {
         console.error("Error fetching primary items:", e);
@@ -166,14 +171,13 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         const collectionPath = `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`;
         const snapshot = await getDocs(query(collection(firestore, collectionPath)));
         let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
-
-        if (items.length > 0) {
-            if (items.every(i => i.hasOwnProperty('order') && typeof i.order === 'number')) {
-                items.sort((a, b) => (a.order || 0) - (b.order || 0));
-            } else if (items[0].hasOwnProperty('name')) {
-                items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            }
-        }
+        
+        items.sort((a, b) => {
+            const orderA = a.order ?? Infinity;
+            const orderB = b.order ?? Infinity;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.name.localeCompare(b.name, 'ar');
+        });
         
         setSecondaryItems(items);
     } catch (e) {
@@ -278,41 +282,6 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     setItemNextStageIds([]);
     setItemAllowedDuringStages([]);
   }
-  
-  const reorderItems = async (type: 'primary' | 'secondary', index: number, direction: 'up' | 'down') => {
-    const list = type === 'primary' ? primaryItems : secondaryItems;
-    const setList = type === 'primary' ? setPrimaryItems : setSecondaryItems;
-    if (!list || list.length < 2) return;
-
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= list.length) return;
-
-    const reorderedList = [...list];
-    [reorderedList[index], reorderedList[newIndex]] = [reorderedList[newIndex], reorderedList[index]];
-    
-    setList(reorderedList as any); // Optimistic update of UI
-
-    if (!firestore) return;
-    const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
-    if (!collectionPath) return;
-
-    try {
-        const batch = writeBatch(firestore);
-        reorderedList.forEach((item, idx) => {
-            const docRef = doc(firestore, collectionPath, item.id);
-            batch.update(docRef, { order: idx });
-        });
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تم تحديث الترتيب.' });
-    } catch (e) {
-        console.error('Failed to save order:', e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
-        // Revert UI on failure
-        if (type === 'primary') await fetchPrimaryItems();
-        else await fetchSecondaryItems();
-    }
-  };
-
 
   const handleSave = async (type: 'primary' | 'secondary') => {
     if (!firestore || !itemName.trim()) return;
@@ -388,6 +357,42 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
       }
   };
 
+  const handleOrderChange = (type: 'primary' | 'secondary', id: string, value: string) => {
+    const setOrders = type === 'primary' ? setPrimaryOrderValues : setSecondaryOrderValues;
+    const setChanged = type === 'primary' ? setIsPrimaryOrderChanged : setIsSecondaryOrderChanged;
+    setOrders(prev => ({...prev, [id]: value}));
+    setChanged(true);
+  };
+  
+  const handleSaveOrder = async (type: 'primary' | 'secondary') => {
+    if (!firestore) return;
+    
+    const list = type === 'primary' ? primaryItems : secondaryItems;
+    const orders = type === 'primary' ? primaryOrderValues : secondaryOrderValues;
+    const setChanged = type === 'primary' ? setIsPrimaryOrderChanged : setIsSecondaryOrderChanged;
+    const fetchFn = type === 'primary' ? fetchPrimaryItems : fetchSecondaryItems;
+    const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
+
+    const batch = writeBatch(firestore);
+    list.forEach(item => {
+        const newOrder = orders[item.id!];
+        if (newOrder !== undefined && Number(newOrder) !== item.order) {
+            const docRef = doc(firestore, collectionPath, item.id!);
+            batch.update(docRef, { order: Number(newOrder) });
+        }
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم حفظ الترتيب الجديد.'});
+        setChanged(false);
+        await fetchFn();
+    } catch(e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب.'});
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -406,21 +411,22 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
             <h4 className="font-semibold">{primaryTitle}</h4>
             <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
           </div>
-          <ScrollArea className="h-72 border rounded-md p-2">
+          <ScrollArea className="h-72 border rounded-md">
             {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-              primaryItems.map((item, index) => (
+              primaryItems.map((item) => (
                 <div key={item.id} onClick={() => handleSelectPrimary(item)}
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
-                  <span>{item.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="number"
+                      value={primaryOrderValues[item.id] ?? item.order ?? ''}
+                      onChange={e => handleOrderChange('primary', item.id, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      className="h-7 w-14"
+                    />
+                    <span>{item.name}</span>
+                  </div>
                   <div className="flex items-center gap-1">
-                    <div className="flex flex-col">
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); reorderItems('primary', index, 'up'); }} disabled={index === 0}>
-                            <ArrowUp className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); reorderItems('primary', index, 'down'); }} disabled={index === primaryItems.length - 1}>
-                            <ArrowDown className="h-3 w-3" />
-                        </Button>
-                    </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }} disabled={disablePrimaryActions}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }} disabled={disablePrimaryActions}><Trash2 className="h-4 w-4" /></Button>
                   </div>
@@ -428,6 +434,13 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
               ))
             )}
           </ScrollArea>
+           {isPrimaryOrderChanged && (
+             <div className="flex justify-end mt-2">
+                <Button size="sm" onClick={() => handleSaveOrder('primary')}>
+                    <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                </Button>
+            </div>
+           )}
         </div>
         
         {/* Secondary List */}
@@ -439,28 +452,27 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                 </h4>
                  <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
               </div>
-              <ScrollArea className="h-72 border rounded-md p-2">
+              <ScrollArea className="h-72 border rounded-md">
                 {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-                  secondaryItems.map((item, index) => (
+                  secondaryItems.map((item) => (
                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span>{item.name}</span>
-                        {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
-                        {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
-                        {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
-                        {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
-                            <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="flex flex-col">
-                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems('secondary', index, 'up')} disabled={index === 0}>
-                                <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems('secondary', index, 'down')} disabled={index === secondaryItems.length - 1}>
-                                <ArrowDown className="h-3 w-3" />
-                            </Button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Input
+                                type="number"
+                                value={secondaryOrderValues[item.id] ?? item.order ?? ''}
+                                onChange={e => handleOrderChange('secondary', item.id, e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                className="h-7 w-14"
+                            />
+                            <span>{item.name}</span>
+                            {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
+                            {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
+                            {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
+                            {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
+                                <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
+                            ))}
                         </div>
+                      <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
                       </div>
@@ -468,6 +480,13 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                   ))
                 )}
               </ScrollArea>
+              {isSecondaryOrderChanged && (
+                <div className="flex justify-end mt-2">
+                    <Button size="sm" onClick={() => handleSaveOrder('secondary')}>
+                        <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                    </Button>
+                </div>
+              )}
             </div>
         )}
       </CardContent>
@@ -624,6 +643,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   const [itemName, setItemName] = useState('');
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   
+  const [orderValues, setOrderValues] = useState<Record<string, string>>({});
+  const [isOrderChanged, setIsOrderChanged] = useState(false);
+
   const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
   const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
@@ -639,14 +661,12 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
       
       let typesData = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
       
-      // Client-side sorting
-      if (typesData.length > 0) {
-        if (typesData.every(i => i.hasOwnProperty('order') && typeof i.order === 'number')) {
-            typesData.sort((a, b) => (a.order || 0) - (b.order || 0));
-        } else {
-            typesData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-        }
-      }
+      typesData.sort((a, b) => {
+          const orderA = a.order ?? Infinity;
+          const orderB = b.order ?? Infinity;
+          if(orderA !== orderB) return orderA - orderB;
+          return a.name.localeCompare(b.name, 'ar');
+      });
       
       setTransactionTypes(typesData);
       setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
@@ -675,32 +695,32 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setItemName('');
     setSelectedDepartments([]);
   };
+  
+  const handleOrderChange = (id: string, value: string) => {
+    setOrderValues(prev => ({...prev, [id]: value}));
+    setIsOrderChanged(true);
+  };
 
-  const reorderItems = async (index: number, direction: 'up' | 'down') => {
-    if (transactionTypes.length < 2) return;
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= transactionTypes.length) return;
+  const handleSaveOrder = async () => {
+    if(!firestore) return;
+    const batch = writeBatch(firestore);
+    transactionTypes.forEach(item => {
+        const newOrder = orderValues[item.id!];
+        if (newOrder !== undefined && Number(newOrder) !== item.order) {
+            batch.update(doc(firestore, 'transactionTypes', item.id!), { order: Number(newOrder) });
+        }
+    });
 
-    const reorderedList = [...transactionTypes];
-    [reorderedList[index], reorderedList[newIndex]] = [reorderedList[newIndex], reorderedList[index]];
-
-    setTransactionTypes(reorderedList); // Optimistic UI update
-
-    if (!firestore) return;
     try {
-        const batch = writeBatch(firestore);
-        reorderedList.forEach((item, idx) => {
-            const docRef = doc(firestore, 'transactionTypes', item.id);
-            batch.update(docRef, { order: idx });
-        });
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تم تحديث الترتيب.' });
+        toast({ title: 'نجاح', description: 'تم حفظ الترتيب الجديد.' });
+        setIsOrderChanged(false);
+        await fetchData();
     } catch (e) {
-        console.error('Failed to save order:', e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
-        setTransactionTypes(transactionTypes); // Revert on failure
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب.' });
     }
   };
+
   
   const handleImportOldTypes = async () => {
     if (!firestore) return;
@@ -802,16 +822,25 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-16">الترتيب</TableHead>
                 <TableHead>اسم نوع المعاملة</TableHead>
                 <TableHead>الأقسام المرتبطة</TableHead>
-                <TableHead className="w-[120px]"><span className="sr-only">الإجراءات</span></TableHead>
+                <TableHead className="w-[100px]"><span className="sr-only">الإجراءات</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-6 w-full" /></TableCell></TableRow>)}
-              {!loading && transactionTypes.length === 0 && <TableRow><TableCell colSpan={3} className="text-center h-24">لا توجد بيانات</TableCell></TableRow>}
-              {!loading && transactionTypes.map((item, index) => (
+              {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell></TableRow>)}
+              {!loading && transactionTypes.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">لا توجد بيانات</TableCell></TableRow>}
+              {!loading && transactionTypes.map((item) => (
                 <TableRow key={item.id}>
+                  <TableCell>
+                    <Input 
+                      type="number"
+                      value={orderValues[item.id] ?? item.order ?? ''}
+                      onChange={e => handleOrderChange(item.id, e.target.value)}
+                      className="h-8 w-16"
+                    />
+                  </TableCell>
                   <TableCell className="font-semibold">{item.name}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -819,15 +848,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                        <div className="flex flex-col">
-                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems(index, 'up')} disabled={index === 0}>
-                                <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems(index, 'down')} disabled={index === transactionTypes.length - 1}>
-                                <ArrowDown className="h-3 w-3" />
-                            </Button>
-                        </div>
+                    <div className="flex items-center justify-end">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog(item)}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setItemToDelete(item)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
@@ -837,6 +858,13 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
             </TableBody>
           </Table>
         </div>
+         {isOrderChanged && (
+            <div className="flex justify-end mt-4">
+                <Button size="sm" onClick={handleSaveOrder}>
+                    <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                </Button>
+            </div>
+         )}
       </CardContent>
       
        <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
