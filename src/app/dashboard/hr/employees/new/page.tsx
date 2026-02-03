@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X } from 'lucide-react';
+import { Save, X, Camera } from 'lucide-react';
 import { useFirebase, useCollection } from '@/firebase';
 import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 export default function NewEmployeePage() {
@@ -429,7 +430,7 @@ export default function NewEmployeePage() {
                                         ? "تحميل الوظائف..." 
                                         : !formData.departmentId 
                                             ? "اختر قسمًا أولاً" 
-                                            : (jobs.length === 0 ? "لا توجد وظائف بهذا القسم" : "اختر الوظيفة...")
+                                            : (jobs.length === 0 ? "لا يوجد وظائف بهذا القسم" : "اختر الوظيفة...")
                                     }
                                     disabled={!formData.departmentId || jobsLoading || jobs.length === 0}
                                 />
@@ -567,3 +568,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
