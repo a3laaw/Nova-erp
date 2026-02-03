@@ -102,7 +102,20 @@ const navItems = {
       ]
     },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
-    { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
+    { 
+      label: 'الموارد البشرية', 
+      icon: HeartHandshake, 
+      roles: ['Admin', 'HR', 'Secretary'],
+      hrefPrefix: '/dashboard/hr',
+      children: [
+        { href: '/dashboard/hr/employees', label: 'الموظفين' },
+        { href: '/dashboard/hr/leave-requests', label: 'طلبات الإجازة' },
+        { href: '/dashboard/hr/attendance', label: 'الحضور والرواتب' },
+        { href: '/dashboard/hr/leave-reports', label: 'تقارير الإجازات' },
+        { href: '/dashboard/hr/reports', label: 'التقارير الشاملة' },
+        { href: '/dashboard/hr/gratuity', label: 'مكافأة نهاية الخدمة' },
+      ]
+    },
   ],
   en: [
       { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
@@ -154,7 +167,20 @@ const navItems = {
           ]
         },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
-      { href: '/dashboard/hr', label: 'Human Resources', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
+      { 
+        label: 'Human Resources', 
+        icon: HeartHandshake, 
+        roles: ['Admin', 'HR', 'Secretary'],
+        hrefPrefix: '/dashboard/hr',
+        children: [
+          { href: '/dashboard/hr/employees', label: 'Employees' },
+          { href: '/dashboard/hr/leave-requests', label: 'Leave Requests' },
+          { href: '/dashboard/hr/attendance', label: 'Attendance & Payroll' },
+          { href: '/dashboard/hr/leave-reports', label: 'Leave Reports' },
+          { href: '/dashboard/hr/reports', label: 'Global Reports' },
+          { href: '/dashboard/hr/gratuity', label: 'Gratuity Calculator' },
+        ]
+      },
   ]
 };
 
