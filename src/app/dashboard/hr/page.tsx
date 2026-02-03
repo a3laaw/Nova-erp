@@ -1,3 +1,4 @@
+'use client';
 
 import {
   Card,
@@ -12,7 +13,6 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { EmployeesTable } from './employees-table';
 import Link from 'next/link';
 import { GratuityCalculator } from '@/components/hr/gratuity-calculator';
 
@@ -28,7 +28,9 @@ export default function HRPage() {
       <CardContent>
         <Tabs defaultValue="employees" dir="rtl">
           <TabsList>
-            <TabsTrigger value="employees">الموظفين</TabsTrigger>
+            <TabsTrigger value="employees" asChild>
+                <Link href="/dashboard/hr/employees">الموظفين</Link>
+            </TabsTrigger>
             <TabsTrigger value="leave-requests" asChild>
                 <Link href="/dashboard/hr/leave-requests">طلبات الإجازة</Link>
             </TabsTrigger>
@@ -44,7 +46,7 @@ export default function HRPage() {
             <TabsTrigger value="gratuity">مكافآت نهاية الخدمة</TabsTrigger>
           </TabsList>
           <TabsContent value="employees" className="mt-4">
-            <EmployeesTable />
+            {/* This content is now handled by its own page */}
           </TabsContent>
            <TabsContent value="reports" className="mt-4">
              {/* This content will be rendered on its own page now */}

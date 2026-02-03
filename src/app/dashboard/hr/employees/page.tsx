@@ -2,6 +2,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
   Table,
   TableBody,
   TableCell,
@@ -45,16 +52,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { InlineSearchList } from '../ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';
 
-
-type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
-
-interface ClientWithEmployee extends Client {
-  assignedEngineerName?: string;
-}
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -74,7 +75,7 @@ const terminationReasons: {value: string, label: string}[] = [
     { value: 'probation', label: 'إنهاء فترة التجربة' },
 ];
 
-export function EmployeesTable() {
+export default function EmployeesPage() {
   const { language } = useLanguage();
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -113,14 +114,12 @@ export function EmployeesTable() {
         ...emp,
         annualLeaveBalance: calculateAnnualLeaveBalance(emp)
     }));
-    // Sort by creation date descending, with a fallback for items without a date.
     return employeeList.sort((a, b) => {
         const timeB = getSafeTimestamp(b.createdAt);
         const timeA = getSafeTimestamp(a.createdAt);
         if (timeB !== timeA) {
-            return timeB - timeA; // Sort by date primarily
+            return timeB - timeA;
         }
-        // Fallback sort by name if dates are the same or not present
         return a.fullName.localeCompare(b.fullName, 'ar');
     });
   }, [employees]);
@@ -265,226 +264,230 @@ export function EmployeesTable() {
   const currentText = t[language];
 
   return (
-    <>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className='text-lg font-medium'>قائمة الموظفين</h3>
-          <p className='text-sm text-muted-foreground'>
-            عرض وإدارة جميع الموظفين في الشركة.
-          </p>
-        </div>
-         <div className="flex gap-2">
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>قائمة الموظفين</CardTitle>
+            <CardDescription>
+              عرض وإدارة جميع الموظفين في الشركة.
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
             <Button size="sm" className="gap-1" asChild>
-                <Link href="/dashboard/hr/employees/new">
-                    <PlusCircle className="ml-2 h-4 w-4" />
-                    إضافة موظف
-                </Link>
+              <Link href="/dashboard/hr/employees/new">
+                <PlusCircle className="ml-2 h-4 w-4" />
+                إضافة موظف
+              </Link>
             </Button>
+          </div>
         </div>
-      </div>
-       <div className="mb-4">
-            <Input
-                placeholder={currentText.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-            />
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <Input
+            placeholder={currentText.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
-      <div className='border rounded-lg'>
+        <div className="border rounded-lg">
           <Table>
-          <TableHeader>
+            <TableHeader>
               <TableRow>
-              <TableHead>اسم الموظف</TableHead>
-              <TableHead>القسم</TableHead>
-              <TableHead>تاريخ التعيين</TableHead>
-              <TableHead>رصيد الإجازة السنوية</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>
+                <TableHead>اسم الموظف</TableHead>
+                <TableHead>القسم</TableHead>
+                <TableHead>تاريخ التعيين</TableHead>
+                <TableHead>رصيد الإجازة السنوية</TableHead>
+                <TableHead>الحالة</TableHead>
+                <TableHead>
                   <span className="sr-only">الإجراءات</span>
-              </TableHead>
+                </TableHead>
               </TableRow>
-          </TableHeader>
-          <TableBody>
+            </TableHeader>
+            <TableBody>
               {loading && filteredEmployees.length === 0 && Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={`skel-${i}`}>
-                      <TableCell colSpan={6}>
-                          <Skeleton className="h-8 w-full" />
-                      </TableCell>
-                  </TableRow>
+                <TableRow key={`skel-${i}`}>
+                  <TableCell colSpan={6}>
+                    <Skeleton className="h-8 w-full" />
+                  </TableCell>
+                </TableRow>
               ))}
               {error && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-destructive">
-                          {error.message}
-                      </TableCell>
-                  </TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-destructive">
+                    {error.message}
+                  </TableCell>
+                </TableRow>
               )}
               {!loading && filteredEmployees.length === 0 && (
-                  <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center">
-                          {searchQuery ? 'لا توجد نتائج تطابق بحثك.' : 'لا يوجد موظفون حالياً. قم بإضافة موظف جديد.'}
-                      </TableCell>
-                  </TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    {searchQuery ? 'لا توجد نتائج تطابق بحثك.' : 'لا يوجد موظفون حالياً. قم بإضافة موظف جديد.'}
+                  </TableCell>
+                </TableRow>
               )}
               {filteredEmployees.map((employee) => (
-                  <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
+                <TableRow key={employee.id} className={employee.status === 'terminated' ? 'bg-muted/50 text-muted-foreground' : ''}>
                   <TableCell className="font-medium">
-                      {employee.fullName}
-                      <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
-                      <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
+                    {employee.fullName}
+                    <div className="text-sm text-muted-foreground font-mono">#{employee.employeeNumber}</div>
+                    <div className="text-sm text-muted-foreground font-mono">{employee.civilId}</div>
                   </TableCell>
                   <TableCell>{employee.department}</TableCell>
                   <TableCell>{formatDateCell(employee.hireDate)}</TableCell>
-                  <TableCell className='font-medium'>
-                      {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
+                  <TableCell className="font-medium">
+                    {(employee as any).annualLeaveBalance !== undefined ? `${(employee as any).annualLeaveBalance} يوم` : '...'}
                   </TableCell>
                   <TableCell>
-                      <Badge variant={'outline'} className={statusColors[employee.status]}>
-                          {statusTranslations[employee.status]}
-                      </Badge>
+                    <Badge variant={'outline'} className={statusColors[employee.status]}>
+                      {statusTranslations[employee.status]}
+                    </Badge>
                   </TableCell>
                   <TableCell>
-                      <DropdownMenu>
+                    <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                          <Button
+                        <Button
                           aria-haspopup="true"
                           size="icon"
                           variant="ghost"
-                          >
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                           <span className="sr-only">Toggle menu</span>
-                          </Button>
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" dir="rtl">
-                          <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
+                        </DropdownMenuItem>
+                        {employee.status !== 'terminated' && (
                           <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف الشخصي</Link>
+                            <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
                           </DropdownMenuItem>
-                          {employee.status !== 'terminated' && (
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
-                              </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          {employee.status !== 'terminated' ? (
-                              <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
-                                  إنهاء الخدمة
-                              </DropdownMenuItem>
-                          ) : (
-                              <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
-                                  إعادة خدمة
-                              </DropdownMenuItem>
-                          )}
+                        )}
+                        <DropdownMenuSeparator />
+                        {employee.status !== 'terminated' ? (
+                          <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
+                            إنهاء الخدمة
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleRehireClick(employee)} className="text-green-600 focus:text-green-700 focus:bg-green-50">
+                            إعادة خدمة
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
-                      </DropdownMenu>
+                    </DropdownMenu>
                   </TableCell>
-                  </TableRow>
+                </TableRow>
               ))}
-          </TableBody>
+            </TableBody>
           </Table>
-      </div>
+        </div>
         <AlertDialog open={!!employeeToTerminate} onOpenChange={(open) => !open && setEmployeeToTerminate(null)}>
           <AlertDialogContent
-              dir="rtl"
+            dir="rtl"
           >
-              <AlertDialogHeader>
-                  <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
-                  <AlertDialogDescription>
-                           اختر سبب وتاريخ إنهاء الخدمة للموظف: {employeeToTerminate?.fullName}.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="space-y-4 py-4">
-                  <div className="grid gap-2">
-                         <Label>سبب إنهاء الخدمة</Label>
-                         <InlineSearchList 
-                            value={terminationReason}
-                            onSelect={setTerminationReason}
-                            options={terminationReasons}
-                            placeholder="اختر السبب..."
-                         />
+            <AlertDialogHeader>
+              <AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle>
+              <AlertDialogDescription>
+                اختر سبب وتاريخ إنهاء الخدمة للموظف: {employeeToTerminate?.fullName}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>سبب إنهاء الخدمة</Label>
+                <InlineSearchList
+                  value={terminationReason}
+                  onSelect={setTerminationReason}
+                  options={terminationReasons}
+                  placeholder="اختر السبب..."
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
+                <Label htmlFor="immediate">إنهاء فوري بدون فترة إنذار</Label>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="noticeStartDate" className={isImmediate ? 'text-muted-foreground' : ''}>تاريخ تقديم الاستقالة / بدء الإنذار</Label>
+                <Input
+                  id="noticeStartDate"
+                  type="date"
+                  value={noticeStartDate}
+                  onChange={(e) => setNoticeStartDate(e.target.value)}
+                  disabled={isImmediate}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="terminationDate" className={!isImmediate ? 'text-muted-foreground' : ''}>تاريخ إنهاء الخدمة الفعلي</Label>
+                <Input
+                  id="terminationDate"
+                  type="date"
+                  value={terminationDate}
+                  onChange={(e) => setTerminationDate(e.target.value)}
+                  readOnly={!isImmediate}
+                  disabled={!isImmediate}
+                  className={!isImmediate ? 'bg-muted' : ''}
+                />
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating || !terminationReason} className='bg-destructive hover:bg-destructive/90'>
+                {isTerminating ? 'جاري الحفظ...' : 'تأكيد إنهاء الخدمة'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={!!employeeToRehire} onOpenChange={(open) => !open && setEmployeeToRehire(null)}>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>إعادة خدمة الموظف: {employeeToRehire?.fullName}</AlertDialogTitle>
+              <AlertDialogDescription>
+                اختر الخيارات المناسبة لإعادة خدمة الموظف.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>نوع إعادة الخدمة</Label>
+                <RadioGroup value={rehireType} onValueChange={(v) => setRehireType(v as any)} className='flex gap-4'>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="continue" id="continue" />
+                    <Label htmlFor="continue">استمرار الخدمة السابقة</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                           <Checkbox id="immediate" checked={isImmediate} onCheckedChange={(checked) => setIsImmediate(checked as boolean)} />
-                           <Label htmlFor="immediate">إنهاء فوري بدون فترة إنذار</Label>
+                    <RadioGroupItem value="new" id="new" />
+                    <Label htmlFor="new">اعتباره تعيين جديد</Label>
                   </div>
-                  <div className="grid gap-2">
-                      <Label htmlFor="noticeStartDate" className={isImmediate ? 'text-muted-foreground' : ''}>تاريخ تقديم الاستقالة / بدء الإنذار</Label>
-                      <Input
-                          id="noticeStartDate"
-                          type="date"
-                          value={noticeStartDate}
-                          onChange={(e) => setNoticeStartDate(e.target.value)}
-                          disabled={isImmediate}
-                      />
-                  </div>
-                  <div className="grid gap-2">
-                      <Label htmlFor="terminationDate" className={!isImmediate ? 'text-muted-foreground' : ''}>تاريخ إنهاء الخدمة الفعلي</Label>
-                      <Input
-                          id="terminationDate"
-                          type="date"
-                          value={terminationDate}
-                          onChange={(e) => setTerminationDate(e.target.value)}
-                          readOnly={!isImmediate}
-                          disabled={!isImmediate}
-                          className={!isImmediate ? 'bg-muted' : ''}
-                      />
-                  </div>
+                </RadioGroup>
               </div>
-              <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleTerminationConfirm} disabled={isTerminating || !terminationReason} className='bg-destructive hover:bg-destructive/90'>
-                      {isTerminating ? 'جاري الحفظ...' : 'تأكيد إنهاء الخدمة'}
-                  </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={!!employeeToRehire} onOpenChange={(open) => !open && setEmployeeToRehire(null)}>
-          <AlertDialogContent dir="rtl">
-              <AlertDialogHeader>
-                  <AlertDialogTitle>إعادة خدمة الموظف: {employeeToRehire?.fullName}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      اختر الخيارات المناسبة لإعادة خدمة الموظف.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="space-y-4 py-4">
-                  <div className="grid gap-2">
-                      <Label>نوع إعادة الخدمة</Label>
-                      <RadioGroup value={rehireType} onValueChange={(v) => setRehireType(v as any)} className='flex gap-4'>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="continue" id="continue" />
-                                    <Label htmlFor="continue">استمرار الخدمة السابقة</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="new" id="new" />
-                                    <Label htmlFor="new">اعتباره تعيين جديد</Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
 
-                        {rehireType === 'new' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="newHireDate">تاريخ التعيين الجديد</Label>
-                                <Input
-                                    id="newHireDate"
-                                    type="date"
-                                    value={newHireDate}
-                                    onChange={(e) => setNewHireDate(e.target.value)}
-                                />
-                            </div>
-                        )}
-                        
-                        <div className="flex items-center space-x-2">
-                            <Checkbox id="resetLeave" checked={resetLeaveBalance} onCheckedChange={(checked) => setResetLeaveBalance(checked as boolean)} />
-                            <Label htmlFor="resetLeave">تصفير رصيد الإجازات السابق</Label>
-                        </div>
-                    </div>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isRehiring}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
-                            {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </>
-    );
+              {rehireType === 'new' && (
+                <div className="grid gap-2">
+                  <Label htmlFor="newHireDate">تاريخ التعيين الجديد</Label>
+                  <Input
+                    id="newHireDate"
+                    type="date"
+                    value={newHireDate}
+                    onChange={(e) => setNewHireDate(e.target.value)}
+                  />
+                </div>
+              )}
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox id="resetLeave" checked={resetLeaveBalance} onCheckedChange={(checked) => setResetLeaveBalance(checked as boolean)} />
+                <Label htmlFor="resetLeave">تصفير رصيد الإجازات السابق</Label>
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isRehiring}>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
+                {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
 }
