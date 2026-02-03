@@ -406,7 +406,8 @@ export default function TransactionDetailPage() {
     
     const now = new Date();
     
-    let logContent = '';
+    let logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${stageTemplateInfo.name}" إلى "${stageStatusTranslations[newStatus]}".`;
+    let commentContent = `قام ${currentUser.fullName} بتحديث حالة المرحلة **"${stageTemplateInfo.name}"** إلى **"${stageStatusTranslations[newStatus]}"**.`;
     let isFinallyCompleted = false;
 
     if (newStatus === 'completed' && stageTemplateInfo.trackingType === 'occurrence') {
@@ -414,21 +415,23 @@ export default function TransactionDetailPage() {
         updatedProgress.completedCount = newCount;
         const maxOccurrences = stageTemplateInfo.maxOccurrences || 1;
         
-        logContent = `قام ${currentUser.fullName} بتسجيل إنجاز للمرحلة "${updatedProgress.name}" (${newCount}/${maxOccurrences}).`;
+        const logAndCommentText = `قام ${currentUser.fullName} بتسجيل إنجاز للمرحلة "${updatedProgress.name}" (${newCount}/${maxOccurrences}).`;
+        logContent = logAndCommentText;
+        commentContent = logAndCommentText;
 
         if (newCount >= maxOccurrences) {
             updatedProgress.status = 'completed';
             if (!updatedProgress.startDate) updatedProgress.startDate = now as any;
             updatedProgress.endDate = now as any;
             isFinallyCompleted = true;
-            logContent = `قام ${currentUser.fullName} بإكمال المرحلة "${updatedProgress.name}" (وصل للحد الأقصى ${maxOccurrences} إنجازات).`;
+            const finalText = `قام ${currentUser.fullName} بإكمال المرحلة "${updatedProgress.name}" (وصل للحد الأقصى ${maxOccurrences} إنجازات).`;
+            logContent = finalText;
+            commentContent = finalText;
         } else {
             updatedProgress.status = 'in-progress';
         }
     } else {
-        logContent = `قام ${currentUser.fullName} بتغيير حالة المرحلة "${stageTemplateInfo.name}" إلى "${stageStatusTranslations[newStatus]}".`;
         updatedProgress.status = newStatus;
-
         if (newStatus === 'in-progress') {
             if (oldStatus === 'pending') {
                 updatedProgress.startDate = now as any;
@@ -487,7 +490,6 @@ export default function TransactionDetailPage() {
         }
     }
     
-    let commentContent = logContent;
     if(isFinallyCompleted) {
          const contractClauses = transaction.contract?.clauses || [];
          const completedStageNames = new Set(newProgressForFirestore.filter((s: TransactionStage) => s.status === 'completed').map((s: TransactionStage) => s.name));
@@ -508,11 +510,29 @@ export default function TransactionDetailPage() {
     const timelineCollectionRef = collection(transactionRefDoc, 'timelineEvents');
     const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
 
-    batch.set(doc(timelineCollectionRef), { type: 'log', content: logContent, userId: currentUser.id, userName: currentUser.fullName, createdAt: serverTimestamp() });
-    batch.set(doc(historyCollectionRef), { type: 'log', content: `[${transaction.transactionType}] ${logContent}`, userId: currentUser.id, userName: currentUser.fullName, createdAt: serverTimestamp() });
-    if(commentContent !== logContent) {
-        batch.set(doc(timelineCollectionRef), { type: 'comment', content: commentContent, userId: 'system', userName: 'النظام', createdAt: serverTimestamp() });
-    }
+    const logData = {
+        type: 'log' as const,
+        content: logContent,
+        userId: currentUser.id,
+        userName: currentUser.fullName,
+        userAvatar: currentUser.avatarUrl,
+        createdAt: serverTimestamp(),
+    };
+    const commentData = {
+        type: 'comment' as const,
+        content: commentContent,
+        userId: currentUser.id,
+        userName: currentUser.fullName,
+        userAvatar: currentUser.avatarUrl,
+        createdAt: serverTimestamp(),
+    };
+
+    // Add log and comment to transaction timeline
+    batch.set(doc(timelineCollectionRef), logData);
+    batch.set(doc(timelineCollectionRef), commentData);
+
+    // Add concise log to client history
+    batch.set(doc(historyCollectionRef), { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
     
     batch.update(transactionRefDoc, { stages: newProgressForFirestore });
     
