@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, collectionGroup, getDocs, query, writeBatch, doc, serverTimestamp, where } from 'firebase/firestore';
-import type { Employee, PaymentVoucher, ClientTransaction } from '@/lib/types';
+import type { Employee, PaymentVoucher, ClientTransaction, TransactionStage } from '@/lib/types';
 import { Loader2, ShieldCheck, Microscope, AlertTriangle, Trash2 } from 'lucide-react';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
@@ -486,75 +487,87 @@ export function DataIntegrityManager() {
         }
     };
     
-    // --- NEW: Contract Stage Fix Logic ---
+    // --- UPDATED Contract Stage Fix Logic ---
     const handleFixContractStages = async () => {
         if (!firestore) return;
         setIsFixingContracts(true);
         setFixContractResults(null);
         let fixedCount = 0;
         let revertedCount = 0;
-
+    
         try {
             const transactionsSnapshot = await getDocs(query(collectionGroup(firestore, 'transactions')));
-            
             const batch = writeBatch(firestore);
-
+    
             for (const txDoc of transactionsSnapshot.docs) {
-                if (!txDoc.data().contract) continue;
-
                 const transaction = { id: txDoc.id, ...txDoc.data() } as ClientTransaction;
                 const clientPath = txDoc.ref.path.split('/');
                 const clientId = clientPath[1];
-                
                 if (!clientId || !transaction.id) continue;
-
-                const stages = transaction.stages || [];
-                const contractStageIndex = stages.findIndex(s => s.name === 'توقيع العقد');
-
-                if (contractStageIndex === -1) continue;
-
-                const contractStage = stages[contractStageIndex];
-
+    
+                const hasContract = !!transaction.contract;
+                const stages = transaction.stages ? JSON.parse(JSON.stringify(transaction.stages)) : [];
+                let needsUpdate = false;
+    
+                const inquiriesStageIndex = stages.findIndex((s: TransactionStage) => s.name === 'استفسارات عامة');
+                const contractStageIndex = stages.findIndex((s: TransactionStage) => s.name === 'توقيع العقد');
+    
                 const receiptsQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', transaction.id));
                 const receiptsSnapshot = await getDocs(receiptsQuery);
                 const hasReceipts = !receiptsSnapshot.empty;
+    
+                if (hasContract && hasReceipts) {
+                    let transactionFixed = false;
+                    // Fix 'General Inquiries'
+                    if (inquiriesStageIndex !== -1 && stages[inquiriesStageIndex].status !== 'completed') {
+                        stages[inquiriesStageIndex].status = 'completed';
+                        if (!stages[inquiriesStageIndex].endDate) stages[inquiriesStageIndex].endDate = serverTimestamp();
+                        needsUpdate = true;
+                        transactionFixed = true;
+                    }
+                    // Fix 'Contract Signing'
+                    if (contractStageIndex !== -1 && stages[contractStageIndex].status !== 'completed') {
+                        stages[contractStageIndex].status = 'completed';
+                        if (!stages[contractStageIndex].endDate) stages[contractStageIndex].endDate = serverTimestamp();
+                        needsUpdate = true;
+                        if (!transactionFixed) fixedCount++;
+                    } else if (transactionFixed) {
+                        fixedCount++;
+                    }
 
-                let needsUpdate = false;
-                if (hasReceipts && contractStage.status !== 'completed') {
-                    stages[contractStageIndex] = { ...contractStage, status: 'completed', endDate: serverTimestamp() };
-                    fixedCount++;
-                    needsUpdate = true;
-                } else if (!hasReceipts && contractStage.status === 'completed') {
-                    if (contractStage.endDate) { // Only revert if it was likely auto-completed by old logic
-                        stages[contractStageIndex] = { ...contractStage, status: 'pending', endDate: null };
+                } else if (!hasReceipts) {
+                    // Revert 'Contract Signing' if incorrectly completed
+                    if (contractStageIndex !== -1 && stages[contractStageIndex].status === 'completed' && stages[contractStageIndex].endDate) {
+                        stages[contractStageIndex].status = 'pending';
+                        stages[contractStageIndex].endDate = null;
                         revertedCount++;
                         needsUpdate = true;
                     }
                 }
-
+    
                 if (needsUpdate) {
                     const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transaction.id!);
                     batch.update(transactionRef, { stages });
                 }
             }
-
+    
             if (fixedCount > 0 || revertedCount > 0) {
                 await batch.commit();
                 toast({
                     title: 'اكتمل التصحيح',
-                    description: `تم تصحيح ${fixedCount} عقود و التراجع عن ${revertedCount} عقود.`,
+                    description: `تم تصحيح ${fixedCount} معاملات والتراجع عن ${revertedCount} معاملات.`,
                 });
             } else {
-                 toast({
+                toast({
                     title: 'لا توجد مشاكل',
-                    description: 'جميع حالات مراحل توقيع العقد متوافقة مع سندات القبض.',
+                    description: 'جميع حالات مراحل سير العمل متوافقة مع البيانات المالية.',
                 });
             }
             setFixContractResults({ fixed: fixedCount, reverted: revertedCount });
-
+    
         } catch (error) {
             console.error("Error fixing contract stages:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تصحيح البيانات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تصحيح بيانات سير العمل.' });
         } finally {
             setIsFixingContracts(false);
         }
@@ -703,9 +716,9 @@ export function DataIntegrityManager() {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="font-semibold">فحص وتصحيح مراحل توقيع العقد</h3>
+                            <h3 className="font-semibold">فحص وتصحيح مراحل سير العمل</h3>
                             <p className="text-sm text-muted-foreground">
-                                يفحص جميع المعاملات التي لها عقود، ويتأكد من أن مرحلة "توقيع العقد" مكتملة فقط إذا كان هناك سند قبض واحد على الأقل.
+                                يفحص المعاملات ويتأكد من أن مراحل (استفسارات عامة) و (توقيع العقد) مكتملة فقط إذا كان هناك عقد وسند قبض واحد على الأقل.
                             </p>
                         </div>
                         <Button onClick={handleFixContractStages} disabled={isFixingContracts} variant="outline" size="sm">
