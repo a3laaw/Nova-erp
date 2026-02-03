@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -81,7 +80,6 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
   };
   
   const currentStatus = employee.status || 'active';
-  const toDate = (val: any) => val ? new Date(val) : null;
 
 
   return (
@@ -118,7 +116,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                         <InfoItem label="الاسم بالعربية" value={employee.fullName} />
                         <InfoItem label="الاسم بالإنجليزية" value={employee.nameEn} />
                         <InfoItem label="الرقم المدني" value={employee.civilId} />
-                        <InfoItem label="تاريخ الميلاد" value={formatDate(toDate(employee.dob))} />
+                        <InfoItem label="تاريخ الميلاد" value={formatDate(employee.dob)} />
                         <InfoItem label="النوع" value={employee.gender === 'male' ? 'ذكر' : 'أنثى'} />
                         <InfoItem 
                             label="حالة الموظف" 
@@ -138,15 +136,15 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                         <InfoItem label="المنصب" value={employee.position} />
                         <InfoItem label="تاريخ التعيين" value={formatDate(hireDate)} />
                         <InfoItem label="نوع العقد" value={employee.contractType} />
-                        <InfoItem label="تاريخ انتهاء العقد" value={formatDate(toDate(employee.contractExpiry))} />
+                        <InfoItem label="تاريخ انتهاء العقد" value={formatDate(employee.contractExpiry)} />
                         <InfoItem label="الجنسية" value={employee.nationality} />
-                        {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(toDate(employee.residencyExpiry))} />}
-                        {employee.status === 'terminated' && (
+                        {employee.nationality !== 'كويتي' && <InfoItem label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
+                         {employee.status === 'terminated' && (
                             <>
-                            <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(toDate(employee.terminationDate))} />
-                            <InfoItem label="سبب إنهاء الخدمة" value={employee.terminationReason === 'resignation' ? 'استقالة' : 'إنهاء من صاحب العمل'} />
+                             <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(employee.terminationDate)} />
+                             <InfoItem label="سبب إنهاء الخدمة" value={employee.terminationReason === 'resignation' ? 'استقالة' : 'إنهاء من صاحب العمل'} />
                             </>
-                        )}
+                         )}
                     </Section>
 
                     <Section title="البيانات المالية" icon={<Wallet />}>
@@ -169,7 +167,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                             <div className='md:col-span-2 space-y-2'>
                                 {employee.auditLogs.map((log: any, index: number) => (
                                     <div key={log.id || index} className="text-xs p-2 rounded-md bg-muted/50">
-                                        <span className="font-semibold text-primary">{formatDate(toDate(log.effectiveDate))}</span>: 
+                                        <span className="font-semibold text-primary">{formatDate(log.effectiveDate)}</span>: 
                                         تغيير في <span className='font-semibold'>"{log.field}"</span> من <span className='font-mono text-muted-foreground'>{log.oldValue !== null ? String(log.oldValue) : '-'}</span> إلى <span className='font-mono'>{log.newValue !== null ? String(log.newValue) : '-'}</span>
                                         {log.changeType === 'Creation' && <span>(إنشاء ملف)</span>}
                                     </div>
@@ -189,7 +187,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                             <div className='md:col-span-2 border-t pt-4'>
                                 <p className='font-semibold mb-2'>آخر عودة من إجازة:</p>
                                 <InfoItem label="نوع الإجازة" value={(employee.lastLeave as any).leaveType} />
-                                <InfoItem label="تاريخ العودة الفعلي" value={formatDate(toDate((employee.lastLeave as any).actualReturnDate))} />
+                                <InfoItem label="تاريخ العودة الفعلي" value={formatDate((employee.lastLeave as any).actualReturnDate)} />
                             </div>
                         )}
                     </Section>
@@ -200,7 +198,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                                 <InfoItem label="مدة الخدمة حتى تاريخ التقرير" value={`${serviceDuration.years || 0} سنة, ${serviceDuration.months || 0} شهر, ${serviceDuration.days || 0} يوم`} />
                             )}
                             <Separator className='my-2 bg-blue-200 dark:bg-blue-700'/>
-                            <div className="flex justify-between items-center mt-2">
+                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
                                 <span className="text-muted-foreground">قيمة نهاية الخدمة المستحقة:</span>
                                 <span className="font-bold text-lg text-blue-600 dark:text-blue-400">{formatCurrency(employee.eosb || 0)}</span>
                             </div>

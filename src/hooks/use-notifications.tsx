@@ -24,12 +24,15 @@ export function useNotifications() {
         ];
     }, [user?.id]);
     
+    // Memoize the empty array to provide a stable reference when there are no constraints.
+    const emptyConstraints = useMemo(() => [], []);
+
     // useSubscription handles caching, real-time updates, loading, and error states.
     // The query will not run if constraints are null (i.e., no user).
     const { data, loading, error } = useSubscription<Notification>(
         firestore, 
         queryConstraints ? 'notifications' : '', 
-        queryConstraints || []
+        queryConstraints || emptyConstraints
     );
     
     // Client-side sorting to avoid composite index
