@@ -25,7 +25,7 @@ import { Loader2, Save, PlusCircle, Trash2, ArrowUp, ArrowDown, FileSignature } 
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, getDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, writeBatch, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Client, ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account, ContractFinancialMilestone } from '@/lib/types';
+import type { Client, ClientTransaction, ContractClause, ContractTemplate, ContractTerm, ContractScopeItem, TransactionStage, Employee, Department, Account, ContractFinancialMilestone, WorkStage } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -790,5 +790,3 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   )
 }
-
-    

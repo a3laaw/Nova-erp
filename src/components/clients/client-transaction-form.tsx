@@ -123,18 +123,24 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const stageIds = new Set<string>();
 
                 for (const deptId of departmentIds) {
-                    if (!deptId) continue; // Defensive check for invalid IDs
+                    if (!deptId) continue;
                     const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
                     const stagesSnapshot = await transaction_firestore.get(stagesQuery);
                     stagesSnapshot.forEach(doc => {
                         if (!stageIds.has(doc.id)) {
                             const stageData = doc.data() as WorkStage;
                             allStages.push({
-                                stageId: doc.id, name: stageData.name, status: 'pending',
-                                order: stageData.order, stageType: stageData.stageType,
-                                allowedRoles: stageData.allowedRoles || [], nextStageIds: stageData.nextStageIds || [],
-                                allowedDuringStages: stageData.allowedDuringStages || [], trackingType: stageData.trackingType || 'duration',
-                                expectedDurationDays: stageData.expectedDurationDays || null, maxOccurrences: stageData.maxOccurrences || null,
+                                stageId: doc.id,
+                                name: stageData.name,
+                                status: 'pending',
+                                order: stageData.order,
+                                stageType: stageData.stageType,
+                                allowedRoles: stageData.allowedRoles || [],
+                                nextStageIds: stageData.nextStageIds || [],
+                                allowedDuringStages: stageData.allowedDuringStages || [],
+                                trackingType: stageData.trackingType || 'duration',
+                                expectedDurationDays: stageData.expectedDurationDays || null,
+                                maxOccurrences: stageData.maxOccurrences || null,
                                 allowManualCompletion: stageData.allowManualCompletion || false,
                             });
                             stageIds.add(doc.id);
@@ -171,10 +177,16 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const engineer = engineers.find(e => e.id === engineerForTransactionId);
 
                 const newTransactionData: Omit<ClientTransaction, 'id'> = {
-                    transactionNumber, clientId, transactionType: transactionTypeName,
-                    description, departmentId: departmentIds[0] || null, // Primary dept
-                    transactionTypeId: selectedType?.id, assignedEngineerId: engineerForTransactionId,
-                    status: 'new', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+                    transactionNumber,
+                    clientId,
+                    transactionType: transactionTypeName,
+                    description,
+                    departmentId: departmentIds[0] || null, // Primary dept
+                    transactionTypeId: selectedType?.id,
+                    assignedEngineerId: engineerForTransactionId,
+                    status: 'new',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
                     stages: allStages,
                 };
 
@@ -196,8 +208,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 }
                 
                 const detailedLogEventData = {
-                    type: 'log' as const, content: detailedLogContent, userId: currentUser.id,
-                    userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
+                    type: 'log' as const,
+                    content: detailedLogContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 };
                 transaction_firestore.set(doc(timelineCollectionRef), detailedLogEventData);
@@ -205,8 +220,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 // Concise log for main client history
                 const conciseLogContent = `تم إنشاء معاملة جديدة: "${transactionTypeName}".`;
                 const conciseLogEventData = {
-                    type: 'log' as const, content: conciseLogContent, userId: currentUser.id,
-                    userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
+                    type: 'log' as const,
+                    content: conciseLogContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 };
                 transaction_firestore.set(doc(historyCollectionRef), conciseLogEventData);
