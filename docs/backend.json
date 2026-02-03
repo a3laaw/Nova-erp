@@ -364,7 +364,7 @@
         "stageType": {
           "type": "string",
           "enum": ["sequential", "parallel"],
-          "description": "Copied from the WorkStage template."
+          "description": "'sequential' for main workflow steps, 'parallel' for service stages like modifications that can run alongside."
         },
         "nextStageIds": {
             "type": "array",
