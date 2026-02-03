@@ -115,39 +115,40 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         let newTransactionRefId = '';
 
         try {
+            // --- Pre-transaction reads ---
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const departmentIds = selectedType?.departmentIds || [];
 
-            await runTransaction(firestore, async (transaction_firestore) => {
-                const allStages: Partial<TransactionStage>[] = [];
-                const stageIds = new Set<string>();
+            const allStages: Partial<TransactionStage>[] = [];
+            const stageIds = new Set<string>();
 
-                for (const deptId of departmentIds) {
-                    if (!deptId) continue;
-                    const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
-                    const stagesSnapshot = await transaction_firestore.get(stagesQuery);
-                    stagesSnapshot.forEach(doc => {
-                        if (!stageIds.has(doc.id)) {
-                            const stageData = doc.data() as WorkStage;
-                            allStages.push({
-                                stageId: doc.id,
-                                name: stageData.name,
-                                status: 'pending',
-                                order: stageData.order,
-                                stageType: stageData.stageType,
-                                allowedRoles: stageData.allowedRoles || [],
-                                nextStageIds: stageData.nextStageIds || [],
-                                allowedDuringStages: stageData.allowedDuringStages || [],
-                                trackingType: stageData.trackingType || 'duration',
-                                expectedDurationDays: stageData.expectedDurationDays || null,
-                                maxOccurrences: stageData.maxOccurrences || null,
-                                allowManualCompletion: stageData.allowManualCompletion || false,
-                            });
-                            stageIds.add(doc.id);
-                        }
-                    });
-                }
-                
+            for (const deptId of departmentIds) {
+                if (!deptId) continue;
+                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
+                const stagesSnapshot = await getDocs(stagesQuery);
+                stagesSnapshot.forEach(doc => {
+                    if (!stageIds.has(doc.id)) {
+                        const stageData = doc.data() as WorkStage;
+                        allStages.push({
+                            stageId: doc.id,
+                            name: stageData.name,
+                            status: 'pending',
+                            order: stageData.order,
+                            stageType: stageData.stageType,
+                            allowedRoles: stageData.allowedRoles || [],
+                            nextStageIds: stageData.nextStageIds || [],
+                            allowedDuringStages: stageData.allowedDuringStages || [],
+                            trackingType: stageData.trackingType || 'duration',
+                            expectedDurationDays: stageData.expectedDurationDays || null,
+                            maxOccurrences: stageData.maxOccurrences || null,
+                            allowManualCompletion: stageData.allowManualCompletion || false,
+                        });
+                        stageIds.add(doc.id);
+                    }
+                });
+            }
+
+            await runTransaction(firestore, async (transaction_firestore) => {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await transaction_firestore.get(clientRef);
                 if (!clientSnap.exists()) {
