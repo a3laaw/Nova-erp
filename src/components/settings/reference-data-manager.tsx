@@ -40,6 +40,15 @@ import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
 
 // --- NEW StatCard Component ---
 function StatCard({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) {
@@ -600,7 +609,7 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, companiesSnap, workStagesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, companiesSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
                     getDocs(query(collection(firestore, 'companies'))),
@@ -613,10 +622,10 @@ export function ReferenceDataManager() {
                 setCounts({
                     depts: deptsSnap.size,
                     govs: govsSnap.size,
+                    companies: companiesSnap.size,
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
-                    companies: companiesSnap.size,
                     workStages: workStagesSnap.size,
                 });
 
