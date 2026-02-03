@@ -6,7 +6,7 @@ import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
 
 export function useSubscription<T extends { id?: string }>(
-  firestore: any, // No longer used, but kept for API compatibility for now
+  firestore: any,
   collectionPath: string, 
   constraints: QueryConstraint[] = []
 ): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
@@ -26,7 +26,6 @@ export function useSubscription<T extends { id?: string }>(
                     const op = filter.op;
                     const fieldPath = filter.field.segments.join('.');
                     
-                    // A more robust way to get the value without being too specific
                     const valueObject = filter.value;
                     let value = 'unknown';
 
@@ -57,7 +56,7 @@ export function useSubscription<T extends { id?: string }>(
     }, [collectionPath, serializedConstraints]);
 
     useEffect(() => {
-        if (!collectionPath) {
+        if (!collectionPath || !firestore) {
             setData([]);
             setLoading(false);
             return;
@@ -74,6 +73,7 @@ export function useSubscription<T extends { id?: string }>(
         });
 
         const unsubscribe = cache.subscribe<T>(
+            firestore,
             collectionPath,
             (newData) => {
                 if (isMounted) {
@@ -98,8 +98,7 @@ export function useSubscription<T extends { id?: string }>(
         );
         
         return () => { isMounted = false; unsubscribe(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cacheKey, collectionPath, signalUpdate]);
+    }, [firestore, cacheKey, collectionPath, signalUpdate, constraints]);
 
     return { data, setData, loading, error };
 }

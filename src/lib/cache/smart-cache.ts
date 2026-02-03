@@ -20,10 +20,6 @@ interface CacheEntry<T> {
 }
 
 class SmartCache {
-  private getFirestore(): Firestore | null {
-    return getFirebaseServices()?.firestore || null;
-  }
-
   async getFromStorage<T>(key: string): Promise<CacheEntry<T> | null> {
     try {
       const cached = await localforage.getItem<CacheEntry<T>>(key);
@@ -62,14 +58,15 @@ class SmartCache {
   }
 
   subscribe<T extends DocumentData>(
+    firestore: Firestore,
     collectionPath: string,
     onUpdate: (data: T[]) => void,
     onError: (error: Error) => void,
     queryConstraints?: QueryConstraint[]
   ): () => void {
-    const db = this.getFirestore();
+    const db = firestore;
     if (!db) {
-      onError(new Error("Firestore not available"));
+      onError(new Error("Firestore instance provided to subscribe is not valid."));
       return () => {};
     }
 
@@ -90,13 +87,14 @@ class SmartCache {
   }
 
   subscribeDoc<T extends DocumentData>(
+    firestore: Firestore,
     docPath: string,
     onUpdate: (data: T | null) => void,
     onError: (error: Error) => void,
   ): () => void {
-    const db = this.getFirestore();
+    const db = firestore;
     if (!db) {
-      onError(new Error("Firestore not available"));
+      onError(new Error("Firestore instance provided to subscribeDoc is not valid."));
       return () => {};
     }
 

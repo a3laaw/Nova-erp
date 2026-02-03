@@ -4,7 +4,7 @@ import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
 
 export function useDocument<T extends { id?: string }>(
-  firestore: any, // No longer used
+  firestore: any,
   docPath: string | null
 ): { data: T | null, loading: boolean, error: Error | null } {
   const [data, setData] = useState<T | null>(null);
@@ -15,7 +15,7 @@ export function useDocument<T extends { id?: string }>(
   const cacheKey = useMemo(() => docPath, [docPath]);
 
   useEffect(() => {
-    if (!cacheKey) {
+    if (!cacheKey || !firestore) {
       setData(null);
       setLoading(false);
       return;
@@ -32,12 +32,15 @@ export function useDocument<T extends { id?: string }>(
     });
 
     const unsubscribe = cache.subscribeDoc<T>(
+      firestore,
       cacheKey,
       (newData) => {
         if (isMounted) {
           setData(newData);
           setError(null);
-          cache.set(cacheKey, newData); // Update cache
+          if (newData !== null) {
+            cache.set(cacheKey, newData);
+          }
           if (isFirstLoad) {
             setLoading(false);
             isFirstLoad = false;
@@ -55,7 +58,7 @@ export function useDocument<T extends { id?: string }>(
     );
 
     return () => { isMounted = false; unsubscribe(); };
-  }, [cacheKey, signalUpdate]);
+  }, [firestore, cacheKey, signalUpdate]);
 
   return { data, loading, error };
 }
