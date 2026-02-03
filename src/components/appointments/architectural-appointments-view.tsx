@@ -90,7 +90,7 @@ export function ArchitecturalAppointmentsView() {
                 ]);
 
                 const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName));
+                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.nameAr));
                 setEngineers(archEngineers);
                 
                 const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
@@ -420,6 +420,7 @@ export function ArchitecturalAppointmentsView() {
                                                 </DropdownMenuTrigger>
                                                 {(canAdminEdit || canUserEdit) && (
                                                     <DropdownMenuContent dir="rtl">
+                                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                                                         <DropdownMenuItem asChild>
                                                             <Link href={`/dashboard/appointments/${booking.id}`}>
                                                                 <Eye className="ml-2 h-4 w-4" />
@@ -490,9 +491,12 @@ export function ArchitecturalAppointmentsView() {
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
 
-                {loading ? <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
-
-                {!loading && (
+                {loading ? (
+                  <div className='space-y-4'>
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                  </div>
+                ) : (
                     <div className="space-y-4">
                         {renderGridSection('الفترة الصباحية', morningSlots)}
                         {renderGridSection('الفترة المسائية', eveningSlots)}
