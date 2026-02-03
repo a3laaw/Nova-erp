@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, limit } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2, ArrowUp, ArrowDown, Save } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -67,6 +67,7 @@ import {
     getDocs as getDocsFromFirestore,
     collection as collectionFromFirestore
 } from 'firebase/firestore';
+import { Input } from '@/components/ui/input';
 
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
@@ -168,6 +169,10 @@ export default function TransactionDetailPage() {
   const [isParallelStageMenuOpen, setIsParallelStageMenuOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // New state for inline editing of stage order
+  const [stageOrders, setStageOrders] = useState<Record<string, number>>({});
+  const [isOrderChanged, setIsOrderChanged] = useState(false);
+
 
   // --- Data Fetching ---
   const transactionRef = useMemo(() => {
@@ -207,6 +212,20 @@ export default function TransactionDetailPage() {
     fetchRefData();
   }, [firestore, toast]);
   
+  // NEW: Initialize local state for orders
+  useEffect(() => {
+    if (transaction?.stages) {
+        const initialOrders: Record<string, number> = {};
+        transaction.stages.forEach(stage => {
+            if (stage.stageId) {
+                initialOrders[stage.stageId] = stage.order ?? 99;
+            }
+        });
+        setStageOrders(initialOrders);
+        setIsOrderChanged(false); // Reset changed state
+    }
+  }, [transaction?.stages]);
+
 
   const formatDate = (dateValue: any): string => {
       if (!dateValue) return '-';
@@ -330,44 +349,51 @@ export default function TransactionDetailPage() {
         setIsProcessing(false);
     }
   };
-
-  const sequentialStages = useMemo(() => (transaction?.stages || []).filter(s => s.stageType !== 'parallel').sort((a,b) => (a.order || 99) - (b.order || 99)), [transaction?.stages]);
-
-  const handleReorderStage = useCallback(async (index: number, direction: 'up' | 'down') => {
-    if (!firestore || !transaction) return;
-    setIsProcessing(true);
-
-    const currentSequentialStages = sequentialStages;
-    const currentParallelStages = transaction.stages?.filter(s => s.stageType === 'parallel') || [];
-
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= currentSequentialStages.length) {
-        setIsProcessing(false);
-        return;
+  
+    // NEW: handler for local order state
+    const handleOrderChange = (stageId: string, newOrderValue: string) => {
+        const numOrder = newOrderValue === '' ? 999 : parseInt(newOrderValue, 10);
+        setStageOrders(prev => ({
+            ...prev,
+            [stageId]: isNaN(numOrder) ? 999 : numOrder,
+        }));
+        setIsOrderChanged(true);
     };
 
-    const reorderedList = [...currentSequentialStages];
-    [reorderedList[index], reorderedList[newIndex]] = [reorderedList[newIndex], reorderedList[index]];
+    // NEW: handler to save the new order
+    const handleSaveOrder = async () => {
+        if (!firestore || !transaction?.stages) return;
+        setIsProcessing(true);
     
-    const listWithNewOrder = reorderedList.map((stage, idx) => ({
-      ...stage,
-      order: idx,
-    }));
+        try {
+            // Create a sortable array from the local state
+            const sortableArray = Object.entries(stageOrders)
+                                      .map(([stageId, order]) => ({ stageId, order }))
+                                      .sort((a, b) => a.order - b.order);
+            
+            // Create a map for the new order: { stageId: newIndex }
+            const newOrderMap = new Map(sortableArray.map((item, index) => [item.stageId, index]));
 
-    const finalStagesArray = [...listWithNewOrder, ...currentParallelStages];
-
-    try {
-        const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-        await updateDoc(transactionRef, { stages: finalStagesArray });
-        toast({ title: 'نجاح', description: 'تم تحديث ترتيب المراحل.' });
-    } catch (e) {
-        console.error("Error reordering stages:", e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
-    } finally {
-        setIsProcessing(false);
-    }
-  }, [firestore, transaction, sequentialStages, clientId, transactionId, toast]);
-
+            // Update the full stages array with the new correct order
+            const newStages = transaction.stages.map(stage => {
+                if (stage.stageId && newOrderMap.has(stage.stageId)) {
+                    return { ...stage, order: newOrderMap.get(stage.stageId) };
+                }
+                return stage; // Return parallel stages or stages without ID unchanged
+            });
+    
+            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+            await updateDoc(transactionRef, { stages: newStages });
+    
+            toast({ title: 'نجاح', description: 'تم تحديث ترتيب المراحل بنجاح.' });
+            setIsOrderChanged(false);
+        } catch (e) {
+            console.error("Error saving new order:", e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
@@ -575,6 +601,8 @@ export default function TransactionDetailPage() {
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
+  const sequentialStages = useMemo(() => (transaction?.stages || []).filter(s => s.stageType !== 'parallel').sort((a,b) => (a.order ?? 99) - (b.order ?? 99)), [transaction?.stages]);
+
   const parallelStages = useMemo(() => {
     const allStages = transaction?.stages || [];
     return allStages.filter((s: TransactionStage) => {
@@ -702,21 +730,29 @@ export default function TransactionDetailPage() {
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> سير العمل</CardTitle>
-                             <DropdownMenu open={isParallelStageMenuOpen} onOpenChange={setIsParallelStageMenuOpen}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline"><ChevronsUpDown className="ml-2 h-4 w-4"/>بدء مرحلة خدمية</Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                {parallelStages.filter((s: TransactionStage) => s.status === 'pending').map((stage: TransactionStage) => (
-                                    <DropdownMenuItem key={stage.stageId} onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')}>
-                                        {stage.name}
-                                    </DropdownMenuItem>
-                                ))}
-                                {parallelStages.filter((s: TransactionStage) => s.status === 'pending').length === 0 && (
-                                    <DropdownMenuItem disabled>لا توجد مراحل خدمية متاحة</DropdownMenuItem>
+                             <div className="flex items-center gap-2">
+                                {isOrderChanged && (
+                                    <Button size="sm" onClick={handleSaveOrder} disabled={isProcessing}>
+                                        {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                                        حفظ الترتيب
+                                    </Button>
                                 )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                <DropdownMenu open={isParallelStageMenuOpen} onOpenChange={setIsParallelStageMenuOpen}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline"><ChevronsUpDown className="ml-2 h-4 w-4"/>بدء مرحلة خدمية</Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                    {parallelStages.filter((s: TransactionStage) => s.status === 'pending').map((stage: TransactionStage) => (
+                                        <DropdownMenuItem key={stage.stageId} onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')}>
+                                            {stage.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                    {parallelStages.filter((s: TransactionStage) => s.status === 'pending').length === 0 && (
+                                        <DropdownMenuItem disabled>لا توجد مراحل خدمية متاحة</DropdownMenuItem>
+                                    )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                         </div>
                         <CardDescription>تتبع التقدم في كل مرحلة من مراحل المعاملة.</CardDescription>
                     </CardHeader>
@@ -725,12 +761,21 @@ export default function TransactionDetailPage() {
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
-                                {sequentialStages.map((stage, index) => {
+                                {sequentialStages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
                                     const canStart = canStartStage(stage, transaction.stages as TransactionStage[]);
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
+                                                {currentUser?.role === 'Admin' && (
+                                                    <Input
+                                                        type="number"
+                                                        value={stageOrders[stage.stageId] ?? ''}
+                                                        onChange={(e) => handleOrderChange(stage.stageId, e.target.value)}
+                                                        className="w-16 h-8 text-center"
+                                                        disabled={isProcessing}
+                                                    />
+                                                )}
                                                 <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
@@ -777,16 +822,6 @@ export default function TransactionDetailPage() {
                                                         )}
                                                     </div>
                                                 )}
-                                                 {currentUser?.role === 'Admin' && (
-                                                    <div className="flex flex-col -my-2 border-l pl-1 ml-1 rtl:border-r rtl:border-l-0 rtl:pr-1 rtl:mr-1">
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleReorderStage(index, 'up')} disabled={index === 0 || isProcessing}>
-                                                            <ArrowUp className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleReorderStage(index, 'down')} disabled={index === sequentialStages.length - 1 || isProcessing}>
-                                                            <ArrowDown className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     )
@@ -830,3 +865,4 @@ export default function TransactionDetailPage() {
     
 
     
+
