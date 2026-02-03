@@ -348,13 +348,11 @@ export default function AppointmentDetailsPage() {
                 updatedProgress.completedCount = newCount;
                 const maxOccurrences = selectedStageTemplate.maxOccurrences || 1;
                 logTextAction = `بتسجيل إنجاز للمرحلة "${selectedStageTemplate.name}" (${newCount}/${maxOccurrences})`;
-                if (newCount >= maxOccurrences) {
-                    updatedProgress.status = 'completed';
-                    isFinallyCompleted = true;
-                    logTextAction = `بإكمال المرحلة "${selectedStageTemplate.name}" (وصل للحد الأقصى ${maxOccurrences} إنجازات)`;
-                } else {
-                    updatedProgress.status = 'in-progress';
-                }
+                
+                // Keep the stage in progress, completion is a manual action elsewhere
+                updatedProgress.status = 'in-progress';
+                isFinallyCompleted = false; // Never auto-complete here
+
             } else { // 'duration' or 'none'
                 updatedProgress.status = 'completed';
                 isFinallyCompleted = true;
