@@ -18,7 +18,7 @@ import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage, Department } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
@@ -47,6 +47,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const [engineersLoading, setEngineersLoading] = useState(true);
     const [transactionTypes, setTransactionTypes] = useState<FetchedTransactionType[]>([]);
     const [typesLoading, setTypesLoading] = useState(true);
+    const [departments, setDepartments] = useState<Department[]>([]);
 
     const [transactionTypeName, setTransactionTypeName] = useState('');
     const [description, setDescription] = useState('');
@@ -55,62 +56,51 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     useEffect(() => {
         if (!firestore || !isOpen) return;
-
-        const fetchEngineers = async () => {
+        
+        const fetchReferenceData = async () => {
             setEngineersLoading(true);
+            setTypesLoading(true);
             try {
-                const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const querySnapshot = await getDocs(q);
+                const [engSnap, transTypesSnap, deptsSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+                    getDocs(query(collectionGroup(firestore, 'transactionTypes'))),
+                    getDocs(query(collection(firestore, 'departments'))),
+                ]);
+
                 const fetchedEngineers: Employee[] = [];
-                querySnapshot.forEach((doc) => {
+                engSnap.forEach((doc) => {
                     const data = doc.data() as Employee;
                     if (data.jobTitle?.includes('مهندس') || data.jobTitle?.toLowerCase().includes('engineer')) {
                         fetchedEngineers.push({ id: doc.id, ...data });
                     }
                 });
                 setEngineers(fetchedEngineers);
-            } catch (error) {
-                console.error("Failed to fetch engineers:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة المهندسين.' });
-            } finally {
-                setEngineersLoading(false);
-            }
-        };
 
-        const fetchTransactionTypes = async () => {
-             setTypesLoading(true);
-             try {
-                const q = query(collectionGroup(firestore, 'transactionTypes'));
-                const querySnapshot = await getDocs(q);
                 const fetchedTypes: FetchedTransactionType[] = [];
                 const uniqueNames = new Set<string>();
-    
-                querySnapshot.forEach((doc) => {
+                transTypesSnap.forEach((doc) => {
                     const data = doc.data() as TransactionType;
                     const parentDeptId = doc.ref.parent.parent?.id;
-                    
                     if (data.name && parentDeptId && !uniqueNames.has(data.name)) {
-                        fetchedTypes.push({
-                            id: doc.id,
-                            name: data.name,
-                            parentDeptId: parentDeptId
-                        });
+                        fetchedTypes.push({ id: doc.id, name: data.name, parentDeptId: parentDeptId });
                         uniqueNames.add(data.name);
                     }
                 });
-                
                 fetchedTypes.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
                 setTransactionTypes(fetchedTypes);
+
+                setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+
             } catch (error) {
-                console.error("Failed to fetch transaction types:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة أنواع المعاملات.' });
+                console.error("Failed to fetch reference data:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
             } finally {
+                setEngineersLoading(false);
                 setTypesLoading(false);
             }
         };
 
-        fetchEngineers();
-        fetchTransactionTypes();
+        fetchReferenceData();
     }, [firestore, isOpen, toast]);
 
     const transactionTypeOptions = useMemo(() => 
@@ -144,24 +134,38 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
         try {
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-            const departmentId = selectedType?.parentDeptId;
+            const primaryDepartmentId = selectedType?.parentDeptId;
+            
+            const structuralDepartment = departments.find(d => d.name === 'القسم الإنشائي');
+            const structuralDepartmentId = structuralDepartment?.id;
 
-            let initialStages: Partial<TransactionStage>[] = [];
-            if (departmentId) {
-                const stagesQuery = query(collection(firestore, `departments/${departmentId}/workStages`), orderBy('order'));
+            const allStages: Partial<TransactionStage>[] = [];
+            const stageIds = new Set<string>();
+
+            const fetchStagesForDept = async (deptId: string | undefined) => {
+                if (!deptId || !firestore) return;
+                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
                 const stagesSnapshot = await getDocs(stagesQuery);
-                initialStages = stagesSnapshot.docs.map(doc => {
-                    const stageData = doc.data() as WorkStage;
-                    return {
-                        stageId: doc.id,
-                        name: stageData.name,
-                        status: 'pending',
-                        allowedRoles: stageData.allowedRoles || [],
-                        trackingType: stageData.trackingType || 'duration',
-                        expectedDurationDays: stageData.expectedDurationDays || null,
-                        maxOccurrences: stageData.maxOccurrences || null,
-                    };
+                stagesSnapshot.forEach(doc => {
+                    if (!stageIds.has(doc.id)) {
+                        const stageData = doc.data() as WorkStage;
+                        allStages.push({
+                            stageId: doc.id,
+                            name: stageData.name,
+                            status: 'pending',
+                            allowedRoles: stageData.allowedRoles || [],
+                            trackingType: stageData.trackingType || 'duration',
+                            expectedDurationDays: stageData.expectedDurationDays || null,
+                            maxOccurrences: stageData.maxOccurrences || null,
+                        });
+                        stageIds.add(doc.id);
+                    }
                 });
+            };
+
+            await fetchStagesForDept(primaryDepartmentId);
+            if (structuralDepartmentId && structuralDepartmentId !== primaryDepartmentId) {
+                await fetchStagesForDept(structuralDepartmentId);
             }
 
             await runTransaction(firestore, async (transaction_firestore) => {
@@ -198,13 +202,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     clientId,
                     transactionType: transactionTypeName,
                     description,
-                    departmentId: departmentId,
+                    departmentId: primaryDepartmentId,
                     transactionTypeId: selectedType?.id,
                     assignedEngineerId: engineerForTransactionId,
                     status: 'new',
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
-                    stages: initialStages,
+                    stages: allStages,
                 };
 
                 transaction_firestore.set(newTransactionRef, newTransactionData);
