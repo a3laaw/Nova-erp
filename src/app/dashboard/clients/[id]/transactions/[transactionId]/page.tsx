@@ -209,87 +209,16 @@ export default function TransactionDetailPage() {
     fetchRefData();
   }, [firestore, toast]);
   
+  // This is the corrected logic: it relies solely on the stages saved in the transaction document.
   useEffect(() => {
-    if (!transaction || !firestore) {
-        if (!transaction) setLoadingStages(false);
-        return;
-    };
-
-    const mergeAndSetStages = async () => {
-        setLoadingStages(true);
-        try {
-            const templateStages: WorkStage[] = [];
-            const stageIds = new Set<string>();
-            const departmentsCollection = collection(firestore, 'departments');
-
-            // Function to fetch stages for a given department ID
-            const fetchStagesForDept = async (deptId: string) => {
-                if (!deptId) return;
-                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order', 'asc'));
-                const stagesSnapshot = await getDocs(stagesQuery);
-                stagesSnapshot.forEach(doc => {
-                    if (!stageIds.has(doc.id)) {
-                        templateStages.push({ id: doc.id, ...doc.data() } as WorkStage);
-                        stageIds.add(doc.id);
-                    }
-                });
-            };
-
-            // Fetch stages from Architectural and Structural departments always
-            const [archDeptSnap, structDeptSnap] = await Promise.all([
-                getDocs(query(departmentsCollection, where('name', '==', 'القسم المعماري'), limit(1))),
-                getDocs(query(departmentsCollection, where('name', '==', 'القسم الإنشائي'), limit(1)))
-            ]);
-
-            const archDeptId = archDeptSnap.empty ? null : archDeptSnap.docs[0].id;
-            const structDeptId = structDeptSnap.empty ? null : structDeptSnap.docs[0].id;
-            
-            if (archDeptId) await fetchStagesForDept(archDeptId);
-            if (structDeptId) await fetchStagesForDept(structDeptId);
-
-            // Also fetch from the transaction's primary department if it's different
-            if (transaction.departmentId && transaction.departmentId !== archDeptId && transaction.departmentId !== structDeptId) {
-                await fetchStagesForDept(transaction.departmentId);
-            }
-            
-            const progressData = transaction.stages || [];
-            const progressMap = new Map(progressData.map(p => [p.stageId, p]));
-
-            const mergedStages: TransactionStage[] = templateStages.map(template => {
-                const progress = progressMap.get(template.id!);
-                return {
-                    stageId: template.id!,
-                    name: template.name,
-                    order: template.order,
-                    stageType: template.stageType || 'sequential',
-                    allowedRoles: template.allowedRoles,
-                    nextStageIds: template.nextStageIds,
-                    allowedDuringStages: template.allowedDuringStages,
-                    trackingType: template.trackingType,
-                    expectedDurationDays: template.expectedDurationDays,
-                    maxOccurrences: template.maxOccurrences,
-                    allowManualCompletion: template.allowManualCompletion,
-                    status: progress?.status || 'pending',
-                    startDate: progress?.startDate || null,
-                    endDate: progress?.endDate || null,
-                    expectedEndDate: progress?.expectedEndDate || null,
-                    notes: progress?.notes || '',
-                    completedCount: progress?.completedCount || 0,
-                };
-            }).sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
-
-            setStages(mergedStages);
-        } catch (e) {
-            console.error("Error merging stages:", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل مراحل المعاملة بشكل صحيح.' });
-        } finally {
-            setLoadingStages(false);
-        }
-    };
-    
-    mergeAndSetStages();
-    
-  }, [transaction, firestore, toast]);
+    if (transaction?.stages) {
+        const sortedStages = [...transaction.stages].sort((a: any, b: any) => (a.order ?? 99) - (b.order ?? 99));
+        setStages(sortedStages as TransactionStage[]);
+    } else {
+        setStages([]);
+    }
+    setLoadingStages(false);
+  }, [transaction]);
 
     
 
@@ -328,7 +257,7 @@ export default function TransactionDetailPage() {
         }
         
         currentStages[stageToRevertIndex].status = 'pending';
-        currentStages[stageToRevertIndex].endDate = null;
+        (currentStages[stageToRevertIndex] as any).endDate = null;
 
         // 2. Revert the next sequential stage if it was auto-started
         const revertedStageTemplate = stages.find(s => s.stageId === stageIdToRevert);
@@ -343,8 +272,8 @@ export default function TransactionDetailPage() {
                     
                     if (!otherCompletedPredecessors) {
                         currentStages[nextStageIndexInProg].status = 'pending';
-                        currentStages[nextStageIndexInProg].startDate = null;
-                        currentStages[nextStageIndexInProg].expectedEndDate = null;
+                        (currentStages[nextStageIndexInProg] as any).startDate = null;
+                        (currentStages[nextStageIndexInProg] as any).expectedEndDate = null;
                     }
                 }
             }
@@ -475,8 +404,8 @@ export default function TransactionDetailPage() {
             updatedProgress.endDate = now as any;
             isFinallyCompleted = true;
         } else {
-            updatedProgress.endDate = null;
-            updatedProgress.expectedEndDate = null;
+            (updatedProgress as any).endDate = null;
+            (updatedProgress as any).expectedEndDate = null;
         }
     }
     
@@ -503,11 +432,11 @@ export default function TransactionDetailPage() {
 
                     if (stageToStart.status === 'pending') {
                         stageToStart.status = 'in-progress';
-                        stageToStart.startDate = now as any;
+                        (stageToStart as any).startDate = now as any;
                         
                         const templateForNextStage = stages.find(ws => ws.stageId === stageToStart.stageId);
                         if (templateForNextStage?.trackingType === 'duration' && templateForNextStage?.expectedDurationDays) {
-                            stageToStart.expectedEndDate = addDays(now, templateForNextStage.expectedDurationDays) as any;
+                            (stageToStart as any).expectedEndDate = addDays(now, templateForNextStage.expectedDurationDays) as any;
                         }
 
                         if (nextStageIndexInProg > -1) {
@@ -611,6 +540,7 @@ export default function TransactionDetailPage() {
   
   const sequentialStages = useMemo(() => stages.filter(s => s.stageType !== 'parallel'), [stages]);
   const parallelStages = useMemo(() => stages.filter(s => {
+    if (s.stageType !== 'parallel') return false; // Ensure it's parallel
     if (s.status !== 'pending') return true; // Always show if in progress or completed
     const canStartResult = canStartStage(s, stages);
     return canStartResult.allowed;

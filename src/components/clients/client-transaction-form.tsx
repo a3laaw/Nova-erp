@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -148,36 +147,36 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             const fetchStagesForDept = async (deptId: string | undefined) => {
                 if (!deptId || !firestore) return;
-                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
+                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`));
                 const stagesSnapshot = await getDocs(stagesQuery);
                 stagesSnapshot.forEach(doc => {
                     if (!stageIds.has(doc.id)) {
                         const stageData = doc.data() as WorkStage;
+                        // Save all relevant properties from the template
                         allStages.push({
                             stageId: doc.id,
                             name: stageData.name,
                             status: 'pending',
+                            order: stageData.order,
+                            stageType: stageData.stageType,
                             allowedRoles: stageData.allowedRoles || [],
+                            nextStageIds: stageData.nextStageIds || [],
+                            allowedDuringStages: stageData.allowedDuringStages || [],
                             trackingType: stageData.trackingType || 'duration',
                             expectedDurationDays: stageData.expectedDurationDays || null,
                             maxOccurrences: stageData.maxOccurrences || null,
+                            allowManualCompletion: stageData.allowManualCompletion || false,
                         });
                         stageIds.add(doc.id);
                     }
                 });
             };
 
-            // Always fetch architectural and structural stages
             const archDept = departments.find(d => d.name === 'القسم المعماري');
             const structDept = departments.find(d => d.name === 'القسم الإنشائي');
             
-            if(archDept?.id) await fetchStagesForDept(archDept.id);
-            if(structDept?.id) await fetchStagesForDept(structDept.id);
-
-            // Also fetch from the transaction's primary department if it's different
-            if (primaryDepartmentId && primaryDepartmentId !== archDept?.id && primaryDepartmentId !== structDept?.id) {
-                await fetchStagesForDept(primaryDepartmentId);
-            }
+            if (archDept?.id) await fetchStagesForDept(archDept.id);
+            if (structDept?.id) await fetchStagesForDept(structDept.id);
 
             await runTransaction(firestore, async (transaction_firestore) => {
                 const clientRef = doc(firestore, 'clients', clientId);
@@ -227,7 +226,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const timelineCollectionRef = collection(newTransactionRef, 'timelineEvents');
                 const historyCollectionRef = collection(firestore, `clients/${clientId}/history`);
 
-                // Detailed log for transaction timeline
                 let detailedLogContent = `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`;
                 if (engineer) {
                     detailedLogContent += ` وأسندها إلى المهندس ${engineer.fullName}.`;
@@ -249,7 +247,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 };
                 transaction_firestore.set(doc(timelineCollectionRef), detailedLogEventData);
 
-                // Concise log for main client history
                 const conciseLogContent = `تم إنشاء معاملة جديدة: "${transactionTypeName}".`;
                 const conciseLogEventData = {
                     type: 'log' as const,
@@ -369,5 +366,3 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
-
-    
