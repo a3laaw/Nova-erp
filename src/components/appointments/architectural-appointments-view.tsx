@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -34,11 +33,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Appointment, Client, Employee } from '@/lib/types';
+import type { Appointment, Client, Employee, WorkStage, TransactionStage } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useAuth } from '@/context/auth-context';
+
 
 // --- Constants & Helpers ---
 const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
@@ -55,6 +56,7 @@ function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean })
 export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const { user: currentUser } = useAuth();
     
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
@@ -206,29 +208,88 @@ export function ArchitecturalAppointmentsView() {
     };
 
     const handleDeleteBooking = async () => {
-        if (!appointmentToDelete || !firestore) return;
+        if (!appointmentToDelete || !firestore || !currentUser) return;
     
         setIsDeleting(true);
         try {
             const batch = writeBatch(firestore);
+            const { id: apptId, workStageProgressId, transactionId, clientId, visitCount, title } = appointmentToDelete;
+
+            // 1. Revert stage if this appointment caused a stage update
+            if (workStageProgressId && transactionId && clientId) {
+                const progressRef = doc(firestore, 'work_stages_progress', workStageProgressId);
+                const progressSnap = await getDoc(progressRef);
+                
+                if (progressSnap.exists()) {
+                    const { stageId, stageName } = progressSnap.data();
+                    
+                    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+                    const transactionSnap = await getDoc(transactionRef);
+                    
+                    if (transactionSnap.exists()) {
+                        const transactionData = transactionSnap.data();
+                        const currentStages = transactionData.stages ? JSON.parse(JSON.stringify(transactionData.stages)) : [];
+                        
+                        const stageToRevertIndex = currentStages.findIndex((s: TransactionStage) => s.stageId === stageId && s.status === 'completed');
+                        
+                        if (stageToRevertIndex !== -1) {
+                            currentStages[stageToRevertIndex].status = 'pending';
+                            currentStages[stageToRevertIndex].endDate = null;
+                            
+                            const deptId = transactionData.departmentId;
+                            if (deptId) {
+                                const stagesTemplateQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
+                                const stagesTemplateSnap = await getDocs(stagesTemplateQuery);
+                                const stagesTemplate = stagesTemplateSnap.docs.map(d => ({id: d.id, ...d.data()} as WorkStage));
+                                const revertedStageTemplate = stagesTemplate.find(s => s.id === stageId);
+
+                                if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
+                                    const nextStageTemplate = stagesTemplate.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
+                                    if (nextStageTemplate) {
+                                        const nextStageIndexInProg = currentStages.findIndex((s: TransactionStage) => s.stageId === nextStageTemplate.id);
+                                        if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
+                                            currentStages[nextStageIndexInProg].status = 'pending';
+                                            currentStages[nextStageIndexInProg].startDate = null;
+                                        }
+                                    }
+                                }
+                            }
+
+                            batch.update(transactionRef, { stages: currentStages });
+
+                            const logContent = `قام ${currentUser.fullName} بحذف الزيارة رقم ${visitCount} ("${title}"), مما أدى إلى التراجع التلقائي عن مرحلة "${stageName}".`;
+                            const logData = {
+                                type: 'log' as const,
+                                content: logContent,
+                                userId: currentUser.id,
+                                userName: currentUser.fullName,
+                                userAvatar: currentUser.avatarUrl,
+                                createdAt: serverTimestamp(),
+                            };
+                            batch.set(doc(collection(transactionRef, 'timelineEvents')), logData);
+                        }
+                    }
+                    batch.delete(progressRef);
+                }
+            }
             
-            const apptToDeleteRef = doc(firestore, 'appointments', appointmentToDelete.id!);
+            const apptToDeleteRef = doc(firestore, 'appointments', apptId!);
             batch.delete(apptToDeleteRef);
 
             // Only perform recalculation for registered clients
-            if (appointmentToDelete.clientId) {
+            if (clientId) {
                 const clientApptsQuery = query(
                     collection(firestore, 'appointments'),
-                    where('clientId', '==', appointmentToDelete.clientId),
+                    where('clientId', '==', clientId),
                     where('type', '==', 'architectural')
                 );
                 const clientApptsSnap = await getDocs(clientApptsQuery);
                 
                 let remainingAppointments = clientApptsSnap.docs
                     .map(d => ({ id: d.id, ...d.data() } as Appointment))
-                    .filter(a => a.id !== appointmentToDelete.id);
+                    .filter(a => a.id !== apptId);
                 
-                const clientRef = doc(firestore, 'clients', appointmentToDelete.clientId);
+                const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
                 const contractSigned = clientSnap.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
 
@@ -249,7 +310,7 @@ export function ArchitecturalAppointmentsView() {
 
             await batch.commit();
 
-            toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث الجدول.' });
+            toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث البيانات المرتبطة به.' });
             if(date) await fetchAppointments(date);
 
         } catch (error) {
@@ -335,38 +396,29 @@ export function ArchitecturalAppointmentsView() {
                             <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">{eng.fullName}</th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[eng.id!]?.[time];
+                                const isClosed = !!booking?.workStageUpdated;
+                                const canAdminEdit = currentUser?.role === 'Admin' && booking;
+                                const canUserEdit = booking && !isClosed;
+
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking ? (
-                                            (booking.workStageUpdated || (booking.appointmentDate && isPast(toFirestoreDate(booking.appointmentDate)!))) ? (
-                                                <div
-                                                    className="relative h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-75"
-                                                    style={{ backgroundColor: booking.color }}
-                                                    title={booking.workStageUpdated ? "تم إغلاق هذه الزيارة." : "لا يمكن تعديل المواعيد السابقة."}
-                                                >
-                                                    {booking.workStageUpdated && <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />}
-                                                    <p className="font-bold">{booking.clientName}</p>
-                                                    {booking.visitCount && (
-                                                        <span className="text-xs mt-1 opacity-75">
-                                                            (الزيارة رقم {booking.visitCount})
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <div
-                                                            className="h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer"
-                                                            style={{ backgroundColor: booking.color }}
-                                                        >
-                                                            <p className="font-bold">{booking.clientName}</p>
-                                                            {booking.visitCount && (
-                                                                <span className="text-xs mt-1 opacity-75">
-                                                                    (الزيارة رقم {booking.visitCount})
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </DropdownMenuTrigger>
+                                             <DropdownMenu>
+                                                <DropdownMenuTrigger asChild disabled={!canAdminEdit && !canUserEdit}>
+                                                     <div
+                                                        className="relative h-full w-full rounded-md p-2 text-xs sm:text-sm text-gray-800 flex flex-col items-center justify-center text-center"
+                                                        style={{ backgroundColor: booking.color, cursor: (canAdminEdit || canUserEdit) ? 'pointer' : 'not-allowed' }}
+                                                    >
+                                                        {isClosed && <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />}
+                                                        <p className="font-bold">{booking.clientName}</p>
+                                                        {booking.visitCount && (
+                                                            <span className="text-xs mt-1 opacity-75">
+                                                                (الزيارة رقم {booking.visitCount})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </DropdownMenuTrigger>
+                                                {(canAdminEdit || canUserEdit) && (
                                                     <DropdownMenuContent dir="rtl">
                                                         <DropdownMenuItem asChild>
                                                             <Link href={`/dashboard/appointments/${booking.id}`}>
@@ -384,8 +436,8 @@ export function ArchitecturalAppointmentsView() {
                                                             <span>إلغاء الموعد</span>
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            )
+                                                )}
+                                            </DropdownMenu>
                                         ) : (
                                             <button onClick={() => handleCellClick(eng, time)} className="h-full w-full text-muted-foreground/50 hover:bg-muted transition-colors rounded-md no-print" />
                                         )}
@@ -438,7 +490,7 @@ export function ArchitecturalAppointmentsView() {
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
 
-                {loading && <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
+                {loading ? <div className='space-y-4'><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>}
 
                 {!loading && (
                     <div className="space-y-4">
@@ -462,6 +514,7 @@ export function ArchitecturalAppointmentsView() {
                     dialogData={dialogData}
                     clients={clients}
                     firestore={firestore}
+                    currentUser={currentUser}
                 />
             )}
 
@@ -470,7 +523,7 @@ export function ArchitecturalAppointmentsView() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد من الإلغاء؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيتم حذف هذا الموعد بشكل دائم، وسيتم إعادة ترقيم وتلوين الزيارات المتبقية للعميل. لا يمكن التراجع عن هذا الإجراء.
+                            سيتم حذف هذا الموعد بشكل دائم، وسيتم إعادة ترقيم وتلوين الزيارات المتبقية للعميل. إذا كان هذا الموعد مرتبطاً بإكمال مرحلة عمل، فسيتم التراجع عن ذلك الإجراء أيضاً.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -488,7 +541,7 @@ export function ArchitecturalAppointmentsView() {
 
 // --- Sub-components ---
 
-function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore, currentUser }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     
@@ -652,6 +705,22 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                         const newApptRef = doc(collection(firestore, 'appointments'));
                         const { id, ...dataToSave } = appt;
                         batch.set(newApptRef, { ...dataToSave, color: newColor, visitCount, createdAt: serverTimestamp() });
+                        
+                        const logContent = `حجز ${currentUser.fullName} موعداً بعنوان "${title || client.nameAr}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}. (الزيارة رقم ${visitCount})`;
+                        const logData = {
+                            type: 'log' as const,
+                            content: logContent,
+                            userId: currentUser.id,
+                            userName: currentUser.fullName,
+                            userAvatar: currentUser.avatarUrl,
+                            createdAt: serverTimestamp(),
+                        };
+                        const clientHistoryRef = doc(collection(firestore, `clients/${client.id}/history`));
+                        batch.set(clientHistoryRef, logData);
+                        if (selectedTransactionId) {
+                            const txTimelineRef = doc(collection(firestore, `clients/${client.id}/transactions/${selectedTransactionId}/timelineEvents`));
+                            batch.set(txTimelineRef, logData);
+                        }
                     } else {
                         const existingData = existingAppointments.find(e => e.id === appt.id);
                         if (existingData && (existingData.visitCount !== visitCount || existingData.color !== newColor)) {

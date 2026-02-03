@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp, updateDoc, doc, deleteField } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp, updateDoc, doc, deleteField, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -24,6 +24,7 @@ import { createNotification, findUserIdByEmployeeId } from '@/services/notificat
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -266,6 +267,19 @@ export default function NewArchitecturalAppointmentPage() {
             if (fromAppointmentId && !isNewClient) {
                 const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
                 await updateDoc(appointmentRef, { clientId: clientId, clientName: deleteField(), clientMobile: deleteField() });
+            }
+
+            if (!isNewClient && clientId) {
+                const logContent = `قام ${currentUser.fullName} بحجز موعد جديد بعنوان "${title}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}`;
+                const logData = {
+                    type: 'log' as const,
+                    content: logContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                };
+                await addDoc(collection(firestore, `clients/${clientId}/history`), logData);
             }
 
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });

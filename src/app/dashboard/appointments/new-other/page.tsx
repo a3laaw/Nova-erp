@@ -31,6 +31,7 @@ import { createNotification, findUserIdByEmployeeId } from '@/services/notificat
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 
@@ -270,11 +271,22 @@ export default function NewOtherAppointmentPage() {
                 meetingRoom: meetingRoom,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
-                type: 'room',
+                type: 'room' as const,
                 department: departments.find(d => d.id === selectedDepartment)?.name,
             };
             
-            await addDoc(collection(firestore, 'appointments'), newAppointment);
+            const newApptRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
+
+            const logContent = `قام ${currentUser.fullName} بحجز "${meetingRoom}" لموعد بعنوان "${title}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}`;
+            const logData = {
+                type: 'log' as const,
+                content: logContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            };
+            await addDoc(collection(firestore, `clients/${clientId}/history`), logData);
 
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
             
