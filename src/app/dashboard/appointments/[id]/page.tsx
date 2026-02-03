@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -76,13 +77,12 @@ export default function AppointmentDetailsPage() {
 
     const clientTransactionsQuery = useMemo(() => {
         if (!appointment?.clientId || appointment.transactionId) return null;
-        // Fetch all transactions for the client if the appointment is not yet linked.
         return [];
     }, [appointment?.clientId, appointment?.transactionId]);
 
     const { data: rawClientTransactions = [], loading: clientTransactionsLoading } = useSubscription<ClientTransaction>(
         firestore, 
-        clientTransactionsQuery ? `clients/${appointment.clientId}/transactions` : null, 
+        clientTransactionsQuery ? `clients/${appointment?.clientId}/transactions` : null, 
         clientTransactionsQuery || []
     );
     
@@ -106,6 +106,7 @@ export default function AppointmentDetailsPage() {
     const [selectedTransactionToLink, setSelectedTransactionToLink] = useState('');
     const [isLinking, setIsLinking] = useState(false);
     const [isAutoLinking, setIsAutoLinking] = useState(false);
+    const isCheckingRef = useRef(false);
 
     const loading = appointmentLoading || clientLoading || engineerLoading || transactionLoading || clientTransactionsLoading;
 
@@ -122,11 +123,14 @@ export default function AppointmentDetailsPage() {
 
     // Auto-link prospective client if a real client file now exists
     useEffect(() => {
-        if (!firestore || !appointment || !id || isAutoLinking || appointment.clientId || !appointment.clientMobile) {
+        if (!firestore || !appointment || !id || appointment.clientId || !appointment.clientMobile) {
             return;
         }
 
+        if (isCheckingRef.current) return;
+
         const checkAndLinkClient = async () => {
+            isCheckingRef.current = true;
             setIsAutoLinking(true);
             try {
                 const clientQuery = query(collection(firestore, 'clients'), where('mobile', '==', appointment.clientMobile), limit(1));
@@ -161,11 +165,13 @@ export default function AppointmentDetailsPage() {
                 console.error("Failed to auto-link client:", error);
             } finally {
                 setIsAutoLinking(false);
+                isCheckingRef.current = false;
             }
         };
 
         checkAndLinkClient();
-    }, [appointment, firestore, id, toast, isAutoLinking]);
+    }, [appointment, firestore, id, toast]);
+
 
     // Fetch one-time data like work stages
     useEffect(() => {
