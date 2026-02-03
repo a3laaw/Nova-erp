@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -168,6 +168,7 @@ export default function TransactionDetailPage() {
   const [stages, setStages] = useState<TransactionStage[]>([]);
   const [loadingStages, setLoadingStages] = useState(true);
   const [isParallelStageMenuOpen, setIsParallelStageMenuOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
 
   // --- Data Fetching ---
@@ -274,6 +275,80 @@ export default function TransactionDetailPage() {
       if (isNaN(date.getTime())) return '-';
       return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
   }
+
+  const handleRevertStage = async (stageIdToRevert: string) => {
+    if (!firestore || !currentUser || currentUser.role !== 'Admin' || !transaction) return;
+
+    const stageTemplate = stages.find(s => s.stageId === stageIdToRevert);
+    if (!stageTemplate) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'تعريف المرحلة غير موجود.' });
+        return;
+    }
+    if (stageTemplate.status !== 'completed') {
+        toast({ variant: 'default', title: 'معلومة', description: 'يمكن التراجع عن المراحل المكتملة فقط.' });
+        return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+        const batch = writeBatch(firestore);
+        const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+
+        const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+
+        // 1. Revert the target stage
+        const stageToRevertIndex = currentStages.findIndex(s => s.stageId === stageIdToRevert);
+        if (stageToRevertIndex === -1) {
+            throw new Error("لم يتم العثور على المرحلة في بيانات المعاملة.");
+        }
+        
+        currentStages[stageToRevertIndex].status = 'pending';
+        currentStages[stageToRevertIndex].endDate = null;
+
+        // 2. Revert the next sequential stage if it was auto-started
+        const revertedStageTemplate = stages.find(s => s.stageId === stageIdToRevert);
+        if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
+             const nextStageTemplate = stages.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
+             if (nextStageTemplate) {
+                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageTemplate.stageId);
+                if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
+                    currentStages[nextStageIndexInProg].status = 'pending';
+                    currentStages[nextStageIndexInProg].startDate = null;
+                }
+             }
+        }
+        
+        batch.update(transactionRef, { stages: currentStages });
+        
+        // 3. Log the action
+        const logContent = `تراجع المدير ${currentUser.fullName} عن إكمال مرحلة: "${stageTemplate.name}".`;
+        const logData = {
+            type: 'log' as const,
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        };
+        const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
+        batch.set(timelineRef, logData);
+        
+        const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
+        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}` });
+        
+        await batch.commit();
+        
+        toast({ title: 'نجاح', description: `تم التراجع عن مرحلة "${stageTemplate.name}".`});
+
+    } catch (error) {
+        console.error("Error reverting stage:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن المرحلة.' });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
     if (!firestore || !transaction || !currentUser || !client) return;
@@ -638,9 +713,18 @@ export default function TransactionDetailPage() {
                                                          )}
                                                     </>
                                                 )}
-                                                {stage.status === 'completed' && stage.endDate && (
-                                                    <div className="text-sm text-green-600 flex items-center gap-2">
-                                                        <Check className="h-4 w-4" /> مكتملة في {formatDate(stage.endDate)}
+                                                {stage.status === 'completed' && (
+                                                    <div className="flex items-center gap-2">
+                                                        {stage.endDate && (
+                                                            <div className="text-sm text-green-600 flex items-center gap-2">
+                                                                <Check className="h-4 w-4" /> مكتملة في {formatDate(stage.endDate)}
+                                                            </div>
+                                                        )}
+                                                        {currentUser?.role === 'Admin' && (
+                                                             <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleRevertStage(stage.stageId)} disabled={isProcessing}>
+                                                                <Undo2 className="ml-1 h-4 w-4" /> تراجع
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
