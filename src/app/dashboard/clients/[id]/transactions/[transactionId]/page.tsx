@@ -244,9 +244,7 @@ export default function TransactionDetailPage() {
             const structuralDeptSnap = await getDocs(structuralDeptQuery);
             if (!structuralDeptSnap.empty) {
                 const structuralDeptId = structuralDeptSnap.docs[0].id;
-                if (structuralDeptId !== transaction.departmentId) {
-                    await fetchStagesForDept(structuralDeptId);
-                }
+                await fetchStagesForDept(structuralDeptId);
             }
             
             const progressData = transaction.stages || [];

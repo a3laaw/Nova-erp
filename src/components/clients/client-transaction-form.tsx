@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -164,7 +165,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             };
 
             await fetchStagesForDept(primaryDepartmentId);
-            if (structuralDepartmentId && structuralDepartmentId !== primaryDepartmentId) {
+            if (structuralDepartmentId) {
                 await fetchStagesForDept(structuralDepartmentId);
             }
 
