@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -42,6 +41,7 @@ export default function NewEmployeePage() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { language } = useLanguage();
+    const { user: currentUser } = useAuth();
     
     const [formData, setFormData] = useState<Partial<Employee> & { departmentId?: string }>({
         employeeNumber: '',
@@ -568,5 +568,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
