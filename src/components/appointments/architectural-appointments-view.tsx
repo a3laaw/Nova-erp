@@ -215,22 +215,21 @@ export function ArchitecturalAppointmentsView() {
         try {
             const batch = writeBatch(firestore);
             const { id: apptId, workStageProgressId, transactionId, clientId, visitCount, title } = appointmentToDelete;
-
-            // 1. Revert stage if this appointment caused a stage update
+    
+            let stageRevertedMessage = '';
+    
             if (workStageProgressId && transactionId && clientId) {
                 const progressRef = doc(firestore, 'work_stages_progress', workStageProgressId);
                 const progressSnap = await getDoc(progressRef);
                 
                 if (progressSnap.exists()) {
                     const { stageId, stageName } = progressSnap.data();
-                    
                     const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
                     const transactionSnap = await getDoc(transactionRef);
                     
                     if (transactionSnap.exists()) {
                         const transactionData = transactionSnap.data();
                         const currentStages = transactionData.stages ? JSON.parse(JSON.stringify(transactionData.stages)) : [];
-                        
                         const stageToRevertIndex = currentStages.findIndex((s: TransactionStage) => s.stageId === stageId && s.status === 'completed');
                         
                         if (stageToRevertIndex !== -1) {
@@ -243,7 +242,7 @@ export function ArchitecturalAppointmentsView() {
                                 const stagesTemplateSnap = await getDocs(stagesTemplateQuery);
                                 const stagesTemplate = stagesTemplateSnap.docs.map(d => ({id: d.id, ...d.data()} as WorkStage));
                                 const revertedStageTemplate = stagesTemplate.find(s => s.id === stageId);
-
+    
                                 if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
                                     const nextStageTemplate = stagesTemplate.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
                                     if (nextStageTemplate) {
@@ -255,29 +254,43 @@ export function ArchitecturalAppointmentsView() {
                                     }
                                 }
                             }
-
+    
                             batch.update(transactionRef, { stages: currentStages });
-
-                            const logContent = `قام ${currentUser.fullName} بحذف الزيارة رقم ${visitCount} ("${title}"), مما أدى إلى التراجع التلقائي عن مرحلة "${stageName}".`;
-                            const logData = {
-                                type: 'log' as const,
-                                content: logContent,
-                                userId: currentUser.id,
-                                userName: currentUser.fullName,
-                                userAvatar: currentUser.avatarUrl,
-                                createdAt: serverTimestamp(),
-                            };
-                            batch.set(doc(collection(transactionRef, 'timelineEvents')), logData);
+                            stageRevertedMessage = ` مما أدى إلى التراجع التلقائي عن مرحلة "${stageName}".`;
                         }
                     }
                     batch.delete(progressRef);
                 }
             }
-            
+    
+            // Always log the deletion
+            if (clientId) {
+                const logContent = `قام ${currentUser.fullName} بحذف موعد الزيارة رقم ${visitCount || ''} ("${title}").${stageRevertedMessage}`;
+                const logData = {
+                    type: 'log' as const,
+                    content: logContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                };
+    
+                // Log in client history with context
+                const historyRef = collection(firestore, `clients/${clientId}/history`);
+                batch.set(doc(historyRef), { ...logData, content: `[موعد] ${logContent}` });
+    
+                // Log in transaction timeline if it exists
+                if (transactionId) {
+                    const timelineRef = collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`);
+                    batch.set(doc(timelineRef), logData);
+                }
+            }
+    
+            // Delete the appointment document
             const apptToDeleteRef = doc(firestore, 'appointments', apptId!);
             batch.delete(apptToDeleteRef);
-
-            // Only perform recalculation for registered clients
+    
+            // Recalculate visit counts and colors for remaining appointments
             if (clientId) {
                 const clientApptsQuery = query(
                     collection(firestore, 'appointments'),
@@ -293,27 +306,27 @@ export function ArchitecturalAppointmentsView() {
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
                 const contractSigned = clientSnap.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
-
+    
                 remainingAppointments.sort((a, b) => a.appointmentDate.toMillis() - b.appointmentDate.toMillis());
-
+    
                 remainingAppointments.forEach((appt, index) => {
                     const visitCount = index + 1;
                     const newColor = getVisitColor({ visitCount, contractSigned });
-
+    
                     const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
-
+    
                     if (needsUpdate) {
                         const apptRef = doc(firestore, 'appointments', appt.id!);
                         batch.update(apptRef, { visitCount, color: newColor });
                     }
                 });
             }
-
+    
             await batch.commit();
-
+    
             toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث البيانات المرتبطة به.' });
             if(date) await fetchAppointments(date);
-
+    
         } catch (error) {
             console.error("Error deleting appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
