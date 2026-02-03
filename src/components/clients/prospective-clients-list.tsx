@@ -31,8 +31,8 @@ export function ProspectiveClientsList() {
   const { firestore } = useFirebase();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch prospective appointments (those without a clientId)
-  const prospectiveQuery = useMemo(() => [where('clientId', '==', null)], []);
+  // Fetch prospective appointments by checking for the existence of 'clientMobile'
+  const prospectiveQuery = useMemo(() => [where('clientMobile', '>', '')], []);
   const { data: prospectiveAppointments, loading: appointmentsLoading } = useSubscription<Appointment>(firestore, 'appointments', prospectiveQuery);
 
   // Fetch all employees to map engineer IDs to names
