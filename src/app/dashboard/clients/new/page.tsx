@@ -32,6 +32,8 @@ export default function NewClientPage() {
         assignedEngineer: searchParams.get('engineerId') || '',
     };
     
+    const fromAppointmentId = searchParams.get('fromAppointmentId');
+    
     const handleSave = useCallback(async (newClientData: Partial<Client>) => {
         if (!firestore || !currentUser) return;
         
@@ -47,10 +49,13 @@ export default function NewClientPage() {
                     throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
                 }
                 
-                const prospectiveClientQuery = query(collection(firestore, 'appointments'), where('clientMobile', '==', newClientData.mobile));
-                const prospectiveSnapshot = await getDocs(prospectiveClientQuery);
-                if (!prospectiveSnapshot.empty) {
-                    throw new Error('رقم الهاتف هذا مستخدم لموعد عميل محتمل. الرجاء إنشاء ملف العميل من داخل الموعد.');
+                // This validation is only necessary if we are NOT coming from an appointment.
+                if (!fromAppointmentId) {
+                    const prospectiveClientQuery = query(collection(firestore, 'appointments'), where('clientMobile', '==', newClientData.mobile));
+                    const prospectiveSnapshot = await getDocs(prospectiveClientQuery);
+                    if (!prospectiveSnapshot.empty) {
+                        throw new Error('رقم الهاتف هذا مستخدم لموعد عميل محتمل. الرجاء إنشاء ملف العميل من داخل الموعد.');
+                    }
                 }
             }
             // --- END OF VALIDATION ---
@@ -86,7 +91,6 @@ export default function NewClientPage() {
 
                 // This logic is now superseded by the global appointment update below,
                 // but we leave it inside the transaction for the `fromAppointmentId` case.
-                const fromAppointmentId = searchParams.get('fromAppointmentId');
                 if(fromAppointmentId) {
                     const apptRef = doc(firestore, 'appointments', fromAppointmentId);
                     transaction.update(apptRef, {
@@ -141,7 +145,7 @@ export default function NewClientPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [firestore, currentUser, toast, router, searchParams]);
+    }, [firestore, currentUser, toast, router, fromAppointmentId]);
 
     return (
         <Card className="max-w-2xl mx-auto" dir="rtl">

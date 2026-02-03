@@ -106,11 +106,6 @@ export default function EditClientPage() {
                 if (!mobileSnapshot.empty && mobileSnapshot.docs[0].id !== id) {
                     throw new Error('رقم الجوال هذا مسجل لعميل آخر.');
                 }
-                 const prospectiveClientQuery = query(collection(firestore, 'appointments'), where('clientMobile', '==', updatePayload.mobile));
-                 const prospectiveSnapshot = await getDocs(prospectiveClientQuery);
-                 if (!prospectiveSnapshot.empty) {
-                     throw new Error('رقم الهاتف هذا مستخدم لموعد عميل محتمل. الرجاء إنشاء ملف العميل من داخل الموعد.');
-                 }
             }
             // --- END VALIDATION ---
 
