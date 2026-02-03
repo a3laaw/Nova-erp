@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -17,9 +16,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, runTransaction, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage, Department } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cn } from '@/lib/utils';
@@ -124,7 +123,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const stageIds = new Set<string>();
 
                 for (const deptId of departmentIds) {
-                    const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`));
+                    const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
                     const stagesSnapshot = await transaction_firestore.get(stagesQuery);
                     stagesSnapshot.forEach(doc => {
                         if (!stageIds.has(doc.id)) {
