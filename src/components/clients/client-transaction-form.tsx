@@ -123,6 +123,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const stageIds = new Set<string>();
 
                 for (const deptId of departmentIds) {
+                    if (!deptId) continue; // Defensive check for invalid IDs
                     const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
                     const stagesSnapshot = await transaction_firestore.get(stagesQuery);
                     stagesSnapshot.forEach(doc => {
