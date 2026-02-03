@@ -13,9 +13,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Camera } from 'lucide-react';
-import { useFirebase, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField } from 'firebase/firestore';
+import { Save, X, Camera, Loader2 } from 'lucide-react';
+import { useFirebase } from '@/firebase';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -271,7 +271,6 @@ export default function NewEmployeePage() {
                 delete employeeData.contractExpiry;
             }
             
-
             const batch = writeBatch(firestore);
 
             const newEmployeeRef = doc(collection(firestore, 'employees'));
@@ -560,7 +559,7 @@ export default function NewEmployeePage() {
                     إلغاء
                   </Button>
                   <Button type="submit" disabled={isLoading || isGeneratingNumber}>
-                    <Save className="ml-2 h-4 w-4" />
+                    {isLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                     {isLoading ? 'جاري الحفظ...' : 'حفظ الموظف'}
                   </Button>
                 </CardFooter>
