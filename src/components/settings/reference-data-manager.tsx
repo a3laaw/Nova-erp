@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -28,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown, PlusCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, ArrowUp, ArrowDown, PlusCircle, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -755,6 +753,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<TransactionType | null>(null);
   const [itemToDelete, setItemToDelete] = useState<TransactionType | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [itemName, setItemName] = useState('');
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
@@ -797,6 +796,53 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setItemName('');
     setSelectedDepartments([]);
   };
+  
+  const handleImportOldTypes = async () => {
+    if (!firestore) return;
+    setIsImporting(true);
+    try {
+        const batch = writeBatch(firestore);
+        const rootTypesRef = collection(firestore, 'transactionTypes');
+        
+        const existingNewTypesSnap = await getDocs(rootTypesRef);
+        const existingNewTypeNames = new Set(existingNewTypesSnap.docs.map(d => d.data().name));
+
+        const oldTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
+        const oldTypesSnapshot = await getDocs(oldTypesQuery);
+
+        let importedCount = 0;
+
+        for (const oldTypeDoc of oldTypesSnapshot.docs) {
+            const oldTypeData = oldTypeDoc.data();
+            const oldTypeName = oldTypeData.name;
+            const parentDeptId = oldTypeDoc.ref.parent.parent?.id;
+
+            if (oldTypeName && !existingNewTypeNames.has(oldTypeName)) {
+                const newTypeRef = doc(rootTypesRef);
+                batch.set(newTypeRef, {
+                    name: oldTypeName,
+                    departmentIds: parentDeptId ? [parentDeptId] : []
+                });
+                existingNewTypeNames.add(oldTypeName);
+                importedCount++;
+            }
+        }
+
+        if (importedCount > 0) {
+            await batch.commit();
+            toast({ title: 'نجاح', description: `تم استيراد ${importedCount} أنواع معاملات فريدة بنجاح.` });
+            fetchData();
+        } else {
+            toast({ title: 'لا توجد بيانات جديدة', description: 'لم يتم العثور على أنواع معاملات قديمة غير موجودة حاليًا.' });
+        }
+
+    } catch (error) {
+        console.error("Error importing old transaction types:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات القديمة.' });
+    } finally {
+        setIsImporting(false);
+    }
+};
 
   const handleSave = async () => {
     if (!firestore || !itemName.trim()) return;
@@ -839,8 +885,12 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
         <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between items-center mb-4">
           <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
+            <Button onClick={handleImportOldTypes} size="sm" variant="outline" disabled={isImporting}>
+                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                استيراد الأنواع القديمة
+            </Button>
         </div>
         <div className="border rounded-lg">
           <Table>
