@@ -663,6 +663,10 @@
             "type": "array",
             "description": "A list of department IDs involved in this transaction type.",
             "items": { "type": "string" }
+        },
+        "order": {
+          "type": "number",
+          "description": "The display and logical order of the type."
         }
       },
       "required": ["name", "departmentIds"]

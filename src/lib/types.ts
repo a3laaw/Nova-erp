@@ -1,6 +1,5 @@
 
 
-
 export interface Company {
     id?: string;
     name: string;
@@ -445,6 +444,7 @@ export interface TransactionType {
     id: string;
     name: string;
     departmentIds?: string[];
+    order?: number;
 }
 
 export interface WorkStage {

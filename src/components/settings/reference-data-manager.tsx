@@ -128,18 +128,27 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(false);
   
-  const primaryQueryConstraints = useMemo(() => [orderBy('name')], []);
+  const primaryQueryConstraints = useMemo(() => [orderBy('order')], []);
   const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
   
    useEffect(() => {
     setLoadingPrimary(primaryLoading);
     if(primaryError) {
-        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: primaryError.message });
+        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}`, description: "قد يكون السبب أن حقل 'order' غير موجود. حاول إعادة ترتيب العناصر مرة لحل المشكلة." });
+        
+        // Fallback to fetch without ordering
+        const fetchWithoutOrder = async () => {
+             if(!firestore) return;
+             const fallbackSnap = await getDocs(query(collection(firestore, primaryCollectionName)));
+             setPrimaryItems(fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
+             setLoadingPrimary(false);
+        }
+        fetchWithoutOrder();
     }
     if (primaryData) {
       setPrimaryItems(primaryData);
     }
-  }, [primaryData, primaryLoading, primaryError, primaryTitle, toast]);
+  }, [primaryData, primaryLoading, primaryError, primaryTitle, primaryCollectionName, firestore, toast]);
 
   const handleSelectPrimary = useCallback((item: T) => {
     setSelectedPrimary(item);
@@ -167,21 +176,27 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     setLoadingSecondary(true);
     const fetchSecondary = async () => {
         try {
-            const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`));
+            const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`), orderBy('order'));
             const secondarySnapshot = await getDocs(secondaryQuery);
             let fetchedItems = secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
             
-            fetchedItems.sort((a: any, b: any) => {
-                if (a.order !== undefined && b.order !== undefined) {
-                    return a.order - b.order;
-                }
-                return a.name.localeCompare(b.name, 'ar');
-            });
-            
             setSecondaryItems(fetchedItems);
-        } catch (e) {
-            console.error(e);
-            toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
+        } catch (e: any) {
+            if (e.code === 'failed-precondition') {
+                 try {
+                     const fallbackQuery = query(collection(firestore, `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`));
+                     const fallbackSnapshot = await getDocs(fallbackQuery);
+                     const fallbackItems = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
+                     setSecondaryItems(fallbackItems.sort((a,b) => a.name.localeCompare(b.name, 'ar')));
+                     toast({ variant: 'default', title: 'ملاحظة', description: `أحد العناصر في '${secondaryTitle}' لا يحتوي على حقل ترتيب. سيتم عرضه بترتيب أبجدي.` });
+                 } catch (finalError) {
+                      console.error(finalError);
+                      toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
+                 }
+            } else {
+                console.error(e);
+                toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
+            }
         } finally {
             setLoadingSecondary(false);
         }
@@ -767,10 +782,14 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       const [typesSnap, deptsSnap] = await Promise.all([
-        getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name'))),
+        getDocs(query(collection(firestore, 'transactionTypes'))),
         getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
       ]);
-      setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
+      
+      const typesData = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
+      typesData.sort((a,b) => (a.order ?? 999) - (b.order ?? 999));
+      
+      setTransactionTypes(typesData);
       setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات.' });
@@ -795,6 +814,32 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setEditingItem(null);
     setItemName('');
     setSelectedDepartments([]);
+  };
+
+  const reorderItems = async (index: number, direction: 'up' | 'down') => {
+    if (transactionTypes.length < 2) return;
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= transactionTypes.length) return;
+
+    const reorderedList = [...transactionTypes];
+    [reorderedList[index], reorderedList[newIndex]] = [reorderedList[newIndex], reorderedList[index]];
+
+    setTransactionTypes(reorderedList); // Optimistic UI update
+
+    if (!firestore) return;
+    try {
+        const batch = writeBatch(firestore);
+        reorderedList.forEach((item, idx) => {
+            const docRef = doc(firestore, 'transactionTypes', item.id);
+            batch.update(docRef, { order: idx });
+        });
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم تحديث الترتيب.' });
+    } catch (e) {
+        console.error('Failed to save order:', e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
+        setTransactionTypes(transactionTypes); // Revert on failure
+    }
   };
   
   const handleImportOldTypes = async () => {
@@ -852,7 +897,8 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
             await updateDoc(doc(firestore, 'transactionTypes', editingItem.id), dataToSave);
             toast({ title: 'نجاح', description: 'تم تحديث نوع المعاملة.' });
         } else {
-            await addDoc(collection(firestore, 'transactionTypes'), dataToSave);
+            const newOrder = transactionTypes.length;
+            await addDoc(collection(firestore, 'transactionTypes'), { ...dataToSave, order: newOrder });
             toast({ title: 'نجاح', description: 'تمت إضافة نوع المعاملة.' });
         }
         fetchData();
@@ -898,13 +944,13 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
               <TableRow>
                 <TableHead>اسم نوع المعاملة</TableHead>
                 <TableHead>الأقسام المرتبطة</TableHead>
-                <TableHead className="w-[100px]"><span className="sr-only">الإجراءات</span></TableHead>
+                <TableHead className="w-[120px]"><span className="sr-only">الإجراءات</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-6 w-full" /></TableCell></TableRow>)}
               {!loading && transactionTypes.length === 0 && <TableRow><TableCell colSpan={3} className="text-center h-24">لا توجد بيانات</TableCell></TableRow>}
-              {!loading && transactionTypes.map(item => (
+              {!loading && transactionTypes.map((item, index) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-semibold">{item.name}</TableCell>
                   <TableCell>
@@ -914,6 +960,14 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                        <div className="flex flex-col">
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems(index, 'up')} disabled={index === 0}>
+                                <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => reorderItems(index, 'down')} disabled={index === transactionTypes.length - 1}>
+                                <ArrowDown className="h-3 w-3" />
+                            </Button>
+                        </div>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog(item)}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setItemToDelete(item)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
