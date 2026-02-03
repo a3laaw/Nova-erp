@@ -41,24 +41,15 @@ export default function NewClientPage() {
         let newClientId = '';
 
         try {
-            // --- NEW VALIDATION LOGIC ---
+            // --- VALIDATION LOGIC ---
             if (newClientData.mobile) {
                 const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', newClientData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
                 if (!mobileSnapshot.empty) {
                     throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
                 }
-                
-                // This validation is only necessary if we are NOT coming from an appointment.
-                if (!fromAppointmentId) {
-                    const prospectiveClientQuery = query(collection(firestore, 'appointments'), where('clientMobile', '==', newClientData.mobile));
-                    const prospectiveSnapshot = await getDocs(prospectiveClientQuery);
-                    if (!prospectiveSnapshot.empty) {
-                        throw new Error('رقم الهاتف هذا مستخدم لموعد عميل محتمل. الرجاء إنشاء ملف العميل من داخل الموعد.');
-                    }
-                }
             }
-            // --- END OF VALIDATION ---
+            // --- END VALIDATION ---
 
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = String(new Date().getFullYear());
