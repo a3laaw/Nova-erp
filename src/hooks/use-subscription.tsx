@@ -5,10 +5,12 @@ import { type QueryConstraint } from 'firebase/firestore';
 import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
 
+const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
+
 export function useSubscription<T extends { id?: string }>(
   firestore: any,
   collectionPath: string, 
-  constraints: QueryConstraint[] = []
+  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS
 ): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
