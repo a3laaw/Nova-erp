@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,12 +28,11 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
-import { useSubscription, SmartCache } from '@/lib/cache/smart-cache';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -47,6 +46,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { useSubscription } from '@/hooks/use-subscription';
+import { cn } from '@/lib/utils';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
@@ -79,11 +80,13 @@ export function EmployeesTable() {
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // --- NEW DATA FETCHING LOGIC ---
-  const { data: employees, setData: setEmployees, loading, error } = useSubscription<Employee>(firestore, 'employees');
+  
+  const { 
+    data: employees, 
+    setData: setEmployees, 
+    loading, 
+    error,
+  } = useSubscription<Employee>(firestore, 'employees');
   
   const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
   const [isTerminating, setIsTerminating] = useState(false);
@@ -91,7 +94,6 @@ export function EmployeesTable() {
   const [terminationDate, setTerminationDate] = useState('');
   const [terminationReason, setTerminationReason] = useState<string>('');
   const [isImmediate, setIsImmediate] = useState(false);
-
 
   const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
   const [isRehiring, setIsRehiring] = useState(false);
@@ -104,15 +106,24 @@ export function EmployeesTable() {
     const getSafeTimestamp = (date: any): number => {
         if (!date) return 0;
         if (typeof date.toMillis === 'function') return date.toMillis();
-        return new Date(date).getTime();
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
     };
     const employeeList = employees.map(emp => ({
         ...emp,
         annualLeaveBalance: calculateAnnualLeaveBalance(emp)
     }));
-    return employeeList.sort((a,b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
+    // Sort by creation date descending, with a fallback for items without a date.
+    return employeeList.sort((a, b) => {
+        const timeB = getSafeTimestamp(b.createdAt);
+        const timeA = getSafeTimestamp(a.createdAt);
+        if (timeB !== timeA) {
+            return timeB - timeA; // Sort by date primarily
+        }
+        // Fallback sort by name if dates are the same or not present
+        return a.fullName.localeCompare(b.fullName, 'ar');
+    });
   }, [employees]);
-
 
   const filteredEmployees = useMemo(() => {
     return searchEmployees(processedEmployees, searchQuery);
@@ -176,7 +187,7 @@ export function EmployeesTable() {
         toast({ title: 'نجاح', description: `تم إنهاء خدمة الموظف ${employeeToTerminate.fullName} بنجاح.` });
         
     } catch (err) {
-        setEmployees(originalEmployees);
+        setEmployees(originalEmployees); // Revert on failure
         console.error(err);
         toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم إنهاء خدمة الموظف. تم التراجع.' });
     } finally {
@@ -245,48 +256,10 @@ export function EmployeesTable() {
 
   const t = {
     ar: {
-      title: 'إدارة الموظفين',
-      description: 'عرض وتحديث حالات ملفات الموظفين.',
-      addClient: 'إضافة موظف',
-      fileNumber: 'رقم الملف',
-      fullName: 'الاسم الكامل',
-      assignedEngineer: 'المهندس المسؤول',
-      mobile: 'رقم الجوال',
-      status: 'الحالة',
-      loading: 'جاري تحميل البيانات...',
-      error: 'حدث خطأ أثناء جلب البيانات.',
-      noClients: 'لا يوجد موظفون حالياً.',
-      actions: 'الإجراءات',
-      viewProfile: 'عرض الملف',
-      edit: 'تعديل',
-      delete: 'حذف',
-      deleteConfirmTitle: 'هل أنت متأكد؟',
-      deleteConfirmDesc: 'سيتم حذف ملف العميل بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
-      cancel: 'إلغاء',
-      confirmDelete: 'نعم، قم بالحذف',
       searchPlaceholder: 'ابحث بالاسم، الرقم الوظيفي، أو الرقم المدني...'
     },
     en: {
-      title: 'Employee Management',
-      description: 'View and update client file statuses.',
-      addClient: 'Add Employee',
-      fileNumber: 'File Number',
-      fullName: 'Full Name',
-      assignedEngineer: 'Assigned Engineer',
-      mobile: 'Mobile',
-      status: 'Status',
-      loading: 'Loading data...',
-      error: 'An error occurred while fetching data.',
-      noClients: 'No employees to display at the moment.',
-      actions: 'Actions',
-      viewProfile: 'View Profile',
-      edit: 'Edit',
-      delete: 'Delete',
-      deleteConfirmTitle: 'Are you sure?',
-      deleteConfirmDesc: 'This will permanently delete the employee file. This action cannot be undone.',
-      cancel: 'Cancel',
-      confirmDelete: 'Yes, delete',
-      searchPlaceholder: 'Search by name, file no., or mobile...'
+      searchPlaceholder: 'Search by name, employee no., or civil ID...'
     }
   }
   const currentText = t[language];
