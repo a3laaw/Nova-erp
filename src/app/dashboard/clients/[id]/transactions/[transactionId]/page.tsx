@@ -218,16 +218,37 @@ export default function TransactionDetailPage() {
     const mergeAndSetStages = async () => {
         setLoadingStages(true);
         try {
-            let templateStages: WorkStage[] = [];
-            if (transaction.departmentId) {
-                const stagesQuery = query(
-                    collection(firestore, `departments/${transaction.departmentId}/workStages`),
-                    orderBy('order', 'asc')
-                );
+            const templateStages: WorkStage[] = [];
+            const stageIds = new Set<string>();
+            const departmentsCollection = collection(firestore, 'departments');
+
+            const fetchStagesForDept = async (deptId: string) => {
+                if (!deptId) return;
+                const stagesQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order', 'asc'));
                 const stagesSnapshot = await getDocs(stagesQuery);
-                templateStages = stagesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
+                stagesSnapshot.forEach(doc => {
+                    if (!stageIds.has(doc.id)) {
+                        templateStages.push({ id: doc.id, ...doc.data() } as WorkStage);
+                        stageIds.add(doc.id);
+                    }
+                });
+            };
+
+            // 1. Fetch stages from the primary department
+            if (transaction.departmentId) {
+                await fetchStagesForDept(transaction.departmentId);
             }
 
+            // 2. Fetch stages from the structural department
+            const structuralDeptQuery = query(departmentsCollection, where('name', '==', 'القسم الإنشائي'), limit(1));
+            const structuralDeptSnap = await getDocs(structuralDeptQuery);
+            if (!structuralDeptSnap.empty) {
+                const structuralDeptId = structuralDeptSnap.docs[0].id;
+                if (structuralDeptId !== transaction.departmentId) {
+                    await fetchStagesForDept(structuralDeptId);
+                }
+            }
+            
             const progressData = transaction.stages || [];
             const progressMap = new Map(progressData.map(p => [p.stageId, p]));
 
@@ -252,7 +273,7 @@ export default function TransactionDetailPage() {
                     notes: progress?.notes || '',
                     completedCount: progress?.completedCount || 0,
                 };
-            });
+            }).sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
 
             setStages(mergedStages);
         } catch (e) {
