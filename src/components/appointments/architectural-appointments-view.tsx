@@ -26,6 +26,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -490,18 +491,19 @@ export function ArchitecturalAppointmentsView() {
                     <h1 className="text-xl font-bold">جدول زيارات القسم المعماري</h1>
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
-
+                
                 {loading ? (
                   <div className='space-y-4'>
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-48 w-full" />
                   </div>
                 ) : (
-                    <div className="space-y-4">
-                        {renderGridSection('الفترة الصباحية', morningSlots)}
-                        {renderGridSection('الفترة المسائية', eveningSlots)}
-                    </div>
+                  <div className="space-y-4">
+                    {renderGridSection('الفترة الصباحية', morningSlots)}
+                    {renderGridSection('الفترة المسائية', eveningSlots)}
+                  </div>
                 )}
+                
                  <div className="flex justify-center gap-4 pt-4 text-xs print:text-[8px]">
                     <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full" style={{ backgroundColor: '#facc15' }} /><span>أول زيارة</span></div>
                     <div className="flex items-center gap-2"><div className="h-4 w-4 rounded-full" style={{ backgroundColor: '#22c55e' }} /><span>متابعة (بدون عقد)</span></div>
