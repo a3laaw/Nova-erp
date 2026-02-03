@@ -423,12 +423,25 @@ export default function NewCashReceiptPage() {
 
             if (selectedProjectId && isFirstReceiptForProject && transactionDataForCheck && transactionRefForUpdate) {
                 const currentStages: TransactionStage[] = [...(transactionDataForCheck.stages || [])];
-                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
+                let stagesHaveChanged = false;
 
+                // Automatically complete "General Inquiries" stage
+                const inquiriesStageIndex = currentStages.findIndex(s => s.name === 'استفسارات عامة');
+                if (inquiriesStageIndex !== -1 && currentStages[inquiriesStageIndex].status !== 'completed') {
+                    currentStages[inquiriesStageIndex].status = 'completed';
+                    if (!(currentStages[inquiriesStageIndex] as any).endDate) {
+                        (currentStages[inquiriesStageIndex] as any).endDate = new Date();
+                    }
+                    stagesHaveChanged = true;
+                }
+
+                // Complete "Contract Signing" stage
+                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
                 if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
                     currentStages[contractStageIndex].status = 'completed';
                     (currentStages[contractStageIndex] as any).endDate = new Date();
-                    
+                    stagesHaveChanged = true;
+
                     const contractWorkStage = workStages.find(ws => ws.name === 'توقيع العقد');
                     if (contractWorkStage?.order !== undefined) {
                         const nextStageInTemplate = workStages.find(ws => ws.order === contractWorkStage.order! + 1);
@@ -452,6 +465,9 @@ export default function NewCashReceiptPage() {
                             }
                         }
                     }
+                }
+                
+                if (stagesHaveChanged) {
                     transaction_fs.update(transactionRefForUpdate, { stages: currentStages });
                 }
             }
