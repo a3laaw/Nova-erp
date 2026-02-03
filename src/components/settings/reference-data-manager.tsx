@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch, collectionGroup } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
@@ -73,8 +72,8 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 }
 
 
-// Reusable component for the management UI (previously the whole component)
-function ManagerView<T extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel'}>({
+// Reusable component for the management UI
+function ManagerView<T extends {id: string, name: string, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel'}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -128,44 +127,68 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
   const [allSequentialStages, setAllSequentialStages] = useState<MultiSelectOption[]>([]);
   const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(false);
-  
-  const primaryQueryConstraints = useMemo(() => [orderBy('order')], []);
-  const { data: primaryData, loading: primaryLoading, error: primaryError } = useSubscription<T>(firestore, primaryCollectionName, primaryQueryConstraints);
-  
-  useEffect(() => {
-    setLoadingPrimary(primaryLoading);
-    if (primaryError) {
-        toast({
-            variant: 'destructive',
-            title: `فشل جلب ${primaryTitle}`,
-            description: "قد يكون السبب أن حقل 'order' غير موجود. حاول إعادة ترتيب العناصر مرة لحل المشكلة."
-        });
-        
-        const fetchWithoutOrder = async () => {
-             if(!firestore) return;
-             try {
-                // To maintain consistency, try to order by name as a fallback.
-                const fallbackSnap = await getDocs(query(collection(firestore, primaryCollectionName), orderBy('name')));
-                setPrimaryItems(fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
-             } catch (e) {
-                // If ordering by name also fails, fetch without any order.
-                const finalFallbackSnap = await getDocs(query(collection(firestore, primaryCollectionName)));
-                setPrimaryItems(finalFallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
-             } finally {
-                setLoadingPrimary(false);
-             }
+
+  const fetchPrimaryItems = useCallback(async () => {
+    if (!firestore) return;
+    setLoadingPrimary(true);
+    try {
+        let snapshot;
+        try {
+            snapshot = await getDocs(query(collection(firestore, primaryCollectionName), orderBy('order')));
+        } catch (e) {
+            // Fallback if 'order' field doesn't exist
+            try {
+                snapshot = await getDocs(query(collection(firestore, primaryCollectionName), orderBy('name')));
+            } catch (e2) {
+                snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
+            }
         }
-        fetchWithoutOrder();
-    } else if (primaryData) {
-      setPrimaryItems(primaryData);
+        setPrimaryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T)));
+    } catch (e) {
+        console.error("Error fetching primary items:", e);
+        toast({ variant: 'destructive', title: `فشل جلب ${primaryTitle}` });
+    } finally {
+        setLoadingPrimary(false);
     }
-  }, [primaryData, primaryLoading, primaryError, primaryTitle, primaryCollectionName, firestore, toast]);
+  }, [firestore, primaryCollectionName, primaryTitle, toast]);
 
-  const handleSelectPrimary = useCallback((item: T) => {
+  useEffect(() => {
+    fetchPrimaryItems();
+  }, [fetchPrimaryItems]);
+  
+  const fetchSecondaryItems = useCallback(async () => {
+    if (!selectedPrimary || !firestore || !secondaryCollectionName) {
+        setSecondaryItems([]);
+        return;
+    }
+    setLoadingSecondary(true);
+    try {
+        let snapshot;
+        const collectionPath = `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`;
+        try {
+            snapshot = await getDocs(query(collection(firestore, collectionPath), orderBy('order')));
+        } catch (e) {
+            // Fallback
+            try {
+                snapshot = await getDocs(query(collection(firestore, collectionPath), orderBy('name')));
+            } catch (e2) {
+                snapshot = await getDocs(query(collection(firestore, collectionPath)));
+            }
+        }
+        setSecondaryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S)));
+    } catch (e) {
+        console.error("Error fetching secondary items:", e);
+        toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
+    } finally {
+        setLoadingSecondary(false);
+    }
+  }, [selectedPrimary, firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
+
+
+  const handleSelectPrimary = (item: T) => {
     setSelectedPrimary(item);
-  }, []);
+  };
 
-  // Effect to select the first item by default
   useEffect(() => {
     const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
     if (!primaryExists && primaryItems.length > 0) {
@@ -175,46 +198,9 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     }
   }, [primaryItems, selectedPrimary]);
 
-  // Effect to fetch secondary items when a primary item is selected
   useEffect(() => {
-    if (!selectedPrimary) {
-      setSecondaryItems([]);
-      return;
-    }
-    
-    if (!firestore || !secondaryCollectionName) return;
-
-    setLoadingSecondary(true);
-    const fetchSecondary = async () => {
-        try {
-            const secondaryQuery = query(collection(firestore, `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`), orderBy('order'));
-            const secondarySnapshot = await getDocs(secondaryQuery);
-            let fetchedItems = secondarySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
-            
-            setSecondaryItems(fetchedItems);
-        } catch (e: any) {
-            if (e.code === 'failed-precondition') {
-                 try {
-                     const fallbackQuery = query(collection(firestore, `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`));
-                     const fallbackSnapshot = await getDocs(fallbackQuery);
-                     const fallbackItems = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
-                     setSecondaryItems(fallbackItems.sort((a,b) => a.name.localeCompare(b.name, 'ar')));
-                     toast({ variant: 'default', title: 'ملاحظة', description: `أحد العناصر في '${secondaryTitle}' لا يحتوي على حقل ترتيب. سيتم عرضه بترتيب أبجدي.` });
-                 } catch (finalError) {
-                      console.error(finalError);
-                      toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
-                 }
-            } else {
-                console.error(e);
-                toast({ variant: 'destructive', title: `فشل جلب ${secondaryTitle}` });
-            }
-        } finally {
-            setLoadingSecondary(false);
-        }
-    };
-    
-    fetchSecondary();
-  }, [selectedPrimary, firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
+    fetchSecondaryItems();
+  }, [fetchSecondaryItems]);
 
 
   const fetchReferenceDataForDialog = useCallback(async () => {
@@ -321,7 +307,9 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
     } catch (e) {
         console.error('Failed to save order:', e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب الجديد.' });
-        setList(list as any); // Revert UI on failure
+        // Revert UI on failure
+        if (type === 'primary') await fetchPrimaryItems();
+        else await fetchSecondaryItems();
     }
   };
 
@@ -366,10 +354,11 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
         await addDoc(collectionRef, dataToSave);
         toast({ title: 'نجاح', description: 'تمت إضافة العنصر.' });
       }
-      if (type === 'secondary' && selectedPrimary) {
-          handleSelectPrimary(selectedPrimary);
-      }
+      
+      if (type === 'primary') await fetchPrimaryItems();
+      else await fetchSecondaryItems();
       closeDialog();
+
     } catch (e) {
        console.error(e);
        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ العنصر.' });
@@ -388,9 +377,8 @@ function ManagerView<T extends {id: string, name: string, allowedRoles?: string[
        try {
         await deleteDoc(doc(firestore, collectionPath, id));
         toast({ title: 'نجاح', description: 'تم حذف العنصر.' });
-        if (type === 'secondary' && selectedPrimary) {
-             handleSelectPrimary(selectedPrimary);
-        }
+        if (type === 'primary') await fetchPrimaryItems();
+        else await fetchSecondaryItems();
       } catch (e) {
         console.error(e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العنصر. قد يكون مرتبطًا ببيانات أخرى.' });
@@ -643,21 +631,22 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       const [typesSnap, deptsSnap] = await Promise.all([
-        getDocs(query(collection(firestore, 'transactionTypes'))),
+        getDocs(query(collection(firestore, 'transactionTypes'), orderBy('order'))),
         getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
       ]);
       
       const typesData = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
-      typesData.sort((a,b) => (a.order ?? 999) - (b.order ?? 999));
       
       setTransactionTypes(typesData);
       setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
     } catch (e) {
-      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات.' });
+      // Fallback if order fails
+      const typesSnap = await getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')));
+      setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
     } finally {
       setLoading(false);
     }
-  }, [firestore, toast]);
+  }, [firestore]);
   
   useEffect(() => {
     fetchData();
@@ -785,9 +774,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FileText className="h-6 w-6" />
-          <CardTitle>إدارة أنواع المعاملات</CardTitle>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <FileText className="h-6 w-6 flex-shrink-0" />
+          <CardTitle className="whitespace-nowrap truncate">إدارة أنواع المعاملات</CardTitle>
         </div>
         <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
