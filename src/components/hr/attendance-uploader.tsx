@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, File, Loader2, Save, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { getDaysInMonth, format } from 'date-fns';
@@ -35,7 +35,7 @@ const DEFAULT_START_TIME = '08:00'; // Fallback if not set on employee
 
 export function AttendanceUploader() {
   const { toast } = useToast();
-  const firestore = useFirestore();
+  const { firestore } = useFirebase();
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

@@ -11,7 +11,7 @@ import { Calculator, Loader2, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Payslip } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -35,7 +35,7 @@ const paymentTypeTranslations: Record<string, string> = {
 
 export function PayrollGenerator() {
   const { toast } = useToast();
-  const firestore = useFirestore();
+  const { firestore } = useFirebase();
   const [year, setYear] = useState<number | null>(null);
   const [month, setMonth] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);

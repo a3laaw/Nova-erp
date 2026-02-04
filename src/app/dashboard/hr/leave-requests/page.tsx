@@ -70,7 +70,7 @@ const typeTranslations: Record<LeaveRequest['leaveType'], string> = {
 
 
 export default function LeaveRequestsPage() {
-    const firestore = useFirebase();
+    const { firestore } = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);

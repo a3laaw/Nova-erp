@@ -22,7 +22,7 @@ import type { Employee } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Calculator, Landmark, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { intervalToDuration } from 'date-fns';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
@@ -34,7 +34,7 @@ type TerminationReason = 'resignation' | 'termination' | 'probation' | null;
 
 
 export function GratuityCalculator() {
-  const firestore = useFirebase();
+  const { firestore } = useFirebase();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
