@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { DateInput } from '@/components/ui/date-input';
 
 
 interface LeaveRequestFormProps {
@@ -278,11 +279,11 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                 <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="startDate">من تاريخ <span className="text-destructive">*</span></Label>
-                        <Input id="startDate" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
+                        <DateInput value={startDate} onChange={setStartDate} />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="endDate">إلى تاريخ <span className="text-destructive">*</span></Label>
-                        <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
+                        <DateInput value={endDate} onChange={setEndDate} />
                     </div>
                 </div>
 

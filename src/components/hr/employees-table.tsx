@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, RefreshCw, Loader2, Calendar } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +29,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, collection } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
@@ -48,7 +55,15 @@ import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';
+import { ClientForm } from '@/components/clients/client-form';
+import { DateInput } from '../ui/date-input';
 
+
+type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
+
+interface ClientWithEmployee extends Client {
+  assignedEngineerName?: string;
+}
 
 const statusTranslations: Record<Employee['status'], string> = {
   active: 'نشط',
@@ -393,24 +408,18 @@ export function EmployeesTable() {
                   </div>
                   <div className="grid gap-2">
                       <Label htmlFor="noticeStartDate" className={isImmediate ? 'text-muted-foreground' : ''}>تاريخ تقديم الاستقالة / بدء الإنذار</Label>
-                      <Input
-                          id="noticeStartDate"
-                          type="date"
+                      <DateInput
                           value={noticeStartDate}
-                          onChange={(e) => setNoticeStartDate(e.target.value)}
+                          onChange={setNoticeStartDate}
                           disabled={isImmediate}
                       />
                   </div>
                   <div className="grid gap-2">
                       <Label htmlFor="terminationDate" className={!isImmediate ? 'text-muted-foreground' : ''}>تاريخ إنهاء الخدمة الفعلي</Label>
-                      <Input
-                          id="terminationDate"
-                          type="date"
+                      <DateInput
                           value={terminationDate}
-                          onChange={(e) => setTerminationDate(e.target.value)}
-                          readOnly={!isImmediate}
+                          onChange={setTerminationDate}
                           disabled={!isImmediate}
-                          className={!isImmediate ? 'bg-muted' : ''}
                       />
                   </div>
               </div>
@@ -448,11 +457,9 @@ export function EmployeesTable() {
                         {rehireType === 'new' && (
                             <div className="grid gap-2">
                                 <Label htmlFor="newHireDate">تاريخ التعيين الجديد</Label>
-                                <Input
-                                    id="newHireDate"
-                                    type="date"
+                                <DateInput
                                     value={newHireDate}
-                                    onChange={(e) => setNewHireDate(e.target.value)}
+                                    onChange={setNewHireDate}
                                 />
                             </div>
                         )}
@@ -470,6 +477,6 @@ export function EmployeesTable() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
-    );
+    </>
+  );
 }

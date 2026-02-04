@@ -38,6 +38,7 @@ import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { DateInput } from '@/components/ui/date-input';
 
 // Represents a leave request augmented with the current employee name
 interface AugmentedLeaveRequest extends LeaveRequest {
@@ -216,21 +217,11 @@ export default function LeaveReportsPage() {
                     <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end'>
                         <div className="grid gap-2">
                             <Label htmlFor="dateFrom">من تاريخ</Label>
-                            <Input 
-                                id="dateFrom"
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                            />
+                            <DateInput value={dateFrom} onChange={setDateFrom} />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="dateTo">إلى تاريخ</Label>
-                            <Input 
-                                id="dateTo"
-                                type="date"
-                                value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                            />
+                            <DateInput value={dateTo} onChange={setDateTo} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="employeeFilter">الموظف</Label>
