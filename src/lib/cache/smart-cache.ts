@@ -19,6 +19,21 @@ interface CacheEntry<T> {
   ttl: number;
 }
 
+/**
+ * A replacer function for JSON.stringify to handle non-serializable objects like Firestore Timestamps.
+ * @param key The key of the property being stringified.
+ * @param value The value of the property being stringified.
+ * @returns A serializable version of the value.
+ */
+function safeJsonReplacer(key: string, value: any) {
+    if (value && typeof value === 'object' && typeof value.toDate === 'function') {
+        // This is a Firestore Timestamp object. Convert it to a serializable ISO string.
+        return value.toDate().toISOString();
+    }
+    // For all other values, return them as is.
+    return value;
+}
+
 class SmartCache {
   async getFromStorage<T>(key: string): Promise<CacheEntry<T> | null> {
     try {
@@ -79,8 +94,8 @@ class SmartCache {
     return onSnapshot(q,
       (snapshot) => {
         const data = snapshot.docs.map(doc => {
-            // Sanitize data to remove any non-serializable fields from Firestore
-            const plainData = JSON.parse(JSON.stringify(doc.data()));
+            // **FIX**: Use the safe replacer to handle Timestamps before JSON parsing.
+            const plainData = JSON.parse(JSON.stringify(doc.data(), safeJsonReplacer));
             return { id: doc.id, ...plainData } as T;
         });
         onUpdate(data);
@@ -107,8 +122,8 @@ class SmartCache {
     return onSnapshot(doc(db, docPath),
       (snapshot) => {
         if(snapshot.exists()) {
-            // Sanitize data to remove any non-serializable fields from Firestore
-            const plainData = JSON.parse(JSON.stringify(snapshot.data()));
+            // **FIX**: Use the safe replacer to handle Timestamps before JSON parsing.
+            const plainData = JSON.parse(JSON.stringify(snapshot.data(), safeJsonReplacer));
             const data = { id: snapshot.id, ...plainData } as T;
             onUpdate(data);
         } else {
@@ -130,7 +145,8 @@ class SmartCache {
     }
 
     const freshData = await fetchFn();
-    const plainData = JSON.parse(JSON.stringify(freshData));
+    // **FIX**: Use the safe replacer to handle Timestamps before JSON parsing.
+    const plainData = JSON.parse(JSON.stringify(freshData, safeJsonReplacer));
     await this.set(key, plainData, ttl);
     return plainData;
   }
