@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -45,7 +45,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs, getDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest, Employee } from '@/lib/types';
@@ -54,7 +54,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
@@ -103,6 +103,9 @@ export default function LeaveRequestsPage() {
     
     const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const [isDeleteAllAlertOpen, setIsDeleteAllAlertOpen] = useState(false);
+    const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
     const [dataLoading, setDataLoading] = useState(true);
@@ -313,6 +316,43 @@ export default function LeaveRequestsPage() {
         }
     };
 
+    const handleDeleteAllRequests = async () => {
+        if (!firestore) return;
+        setIsDeletingAll(true);
+        try {
+            const batch = writeBatch(firestore);
+
+            const requestsQuery = query(collection(firestore, 'leaveRequests'));
+            const requestsSnapshot = await getDocs(requestsQuery);
+            requestsSnapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            const onLeaveEmployeesQuery = query(collection(firestore, 'employees'), where('status', '==', 'on-leave'));
+            const onLeaveEmployeesSnapshot = await getDocs(onLeaveEmployeesQuery);
+            onLeaveEmployeesSnapshot.forEach(doc => {
+                batch.update(doc.ref, { status: 'active' });
+            });
+
+            await batch.commit();
+            toast({
+                title: 'نجاح',
+                description: `تم حذف ${requestsSnapshot.size} طلب إجازة وتحديث حالة ${onLeaveEmployeesSnapshot.size} موظف بنجاح.`
+            });
+            
+        } catch (err) {
+            console.error("Error deleting all leave requests:", err);
+            toast({
+                variant: 'destructive',
+                title: 'خطأ فادح',
+                description: 'فشل حذف جميع طلبات الإجازة. يرجى المحاولة مرة أخرى.'
+            });
+        } finally {
+            setIsDeletingAll(false);
+            setIsDeleteAllAlertOpen(false);
+        }
+    };
+
 
     const handleCloseForm = () => {
         setIsFormOpen(false);
@@ -344,10 +384,16 @@ export default function LeaveRequestsPage() {
                         إدارة طلبات الإجازات المقدمة من الموظفين.
                         </CardDescription>
                     </div>
-                    <Button onClick={handleNewRequestClick}>
-                        <PlusCircle className="ml-2 h-4 w-4" />
-                        طلب إجازة جديد
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleNewRequestClick}>
+                            <PlusCircle className="ml-2 h-4 w-4" />
+                            طلب إجازة جديد
+                        </Button>
+                         <Button variant="destructive" onClick={() => setIsDeleteAllAlertOpen(true)}>
+                            <Trash2 className="ml-2 h-4 w-4" />
+                            حذف جميع الإجازات
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -565,7 +611,23 @@ export default function LeaveRequestsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            <AlertDialog open={isDeleteAllAlertOpen} onOpenChange={setIsDeleteAllAlertOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد حذف جميع الإجازات؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            تحذير: سيتم حذف جميع طلبات الإجازة في النظام بشكل نهائي. سيؤدي هذا أيضًا إلى إعادة جميع الموظفين الذين هم "في إجازة" إلى الحالة "نشط". لا يمكن التراجع عن هذا الإجراء.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingAll}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAllRequests} disabled={isDeletingAll} className="bg-destructive hover:bg-destructive/90">
+                            {isDeletingAll ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف الكل'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
     </div>
   );
 }
-    
