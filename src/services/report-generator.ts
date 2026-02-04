@@ -76,6 +76,7 @@ interface ReportOptions {
 // --- Helper Functions ---
 
 function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, initialValue: any) {
+  // .find() is efficient because the query is already ordered by date descending
   const relevantLog = logs.find(log => {
     const effectiveDate = toFirestoreDate(log.effectiveDate);
     return log.field === field && effectiveDate && effectiveDate <= asOfDate;

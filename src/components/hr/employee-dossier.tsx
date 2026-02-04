@@ -39,7 +39,7 @@ const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800', 'on-leave': 'bg-yellow-100 text-yellow-800', terminated: 'bg-red-100 text-red-800',
 };
 
-function InfoItem({ label, value }: { label: string, value: string | number | null | undefined | React.ReactNode }) {
+function InfoItem({ label, value, className }: { label: string, value: string | number | null | undefined | React.ReactNode, className?: string }) {
   return (
       <div className="flex justify-between items-center py-1 print:py-0.5">
           <span className="text-muted-foreground">{label}:</span>
