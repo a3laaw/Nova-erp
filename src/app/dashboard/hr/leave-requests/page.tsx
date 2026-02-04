@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -175,7 +176,7 @@ export default function LeaveRequestsPage() {
         };
 
         autoStartLeaves();
-    }, [firestore, hasCheckedLeaves, dataLoading, toast]);
+    }, [firestore, hasCheckedLeaves, dataLoading]);
 
     useEffect(() => {
         if (!firestore) return;
@@ -203,7 +204,7 @@ export default function LeaveRequestsPage() {
         };
 
         fetchAllEmployees();
-    }, [firestore, toast]);
+    }, [firestore]);
 
 
     const requestsQueryConstraints = useMemo(() => {
@@ -660,3 +661,4 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
+
