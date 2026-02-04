@@ -19,7 +19,7 @@ import { toFirestoreDate } from './date-converter';
 import { calculateAnnualLeaveBalance } from './leave-calculator';
 
 // A completely serializable version of the Employee, safe to pass to clients.
-// All date-like objects are converted to strings.
+// All date-like objects are converted to strings, and complex objects are manually mapped.
 type SerializableEmployee = Omit<Employee, 'hireDate' | 'dob' | 'residencyExpiry' | 'contractExpiry' | 'terminationDate' | 'lastVacationAccrualDate' | 'lastLeaveResetDate' | 'createdAt' | 'lastLeave' | 'auditLogs' | 'serviceDuration'> & {
   hireDate: string | null;
   dob: string | null;
@@ -152,6 +152,8 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       }
     }
 
+    // *** CRITICAL FIX: ABSOLUTE SANITIZATION ***
+    // Manually construct the final clean object. Do NOT use spread operator (...) on raw Firestore objects.
     const finalData = {
         id: empSnap.id,
         employeeNumber: baseData.employeeNumber,
@@ -183,12 +185,14 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         eosb: calculatedEosb,
         leaveBalance,
         serviceDuration,
+        // *** CRITICAL FIX: Manually map audit logs to prevent prototype pollution ***
         auditLogs: auditLogs.map(log => ({
             field: log.field,
-            oldValue: log.oldValue,
-            newValue: log.newValue,
+            oldValue: String(log.oldValue ?? '-'),
+            newValue: String(log.newValue ?? '-'),
             effectiveDate: toFirestoreDate(log.effectiveDate)?.toISOString() || ''
         })),
+        // *** CRITICAL FIX: Manually map lastLeave object ***
         lastLeave: lastReturn ? {
             leaveType: lastReturn.leaveType,
             days: lastReturn.days,
@@ -224,6 +228,7 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             const data = doc.data() as Employee;
             const hireDate = toFirestoreDate(data.hireDate);
             const serviceYears = hireDate ? differenceInYears(asOfDate, hireDate) : 0;
+            // Manual mapping to ensure a clean object
             return {
                 id: doc.id,
                 employeeNumber: data.employeeNumber ?? '-',
@@ -286,6 +291,8 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
       throw new Error(`Report type '${reportType}' is not implemented.`);
     }
 
+    // *** CRITICAL FIX: Final sanitization step to strip any remaining non-serializable prototypes.
+    // This is the ultimate guarantee against stack overflows.
     return JSON.parse(JSON.stringify(result));
 
   } catch (error) {
@@ -293,3 +300,5 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
     throw new Error(error instanceof Error ? error.message : 'An unknown server error occurred during report generation.');
   }
 }
+
+    

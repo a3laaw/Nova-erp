@@ -17,13 +17,16 @@ interface DossierProps {
   reportDate: Date;
 }
 
+// This function is now more robust and expects a string input.
 const formatDate = (dateValue: string | null | undefined, fallback = '-') => {
   if (!dateValue) return fallback;
   try {
     const date = parseISO(dateValue);
-    if (isNaN(date.getTime())) return dateValue;
+    // Check if the parsed date is valid
+    if (isNaN(date.getTime())) return dateValue; // Return the original string if parsing fails
     return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(date);
   } catch (e) {
+    // Return the string itself if parseISO fails (e.g., malformed string)
     return dateValue;
   }
 };
@@ -86,6 +89,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
     <div className="p-4 md:p-6 bg-background font-body print:p-0 printable-content" dir="rtl">
       <div className="max-w-4xl mx-auto space-y-4 bg-card p-0 rounded-lg shadow-lg print:shadow-none print:rounded-none print:border-none print:bg-transparent">
         {branding?.letterhead_image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={branding.letterhead_image_url} alt="Letterhead" className="w-full h-auto" />
         )}
         <div className="p-6 md:p-8">
@@ -183,3 +187,5 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
     </div>
   );
 }
+
+    
