@@ -123,25 +123,29 @@ export default function LeaveRequestsPage() {
 
         const autoStartLeaves = async () => {
             const today = new Date();
-            // Set to start of day to catch any leave that started today
             today.setHours(0, 0, 0, 0);
 
             try {
+                // Simplified query to avoid composite index requirement
                 const q = query(
                     collection(firestore, 'leaveRequests'),
                     where('status', '==', 'approved'),
-                    where('isBackFromLeave', '!=', true),
                     where('startDate', '<=', Timestamp.fromDate(today))
                 );
 
                 const snapshot = await getDocs(q);
-                if (snapshot.empty) {
+                
+                // Client-side filtering for isBackFromLeave
+                const activeLeaveDocs = snapshot.docs.filter(doc => doc.data().isBackFromLeave !== true);
+
+                if (activeLeaveDocs.length === 0) {
                     setHasCheckedLeaves(true);
                     return;
                 }
 
-                const employeeIdsToPotentiallyUpdate = snapshot.docs.map(doc => doc.data().employeeId);
+                const employeeIdsToPotentiallyUpdate = activeLeaveDocs.map(doc => doc.data().employeeId);
                 const uniqueEmployeeIds = [...new Set(employeeIdsToPotentiallyUpdate)];
+                
                 if (uniqueEmployeeIds.length === 0) {
                     setHasCheckedLeaves(true);
                     return;
@@ -658,4 +662,3 @@ export default function LeaveRequestsPage() {
   );
 }
 
-    
