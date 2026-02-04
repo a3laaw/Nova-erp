@@ -44,7 +44,7 @@ const leaveTypeOptions: { value: LeaveType; label: string }[] = [
 
 
 export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveRequestFormProps) {
-    const firestore = useFirebase();
+    const { firestore } = useFirebase();
     const { toast } = useToast();
     
     const [employees, setEmployees] = useState<Employee[]>([]);
