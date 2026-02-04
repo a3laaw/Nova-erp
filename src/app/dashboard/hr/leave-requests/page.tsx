@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2, Loader2, Printer } from 'lucide-react';
+import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2, Loader2, Printer, PlayCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -104,6 +104,7 @@ export default function LeaveRequestsPage() {
     
     const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
     const [hasCheckedLeaves, setHasCheckedLeaves] = useState(false);
     const [employeesMap, setEmployeesMap] = useState<Map<string, Employee>>(new Map());
@@ -272,6 +273,34 @@ export default function LeaveRequestsPage() {
     const handleEditRequestClick = (request: LeaveRequest) => {
         setEditingRequest(request);
         setIsFormOpen(true);
+    };
+    
+    const handleStartLeave = async (request: LeaveRequest) => {
+        if (!firestore || !request.employeeId) return;
+
+        setIsProcessingAction(true);
+        const employeeRef = doc(firestore, 'employees', request.employeeId);
+
+        try {
+            await updateDoc(employeeRef, { status: 'on-leave' });
+            toast({ title: 'نجاح', description: `تم تحديث حالة الموظف ${request.employeeName} إلى "في إجازة".` });
+            
+            // Optimistically update local state to reflect the change immediately
+            setEmployeesMap(prev => {
+                const newMap = new Map(prev);
+                const emp = newMap.get(request.employeeId);
+                if (emp) {
+                    newMap.set(request.employeeId, { ...emp, status: 'on-leave' });
+                }
+                return newMap;
+            });
+
+        } catch (error) {
+            console.error("Error starting leave:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الموظف.' });
+        } finally {
+            setIsProcessingAction(false);
+        }
     };
 
     const handleReturnClick = (request: LeaveRequest) => {
@@ -508,7 +537,7 @@ export default function LeaveRequestsPage() {
                                                             <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)} className="text-green-600 focus:text-green-700">
+                                                        <DropdownMenuItem onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)} className="text-green-600 focus:text-green-700 focus:bg-green-50">
                                                             <Check className="ml-2 h-4 w-4" /> قبول
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => handleRejectClick(req)} className="text-destructive focus:text-destructive">
@@ -521,7 +550,12 @@ export default function LeaveRequestsPage() {
                                                         <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
                                                             <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                         </DropdownMenuItem>
-                                                        {!req.isBackFromLeave && (
+                                                        {!req.isBackFromLeave && employee?.status !== 'on-leave' && (
+                                                          <DropdownMenuItem onClick={() => handleStartLeave(req)} disabled={isProcessingAction}>
+                                                              <PlayCircle className="ml-2 h-4 w-4" /> بدء الإجازة
+                                                          </DropdownMenuItem>
+                                                        )}
+                                                        {!req.isBackFromLeave && employee?.status === 'on-leave' && (
                                                             <TooltipProvider>
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
