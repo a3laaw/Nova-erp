@@ -43,6 +43,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DateInput } from '@/components/ui/date-input';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -79,28 +80,28 @@ function TemplateSelectionView({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>اختر نموذج العقد</DialogTitle>
-        <DialogDescription>
+        DialogTitle>اختر نموذج العقدDialogTitle>
+        DialogDescription>
           تم العثور على عدة نماذج مرتبطة بنوع هذه المعاملة. الرجاء اختيار النموذج المناسب للبدء.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="py-4 space-y-2 max-h-[60vh] overflow-y-auto">
+        DialogDescription>
+      DialogHeader>
+      div className="py-4 space-y-2 max-h-[60vh] overflow-y-auto">
         {templates.map((t) => (
-          <button
+          button
             key={t.id}
             onClick={() => onSelect(t)}
             className="block w-full text-right p-4 border rounded-lg hover:bg-accent transition-colors"
           >
-            <p className="font-semibold">{t.title}</p>
-            <p className="text-sm text-muted-foreground">{t.description}</p>
-          </button>
+            p className="font-semibold">{t.title}p>
+            p className="text-sm text-muted-foreground">{t.description}p>
+          button>
         ))}
-      </div>
-      <DialogFooter>
-        <Button variant="ghost" type="button" onClick={onContinueWithout}>
+      div>
+      DialogFooter>
+        Button variant="ghost" type="button" onClick={onContinueWithout}>
           متابعة بدون نموذج (إنشاء يدوي)
-        </Button>
-      </DialogFooter>
+        Button>
+      DialogFooter>
     </>
   );
 }
@@ -135,7 +136,7 @@ export default function NewQuotationPage() {
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
 
 
-  const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset, getValues } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, formState: { errors }, watch, setValue, replace } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     mode: 'onChange',
     defaultValues: {
@@ -150,7 +151,7 @@ export default function NewQuotationPage() {
     },
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "items",
   });
@@ -365,9 +366,9 @@ export default function NewQuotationPage() {
 
   return (
     <>
-      <Dialog open={step === 'select'} onOpenChange={(open) => !open && setStep('form')}>
-        <DialogContent>
-          <TemplateSelectionView
+      Dialog open={step === 'select'} onOpenChange={(open) => !open && setStep('form')}>
+        DialogContent>
+          TemplateSelectionView
             templates={availableTemplates}
             onSelect={(selected) => {
               populateFormFromTemplate(selected);
@@ -378,140 +379,137 @@ export default function NewQuotationPage() {
               setStep('form');
             }}
           />
-        </DialogContent>
-      </Dialog>
+        DialogContent>
+      Dialog>
     
-      <Card className="max-w-4xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle>عرض سعر جديد</CardTitle>
-                        <CardDescription>املأ التفاصيل لإنشاء عرض سعر جديد.</CardDescription>
-                    </div>
-                    <div className="text-right">
-                        <Label>رقم العرض</Label>
-                        <div className="font-mono text-lg font-semibold h-7">
-                            {isGeneratingNumber ? <Skeleton className="h-6 w-24" /> : quotationNumber}
-                        </div>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="grid gap-2">
-                        <Label>العميل <span className="text-destructive">*</span></Label>
-                        <Controller
+      Card className="max-w-4xl mx-auto" dir="rtl">
+        form onSubmit={handleSubmit(onSubmit)}>
+            CardHeader>
+                div className="flex justify-between items-start">
+                    div>
+                        CardTitle>عرض سعر جديدCardTitle>
+                        CardDescription>املأ التفاصيل لإنشاء عرض سعر جديد.CardDescription>
+                    div>
+                    div className="text-right">
+                        Label>رقم العرضLabel>
+                        div className="font-mono text-lg font-semibold h-7">
+                            {isGeneratingNumber ? Skeleton className="h-6 w-24" /> : quotationNumber}
+                        div>
+                    div>
+                div>
+            CardHeader>
+            CardContent className="space-y-6">
+                 div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    div className="grid gap-2">
+                        Label>العميل <span className="text-destructive">*span>Label>
+                        Controller
                             control={control} name="clientId"
                             render={({ field }) => (
-                                <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder={refDataLoading ? 'تحميل...' : 'ابحث عن عميل...'} disabled={refDataLoading || !!clientIdFromUrl} />
+                                InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder={refDataLoading ? 'تحميل...' : 'ابحث عن عميل...'} disabled={refDataLoading || !!clientIdFromUrl} />
                             )}
                         />
-                        {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
-                    </div>
-                     <div className="grid gap-2">
-                        <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
-                        <Controller control={control} name="transactionTypeId"
+                        {errors.clientId && p className="text-xs text-destructive">{errors.clientId.message}p>}
+                    div>
+                     div className="grid gap-2">
+                        Label>نوع المعاملة <span className="text-destructive">*span>Label>
+                        Controller control={control} name="transactionTypeId"
                             render={({ field }) => (
-                                <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionTypeOptions} placeholder={refDataLoading ? 'تحميل...' : 'اختر نوع المعاملة...'} disabled={refDataLoading}/>
+                                InlineSearchList value={field.value} onSelect={field.onChange} options={transactionTypeOptions} placeholder={refDataLoading ? 'تحميل...' : 'اختر نوع المعاملة...'} disabled={refDataLoading}/>
                             )}
                         />
-                        {errors.transactionTypeId && <p className="text-xs text-destructive">{errors.transactionTypeId.message}</p>}
-                    </div>
-                </div>
+                        {errors.transactionTypeId && p className="text-xs text-destructive">{errors.transactionTypeId.message}p>}
+                    div>
+                div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                     <div className="grid gap-2 md:col-span-1">
-                        <Label htmlFor="subject">الموضوع <span className="text-destructive">*</span></Label>
-                        <Input id="subject" {...register('subject')} />
-                        {errors.subject && <p className="text-xs text-destructive">{errors.subject.message}</p>}
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                        <Input id="date" type="date" {...register('date')} />
-                        {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="validUntil">صالح حتى تاريخ <span className="text-destructive">*</span></Label>
-                        <Input id="validUntil" type="date" {...register('validUntil')} />
-                        {errors.validUntil && <p className="text-xs text-destructive">{errors.validUntil.message}</p>}
-                    </div>
-                </div>
+                div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     div className="grid gap-2 md:col-span-1">
+                        Label htmlFor="subject">الموضوع <span className="text-destructive">*span>Label>
+                        Input id="subject" {...register('subject')} />
+                        {errors.subject && p className="text-xs text-destructive">{errors.subject.message}p>}
+                    div>
+                    div className="grid gap-2">
+                        Label htmlFor="date">التاريخ <span className="text-destructive">*span>Label>
+                        Controller name="date" control={control} render={({ field }) => ( DateInput value={field.value} onChange={field.onChange} /> )} />
+                        {errors.date && p className="text-xs text-destructive">{errors.date.message}p>}
+                    div>
+                    div className="grid gap-2">
+                        Label htmlFor="validUntil">صالح حتى تاريخ <span className="text-destructive">*span>Label>
+                        Controller name="validUntil" control={control} render={({ field }) => ( DateInput value={field.value} onChange={field.onChange} /> )} />
+                        {errors.validUntil && p className="text-xs text-destructive">{errors.validUntil.message}p>}
+                    div>
+                div>
                 
-                <div>
-                    <Label className="mb-2 block">البنود</Label>
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-2/5">الوصف</TableHead>
-                                <TableHead className="w-1/6">الكمية</TableHead>
-                                <TableHead className="w-1/6">سعر الوحدة</TableHead>
-                                <TableHead className="w-1/6 text-left">الإجمالي</TableHead>
-                                <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                div>
+                    Label className="mb-2 block">البنودLabel>
+                     Table>
+                        TableHeader>
+                            TableRow>
+                                TableHead className="w-2/5">الوصفTableHead>
+                                TableHead className="w-1/6">الكميةTableHead>
+                                TableHead className="w-1/6">سعر الوحدةTableHead>
+                                TableHead className="w-1/6 text-left">الإجماليTableHead>
+                                TableHead className="w-[50px]"><span className="sr-only">حذفspan>TableHead>
+                            TableRow>
+                        TableHeader>
+                        TableBody>
                             {fields.map((field, index) => {
                                 const item = watchedItems?.[index] || {};
                                 const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
                                 return (
-                                <TableRow key={field.id}>
-                                    <TableCell>
-                                        <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..."/>
-                                        {errors.items?.[index]?.description && <p className="text-xs text-destructive mt-1">{errors.items?.[index]?.description?.message}</p>}
+                                TableRow key={field.id}>
+                                    TableCell>
+                                        Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..."/>
+                                        {errors.items?.[index]?.description && p className="text-xs text-destructive mt-1">{errors.items?.[index]?.description?.message}p>}
                                         {watchedItems?.[index]?.condition && (
-                                            <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
-                                                <span className="font-semibold">شرط الاستحقاق:</span> {watchedItems[index].condition}
-                                            </div>
+                                            div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
+                                                span className="font-semibold">شرط الاستحقاق:span> {watchedItems[index].condition}
+                                            div>
                                         )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input type="number" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
-                                    </TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
-                                    <TableCell>
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
+                                    TableCell>
+                                        Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" />
+                                    TableCell>
+                                        Input type="number" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
+                                    TableCell className="text-left font-mono">{formatCurrency(lineTotal)}TableCell>
+                                    TableCell>
+                                        Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                                            Trash2 className="h-4 w-4 text-destructive" />
+                                        Button>
+                                    TableCell>
+                                TableRow>
                             )})}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow>
-                                <TableCell colSpan={3} className="font-bold text-lg">الإجمالي</TableCell>
-                                <TableCell className="font-bold font-mono text-lg text-left">{formatCurrency(totalAmount)}</TableCell>
-                                <TableCell />
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                     <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' })}>
-                            <PlusCircle className="ml-2 h-4 w-4" />
+                        TableBody>
+                        TableFooter>
+                            TableRow>
+                                TableCell colSpan={3} className="font-bold text-lg">الإجماليTableCell>
+                                TableCell className="font-bold font-mono text-lg text-left">{formatCurrency(totalAmount)}TableCell>
+                                TableCell />
+                            TableRow>
+                        TableFooter>
+                    Table>
+                     div className="flex justify-start mt-2">
+                        Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' })}>
+                            PlusCircle className="ml-2 h-4 w-4" />
                             إضافة بند
-                        </Button>
-                     </div>
-                </div>
+                        Button>
+                     div>
+                div>
 
-                <div className="grid gap-2">
-                    <Label htmlFor="notes">ملاحظات إضافية (تحتوي على بنود العقد)</Label>
-                    <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
-                </div>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
-                    <X className="ml-2 h-4 w-4"/> إلغاء
-                </Button>
-                <Button type="submit" disabled={isSaving || isGeneratingNumber}>
-                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                div className="grid gap-2">
+                    Label htmlFor="notes">ملاحظات إضافية (تحتوي على بنود العقد)Label>
+                    Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
+                div>
+            CardContent>
+            CardFooter className="flex justify-end gap-2">
+                Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
+                    X className="ml-2 h-4 w-4"/> إلغاء
+                Button>
+                Button type="submit" disabled={isSaving || isGeneratingNumber}>
+                    {isSaving ? Loader2 className="ml-2 h-4 w-4 animate-spin"/> : Save className="ml-2 h-4 w-4"/>}
                     حفظ كمسودة
-                </Button>
-            </CardFooter>
-        </form>
-      </Card>
+                Button>
+            CardFooter>
+        form>
+      Card>
     </>
   );
 }

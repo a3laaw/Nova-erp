@@ -28,6 +28,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { searchPaymentVouchers } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
+import { DateInput } from '../ui/date-input';
 
 
 const statusColors: Record<string, string> = {
@@ -108,160 +109,156 @@ export function PaymentVouchersList() {
 
   if (loading) {
     return (
-        <div className="border rounded-lg">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>رقم السند</TableHead>
-                        <TableHead>اسم المستفيد</TableHead>
-                        <TableHead>التاريخ</TableHead>
-                        <TableHead>المبلغ</TableHead>
-                        <TableHead>الحالة</TableHead>
-                        <TableHead>الإجراءات</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
+        div className="border rounded-lg">
+            Table>
+                TableHeader>
+                    TableRow>
+                        TableHead>رقم السندTableHead>
+                        TableHead>اسم المستفيدTableHead>
+                        TableHead>التاريخTableHead>
+                        TableHead>المبلغTableHead>
+                        TableHead>الحالةTableHead>
+                        TableHead>الإجراءاتTableHead>
+                    TableRow>
+                TableHeader>
+                TableBody>
                     {Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
-                        </TableRow>
+                        TableRow key={i}>
+                            TableCell colSpan={6}>Skeleton className="h-6 w-full" />TableCell>
+                        TableRow>
                     ))}
-                </TableBody>
-            </Table>
-        </div>
+                TableBody>
+            Table>
+        div>
     );
   }
   
   if (error) {
-      return <div className="text-center py-10 text-destructive">فشل تحميل قائمة السندات.</div>;
+      return div className="text-center py-10 text-destructive">فشل تحميل قائمة السندات.div>;
   }
 
   return (
     <>
-        <div className="bg-muted/50 p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="grid gap-2 md:col-span-1">
-                    <Label htmlFor="search">بحث ذكي</Label>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
+        div className="bg-muted/50 p-4 rounded-lg mb-6">
+            div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                div className="grid gap-2 md:col-span-1">
+                    Label htmlFor="search">بحث ذكيLabel>
+                    div className="relative">
+                        Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        Input
                             id="search"
                             placeholder="رقم السند, اسم المستفيد, المبلغ..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
                         />
-                    </div>
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="dateFrom">من تاريخ</Label>
-                    <Input 
-                        id="dateFrom"
-                        type="date"
+                    div>
+                div>
+                div className="grid gap-2">
+                    Label htmlFor="dateFrom">من تاريخLabel>
+                    DateInput 
                         value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
+                        onChange={setDateFrom}
                     />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="dateTo">إلى تاريخ</Label>
-                    <Input 
-                        id="dateTo"
-                        type="date"
+                div>
+                div className="grid gap-2">
+                    Label htmlFor="dateTo">إلى تاريخLabel>
+                    DateInput 
                         value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
+                        onChange={setDateTo}
                     />
-                </div>
-            </div>
-        </div>
+                div>
+            div>
+        div>
 
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>رقم السند</TableHead>
-                <TableHead>اسم المستفيد</TableHead>
-                <TableHead>التاريخ</TableHead>
-                <TableHead>المبلغ</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        div className="border rounded-lg">
+          Table>
+            TableHeader>
+              TableRow>
+                TableHead>رقم السندTableHead>
+                TableHead>اسم المستفيدTableHead>
+                TableHead>التاريخTableHead>
+                TableHead>المبلغTableHead>
+                TableHead>الحالةTableHead>
+                TableHead>الإجراءاتTableHead>
+              TableRow>
+            TableHeader>
+            TableBody>
               {vouchers.length === 0 ? (
-                 <TableRow>
-                    <TableCell colSpan={6}>
-                        <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                            <h3 className="mt-4 text-lg font-medium">لا توجد سندات صرف</h3>
-                            <p className="mt-2 text-sm text-muted-foreground">
+                 TableRow>
+                    TableCell colSpan={6}>
+                        div className="p-8 text-center border-2 border-dashed rounded-lg">
+                            FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                            h3 className="mt-4 text-lg font-medium">لا توجد سندات صرفh3>
+                            p className="mt-2 text-sm text-muted-foreground">
                                 ابدأ بإنشاء سند صرف جديد ليظهر هنا.
-                            </p>
-                        </div>
-                    </TableCell>
-                </TableRow>
+                            p>
+                        div>
+                    TableCell>
+                TableRow>
               ) : filteredVouchers.length === 0 ? (
-                <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                TableRow>
+                    TableCell colSpan={6} className="h-24 text-center">
                         لا توجد نتائج تطابق بحثك.
-                    </TableCell>
-                </TableRow>
+                    TableCell>
+                TableRow>
               ) : (
                     filteredVouchers.map((voucher) => (
-                        <TableRow key={voucher.id}>
-                        <TableCell className="font-mono">
-                            <Link href={`/dashboard/accounting/payment-vouchers/${voucher.id}`} className="hover:underline text-primary">
+                        TableRow key={voucher.id}>
+                        TableCell className="font-mono">
+                            Link href={`/dashboard/accounting/payment-vouchers/${voucher.id}`} className="hover:underline text-primary">
                             {voucher.voucherNumber}
-                            </Link>
-                        </TableCell>
-                        <TableCell>{voucher.payeeName}</TableCell>
-                        <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
-                        <TableCell className="font-mono">{formatCurrency(voucher.amount)}</TableCell>
-                        <TableCell>
-                            <Badge variant="outline" className={statusColors[voucher.status]}>{statusTranslations[voucher.status]}</Badge>
-                        </TableCell>
-                        <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl">
-                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}`)}>
-                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}/edit`)}>
-                                            <Pencil className="ml-2 h-4 w-4" /> تعديل
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setVoucherToDelete(voucher)} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                        </TableCell>
-                        </TableRow>
+                            Link>
+                        TableCell>
+                        TableCell>{voucher.payeeName}TableCell>
+                        TableCell>{formatDate(voucher.paymentDate)}TableCell>
+                        TableCell className="font-mono">{formatCurrency(voucher.amount)}TableCell>
+                        TableCell>
+                            Badge variant="outline" className={statusColors[voucher.status]}>{statusTranslations[voucher.status]}Badge>
+                        TableCell>
+                        TableCell>
+                                DropdownMenu>
+                                    DropdownMenuTrigger asChild>
+                                        Button variant="ghost" size="icon" className="h-8 w-8">MoreHorizontal className="h-4 w-4" />Button>
+                                    DropdownMenuTrigger>
+                                    DropdownMenuContent align="end" dir="rtl">
+                                        DropdownMenuLabel>الإجراءاتDropdownMenuLabel>
+                                        DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}`)}>
+                                            Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                        DropdownMenuItem>
+                                        DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/payment-vouchers/${voucher.id}/edit`)}>
+                                            Pencil className="ml-2 h-4 w-4" /> تعديل
+                                        DropdownMenuItem>
+                                        DropdownMenuSeparator />
+                                        DropdownMenuItem onClick={() => setVoucherToDelete(voucher)} className="text-destructive focus:text-destructive">
+                                            Trash2 className="ml-2 h-4 w-4" /> حذف
+                                        DropdownMenuItem>
+                                    DropdownMenuContent>
+                                DropdownMenu>
+                        TableCell>
+                        TableRow>
                     ))
               )}
-            </TableBody>
-          </Table>
-        </div>
+            TableBody>
+          Table>
+        div>
         
-         <AlertDialog open={!!voucherToDelete} onOpenChange={() => setVoucherToDelete(null)}>
-            <AlertDialogContent dir="rtl">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                    <AlertDialogDescription>
+         AlertDialog open={!!voucherToDelete} onOpenChange={() => setVoucherToDelete(null)}>
+            AlertDialogContent dir="rtl">
+                AlertDialogHeader>
+                    AlertDialogTitle>هل أنت متأكد من الحذف؟AlertDialogTitle>
+                    AlertDialogDescription>
                         سيتم حذف السند رقم "{voucherToDelete?.voucherNumber}" والقيد المحاسبي المرتبط به بشكل دائم.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بالحذف'}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                    AlertDialogDescription>
+                AlertDialogHeader>
+                AlertDialogFooter>
+                    AlertDialogCancel disabled={isDeleting}>إلغاءAlertDialogCancel>
+                    AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                        {isDeleting ?  جاري الحذف... : 'نعم، قم بالحذف'}
+                    AlertDialogAction>
+                AlertDialogFooter>
+            AlertDialogContent>
+        AlertDialog>
     </>
   );
 }

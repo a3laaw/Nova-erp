@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useAnalyticalData } from '@/hooks/use-analytical-data';
+import { useAnalyticalData from '@/hooks/use-analytical-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search } from 'lucide-react';
 import Link from 'next/link';
+import { DateInput } from '@/components/ui/date-input';
 
 interface ProjectPnl {
   transactionId: string;
@@ -98,65 +99,65 @@ export function ProjectsPnlReport() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-muted/50 p-4 rounded-lg">
-        <div className="grid gap-2">
-          <Label htmlFor="dateFrom">من تاريخ</Label>
-          <Input id="dateFrom" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="dateTo">إلى تاريخ</Label>
-          <Input id="dateTo" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-        </div>
-      </div>
+      div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-muted/50 p-4 rounded-lg">
+        div className="grid gap-2">
+          Label htmlFor="dateFrom">من تاريخLabel>
+          DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
+        div>
+        div className="grid gap-2">
+          Label htmlFor="dateTo">إلى تاريخLabel>
+          DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
+        div>
+      div>
       
-       <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>المشروع (العميل)</TableHead>
-                <TableHead className="text-left">الإيرادات</TableHead>
-                <TableHead className="text-left">التكاليف المباشرة</TableHead>
-                <TableHead className="text-left">هامش الربح</TableHead>
-                <TableHead className="text-left">النسبة</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+       div className="border rounded-lg">
+          Table>
+            TableHeader>
+              TableRow>
+                TableHead>المشروع (العميل)TableHead>
+                TableHead className="text-left">الإيراداتTableHead>
+                TableHead className="text-left">التكاليف المباشرةTableHead>
+                TableHead className="text-left">هامش الربحTableHead>
+                TableHead className="text-left">النسبةTableHead>
+              TableRow>
+            TableHeader>
+            TableBody>
               {loading && Array.from({length: 3}).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
-                </TableRow>
+                TableRow key={i}>
+                  TableCell colSpan={5}>Skeleton className="h-6 w-full" />TableCell>
+                TableRow>
               ))}
               {!loading && reportData.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">لا توجد بيانات للفترة المحددة.</TableCell>
-                </TableRow>
+                TableRow>
+                  TableCell colSpan={5} className="h-24 text-center">لا توجد بيانات للفترة المحددة.TableCell>
+                TableRow>
               )}
               {!loading && reportData.map(item => (
-                <TableRow key={item.transactionId}>
-                  <TableCell className="font-medium">
-                    <Link href={`/dashboard/clients/${item.clientId}/transactions/${item.transactionId}`} className="hover:underline text-primary">
+                TableRow key={item.transactionId}>
+                  TableCell className="font-medium">
+                    Link href={`/dashboard/clients/${item.clientId}/transactions/${item.transactionId}`} className="hover:underline text-primary">
                         {item.projectName}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{item.clientName}</p>
-                  </TableCell>
-                  <TableCell className="text-left font-mono text-green-600">{formatCurrency(item.revenue)}</TableCell>
-                  <TableCell className="text-left font-mono text-red-600">({formatCurrency(item.directCosts)})</TableCell>
-                  <TableCell className="text-left font-mono font-bold">{formatCurrency(item.profit)}</TableCell>
-                  <TableCell className="text-left font-mono">{item.margin.toFixed(1)}%</TableCell>
-                </TableRow>
+                    Link>
+                    p className="text-xs text-muted-foreground">{item.clientName}p>
+                  TableCell>
+                  TableCell className="text-left font-mono text-green-600">{formatCurrency(item.revenue)}TableCell>
+                  TableCell className="text-left font-mono text-red-600">({formatCurrency(item.directCosts)})TableCell>
+                  TableCell className="text-left font-mono font-bold">{formatCurrency(item.profit)}TableCell>
+                  TableCell className="text-left font-mono">{item.margin.toFixed(1)}%TableCell>
+                TableRow>
               ))}
-            </TableBody>
-             <TableFooter>
-                <TableRow className="font-bold text-base">
-                    <TableCell>الإجمالي</TableCell>
-                    <TableCell className="text-left font-mono">{formatCurrency(totals.revenue)}</TableCell>
-                    <TableCell className="text-left font-mono">({formatCurrency(totals.directCosts)})</TableCell>
-                    <TableCell className="text-left font-mono">{formatCurrency(totals.profit)}</TableCell>
-                    <TableCell></TableCell>
-                </TableRow>
-             </TableFooter>
-          </Table>
-        </div>
-    </div>
+            TableBody>
+             TableFooter>
+                TableRow className="font-bold text-base">
+                    TableCell>الإجماليTableCell>
+                    TableCell className="text-left font-mono">{formatCurrency(totals.revenue)}TableCell>
+                    TableCell className="text-left font-mono">({formatCurrency(totals.directCosts)})TableCell>
+                    TableCell className="text-left font-mono">{formatCurrency(totals.profit)}TableCell>
+                    TableCell>TableCell>
+                TableRow>
+             TableFooter>
+          Table>
+        div>
+    div>
   );
 }

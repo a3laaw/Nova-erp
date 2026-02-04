@@ -11,7 +11,6 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
@@ -22,6 +21,7 @@ import { Loader2, Printer, Users } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { DateInput } from '@/components/ui/date-input';
 
 
 interface EquityStatementData {
@@ -157,24 +157,24 @@ export default function EquityStatementPage() {
                  <CardHeader>
                     <CardTitle>قائمة التغير في حقوق الملكية</CardTitle>
                     <CardDescription>عرض التغير في حقوق الملاك خلال فترة محددة.</CardDescription>
-                </CardHeader>
+                CardHeader>
                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">من تاريخ</Label>
-                        <Input id="dateFrom" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                     </div>
+                        <DateInput value={dateFrom} onChange={setDateFrom} />
+                     div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">إلى تاريخ</Label>
-                        <Input id="dateTo" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-                     </div>
+                        <DateInput value={dateTo} onChange={setDateTo} />
+                     div>
                 </CardContent>
-            </Card>
+            Card>
 
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
             {!isLoading && equityStatementData && (
                 <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
-                    <div id="printable-area" className="printable-content">
+                    div id="printable-area" className="printable-content">
                         {branding?.letterhead_image_url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img 
@@ -183,67 +183,67 @@ export default function EquityStatementPage() {
                                 className="w-full h-auto"
                             />
                         )}
-                        <div className="p-8 md:p-12">
+                        div className="p-8 md:p-12">
                             <CardHeader className="p-0">
-                                <div className="flex justify-between items-start pb-4">
-                                    <div className="text-left flex-shrink-0">
-                                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة التغيرات في حقوق الملكية</h2>
-                                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Statement of Changes in Equity</p>
-                                        <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                       <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                        <div>
-                                            <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                            <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                            <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                 <div className="mt-6 text-sm">
-                                    <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
-                                 </div>
-                            </CardHeader>
-                             <CardContent className="px-0 pt-6">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-2/5">البند</TableHead>
-                                            <TableHead className="text-left">رصيد بداية الفترة</TableHead>
-                                            <TableHead className="text-left">صافي ربح الفترة</TableHead>
-                                            <TableHead className="text-left">رصيد نهاية الفترة</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
+                                div className="flex justify-between items-start pb-4">
+                                    div className="text-left flex-shrink-0">
+                                        h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة التغيرات في حقوق الملكيةh2>
+                                        p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Statement of Changes in Equityp>
+                                        p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}p>
+                                    div>
+                                    div className="flex items-center gap-4">
+                                       Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                        div>
+                                            h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}h1>
+                                            p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}p>
+                                            p className="text-xs text-muted-foreground mt-2">{branding?.address}p>
+                                        div>
+                                    div>
+                                div>
+                                 div className="mt-6 text-sm">
+                                    p><span className="font-semibold w-24 inline-block">عن الفترة من:span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}p>
+                                 div>
+                            CardHeader>
+                             CardContent className="px-0 pt-6">
+                                Table>
+                                    TableHeader>
+                                        TableRow>
+                                            TableHead className="w-2/5">البندTableHead>
+                                            TableHead className="text-left">رصيد بداية الفترةTableHead>
+                                            TableHead className="text-left">صافي ربح الفترةTableHead>
+                                            TableHead className="text-left">رصيد نهاية الفترةTableHead>
+                                        TableRow>
+                                    TableHeader>
+                                    TableBody>
                                         {equityStatementData.lines.map(line => (
-                                            <TableRow key={line.name}>
-                                                <TableCell className="font-medium">{line.name}</TableCell>
-                                                <TableCell className="text-left font-mono">{formatCurrency(line.openingBalance)}</TableCell>
-                                                <TableCell className="text-left font-mono">{line.netIncome !== 0 ? formatCurrency(line.netIncome) : '-'}</TableCell>
-                                                <TableCell className="text-left font-mono">{formatCurrency(line.closingBalance)}</TableCell>
-                                            </TableRow>
+                                            TableRow key={line.name}>
+                                                TableCell className="font-medium">{line.name}TableCell>
+                                                TableCell className="text-left font-mono">{formatCurrency(line.openingBalance)}TableCell>
+                                                TableCell className="text-left font-mono">{line.netIncome !== 0 ? formatCurrency(line.netIncome) : '-'}TableCell>
+                                                TableCell className="text-left font-mono">{formatCurrency(line.closingBalance)}TableCell>
+                                            TableRow>
                                         ))}
-                                    </TableBody>
-                                    <TableFooter>
-                                        <TableRow className="font-bold bg-muted text-lg">
-                                            <TableCell>إجمالي حقوق الملكية</TableCell>
-                                            <TableCell className="text-left font-mono">{formatCurrency(equityStatementData.totals.openingBalance)}</TableCell>
-                                            <TableCell className="text-left font-mono">{formatCurrency(equityStatementData.totals.netIncome)}</TableCell>
-                                            <TableCell className="text-left font-mono">{formatCurrency(equityStatementData.totals.closingBalance)}</TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
-                            </CardContent>
-                             <CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
-                                <Button onClick={handlePrint}>
-                                    <Printer className="ml-2 h-4 w-4" />
+                                    TableBody>
+                                    TableFooter>
+                                        TableRow className="font-bold bg-muted text-lg">
+                                            TableCell>إجمالي حقوق الملكيةTableCell>
+                                            TableCell className="text-left font-mono">{formatCurrency(equityStatementData.totals.openingBalance)}TableCell>
+                                            TableCell className="text-left font-mono">{formatCurrency(equityStatementData.totals.netIncome)}TableCell>
+                                            TableCell className="text-left font-mono">{formatCurrency(equityStatementData.totals.closingBalance)}TableCell>
+                                        TableRow>
+                                    TableFooter>
+                                Table>
+                            CardContent>
+                             CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
+                                Button onClick={handlePrint}>
+                                    Printer className="ml-2 h-4 w-4" />
                                     طباعة / تصدير PDF
-                                </Button>
-                            </CardFooter>
-                        </div>
-                    </div>
-                </div>
+                                Button>
+                            CardFooter>
+                        div>
+                    div>
+                div>
             )}
-        </div>
+        div>
     );
 }

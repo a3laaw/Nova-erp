@@ -29,12 +29,12 @@ import { ar } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, ArrowRight, Search } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import Link from 'next/link';
 import { useBranding } from '@/context/branding-context';
+import { DateInput } from '@/components/ui/date-input';
 
 interface StatementLine {
     date: Date;
@@ -181,145 +181,145 @@ export default function GeneralLedgerPage() {
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-            <Card className="mb-4 no-print">
-                <CardHeader>
-                    <CardTitle>دفتر الأستاذ العام</CardTitle>
-                    <CardDescription>عرض تفصيلي لجميع الحركات على حساب محدد.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                     <div className="grid gap-2 lg:col-span-2">
-                        <Label htmlFor="account">الحساب</Label>
-                        <InlineSearchList 
+            Card className="mb-4 no-print">
+                CardHeader>
+                    CardTitle>دفتر الأستاذ العامCardTitle>
+                    CardDescription>عرض تفصيلي لجميع الحركات على حساب محدد.CardDescription>
+                CardHeader>
+                CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                     div className="grid gap-2 lg:col-span-2">
+                        Label htmlFor="account">الحسابLabel>
+                        InlineSearchList 
                             value={accountId}
                             onSelect={setAccountId}
                             options={accountOptions}
                             placeholder={loading ? 'جاري تحميل الحسابات...' : 'اختر حسابًا لعرضه...'}
                             disabled={loading}
                         />
-                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="dateFrom">التاريخ من</Label>
-                        <Input id="dateFrom" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="dateTo">التاريخ إلى</Label>
-                        <Input id="dateTo" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-                     </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="statusFilter">حالة القيود</Label>
-                        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                            <SelectTrigger id="statusFilter"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">الكل</SelectItem>
-                                <SelectItem value="posted">المرحّلة فقط</SelectItem>
-                                <SelectItem value="draft">المسودات فقط</SelectItem>
-                            </SelectContent>
-                        </Select>
-                     </div>
-                </CardContent>
-            </Card>
+                     div>
+                     div className="grid gap-2">
+                        Label htmlFor="dateFrom">التاريخ منLabel>
+                        DateInput value={dateFrom} onChange={setDateFrom} />
+                     div>
+                     div className="grid gap-2">
+                        Label htmlFor="dateTo">التاريخ إلىLabel>
+                        DateInput value={dateTo} onChange={setDateTo} />
+                     div>
+                      div className="grid gap-2">
+                        Label htmlFor="statusFilter">حالة القيودLabel>
+                        Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                            SelectTrigger id="statusFilter">SelectValue />SelectTrigger>
+                            SelectContent>
+                                SelectItem value="all">الكلSelectItem>
+                                SelectItem value="posted">المرحّلة فقطSelectItem>
+                                SelectItem value="draft">المسودات فقطSelectItem>
+                            SelectContent>
+                        Select>
+                     div>
+                CardContent>
+            Card>
             
             {!accountId && !isLoading && (
-                <Card>
-                    <CardContent className="p-12 text-center text-muted-foreground">
+                Card>
+                    CardContent className="p-12 text-center text-muted-foreground">
                         الرجاء اختيار حساب لعرض دفتر الأستاذ الخاص به.
-                    </CardContent>
-                </Card>
+                    CardContent>
+                Card>
             )}
 
-            {isLoading && accountId && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
+            {isLoading && accountId && Card>CardContent className="p-12 text-center">Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" />CardContent>Card>}
 
             {accountId && !isLoading && (
-                <Card id="printable-area" className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
-                    <CardHeader className="p-8 md:p-12">
+                Card id="printable-area" className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
+                    CardHeader className="p-8 md:p-12">
                         {branding?.letterhead_image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img 
+                            img 
                                 src={branding.letterhead_image_url} 
                                 alt={`${branding.company_name || ''} Letterhead`}
                                 className="w-full h-auto object-contain max-h-[150px] mb-4"
                             />
                         ) : (
-                            <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                                <div className="text-left flex-shrink-0">
-                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">دفتر الأستاذ العام</h2>
-                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">General Ledger</p>
-                                    <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                   <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                    <div>
-                                        <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                        <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                        <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                                    </div>
-                                </div>
-                            </div>
+                            div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
+                                div className="text-left flex-shrink-0">
+                                    h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">دفتر الأستاذ العامh2>
+                                    p className="text-lg font-semibold text-gray-700 dark:text-gray-300">General Ledgerp>
+                                    p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}p>
+                                div>
+                                div className="flex items-center gap-4">
+                                   Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                    div>
+                                        h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}h1>
+                                        p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}p>
+                                        p className="text-xs text-muted-foreground mt-2">{branding?.address}p>
+                                    div>
+                                div>
+                            div>
                         )}
-                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">الحساب:</span> {selectedAccount?.name} ({selectedAccount?.code})</p>
-                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(parseISO(dateFrom), 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(parseISO(dateTo), 'dd/MM/yyyy')}</p>
-                         </div>
-                    </CardHeader>
-                    <CardContent className="px-8 md:px-12">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[100px]">التاريخ</TableHead>
-                                    <TableHead className="w-[120px]">رقم القيد</TableHead>
-                                    <TableHead>البيان</TableHead>
-                                    <TableHead className="text-left w-[110px]">مدين</TableHead>
-                                    <TableHead className="text-left w-[110px]">دائن</TableHead>
-                                    <TableHead className="text-left w-[120px]">الرصيد</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell colSpan={5} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
-                                </TableRow>
+                         div className="mt-6 text-sm">
+                            p><span className="font-semibold w-24 inline-block">الحساب:span> {selectedAccount?.name} ({selectedAccount?.code})p>
+                            p><span className="font-semibold w-24 inline-block">الفترة من:span> {format(parseISO(dateFrom), 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:span> {format(parseISO(dateTo), 'dd/MM/yyyy')}p>
+                         div>
+                    CardHeader>
+                    CardContent className="px-8 md:px-12">
+                        Table>
+                            TableHeader>
+                                TableRow>
+                                    TableHead className="w-[100px]">التاريخTableHead>
+                                    TableHead className="w-[120px]">رقم القيدTableHead>
+                                    TableHead>البيانTableHead>
+                                    TableHead className="text-left w-[110px]">مدينTableHead>
+                                    TableHead className="text-left w-[110px]">دائنTableHead>
+                                    TableHead className="text-left w-[120px]">الرصيدTableHead>
+                                TableRow>
+                            TableHeader>
+                            TableBody>
+                                TableRow>
+                                    TableCell colSpan={5} className="font-semibold">الرصيد الافتتاحي للفترةTableCell>
+                                    TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}TableCell>
+                                TableRow>
                                 {statementData.lines.map((line, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell className="font-mono hover:underline text-primary">
-                                            <Link href={`/dashboard/accounting/journal-entries/${line.entryId}`}>
+                                    TableRow key={index}>
+                                        TableCell>{format(line.date, 'dd/MM/yyyy')}TableCell>
+                                        TableCell className="font-mono hover:underline text-primary">
+                                            Link href={`/dashboard/accounting/journal-entries/${line.entryId}`}>
                                                {line.entryNumber}
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell>{line.narration}</TableCell>
-                                        <TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
-                                        <TableCell className="text-left font-mono">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
-                                        <TableCell className="text-left font-mono">{formatCurrency(line.balance)}</TableCell>
-                                    </TableRow>
+                                            Link>
+                                        TableCell>
+                                        TableCell>{line.narration}TableCell>
+                                        TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}TableCell>
+                                        TableCell className="text-left font-mono">{line.credit > 0 ? formatCurrency(line.credit) : '-'}TableCell>
+                                        TableCell className="text-left font-mono">{formatCurrency(line.balance)}TableCell>
+                                    TableRow>
                                 ))}
                                 {statementData.lines.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">لا توجد حركات في هذه الفترة.</TableCell>
-                                    </TableRow>
+                                    TableRow>
+                                        TableCell colSpan={6} className="h-24 text-center">لا توجد حركات في هذه الفترة.TableCell>
+                                    TableRow>
                                 )}
-                            </TableBody>
-                            <TableFooter>
-                                <TableRow className="font-bold bg-muted/50">
-                                    <TableCell colSpan={3}>إجمالي الحركات</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                    <TableCell colSpan={1}></TableCell>
-                                </TableRow>
-                                <TableRow className="font-bold text-lg bg-muted">
-                                    <TableCell colSpan={5}>الرصيد النهائي</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </CardContent>
-                    <CardFooter className="p-8 md:p-12 flex justify-end items-center no-print">
-                        <Button onClick={handlePrint} disabled={!accountId}>
-                            <Printer className="ml-2 h-4 w-4" />
+                            TableBody>
+                            TableFooter>
+                                TableRow className="font-bold bg-muted/50">
+                                    TableCell colSpan={3}>إجمالي الحركاتTableCell>
+                                    TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}TableCell>
+                                    TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}TableCell>
+                                    TableCell colSpan={1}>TableCell>
+                                TableRow>
+                                TableRow className="font-bold text-lg bg-muted">
+                                    TableCell colSpan={5}>الرصيد النهائيTableCell>
+                                    TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}TableCell>
+                                TableRow>
+                            TableFooter>
+                        Table>
+                    CardContent>
+                    CardFooter className="p-8 md:p-12 flex justify-end items-center no-print">
+                        Button onClick={handlePrint} disabled={!accountId}>
+                            Printer className="ml-2 h-4 w-4" />
                             طباعة / تصدير PDF
-                        </Button>
-                    </CardFooter>
-                </Card>
+                        Button>
+                    CardFooter>
+                Card>
             )}
-        </div>
+        div>
     );
 }
