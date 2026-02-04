@@ -54,6 +54,7 @@ import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { useSubscription } from '@/hooks/use-subscription';
 import { DateInput } from '../ui/date-input';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
