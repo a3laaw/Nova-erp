@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -36,12 +37,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { doc, updateDoc, collection, writeBatch, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { Badge } from '../ui/badge';
+import { doc, updateDoc, collection, writeBatch, getDocs, query, orderBy, where, getDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -55,7 +56,8 @@ import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { useSubscription } from '@/hooks/use-subscription';
 import { DateInput } from '../ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-
+import { useRouter } from 'next/navigation';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
 
@@ -86,6 +88,7 @@ export function EmployeesTable() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [searchQuery, setSearchQuery] = useState('');
   
