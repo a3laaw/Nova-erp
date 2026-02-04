@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -120,29 +119,31 @@ export default function LeaveRequestsPage() {
     // Effect to automatically set employee status to 'on-leave' when leave starts
     useEffect(() => {
         if (!firestore || hasCheckedLeaves || dataLoading) return;
-
+    
         const autoStartLeaves = async () => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
             try {
-                // Simplified query to avoid composite index requirement
+                // Fetch all approved leaves. This is a simple query that needs no special index.
                 const q = query(
                     collection(firestore, 'leaveRequests'),
-                    where('status', '==', 'approved'),
-                    where('startDate', '<=', Timestamp.fromDate(today))
+                    where('status', '==', 'approved')
                 );
-
-                const snapshot = await getDocs(q);
                 
-                // Client-side filtering for isBackFromLeave
-                const activeLeaveDocs = snapshot.docs.filter(doc => doc.data().isBackFromLeave !== true);
-
+                const snapshot = await getDocs(q);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+    
+                // Filter client-side for leaves that have started but employee hasn't returned
+                const activeLeaveDocs = snapshot.docs.filter(doc => {
+                    const data = doc.data();
+                    const startDate = data.startDate?.toDate ? data.startDate.toDate() : null;
+                    return data.isBackFromLeave !== true && startDate && startDate <= today;
+                });
+    
                 if (activeLeaveDocs.length === 0) {
                     setHasCheckedLeaves(true);
                     return;
                 }
-
+    
                 const employeeIdsToPotentiallyUpdate = activeLeaveDocs.map(doc => doc.data().employeeId);
                 const uniqueEmployeeIds = [...new Set(employeeIdsToPotentiallyUpdate)];
                 
@@ -150,35 +151,35 @@ export default function LeaveRequestsPage() {
                     setHasCheckedLeaves(true);
                     return;
                 }
-
-                // Find which of these employees are still 'active'
+    
                 const employeesRef = collection(firestore, 'employees');
                 const employeesQuery = query(employeesRef, where('__name__', 'in', uniqueEmployeeIds), where('status', '==', 'active'));
                 const activeEmployeesToUpdateSnap = await getDocs(employeesQuery);
-
+    
                 if (activeEmployeesToUpdateSnap.empty) {
                     setHasCheckedLeaves(true);
                     return;
                 }
-
+    
                 const batch = writeBatch(firestore);
                 activeEmployeesToUpdateSnap.forEach(employeeDoc => {
                     batch.update(doc(firestore, 'employees', employeeDoc.id), { status: 'on-leave' });
                 });
-
+    
                 await batch.commit();
-
+    
                 toast({
                     title: 'تحديث تلقائي',
                     description: `تم تحديث حالة ${activeEmployeesToUpdateSnap.size} موظف إلى "في إجازة" تلقائيًا.`
                 });
+    
             } catch (error) {
                 console.error("Failed to auto-start leaves:", error);
             } finally {
-                setHasCheckedLeaves(true);
+                setHasCheckedLeaves(true); // Mark as checked even if it fails to prevent loops
             }
         };
-
+    
         autoStartLeaves();
     }, [firestore, hasCheckedLeaves, dataLoading, toast]);
 
@@ -661,4 +662,3 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
-
