@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X, Camera, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField, writeBatch, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -218,12 +218,16 @@ export default function NewEmployeePage() {
                 return;
             }
 
-
             const hireDate = toFirestoreDate(formData.hireDate as string);
-            if(!hireDate) {
+            if (!hireDate) {
                  toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'تاريخ التعيين مطلوب' });
                  setIsLoading(false);
                  return;
+            }
+            if (hireDate > new Date()) {
+                toast({ variant: 'destructive', title: 'خطأ منطقي', description: 'تاريخ التعيين لا يمكن أن يكون في المستقبل.' });
+                setIsLoading(false);
+                return;
             }
 
 
@@ -236,7 +240,7 @@ export default function NewEmployeePage() {
             const employeeData: DocumentData = {
                 ...formData,
                 department: departmentName,
-                hireDate: hireDate,
+                hireDate: Timestamp.fromDate(hireDate),
                 basicSalary: Number(formData.basicSalary) || 0,
                 housingAllowance: includeHousing ? Number(formData.housingAllowance) || 0 : 0,
                 transportAllowance: includeTransport ? Number(formData.transportAllowance) || 0 : 0,
@@ -251,8 +255,8 @@ export default function NewEmployeePage() {
                 sickLeaveUsed: 0,
                 emergencyLeaveUsed: 0,
                 maxEmergencyLeave: 5,
-                lastVacationAccrualDate: hireDate,
-                lastLeaveResetDate: hireDate,
+                lastVacationAccrualDate: Timestamp.fromDate(hireDate),
+                lastLeaveResetDate: Timestamp.fromDate(hireDate),
             };
             delete employeeData.departmentId; // Remove temporary field before saving
 
@@ -260,7 +264,7 @@ export default function NewEmployeePage() {
             dateFields.forEach(field => {
                 const dateValue = toFirestoreDate(formData[field] as string);
                 if (dateValue) {
-                    employeeData[field] = dateValue;
+                    employeeData[field] = Timestamp.fromDate(dateValue);
                 } else {
                     delete employeeData[field]; 
                 }
@@ -566,5 +570,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    

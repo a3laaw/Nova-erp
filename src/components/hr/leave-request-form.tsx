@@ -98,10 +98,10 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
         if (isEditing && requestToEdit) {
             setEmployeeId(requestToEdit.employeeId);
             setLeaveType(requestToEdit.leaveType);
-            const start = requestToEdit.startDate ? (requestToEdit.startDate as any).toDate() : new Date();
-            const end = requestToEdit.endDate ? (requestToEdit.endDate as any).toDate() : new Date();
-            setStartDate(format(start, 'yyyy-MM-dd'));
-            setEndDate(format(end, 'yyyy-MM-dd'));
+            const start = requestToEdit.startDate ? toFirestoreDate(requestToEdit.startDate) : new Date();
+            const end = requestToEdit.endDate ? toFirestoreDate(requestToEdit.endDate) : new Date();
+            setStartDate(format(start!, 'yyyy-MM-dd'));
+            setEndDate(format(end!, 'yyyy-MM-dd'));
             setNotes(requestToEdit.notes || '');
         } else {
             resetForm();
@@ -134,9 +134,9 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
 
     const totalCalendarDays = useMemo(() => {
         if (startDate && endDate) {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            if (start > end) return -1;
+            const start = toFirestoreDate(startDate);
+            const end = toFirestoreDate(endDate);
+            if (!start || !end || start > end) return -1;
             return differenceInCalendarDays(end, start) + 1;
         }
         return 0;
@@ -203,7 +203,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                 days: totalCalendarDays,
                 workingDays: workingDays,
                 notes: notes,
-                attachmentUrl: null,
+                attachmentUrl: null, // File upload to be implemented
             };
 
             if (isEditing && requestToEdit) {
@@ -283,7 +283,7 @@ export function LeaveRequestForm({ isOpen, onClose, requestToEdit }: LeaveReques
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="endDate">إلى تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={endDate} onChange={setEndDate} />
+                        <DateInput value={endDate} onChange={setEndDate} disabled={!startDate}/>
                     </div>
                 </div>
 

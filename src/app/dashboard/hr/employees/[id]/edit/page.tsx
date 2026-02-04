@@ -22,10 +22,10 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Save } from 'lucide-react';
+import { Camera, Save, Loader2 } from 'lucide-react';
 import type { Employee, AuditLog, Department, Job } from '@/lib/types';
 import { useFirebase, useCollection } from '@/firebase';
-import { doc, getDoc, writeBatch, collection, Timestamp, query, orderBy, getDocs } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, Timestamp, query, orderBy, getDocs, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -197,9 +197,9 @@ export default function EditEmployeePage() {
                 if (['dob', 'residencyExpiry', 'contractExpiry', 'hireDate'].includes(field)) {
                     const originalDateStr = fromFirestoreDate(originalValue as any);
                     const formDateStr = formValue as string;
-                     isChanged = originalDateStr !== formDateStr;
-                     if (isChanged) updatedEmployeeData[field] = toFirestoreDate(formDateStr);
-
+                    const dateObj = toFirestoreDate(formDateStr);
+                    isChanged = originalDateStr !== formDateStr;
+                    if (isChanged && dateObj) updatedEmployeeData[field] = Timestamp.fromDate(dateObj);
                 } else if (['basicSalary', 'housingAllowance', 'transportAllowance'].includes(field)) {
                     const originalNumValue = Number(originalValue) || 0;
                     const formNumValue = Number(formValue) || 0;
@@ -278,7 +278,7 @@ export default function EditEmployeePage() {
                  toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات.' });
             }
             
-            router.push('/dashboard/hr');
+            router.push('/dashboard/hr/employees');
         } catch (error) {
             console.error("Error saving employee:", error);
             const errorMessage = error instanceof Error ? error.message : 'لم يتم حفظ التغييرات. يرجى التأكد من صحة البيانات المدخلة.';
@@ -590,5 +590,3 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
-
-    

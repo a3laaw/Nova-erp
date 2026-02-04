@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -97,17 +96,15 @@ export default function LeaveRequestsPage() {
     const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
     const [actualReturnDate, setActualReturnDate] = useState('');
     const [isReturnConfirmOpen, setIsReturnConfirmOpen] = useState(false);
-    const [isProcessingReturn, setIsProcessingReturn] = useState(false);
 
     const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
     const [isRejectConfirmOpen, setIsRejectConfirmOpen] = useState(false);
-    const [isProcessingReject, setIsProcessingReject] = useState(false);
     
     const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
+    const [processingId, setProcessingId] = useState<string | null>(null);
+    
     const [hasCheckedLeaves, setHasCheckedLeaves] = useState(false);
     const [employeesMap, setEmployeesMap] = useState<Map<string, Employee>>(new Map());
     const [dataLoading, setDataLoading] = useState(true);
@@ -118,13 +115,11 @@ export default function LeaveRequestsPage() {
         }
     }, [isReturnConfirmOpen]);
     
-    // Effect to automatically set employee status to 'on-leave' when leave starts
     useEffect(() => {
         if (!firestore || hasCheckedLeaves || dataLoading) return;
     
         const autoStartLeaves = async () => {
             try {
-                // Fetch all approved leaves. This is a simple query that needs no special index.
                 const q = query(
                     collection(firestore, 'leaveRequests'),
                     where('status', '==', 'approved')
@@ -134,34 +129,22 @@ export default function LeaveRequestsPage() {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
     
-                // Filter client-side for leaves that have started but employee hasn't returned
                 const activeLeaveDocs = snapshot.docs.filter(doc => {
                     const data = doc.data();
-                    const startDate = data.startDate?.toDate ? data.startDate.toDate() : null;
+                    const startDate = toFirestoreDate(data.startDate);
                     return data.isBackFromLeave !== true && startDate && startDate <= today;
                 });
     
-                if (activeLeaveDocs.length === 0) {
-                    setHasCheckedLeaves(true);
-                    return;
-                }
+                if (activeLeaveDocs.length === 0) return;
     
-                const employeeIdsToPotentiallyUpdate = activeLeaveDocs.map(doc => doc.data().employeeId);
-                const uniqueEmployeeIds = [...new Set(employeeIdsToPotentiallyUpdate)];
-                
-                if (uniqueEmployeeIds.length === 0) {
-                    setHasCheckedLeaves(true);
-                    return;
-                }
+                const employeeIdsToUpdate = [...new Set(activeLeaveDocs.map(doc => doc.data().employeeId))];
+                if (employeeIdsToUpdate.length === 0) return;
     
                 const employeesRef = collection(firestore, 'employees');
-                const employeesQuery = query(employeesRef, where('__name__', 'in', uniqueEmployeeIds), where('status', '==', 'active'));
+                const employeesQuery = query(employeesRef, where('__name__', 'in', employeeIdsToUpdate), where('status', '==', 'active'));
                 const activeEmployeesToUpdateSnap = await getDocs(employeesQuery);
     
-                if (activeEmployeesToUpdateSnap.empty) {
-                    setHasCheckedLeaves(true);
-                    return;
-                }
+                if (activeEmployeesToUpdateSnap.empty) return;
     
                 const batch = writeBatch(firestore);
                 activeEmployeesToUpdateSnap.forEach(employeeDoc => {
@@ -178,7 +161,7 @@ export default function LeaveRequestsPage() {
             } catch (error) {
                 console.error("Failed to auto-start leaves:", error);
             } finally {
-                setHasCheckedLeaves(true); // Mark as checked even if it fails to prevent loops
+                setHasCheckedLeaves(true);
             }
         };
     
@@ -218,33 +201,30 @@ export default function LeaveRequestsPage() {
         return [where('status', '==', filter)];
     }, [filter]);
 
-    const { data: requestsData, loading, error } = useSubscription<LeaveRequest>(
+    const { data: requests, setData: setRequests, loading, error } = useSubscription<LeaveRequest>(
         firestore, 
         'leaveRequests', 
         requestsQueryConstraints
     );
 
-    const requests = useMemo(() => {
-        if (!requestsData) return [];
-        const getSafeTimestamp = (date: any): number => {
-            if (!date) return 0;
-            if (typeof date.toMillis === 'function') return date.toMillis();
-            const d = new Date(date);
-            return isNaN(d.getTime()) ? 0 : d.getTime();
-        };
-        const data = [...requestsData]; // Create a mutable copy
-        data.sort((a, b) => {
-            const timeB = getSafeTimestamp(b.createdAt);
-            const timeA = getSafeTimestamp(a.createdAt);
+    const sortedRequests = useMemo(() => {
+        if (!requests) return [];
+        return [...requests].sort((a, b) => {
+            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
             return timeB - timeA;
         });
-        return data;
-    }, [requestsData]);
+    }, [requests]);
 
 
     const handleStatusUpdate = async (requestId: string, newStatus: 'approved' | 'rejected', employeeId?: string, rejectionReason?: string) => {
         if (!firestore || !employeeId) return;
-
+        
+        setProcessingId(requestId);
+        
+        // Optimistic update
+        setRequests(prev => prev.filter(r => r.id !== requestId));
+        
         const requestRef = doc(firestore, 'leaveRequests', requestId);
 
         try {
@@ -270,6 +250,10 @@ export default function LeaveRequestsPage() {
                 title: 'خطأ',
                 description: 'فشل تحديث حالة الطلب.'
             });
+            // Revert optimistic update (refetch will handle this automatically but this is faster)
+            // Or just let the subscription handle the revert
+        } finally {
+            setProcessingId(null);
         }
     };
     
@@ -286,14 +270,13 @@ export default function LeaveRequestsPage() {
     const handleStartLeave = async (request: LeaveRequest) => {
         if (!firestore || !request.employeeId) return;
 
-        setIsProcessingAction(true);
+        setProcessingId(request.id);
         const employeeRef = doc(firestore, 'employees', request.employeeId);
 
         try {
             await updateDoc(employeeRef, { status: 'on-leave' });
             toast({ title: 'نجاح', description: `تم تحديث حالة الموظف ${request.employeeName} إلى "في إجازة".` });
             
-            // Optimistically update local state to reflect the change immediately
             setEmployeesMap(prev => {
                 const newMap = new Map(prev);
                 const emp = newMap.get(request.employeeId);
@@ -307,7 +290,7 @@ export default function LeaveRequestsPage() {
             console.error("Error starting leave:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الموظف.' });
         } finally {
-            setIsProcessingAction(false);
+            setProcessingId(null);
         }
     };
 
@@ -329,7 +312,18 @@ export default function LeaveRequestsPage() {
             return;
         }
 
-        setIsProcessingReturn(true);
+        setProcessingId(requestToReturn.id);
+        setIsReturnConfirmOpen(false);
+
+        // Optimistic update
+        setRequests(prev => prev.filter(r => r.id !== requestToReturn.id));
+        setEmployeesMap(prev => {
+            const newMap = new Map(prev);
+            const emp = newMap.get(requestToReturn.employeeId);
+            if (emp) newMap.set(requestToReturn.employeeId, { ...emp, status: 'active' });
+            return newMap;
+        });
+
         const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id);
         const employeeRef = doc(firestore, 'employees', requestToReturn.employeeId);
 
@@ -345,39 +339,32 @@ export default function LeaveRequestsPage() {
                 status: 'active'
             });
             
-            setEmployeesMap(prev => {
-                const newMap = new Map(prev);
-                const emp = newMap.get(requestToReturn.employeeId);
-                if (emp) {
-                    newMap.set(requestToReturn.employeeId, { ...emp, status: 'active' });
-                }
-                return newMap;
-            });
-
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تسجيل عودة الموظف بنجاح.' });
         } catch (err) {
             console.error(err);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل عودة الموظف.' });
+            // Revert state if needed, though subscription will eventually correct it
         } finally {
-            setIsProcessingReturn(false);
-            setIsReturnConfirmOpen(false);
+            setProcessingId(null);
             setRequestToReturn(null);
         }
     };
 
     const handleConfirmReject = async () => {
         if (!requestToReject) return;
-        setIsProcessingReject(true);
         await handleStatusUpdate(requestToReject.id, 'rejected', requestToReject.employeeId, rejectionReason);
-        setIsProcessingReject(false);
         setIsRejectConfirmOpen(false);
         setRequestToReject(null);
     };
 
     const handleDeleteRequest = async () => {
         if (!requestToDelete || !firestore) return;
-        setIsDeleting(true);
+        
+        setProcessingId(requestToDelete.id);
+        setRequests(prev => prev.filter(r => r.id !== requestToDelete.id));
+        setRequestToDelete(null);
+
         try {
             const batch = writeBatch(firestore);
             const requestRef = doc(firestore, 'leaveRequests', requestToDelete.id);
@@ -388,8 +375,6 @@ export default function LeaveRequestsPage() {
                 const employeeRef = doc(firestore, 'employees', requestToDelete.employeeId);
                 const employeeSnap = await getDoc(employeeRef);
                 
-                // If the employee is currently 'on-leave', deleting an approved leave
-                // should revert their status to 'active'.
                 if (employeeSnap.exists() && employeeSnap.data().status === 'on-leave') {
                     batch.update(employeeRef, { status: 'active' });
                 }
@@ -405,8 +390,7 @@ export default function LeaveRequestsPage() {
                 description: 'فشل حذف طلب الإجازة.'
             });
         } finally {
-            setIsDeleting(false);
-            setRequestToDelete(null);
+            setProcessingId(null);
         }
     };
 
@@ -421,8 +405,10 @@ export default function LeaveRequestsPage() {
     if (!dateString) return '-';
     try {
         const [year, month, day] = dateString.split('-');
+        if (!year || !month || !day) return '-';
         return `${day}/${month}/${year}`;
     } catch (e) {
+        console.error("Failed to format date in table:", e);
         return dateString;
     }
   }
@@ -486,14 +472,14 @@ export default function LeaveRequestsPage() {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && requests.length === 0 && (
+                            {!isLoading && sortedRequests.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center">
                                         لا توجد طلبات إجازة حالياً.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && requests.map(req => {
+                            {!isLoading && sortedRequests.map(req => {
                                 const employee = employeesMap.get(req.employeeId);
                                 const leaveStartDate = toFirestoreDate(req.startDate);
 
@@ -525,7 +511,9 @@ export default function LeaveRequestsPage() {
                                     <TableCell className='text-center'>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isProcessingAction}><MoreHorizontal className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={processingId === req.id}>
+                                                    {processingId === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
+                                                </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl">
                                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
@@ -555,7 +543,7 @@ export default function LeaveRequestsPage() {
                                                             <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                         </DropdownMenuItem>
                                                         {!req.isBackFromLeave && employee?.status !== 'on-leave' && (
-                                                          <DropdownMenuItem onClick={() => handleStartLeave(req)} disabled={isProcessingAction}>
+                                                          <DropdownMenuItem onClick={() => handleStartLeave(req)} disabled={processingId === req.id}>
                                                               <PlayCircle className="ml-2 h-4 w-4" /> بدء الإجازة
                                                           </DropdownMenuItem>
                                                         )}
@@ -609,9 +597,9 @@ export default function LeaveRequestsPage() {
                         />
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isProcessingReturn}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmReturn} disabled={isProcessingReturn}>
-                            {isProcessingReturn ? 'جاري الحفظ...' : 'تأكيد العودة'}
+                        <AlertDialogCancel disabled={processingId === requestToReturn?.id}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmReturn} disabled={processingId === requestToReturn?.id}>
+                            {processingId === requestToReturn?.id ? 'جاري الحفظ...' : 'تأكيد العودة'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -635,9 +623,9 @@ export default function LeaveRequestsPage() {
                         />
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isProcessingReject}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmReject} disabled={isProcessingReject || !rejectionReason} className="bg-destructive hover:bg-destructive/90">
-                            {isProcessingReject ? 'جاري الرفض...' : 'تأكيد الرفض'}
+                        <AlertDialogCancel disabled={processingId === requestToReject?.id}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmReject} disabled={processingId === requestToReject?.id || !rejectionReason} className="bg-destructive hover:bg-destructive/90">
+                            {processingId === requestToReject?.id ? 'جاري الرفض...' : 'تأكيد الرفض'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -652,9 +640,9 @@ export default function LeaveRequestsPage() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                            {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
+                        <AlertDialogCancel disabled={processingId === requestToDelete?.id}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteRequest} disabled={processingId === requestToDelete?.id} className="bg-destructive hover:bg-destructive/90">
+                            {processingId === requestToDelete?.id ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -662,6 +650,3 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
-    
-
-    
