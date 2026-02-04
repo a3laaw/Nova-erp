@@ -1,4 +1,3 @@
-
 'use server';
 
 import {
@@ -76,12 +75,11 @@ function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, 
   return relevantLog ? relevantLog.newValue : initialValue;
 }
 
-// --- Core state reconstruction function ---
+// --- NEW: Core state reconstruction function (REWRITTEN FOR SAFETY) ---
 async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfDate: Date): Promise<SerializableEmployee> {
   try {
     const [empSnap, auditLogsSnap, leaveRequestsSnap] = await Promise.all([
       getDoc(doc(db, 'employees', employeeId)),
-      // Optimized query: order and limit directly in Firestore.
       getDocs(query(collection(db, `employees/${employeeId}/auditLogs`), orderBy('effectiveDate', 'desc'), limit(500))),
       getDocs(query(collection(db, 'leaveRequests'), where('employeeId', '==', employeeId))),
     ]);
@@ -90,12 +88,9 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       throw new Error(`Employee with ID ${employeeId} not found.`);
     }
 
-    // --- Strict Manual Mapping ---
-    // Do NOT use `...empSnap.data()`. Manually map fields to create a plain object.
     const baseData = empSnap.data();
     const hireDate = toFirestoreDate(baseData.hireDate);
     
-    // CRITICAL: Validate hireDate before proceeding.
     if (!hireDate) {
       throw new Error(`Invalid or missing hire date for employee ID: ${employeeId}`);
     }
@@ -103,19 +98,22 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
     const auditLogs = auditLogsSnap.docs.map(d => d.data() as AuditLog);
     const allLeaveRequests = leaveRequestsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
     
-    const reconstructedState: Partial<Employee> = {
+    // Manual mapping of reconstructed values to a temporary object.
+    const historicalValues = {
       jobTitle: findValueAsOf(auditLogs, 'jobTitle', asOfDate, baseData.jobTitle),
       department: findValueAsOf(auditLogs, 'department', asOfDate, baseData.department),
       basicSalary: findValueAsOf(auditLogs, 'basicSalary', asOfDate, baseData.basicSalary),
       housingAllowance: findValueAsOf(auditLogs, 'housingAllowance', asOfDate, baseData.housingAllowance),
       transportAllowance: findValueAsOf(auditLogs, 'transportAllowance', asOfDate, baseData.transportAllowance),
+      residencyExpiry: findValueAsOf(auditLogs, 'residencyExpiry', asOfDate, baseData.residencyExpiry),
+      contractExpiry: findValueAsOf(auditLogs, 'contractExpiry', asOfDate, baseData.contractExpiry),
     };
-
+    
     // --- Safe Calculations ---
     let leaveBalance = 0;
     try {
-        // Pass a reconstructed object to the calculator
-        leaveBalance = calculateAnnualLeaveBalance({ ...baseData, ...reconstructedState } as Employee, asOfDate);
+        const employeeDataForCalc = { ...baseData, ...historicalValues };
+        leaveBalance = calculateAnnualLeaveBalance(employeeDataForCalc as Employee, asOfDate);
     } catch (e) {
         console.error(`Could not calculate leave balance for ${employeeId}:`, e);
     }
@@ -130,7 +128,7 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
     const serviceDuration = intervalToDuration({ start: hireDate, end: asOfDate });
     const serviceInYears = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
     let calculatedEosb = 0;
-    const currentSalary = Number(reconstructedState.basicSalary) || 0;
+    const currentSalary = Number(historicalValues.basicSalary) || 0;
 
     if (serviceInYears > 0 && currentSalary > 0) {
       if (serviceInYears <= 5) {
@@ -143,7 +141,7 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       }
     }
 
-    // --- Final Manual Mapping to a Plain, Serializable Object ---
+    // --- Final Strict Manual Mapping to a Plain, Serializable Object ---
     // This creates a clean object with no Firestore prototypes.
     const finalData = {
         id: empSnap.id,
@@ -154,22 +152,22 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         gender: baseData.gender,
         civilId: baseData.civilId,
         nationality: baseData.nationality,
-        residencyExpiry: toFirestoreDate(reconstructedState.residencyExpiry ?? baseData.residencyExpiry)?.toISOString() || null,
-        contractExpiry: toFirestoreDate(reconstructedState.contractExpiry ?? baseData.contractExpiry)?.toISOString() || null,
+        residencyExpiry: toFirestoreDate(historicalValues.residencyExpiry)?.toISOString() || null,
+        contractExpiry: toFirestoreDate(historicalValues.contractExpiry)?.toISOString() || null,
         mobile: baseData.mobile,
         emergencyContact: baseData.emergencyContact,
         email: baseData.email,
-        jobTitle: reconstructedState.jobTitle,
-        position: reconstructedState.position,
-        department: reconstructedState.department,
+        jobTitle: historicalValues.jobTitle,
+        position: baseData.position,
+        department: historicalValues.department,
         contractType: baseData.contractType,
         hireDate: hireDate.toISOString(), // Immediate serialization
         terminationDate: toFirestoreDate(baseData.terminationDate)?.toISOString() || null,
         terminationReason: baseData.terminationReason,
         status: baseData.status,
-        basicSalary: reconstructedState.basicSalary,
-        housingAllowance: reconstructedState.housingAllowance,
-        transportAllowance: reconstructedState.transportAllowance,
+        basicSalary: historicalValues.basicSalary,
+        housingAllowance: historicalValues.housingAllowance,
+        transportAllowance: historicalValues.transportAllowance,
         salaryPaymentType: baseData.salaryPaymentType,
         bankName: baseData.bankName,
         iban: baseData.iban,
@@ -237,7 +235,7 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
           { key: 'fullName', label: 'الاسم الكامل' },
           { key: 'department', label: 'القسم' },
           { key: 'jobTitle', label: 'المسمى الوظيفي' },
-          { key: 'status', label: 'الحالة' },
+          { key: 'status', label: 'الحالة', type: 'component' },
           { key: 'hireDate', label: 'تاريخ التعيين', type: 'date' },
           { key: 'serviceYears', label: 'سنوات الخدمة', type: 'number' },
         ],

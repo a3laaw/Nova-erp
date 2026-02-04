@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -23,6 +22,7 @@ const formatDate = (dateValue: string | null | undefined, fallback = '-') => {
   try {
     const date = parseISO(dateValue);
     // Format only if the parsed date is valid
+    if (isNaN(date.getTime())) return dateValue; // return original string if invalid
     return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(date);
   } catch (e) {
     // Return the original string or fallback if parsing fails
