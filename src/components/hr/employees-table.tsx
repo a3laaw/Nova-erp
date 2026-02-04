@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -10,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, RefreshCw, Loader2, Calendar } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Loader2, Calendar } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,14 +48,12 @@ import type { Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Label } from '@/components/ui/label';
-import { addMonths, format, differenceInDays } from 'date-fns';
+import { addMonths, format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
-import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useSubscription } from '@/hooks/use-subscription';
-import { cn } from '@/lib/utils';
 import { ClientForm } from '@/components/clients/client-form';
 import { DateInput } from '../ui/date-input';
 
@@ -113,23 +112,20 @@ export function EmployeesTable() {
 
   const processedEmployees = useMemo(() => {
     if (!employees) return [];
-    const getSafeTimestamp = (date: any): number => {
-        if (!date) return 0;
-        if (typeof date.toMillis === 'function') return date.toMillis();
-        const d = new Date(date);
-        return isNaN(d.getTime()) ? 0 : d.getTime();
-    };
+    // Calculate leave balance for each employee
     const employeeList = employees.map(emp => ({
         ...emp,
         annualLeaveBalance: calculateAnnualLeaveBalance(emp)
     }));
+    // Sort by status first (active, on-leave, then terminated), then by name
     return employeeList.sort((a, b) => {
-        const timeB = getSafeTimestamp(b.createdAt);
-        const timeA = getSafeTimestamp(a.createdAt);
-        if (timeB !== timeA) {
-            return timeB - timeA;
+        const statusOrder = { 'active': 1, 'on-leave': 2, 'terminated': 3 };
+        const statusA = statusOrder[a.status] || 4;
+        const statusB = statusOrder[b.status] || 4;
+        if (statusA !== statusB) {
+            return statusA - statusB;
         }
-        return a.fullName.localeCompare(b.fullName, 'ar');
+        return (a.fullName || '').localeCompare(b.fullName || '', 'ar');
     });
   }, [employees]);
 
@@ -249,6 +245,7 @@ export function EmployeesTable() {
   };
 
   const formatDateCell = (dateValue: any): string => {
+      // Use the safe fromFirestoreDate which returns 'yyyy-MM-dd' or ''
       const dateString = fromFirestoreDate(dateValue);
       if (!dateString) return '-';
       
@@ -397,7 +394,7 @@ export function EmployeesTable() {
                   <div className="grid gap-2">
                          <Label>سبب إنهاء الخدمة</Label>
                          <InlineSearchList 
-                            value={terminationReason}
+                            value={terminationReason || ''}
                             onSelect={setTerminationReason}
                             options={terminationReasons}
                             placeholder="اختر السبب..."

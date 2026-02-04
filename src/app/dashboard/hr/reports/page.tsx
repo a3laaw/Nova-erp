@@ -23,11 +23,10 @@ import { Loader2, Search, FileText, Printer, AlertTriangle } from 'lucide-react'
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { useRouter } from 'next/navigation';
 import { ReportResults } from '@/components/hr/report-results';
 import { generateReport, ReportData, ReportType, BulkReportData, StandardReportData } from '@/services/report-generator';
 import type { Employee } from '@/lib/types';
-import { collection, query, getDocs, where } from 'firebase/firestore';
+import { collection, query, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -44,6 +43,7 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
   const [asOfDate, setAsOfDate] = useState<string>('');
   
+  // NEW: State to handle generation errors
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,10 +52,12 @@ export default function ReportsPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
   
+  // Set initial date on the client to avoid hydration mismatch
   useEffect(() => {
     setAsOfDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
 
+  // Fetch employees for the dropdown
   useEffect(() => {
     if (!firestore) return;
     const fetchEmployees = async () => {
@@ -63,7 +65,7 @@ export default function ReportsPage() {
         const q = query(collection(firestore, 'employees'));
         const querySnapshot = await getDocs(q);
         
-        // Manually map to plain objects to avoid serialization issues
+        // Manual mapping to create plain objects
         const fetchedEmployees: Employee[] = querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -103,12 +105,14 @@ export default function ReportsPage() {
       return;
     }
 
+    // NEW: Reset state before generating a new report
     setIsGenerating(true);
     setReportData(null);
     setError(null);
     
     const options = { asOfDate, employeeId: selectedEmployeeId, statusFilter };
 
+    // NEW: Wrap the server action call in a try/catch block
     try {
       const data = await generateReport(firestore, reportType, options);
       
@@ -118,6 +122,7 @@ export default function ReportsPage() {
       setReportData(data);
     } catch (err: any) {
       console.error("Error generating report: ", err);
+      // Set the error state to display a message in the UI
       const errorMessage = err instanceof Error ? err.message : 'حدث خطأ غير متوقع.';
       setError(errorMessage);
       toast({ variant: 'destructive', title: 'فشل إنشاء التقرير', description: errorMessage });
@@ -135,7 +140,6 @@ export default function ReportsPage() {
       return;
     }
 
-    // Printing for other report types can be added here
     toast({ title: "غير متاح", description: "الطباعة متاحة فقط لتقرير الموظف الفردي حالياً." });
   };
 
@@ -212,6 +216,7 @@ export default function ReportsPage() {
                     </div>
                 )}
                  
+                 {/* NEW: Display error message if report generation fails */}
                  {error && !isGenerating && (
                     <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
@@ -249,7 +254,7 @@ export default function ReportsPage() {
                                     ))}
                                 </div>
                             )}
-                            {reportData.type === 'EmployeeRoster' && 'rows' in reportData && (
+                            {reportData.type === 'EmployeeRoster' && 'rows' in reportData && reportData.rows.length > 0 && (
                                 <ReportResults reportData={reportData} />
                             )}
                         </div>

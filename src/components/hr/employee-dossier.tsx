@@ -11,19 +11,22 @@ import { Badge } from '../ui/badge';
 import { useBranding } from '@/context/branding-context';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
-// Props accept a serializable version of the employee
+// Props accept a serializable version of the employee where dates are strings
 interface DossierProps {
-  employee: Partial<Employee & { hireDate: string | null; lastLeave: any; serviceDuration: any; auditLogs: any[] }>;
+  employee: Partial<Employee & { hireDate: string | null; dob: string | null; lastLeave: any; serviceDuration: any; auditLogs: any[] }>;
   reportDate: Date;
 }
 
+// A safe formatter that handles null/undefined or invalid date strings
 const formatDate = (dateValue: string | null | undefined, fallback = '-') => {
   if (!dateValue) return fallback;
   try {
     const date = parseISO(dateValue);
+    // Format only if the parsed date is valid
     return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(date);
   } catch (e) {
-    return dateValue; // return the string if parsing fails
+    // Return the original string or fallback if parsing fails
+    return dateValue;
   }
 };
 
@@ -39,10 +42,11 @@ const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800', 'on-leave': 'bg-yellow-100 text-yellow-800', terminated: 'bg-red-100 text-red-800',
 };
 
-function InfoItem({ label, value, className }: { label: string, value: string | number | null | undefined | React.ReactNode, className?: string }) {
+function InfoItem({ label, value }: { label: string, value: string | number | null | undefined | React.ReactNode }) {
   return (
       <div className="flex justify-between items-center py-1 print:py-0.5">
           <span className="text-muted-foreground">{label}:</span>
+          {/* Render value safely with a fallback */}
           <span className="font-semibold text-right">{value ?? '-'}</span>
       </div>
   );
@@ -64,19 +68,22 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
   const { branding } = useBranding();
 
   useEffect(() => {
+    // This is safe because it runs only on the client
     setCurrentDate(new Date().toISOString());
   }, []);
 
+  // Defensive Check: Return an error message if employee data is missing.
   if (!employee) {
     return (
       <Alert variant="destructive" dir="rtl">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>خطأ في البيانات</AlertTitle>
-        <AlertDescription>لا يمكن عرض ملف الموظف لأن البيانات غير متوفرة.</AlertDescription>
+        <AlertDescription>لا يمكن عرض ملف الموظف لأن البيانات غير متوفرة أو تالفة.</AlertDescription>
       </Alert>
     );
   }
   
+  // Safely access potentially null/undefined properties
   const serviceDuration = employee.serviceDuration;
   const currentStatus = employee.status ?? 'active';
   const lastLeave = employee.lastLeave;
@@ -126,7 +133,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
                     <InfoItem label="نوع العقد" value={employee.contractType} />
                     {employee.contractType !== 'permanent' && <InfoItem label="انتهاء العقد" value={formatDate(employee.contractExpiry)} />}
-                    {employee.nationality !== 'كويتي' && <InfoItem label="انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
+                    {(employee.nationality && employee.nationality !== 'كويتي') && <InfoItem label="انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
                 </Section>
 
                 <Section title="البيانات المالية" icon={<Wallet />}>

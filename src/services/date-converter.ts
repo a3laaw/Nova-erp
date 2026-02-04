@@ -2,65 +2,38 @@
 'use client';
 
 /**
- * Safely converts a Firestore Timestamp, a Date object, or a valid date string 
- * into a "yyyy-MM-dd" string format, suitable for HTML date inputs.
- * Returns an empty string for any invalid or nullish input.
- * This is for READING data FROM Firestore/other sources for DISPLAY.
- * @param dateValue The date to convert (Timestamp, Date, string, null, or undefined).
- * @returns A string in "yyyy-MM-dd" format or an empty string.
- */
-export function fromFirestoreDate(dateValue: any): string {
-  const date = toFirestoreDate(dateValue);
-  if (!date) {
-    return '';
-  }
-
-  try {
-    const year = date.getFullYear();
-    // getMonth() is 0-indexed, so we add 1
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}`;
-
-  } catch (error) {
-    console.error("Failed to format date from value:", dateValue, error);
-    return '';
-  }
-}
-
-/**
- * Safely converts a string, Date object, or Timestamp-like object into a valid JavaScript Date object.
- * This function is non-recursive and designed to be safe from stack overflows.
- * Returns null if the input is empty, null, or results in an invalid date.
- * @param dateInput The date value from any source.
- * @returns A Date object or null.
+ * Safely converts various date-like inputs into a valid JavaScript Date object.
+ * This function is non-recursive and designed to be robust against different data types.
+ *
+ * @param dateInput - The value to convert. Can be a Date object, a Firestore Timestamp
+ * (or an object with seconds/nanoseconds), a valid date string (like ISO), or a number (milliseconds).
+ * @returns A valid Date object or `null` if the input is invalid or cannot be parsed.
  */
 export function toFirestoreDate(dateInput: any): Date | null {
+  // Return null for any falsy input (null, undefined, 0, '', false)
   if (!dateInput) {
     return null;
   }
 
   try {
-    // Handle existing Date object
+    // 1. Handle existing Date objects
     if (dateInput instanceof Date) {
+      // Check if the date is valid
       if (isNaN(dateInput.getTime())) {
-          return null;
+        return null;
       }
       return dateInput;
     }
 
-    // Handle Firestore Timestamp (has a toDate method)
-    if (dateInput.toDate && typeof dateInput.toDate === 'function') {
-      const d = dateInput.toDate();
-      if (isNaN(d.getTime())) {
-          return null;
-      }
-      return d;
-    }
-
-    // Handle serialized Firestore Timestamp object (e.g., from cache or JSON.stringify)
-    if (typeof dateInput === 'object' && dateInput !== null && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
+    // 2. Handle Firestore Timestamp-like objects (both from live and serialized data)
+    if (
+      typeof dateInput === 'object' &&
+      dateInput !== null &&
+      'seconds' in dateInput &&
+      'nanoseconds' in dateInput &&
+      typeof dateInput.seconds === 'number' &&
+      typeof dateInput.nanoseconds === 'number'
+    ) {
       const d = new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
       if (isNaN(d.getTime())) {
         return null;
@@ -68,32 +41,64 @@ export function toFirestoreDate(dateInput: any): Date | null {
       return d;
     }
     
-    // Handle string formats
-    if (typeof dateInput === 'string') {
-      let d: Date;
-      // Prefer creating date from ISO string to avoid timezone issues.
-      // Add T00:00:00 for "yyyy-MM-dd" to ensure it's parsed as local time start of day.
-      const sanitizedInput = /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? `${dateInput}T00:00:00` : dateInput;
-      d = new Date(sanitizedInput);
-      if (isNaN(d.getTime())) {
-        return null;
-      }
-      return d;
-    }
-    
-    // Handle number (milliseconds from epoch)
-    if (typeof dateInput === 'number') {
-        const d = new Date(dateInput);
+    // 3. Handle Firestore Timestamp objects with a toDate method
+    if (typeof dateInput.toDate === 'function') {
+        const d = dateInput.toDate();
         if (isNaN(d.getTime())) {
             return null;
         }
         return d;
     }
+
+    // 4. Handle string inputs (ISO strings, "yyyy-MM-dd", etc.)
+    if (typeof dateInput === 'string') {
+      // Add T00:00:00 to date-only strings to ensure parsing in local timezone.
+      const sanitizedInput = /^\d{4}-\d{2}-\d{2}$/.test(dateInput)
+        ? `${dateInput}T00:00:00`
+        : dateInput;
+      const d = new Date(sanitizedInput);
+      if (isNaN(d.getTime())) {
+        return null;
+      }
+      return d;
+    }
+
+    // 5. Handle number (milliseconds from epoch)
+    if (typeof dateInput === 'number') {
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) {
+        return null;
+      }
+      return d;
+    }
   } catch (error) {
     console.error("Error converting value to Date:", dateInput, error);
-    return null;
+    return null; // Fail safely
   }
 
-  // If the type is unknown or invalid, return null.
+  // If the input type is unknown or unhandled, return null.
   return null;
+}
+
+/**
+ * Safely converts a date-like value into a "yyyy-MM-dd" string for HTML date inputs.
+ * Uses the robust `toFirestoreDate` function internally.
+ * @param dateValue - The date value to format.
+ * @returns A string in "yyyy-MM-dd" format, or an empty string if invalid.
+ */
+export function fromFirestoreDate(dateValue: any): string {
+  const date = toFirestoreDate(dateValue);
+  if (!date) {
+    return '';
+  }
+  
+  try {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error("Failed to format date from value:", dateValue, error);
+    return '';
+  }
 }
