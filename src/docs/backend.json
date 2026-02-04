@@ -351,6 +351,7 @@
       "properties": {
         "stageId": { "type": "string", "description": "The ID of the reference WorkStage document from the department's workStages subcollection." },
         "name": { "type": "string", "description": "Name of the stage, stored for convenience. The name in the reference data is the source of truth." },
+        "order": { "type": "number", "description": "The display and logical order of the stage, copied from the template." },
         "status": {
           "type": "string",
           "enum": ["pending", "in-progress", "completed", "skipped", "awaiting-review"],
@@ -361,10 +362,37 @@
             "description": "The job titles responsible for this stage, copied from the WorkStage template.",
             "items": { "type": "string" }
         },
+        "stageType": {
+          "type": "string",
+          "enum": ["sequential", "parallel"],
+          "description": "'sequential' for main workflow steps, 'parallel' for service stages like modifications that can run alongside."
+        },
+        "nextStageIds": {
+            "type": "array",
+            "description": "A list of possible next stage IDs to transition to from this stage.",
+            "items": { "type": "string" }
+        },
+        "allowedDuringStages": {
+            "type": "array",
+            "description": "For parallel stages only. A list of sequential stage IDs during which this parallel stage can be initiated.",
+            "items": { "type": "string" }
+        },
         "trackingType": {
           "type": "string",
           "enum": ["duration", "occurrence", "none"],
           "description": "The tracking type of the stage, copied from the template."
+        },
+        "expectedDurationDays": {
+            "type": ["number", "null"],
+            "description": "The expected duration in days for this stage (if trackingType is 'duration')."
+        },
+        "maxOccurrences": {
+            "type": ["number", "null"],
+            "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')."
+        },
+        "allowManualCompletion": {
+            "type": "boolean",
+            "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count."
         },
         "startDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
@@ -428,7 +456,8 @@
         "emergencyLeaveUsed": { "type": "number" },
         "maxEmergencyLeave": { "type": "number" },
         "lastLeaveResetDate": { "type": "string", "format": "date-time" },
-        "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." }
+        "annualLeaveBalance": { "type": "number", "description": "Calculated current annual leave balance." },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
         "employeeNumber",
@@ -583,6 +612,10 @@
         "name": {
           "type": "string",
           "description": "The name of the department."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -595,6 +628,10 @@
         "name": {
           "type": "string",
           "description": "The name of the job."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -607,6 +644,10 @@
         "name": {
           "type": "string",
           "description": "The name of the governorate."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
@@ -619,21 +660,34 @@
         "name": {
           "type": "string",
           "description": "The name of the area."
+        },
+        "order": {
+            "type": "number",
+            "description": "The display order."
         }
       },
       "required": ["name"]
     },
     "TransactionType": {
       "title": "Transaction Type",
-      "description": "Represents a type of internal client transaction.",
+      "description": "Represents a type of internal client transaction and links it to the departments involved.",
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "The name of the transaction type."
+          "description": "The name of the transaction type (e.g., 'Municipality Design')."
+        },
+        "departmentIds": {
+            "type": "array",
+            "description": "A list of department IDs involved in this transaction type.",
+            "items": { "type": "string" }
+        },
+        "order": {
+          "type": "number",
+          "description": "The display and logical order of the type."
         }
       },
-      "required": ["name"]
+      "required": ["name", "departmentIds"]
     },
     "WorkStage": {
       "title": "Work Stage",
@@ -1222,10 +1276,6 @@
         "schema": { "$ref": "#/entities/Job" },
         "description": "Stores job titles for a specific department."
     },
-    "/departments/{departmentId}/transactionTypes/{transactionTypeId}": {
-        "schema": { "$ref": "#/entities/TransactionType" },
-        "description": "Stores transaction types for a specific department."
-    },
     "/departments/{departmentId}/workStages/{workStageId}": {
         "schema": { "$ref": "#/entities/WorkStage" },
         "description": "Stores standard work stages for a specific department."
@@ -1237,6 +1287,10 @@
     "/governorates/{governorateId}/areas/{areaId}": {
         "schema": { "$ref": "#/entities/Area" },
         "description": "Stores areas for a specific governorate."
+    },
+    "/transactionTypes/{transactionTypeId}": {
+      "schema": { "$ref": "#/entities/TransactionType" },
+      "description": "Stores the types of internal client transactions, linking them to one or more departments."
     },
     "/appointments/{appointmentId}": {
       "schema": {
