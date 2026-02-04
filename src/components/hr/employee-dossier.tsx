@@ -16,16 +16,13 @@ interface DossierProps {
   reportDate: Date;
 }
 
-// A safe formatter that handles null/undefined or invalid date strings
 const formatDate = (dateValue: string | null | undefined, fallback = '-') => {
   if (!dateValue) return fallback;
   try {
     const date = parseISO(dateValue);
-    // Format only if the parsed date is valid
-    if (isNaN(date.getTime())) return dateValue; // return original string if invalid
+    if (isNaN(date.getTime())) return dateValue;
     return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(date);
   } catch (e) {
-    // Return the original string or fallback if parsing fails
     return dateValue;
   }
 };
@@ -42,14 +39,13 @@ const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800', 'on-leave': 'bg-yellow-100 text-yellow-800', terminated: 'bg-red-100 text-red-800',
 };
 
-function InfoItem({ label, value }: { label: string, value: string | number | null | undefined | React.ReactNode }) {
-  return (
-      <div className="flex justify-between items-center py-1 print:py-0.5">
-          <span className="text-muted-foreground">{label}:</span>
-          {/* Render value safely with a fallback */}
-          <span className="font-semibold text-right">{value ?? '-'}</span>
-      </div>
-  );
+function InfoItem({ label, value, className = '' }: { label: string, value: string | number | null | undefined | React.ReactNode, className?: string }) {
+    return (
+        <div className={`flex justify-between items-center py-1 print:py-0.5 ${className}`}>
+            <span className="text-muted-foreground">{label}:</span>
+            <span className="font-semibold text-right">{value ?? '-'}</span>
+        </div>
+    );
 }
 
 function Section({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
@@ -68,11 +64,9 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
   const { branding } = useBranding();
 
   useEffect(() => {
-    // This is safe because it runs only on the client
     setCurrentDate(new Date().toISOString());
   }, []);
 
-  // Defensive Check: Return an error message if employee data is missing.
   if (!employee) {
     return (
       <Alert variant="destructive" dir="rtl">
@@ -83,7 +77,6 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
     );
   }
   
-  // Safely access potentially null/undefined properties
   const serviceDuration = employee.serviceDuration;
   const currentStatus = employee.status ?? 'active';
   const lastLeave = employee.lastLeave;
@@ -140,7 +133,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="الراتب الأساسي" value={formatCurrency(employee.basicSalary || 0)} />
                     <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
                     <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
-                    <InfoItem label="الإجمالي" value={formatCurrency((employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0))} />
+                    <InfoItem label="الإجمالي" value={formatCurrency((employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0))} className="font-bold border-t pt-2" />
                 </Section>
 
                 {employee.auditLogs && employee.auditLogs.length > 0 && (
@@ -148,7 +141,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                         <h3 className="flex items-center gap-2 font-bold text-lg mb-4 text-primary border-b pb-2 print:text-base print:mb-2"><History />السجل الزمني للتغييرات</h3>
                         <div className='space-y-2 max-h-48 overflow-y-auto'>
                             {employee.auditLogs.map((log: any, index: number) => (
-                                <div key={log.id || index} className="text-xs p-2 rounded-md bg-muted/50">
+                                <div key={index} className="text-xs p-2 rounded-md bg-muted/50">
                                     <span className="font-semibold text-primary">{formatDate(log.effectiveDate)}</span>: 
                                     تغيير في <span className='font-semibold'>"{log.field}"</span> من <span className='font-mono text-muted-foreground'>{String(log.oldValue ?? '-')}</span> إلى <span className='font-mono'>{String(log.newValue ?? '-')}</span>
                                 </div>

@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -117,12 +116,20 @@ export function EmployeesTable() {
 
   const processedEmployees = useMemo(() => {
     if (!employees) return [];
-    // Calculate leave balance for each employee
-    const employeeList = employees.map(emp => ({
-        ...emp,
-        annualLeaveBalance: calculateAnnualLeaveBalance(emp)
-    }));
-    // Sort by status first (active, on-leave, then terminated), then by name
+    const employeeList = employees.map(emp => {
+        // Strict manual mapping to prevent prototype chain issues.
+        return {
+            id: emp.id,
+            fullName: emp.fullName,
+            employeeNumber: emp.employeeNumber,
+            civilId: emp.civilId,
+            department: emp.department,
+            hireDate: emp.hireDate, // Keep as Firestore timestamp for sorting/display formatting
+            status: emp.status,
+            annualLeaveBalance: calculateAnnualLeaveBalance(emp)
+        };
+    });
+    
     return employeeList.sort((a, b) => {
         const statusOrder = { 'active': 1, 'on-leave': 2, 'terminated': 3 };
         const statusA = statusOrder[a.status] || 4;
@@ -133,6 +140,7 @@ export function EmployeesTable() {
         return (a.fullName || '').localeCompare(b.fullName || '', 'ar');
     });
   }, [employees]);
+
 
   const filteredEmployees = useMemo(() => {
     return searchEmployees(processedEmployees, searchQuery);
@@ -422,11 +430,11 @@ export function EmployeesTable() {
                           )}
                           <DropdownMenuSeparator />
                           {employee.status !== 'terminated' ? (
-                              <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
+                              <DropdownMenuItem onClick={() => handleTerminateClick(employee as Employee)} className="text-destructive focus:text-destructive focus:bg-red-50">
                                   إنهاء الخدمة
                               </DropdownMenuItem>
                           ) : (
-                              <DropdownMenuItem onClick={() => handleRehireClick(employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
+                              <DropdownMenuItem onClick={() => handleRehireClick(employee as Employee)} className='text-green-600 focus:text-green-700 focus:bg-green-50'>
                                   إعادة خدمة
                               </DropdownMenuItem>
                           )}

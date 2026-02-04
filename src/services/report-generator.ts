@@ -19,15 +19,22 @@ import { calculateAnnualLeaveBalance } from './leave-calculator';
 
 // A completely serializable version of the Employee, safe to pass to clients.
 // All date-like objects are converted to strings.
-type SerializableEmployee = Omit<Employee, 'hireDate' | 'dob' | 'residencyExpiry' | 'contractExpiry' | 'terminationDate' | 'lastVacationAccrualDate' | 'lastLeaveResetDate' | 'createdAt' | 'lastLeave' | 'auditLogs'> & {
+type SerializableEmployee = Omit<Employee, 'hireDate' | 'dob' | 'residencyExpiry' | 'contractExpiry' | 'terminationDate' | 'lastVacationAccrualDate' | 'lastLeaveResetDate' | 'createdAt' | 'lastLeave' | 'auditLogs' | 'serviceDuration'> & {
   hireDate: string | null;
   dob: string | null;
   residencyExpiry: string | null;
   contractExpiry: string | null;
   terminationDate: string | null;
-  lastLeave: (Omit<LeaveRequest, 'startDate' | 'endDate' | 'actualReturnDate'> & { startDate: string, endDate: string, actualReturnDate: string | null }) | null;
-  auditLogs: (Omit<AuditLog, 'effectiveDate'> & { effectiveDate: string })[];
-  serviceDuration: Duration;
+  lastLeave: {
+    leaveType: LeaveRequest['leaveType'];
+    startDate: string;
+    endDate: string;
+    actualReturnDate: string | null;
+    days: number;
+    workingDays: number | undefined;
+  } | null;
+  auditLogs: { field: string; oldValue: any; newValue: any; effectiveDate: string }[];
+  serviceDuration: { years: number, months: number, days: number };
 };
 
 // --- Report Data Types ---
@@ -67,7 +74,6 @@ interface ReportOptions {
 
 // --- Helper to find historical value ---
 function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, initialValue: any) {
-  // .find() is efficient because the query is already ordered by date descending.
   const relevantLog = logs.find(log => {
     const effectiveDate = toFirestoreDate(log.effectiveDate);
     return log.field === field && effectiveDate && effectiveDate <= asOfDate;
@@ -75,7 +81,7 @@ function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, 
   return relevantLog ? relevantLog.newValue : initialValue;
 }
 
-// --- NEW: Core state reconstruction function (REWRITTEN FOR SAFETY) ---
+
 async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfDate: Date): Promise<SerializableEmployee> {
   try {
     const [empSnap, auditLogsSnap, leaveRequestsSnap] = await Promise.all([
@@ -98,7 +104,6 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
     const auditLogs = auditLogsSnap.docs.map(d => d.data() as AuditLog);
     const allLeaveRequests = leaveRequestsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
     
-    // Manual mapping of reconstructed values to a temporary object.
     const historicalValues = {
       jobTitle: findValueAsOf(auditLogs, 'jobTitle', asOfDate, baseData.jobTitle),
       department: findValueAsOf(auditLogs, 'department', asOfDate, baseData.department),
@@ -109,7 +114,6 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       contractExpiry: findValueAsOf(auditLogs, 'contractExpiry', asOfDate, baseData.contractExpiry),
     };
     
-    // --- Safe Calculations ---
     let leaveBalance = 0;
     try {
         const employeeDataForCalc = { ...baseData, ...historicalValues };
@@ -125,7 +129,13 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       })
       .sort((a, b) => (toFirestoreDate(b.actualReturnDate)?.getTime() || 0) - (toFirestoreDate(a.actualReturnDate)?.getTime() || 0))[0] || null;
 
-    const serviceDuration = intervalToDuration({ start: hireDate, end: asOfDate });
+    const duration = intervalToDuration({ start: hireDate, end: asOfDate });
+    const serviceDuration = {
+        years: duration.years || 0,
+        months: duration.months || 0,
+        days: duration.days || 0,
+    };
+    
     const serviceInYears = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
     let calculatedEosb = 0;
     const currentSalary = Number(historicalValues.basicSalary) || 0;
@@ -141,8 +151,6 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       }
     }
 
-    // --- Final Strict Manual Mapping to a Plain, Serializable Object ---
-    // This creates a clean object with no Firestore prototypes.
     const finalData = {
         id: empSnap.id,
         employeeNumber: baseData.employeeNumber,
@@ -161,7 +169,7 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         position: baseData.position,
         department: historicalValues.department,
         contractType: baseData.contractType,
-        hireDate: hireDate.toISOString(), // Immediate serialization
+        hireDate: hireDate.toISOString(),
         terminationDate: toFirestoreDate(baseData.terminationDate)?.toISOString() || null,
         terminationReason: baseData.terminationReason,
         status: baseData.status,
@@ -175,11 +183,15 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         leaveBalance,
         serviceDuration,
         auditLogs: auditLogs.map(log => ({
-            ...log,
+            field: log.field,
+            oldValue: log.oldValue,
+            newValue: log.newValue,
             effectiveDate: toFirestoreDate(log.effectiveDate)?.toISOString() || ''
         })),
         lastLeave: lastReturn ? {
-            ...lastReturn,
+            leaveType: lastReturn.leaveType,
+            days: lastReturn.days,
+            workingDays: lastReturn.workingDays,
             startDate: toFirestoreDate(lastReturn.startDate)?.toISOString() || '',
             endDate: toFirestoreDate(lastReturn.endDate)?.toISOString() || '',
             actualReturnDate: toFirestoreDate(lastReturn.actualReturnDate)?.toISOString() || null,
@@ -194,7 +206,6 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
   }
 }
 
-// --- Main Report Generation Function ---
 export async function generateReport(db: Firestore, reportType: ReportType, options: ReportOptions): Promise<ReportData> {
   let result: ReportData;
 
@@ -212,7 +223,6 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             const data = doc.data() as Employee;
             const hireDate = toFirestoreDate(data.hireDate);
             const serviceYears = hireDate ? differenceInYears(asOfDate, hireDate) : 0;
-            // Manual mapping for rows
             return {
                 id: doc.id,
                 employeeNumber: data.employeeNumber ?? '-',
@@ -220,7 +230,7 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
                 department: data.department ?? '-',
                 jobTitle: data.jobTitle ?? '-',
                 status: data.status,
-                hireDate: hireDate?.toISOString() || null, // Serialize date
+                hireDate: hireDate?.toISOString() || null,
                 serviceYears,
             };
         })
@@ -246,12 +256,11 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
 
       if (options.employeeId === 'all') {
         const q = options.statusFilter === 'all'
-          ? query(collection(db, 'employees'), limit(50)) // Limit for bulk operations
+          ? query(collection(db, 'employees'), limit(50))
           : query(collection(db, 'employees'), where('status', '==', 'active'), limit(50));
         const empSnap = await getDocs(q);
         
         const dossiers: SerializableEmployee[] = [];
-        // Using for...of loop to avoid overwhelming the stack with Promise.all on large datasets.
         for (const doc of empSnap.docs) {
           try {
             const dossier = await reconstructEmployeeState(db, doc.id, asOfDate);
@@ -276,13 +285,10 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
       throw new Error(`Report type '${reportType}' is not implemented.`);
     }
 
-    // CRITICAL: Final sanitization step. This strips any remaining non-serializable prototypes
-    // (like from deep inside a nested object) that might have been missed.
     return JSON.parse(JSON.stringify(result));
 
   } catch (error) {
     console.error("Error in generateReport:", error);
-    // Rethrow a serializable error to be caught by the client component.
     throw new Error(error instanceof Error ? error.message : 'An unknown server error occurred during report generation.');
   }
 }
