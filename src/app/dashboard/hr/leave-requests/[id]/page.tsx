@@ -66,16 +66,24 @@ export default function LeaveRequestPrintPage() {
         const fetchLastLeave = async () => {
             setLoadingLastLeave(true);
             try {
-                const q = query(
-                    collection(firestore, 'leaveRequests'),
-                    where('employeeId', '==', employee.id),
-                    where('isBackFromLeave', '==', true),
-                    orderBy('actualReturnDate', 'desc'),
-                    limit(1)
-                );
+                // Fetch all leaves for the employee to avoid a composite index
+                const q = query(collection(firestore, 'leaveRequests'), where('employeeId', '==', employee.id));
                 const snapshot = await getDocs(q);
+
                 if (!snapshot.empty) {
-                    setLastLeave({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as LeaveRequest);
+                    const allLeaves = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+                    
+                    const lastReturnedLeave = allLeaves
+                        .filter(leave => leave.isBackFromLeave === true && leave.actualReturnDate)
+                        .sort((a, b) => {
+                            const dateA = toFirestoreDate(a.actualReturnDate);
+                            const dateB = toFirestoreDate(b.actualReturnDate);
+                            if (!dateA || !dateB) return 0;
+                            return dateB.getTime() - dateA.getTime();
+                        })[0] || null;
+
+                    setLastLeave(lastReturnedLeave);
+
                 } else {
                     setLastLeave(null);
                 }
