@@ -14,6 +14,7 @@ import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Logo } from '@/components/layout/logo';
+import { cn } from '@/lib/utils';
 
 const typeTranslations: Record<string, string> = {
     'Annual': 'سنوية',
@@ -28,9 +29,9 @@ const statusTranslations: Record<string, string> = {
     'rejected': 'مرفوضة',
 };
 
-function InfoRow({ label, value }: { label: string, value?: string | number | null }) {
+function InfoRow({ label, value, className }: { label: string, value?: string | number | null, className?: string }) {
     return (
-        <div className="flex items-baseline border-b py-2">
+        <div className={cn("flex items-baseline border-b py-2", className)}>
             <span className="w-48 font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
             <span className="flex-1 text-gray-800 dark:text-gray-200">{value || '---'}</span>
         </div>
@@ -66,7 +67,6 @@ export default function LeaveRequestPrintPage() {
         const fetchLastLeave = async () => {
             setLoadingLastLeave(true);
             try {
-                // Fetch all leaves for the employee to avoid a composite index
                 const q = query(collection(firestore, 'leaveRequests'), where('employeeId', '==', employee.id));
                 const snapshot = await getDocs(q);
 
@@ -217,11 +217,11 @@ export default function LeaveRequestPrintPage() {
                                 <section>
                                     <h3 className="font-bold text-lg border-b mb-4 pb-2">تفاصيل الخصم من الرصيد</h3>
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-base bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                                        <InfoRow label="الرصيد السنوي قبل الطلب" value={`${leaveBalanceDetails.balanceBeforeRequest} يوم`} />
+                                        <InfoRow className="print:hidden" label="الرصيد السنوي قبل الطلب" value={`${leaveBalanceDetails.balanceBeforeRequest} يوم`} />
                                         <InfoRow label="أيام العمل المطلوبة" value={`${leaveBalanceDetails.requestedDays} يوم`} />
                                         <InfoRow label="الأيام المخصومة من الرصيد" value={`${leaveBalanceDetails.deductedFromBalance} يوم`} />
                                         <InfoRow label="أيام بدون راتب" value={`${leaveBalanceDetails.unpaidDays} يوم`} />
-                                        <div className="col-span-2 pt-2 border-t mt-2">
+                                        <div className="col-span-2 pt-2 border-t mt-2 print:hidden">
                                             <InfoRow label="الرصيد المتبقي المتوقع" value={`${leaveBalanceDetails.balanceAfterRequest} يوم`} />
                                         </div>
                                     </div>
