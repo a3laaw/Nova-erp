@@ -32,6 +32,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { fromFirestoreDate, toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { DateInput } from '@/components/ui/date-input';
 
 
 export default function EditEmployeePage() {
@@ -297,7 +298,7 @@ export default function EditEmployeePage() {
                 </CardHeader>
                 <CardContent className="space-y-8">
                    <div className="space-y-4">
-                        <Skeleton className="h-6 w-1/5" />
+                        <h3 className="font-semibold text-lg border-b pb-2">المعلومات الشخصية</h3>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                              <div className="md:col-span-1 flex flex-col items-center gap-2">
                                 <Skeleton className="h-32 w-32 rounded-full" />
@@ -365,7 +366,7 @@ export default function EditEmployeePage() {
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="dob">تاريخ الميلاد</Label>
-                                    <Input id="dob" type="date" value={formData.dob || ''} onChange={handleInputChange} />
+                                    <DateInput value={formData.dob || ''} onChange={(v) => handleSelectChange('dob', v)} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="gender">النوع</Label>
@@ -398,7 +399,7 @@ export default function EditEmployeePage() {
                             {formData.nationality !== 'كويتي' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry || ''} onChange={handleInputChange} />
+                                    <DateInput value={formData.residencyExpiry || ''} onChange={(v) => handleSelectChange('residencyExpiry', v)} />
                                 </div>
                             )}
                         </div>
@@ -470,7 +471,7 @@ export default function EditEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                                <Input id="hireDate" type="date" value={formData.hireDate || ''} onChange={handleInputChange} required />
+                                <DateInput value={formData.hireDate || ''} onChange={(v) => handleSelectChange('hireDate', v)} />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
@@ -486,7 +487,7 @@ export default function EditEmployeePage() {
                             {(formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
-                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry || ''} onChange={handleInputChange} />
+                                    <DateInput value={formData.contractExpiry || ''} onChange={(v) => handleSelectChange('contractExpiry', v)} />
                                 </div>
                             )}
                              <div className="grid gap-2">
@@ -589,3 +590,5 @@ export default function EditEmployeePage() {
         </Card>
     );
 }
+
+    

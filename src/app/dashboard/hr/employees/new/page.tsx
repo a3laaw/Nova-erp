@@ -17,7 +17,6 @@ import { Save, X, Camera, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, query, where, getDocs, runTransaction, doc, getDoc, orderBy, limit, deleteField, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useLanguage } from '@/context/language-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -27,12 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Employee, Governorate, Area, Department, Job } from '@/lib/types';
+import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DateInput } from '@/components/ui/date-input';
 
 
 export default function NewEmployeePage() {
@@ -40,7 +40,6 @@ export default function NewEmployeePage() {
     const searchParams = useSearchParams();
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const { language } = useLanguage();
     const { user: currentUser } = useAuth();
     
     const [formData, setFormData] = useState<Partial<Employee> & { departmentId?: string }>({
@@ -152,7 +151,7 @@ export default function NewEmployeePage() {
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
 
-    const handleSelectChange = (id: keyof Employee | 'departmentId', value: any) => {
+    const handleSelectChange = (id: keyof typeof formData, value: any) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
@@ -342,7 +341,7 @@ export default function NewEmployeePage() {
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="dob">تاريخ الميلاد</Label>
-                                    <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} />
+                                    <DateInput value={formData.dob!} onChange={(v) => handleSelectChange('dob', v)} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="gender">النوع</Label>
@@ -375,7 +374,7 @@ export default function NewEmployeePage() {
                             {formData.nationality !== 'كويتي' && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                                    <Input id="residencyExpiry" type="date" value={formData.residencyExpiry} onChange={handleInputChange} required={formData.nationality !== 'كويتي'} />
+                                    <DateInput value={formData.residencyExpiry!} onChange={(v) => handleSelectChange('residencyExpiry', v)} />
                                 </div>
                             )}
                         </div>
@@ -448,7 +447,7 @@ export default function NewEmployeePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                                <Input id="hireDate" type="date" value={formData.hireDate} onChange={handleInputChange} required />
+                                <DateInput value={formData.hireDate as string} onChange={(v) => handleSelectChange('hireDate', v)} />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="contractType">نوع العقد</Label>
@@ -464,7 +463,7 @@ export default function NewEmployeePage() {
                             {(formData.contractType === 'temporary' || formData.contractType === 'subcontractor') && (
                                 <div className="grid gap-2">
                                     <Label htmlFor="contractExpiry">تاريخ انتهاء العقد</Label>
-                                    <Input id="contractExpiry" type="date" value={formData.contractExpiry} onChange={handleInputChange} required={formData.contractType !== 'permanent'} />
+                                    <DateInput value={formData.contractExpiry!} onChange={(v) => handleSelectChange('contractExpiry', v)} />
                                 </div>
                             )}
                             <div className="grid gap-2">
@@ -486,7 +485,7 @@ export default function NewEmployeePage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             <div className="grid gap-2 md:col-span-3">
                                 <Label htmlFor="basicSalary">الراتب الأساسي <span className="text-destructive">*</span></Label>
-                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary} onChange={handleInputChange} placeholder="0.000" required />
+                                <Input id="basicSalary" type="number" dir="ltr" value={formData.basicSalary as string} onChange={handleInputChange} placeholder="0.000" required />
                             </div>
 
                             <div className="items-center flex space-x-2 space-y-2">
@@ -499,7 +498,7 @@ export default function NewEmployeePage() {
                             {includeHousing && (
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="housingAllowance">قيمة بدل السكن</Label>
-                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance} onChange={handleInputChange} placeholder="0.000" />
+                                    <Input id="housingAllowance" type="number" dir="ltr" value={formData.housingAllowance as string} onChange={handleInputChange} placeholder="0.000" />
                                 </div>
                             )}
 
@@ -513,7 +512,7 @@ export default function NewEmployeePage() {
                             {includeTransport && (
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="transportAllowance">قيمة بدل النقل</Label>
-                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance} onChange={handleInputChange} placeholder="0.000" />
+                                    <Input id="transportAllowance" type="number" dir="ltr" value={formData.transportAllowance as string} onChange={handleInputChange} placeholder="0.000" />
                                 </div>
                             )}
                             
@@ -567,3 +566,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
