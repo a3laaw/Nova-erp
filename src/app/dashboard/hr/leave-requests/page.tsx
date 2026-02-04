@@ -27,7 +27,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +45,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest, Employee } from '@/lib/types';
@@ -104,8 +104,8 @@ export default function LeaveRequestsPage() {
     
     const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
+    const [hasCheckedLeaves, setHasCheckedLeaves] = useState(false);
     const [employeesMap, setEmployeesMap] = useState<Map<string, Employee>>(new Map());
     const [dataLoading, setDataLoading] = useState(true);
 
@@ -115,6 +115,67 @@ export default function LeaveRequestsPage() {
         }
     }, [isReturnConfirmOpen]);
     
+    // Effect to automatically set employee status to 'on-leave' when leave starts
+    useEffect(() => {
+        if (!firestore || hasCheckedLeaves || dataLoading) return;
+
+        const autoStartLeaves = async () => {
+            const today = new Date();
+            // Set to start of day to catch any leave that started today
+            today.setHours(0, 0, 0, 0);
+
+            try {
+                const q = query(
+                    collection(firestore, 'leaveRequests'),
+                    where('status', '==', 'approved'),
+                    where('isBackFromLeave', '!=', true),
+                    where('startDate', '<=', Timestamp.fromDate(today))
+                );
+
+                const snapshot = await getDocs(q);
+                if (snapshot.empty) {
+                    setHasCheckedLeaves(true);
+                    return;
+                }
+
+                const employeeIdsToPotentiallyUpdate = snapshot.docs.map(doc => doc.data().employeeId);
+                const uniqueEmployeeIds = [...new Set(employeeIdsToPotentiallyUpdate)];
+                if (uniqueEmployeeIds.length === 0) {
+                    setHasCheckedLeaves(true);
+                    return;
+                }
+
+                // Find which of these employees are still 'active'
+                const employeesRef = collection(firestore, 'employees');
+                const employeesQuery = query(employeesRef, where('__name__', 'in', uniqueEmployeeIds), where('status', '==', 'active'));
+                const activeEmployeesToUpdateSnap = await getDocs(employeesQuery);
+
+                if (activeEmployeesToUpdateSnap.empty) {
+                    setHasCheckedLeaves(true);
+                    return;
+                }
+
+                const batch = writeBatch(firestore);
+                activeEmployeesToUpdateSnap.forEach(employeeDoc => {
+                    batch.update(doc(firestore, 'employees', employeeDoc.id), { status: 'on-leave' });
+                });
+
+                await batch.commit();
+
+                toast({
+                    title: 'تحديث تلقائي',
+                    description: `تم تحديث حالة ${activeEmployeesToUpdateSnap.size} موظف إلى "في إجازة" تلقائيًا.`
+                });
+            } catch (error) {
+                console.error("Failed to auto-start leaves:", error);
+            } finally {
+                setHasCheckedLeaves(true);
+            }
+        };
+
+        autoStartLeaves();
+    }, [firestore, hasCheckedLeaves, dataLoading, toast]);
+
     useEffect(() => {
         if (!firestore) return;
 
@@ -224,31 +285,6 @@ export default function LeaveRequestsPage() {
         setIsRejectConfirmOpen(true);
     }
     
-    const handleStartLeaveClick = async (request: LeaveRequest) => {
-        if (!firestore || !request.employeeId) return;
-        setIsProcessingAction(true);
-        try {
-            const employeeRef = doc(firestore, 'employees', request.employeeId);
-            await updateDoc(employeeRef, { status: 'on-leave' });
-            
-            setEmployeesMap(prev => {
-                const newMap = new Map(prev);
-                const emp = newMap.get(request.employeeId);
-                if (emp) {
-                    newMap.set(request.employeeId, { ...emp, status: 'on-leave' });
-                }
-                return newMap;
-            });
-
-            toast({ title: 'نجاح', description: 'تم تحديث حالة الموظف إلى "في إجازة".' });
-        } catch (err) {
-            console.error(err);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الموظف.' });
-        } finally {
-            setIsProcessingAction(false);
-        }
-    };
-
 
     const handleConfirmReturn = async () => {
         if (!firestore || !requestToReturn || !actualReturnDate) {
@@ -427,7 +463,6 @@ export default function LeaveRequestsPage() {
                             {!isLoading && requests.map(req => {
                                 const employee = employeesMap.get(req.employeeId);
                                 const leaveStartDate = toFirestoreDate(req.startDate);
-                                const canStartLeave = employee?.status === 'active' && leaveStartDate && leaveStartDate <= new Date();
 
                                 return (
                                 <TableRow key={req.id}>
@@ -483,11 +518,6 @@ export default function LeaveRequestsPage() {
                                                 )}
                                                 {filter === 'approved' && (
                                                     <>
-                                                        {canStartLeave && (
-                                                            <DropdownMenuItem onClick={() => handleStartLeaveClick(req)} className="text-blue-600 focus:text-blue-700">
-                                                                <CheckCircle className="ml-2 h-4 w-4" /> بدء الإجازة
-                                                            </DropdownMenuItem>
-                                                        )}
                                                         <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
                                                             <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                         </DropdownMenuItem>
