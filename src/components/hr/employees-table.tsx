@@ -86,6 +86,7 @@ const terminationReasons: {value: string, label: string}[] = [
 export function EmployeesTable() {
   const { language } = useLanguage();
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
