@@ -176,7 +176,7 @@ export default function LeaveRequestsPage() {
         };
 
         autoStartLeaves();
-    }, [firestore, hasCheckedLeaves, dataLoading]);
+    }, [firestore, hasCheckedLeaves, dataLoading, toast]);
 
     useEffect(() => {
         if (!firestore) return;
@@ -204,7 +204,7 @@ export default function LeaveRequestsPage() {
         };
 
         fetchAllEmployees();
-    }, [firestore]);
+    }, [firestore, toast]);
 
 
     const requestsQueryConstraints = useMemo(() => {
@@ -380,15 +380,11 @@ export default function LeaveRequestsPage() {
             if (requestToDelete.status === 'approved') {
                 const employeeRef = doc(firestore, 'employees', requestToDelete.employeeId);
                 const employeeSnap = await getDoc(employeeRef);
-
-                if (employeeSnap.exists()) {
-                    const today = new Date();
-                    const startDate = toFirestoreDate(requestToDelete.startDate);
-                    const endDate = toFirestoreDate(requestToDelete.endDate);
-                    
-                    if (startDate && endDate && today >= startDate && today <= endDate) {
-                        batch.update(employeeRef, { status: 'active' });
-                    }
+                
+                // If the employee is currently 'on-leave', deleting an approved leave
+                // should revert their status to 'active'.
+                if (employeeSnap.exists() && employeeSnap.data().status === 'on-leave') {
+                    batch.update(employeeRef, { status: 'active' });
                 }
             }
             
@@ -662,3 +658,4 @@ export default function LeaveRequestsPage() {
   );
 }
 
+    
