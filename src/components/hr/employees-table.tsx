@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -38,7 +37,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { doc, updateDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, collection, writeBatch, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -48,13 +47,12 @@ import type { Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Label } from '@/components/ui/label';
-import { addMonths, format } from 'date-fns';
+import { addMonths, format, differenceInDays } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { useSubscription } from '@/hooks/use-subscription';
-import { ClientForm } from '@/components/clients/client-form';
 import { DateInput } from '../ui/date-input';
 
 
@@ -109,6 +107,9 @@ export function EmployeesTable() {
   const [rehireType, setRehireType] = useState<'continue' | 'new'>('continue');
   const [newHireDate, setNewHireDate] = useState('');
   const [resetLeaveBalance, setResetLeaveBalance] = useState(false);
+  
+  const [isDeleteAllAlertOpen, setIsDeleteAllAlertOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const processedEmployees = useMemo(() => {
     if (!employees) return [];
@@ -243,16 +244,61 @@ export function EmployeesTable() {
         setIsRehiring(false);
     }
   };
+  
+  const handleDeleteAll = async () => {
+    if (!firestore) return;
+    setIsDeletingAll(true);
+
+    try {
+        const batch = writeBatch(firestore);
+
+        const [employeesSnapshot, usersSnapshot] = await Promise.all([
+            getDocs(collection(firestore, 'employees')),
+            getDocs(collection(firestore, 'users'))
+        ]);
+        
+        if (employeesSnapshot.empty && usersSnapshot.empty) {
+            toast({ title: 'لا توجد بيانات', description: 'لا يوجد موظفون أو مستخدمون لحذفهم.' });
+            setIsDeletingAll(false);
+            setIsDeleteAllAlertOpen(false);
+            return;
+        }
+
+        employeesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        usersSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+
+        toast({
+            title: 'نجاح',
+            description: 'تم حذف جميع الموظفين وحساباتهم بنجاح.',
+        });
+    } catch (error) {
+        console.error("Error deleting all employees:", error);
+        toast({
+            variant: 'destructive',
+            title: 'خطأ',
+            description: 'فشل حذف جميع الموظفين.'
+        });
+    } finally {
+        setIsDeletingAll(false);
+        setIsDeleteAllAlertOpen(false);
+    }
+};
+
 
   const formatDateCell = (dateValue: any): string => {
-      // Use the safe fromFirestoreDate which returns 'yyyy-MM-dd' or ''
       const dateString = fromFirestoreDate(dateValue);
       if (!dateString) return '-';
-      
       try {
-          const [year, month, day] = dateString.split('-');
-          if (!year || !month || !day) return '-';
-          return `${day}/${month}/${year}`;
+        const [year, month, day] = dateString.split('-');
+        if (!year || !month || !day) return '-';
+        return `${day}/${month}/${year}`;
       } catch(e) {
           console.error("Failed to format date in table:", e);
           return dateString;
@@ -261,9 +307,11 @@ export function EmployeesTable() {
 
   const t = {
     ar: {
+      addClient: 'إضافة موظف',
       searchPlaceholder: 'ابحث بالاسم، الرقم الوظيفي، أو الرقم المدني...'
     },
     en: {
+      addClient: 'Add Employee',
       searchPlaceholder: 'Search by name, employee no., or civil ID...'
     }
   }
@@ -278,12 +326,18 @@ export function EmployeesTable() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-sm"
           />
-           <Button size="sm" className="gap-1" asChild>
-              <Link href="/dashboard/hr/employees/new">
+          <div className="flex gap-2">
+              <Button onClick={() => { router.push('/dashboard/hr/employees/new')}} size="sm" className="gap-1">
                   <PlusCircle className="ml-2 h-4 w-4" />
-                  إضافة موظف
-              </Link>
-          </Button>
+                  {currentText.addClient}
+              </Button>
+              {currentUser?.role === 'Admin' && (
+                  <Button variant="destructive" size="sm" className="gap-1" onClick={() => setIsDeleteAllAlertOpen(true)} disabled={isDeletingAll}>
+                      <Trash2 className="h-4 w-4" />
+                      حذف الكل
+                  </Button>
+              )}
+          </div>
       </div>
       <div className='border rounded-lg'>
           <Table>
@@ -471,6 +525,22 @@ export function EmployeesTable() {
                         <AlertDialogCancel disabled={isRehiring}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleRehireConfirm} disabled={isRehiring} className='bg-green-600 hover:bg-green-700'>
                             {isRehiring ? 'جاري الحفظ...' : 'تأكيد إعادة الخدمة'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={isDeleteAllAlertOpen} onOpenChange={setIsDeleteAllAlertOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                           سيؤدي هذا الإجراء إلى حذف <span className="font-bold text-destructive">جميع</span> سجلات الموظفين و <span className="font-bold text-destructive">جميع</span> حسابات المستخدمين المرتبطة بهم بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingAll}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAll} disabled={isDeletingAll} className="bg-destructive hover:bg-destructive/90">
+                            {isDeletingAll ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف الكل'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
