@@ -10,7 +10,9 @@ import {
     Timestamp, 
     type Firestore,
     type DocumentData,
-    collectionGroup
+    collectionGroup,
+    doc,
+    getDoc
 } from 'firebase/firestore';
 import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
 import { format, differenceInYears, eachDayOfInterval, isFriday, intervalToDuration, parseISO, differenceInDays } from 'date-fns';
@@ -65,8 +67,15 @@ interface ReportOptions {
 // --- Data Reconstruction Logic ---
 function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, initialValue: any) {
     const relevantLog = logs
-        .filter(log => log.field === field && toFirestoreDate(log.effectiveDate)! <= asOfDate)
-        .sort((a, b) => toFirestoreDate(b.effectiveDate)!.getTime() - toFirestoreDate(a.effectiveDate)!.getTime())[0];
+        .filter(log => {
+            const effectiveDate = toFirestoreDate(log.effectiveDate);
+            return log.field === field && effectiveDate && effectiveDate <= asOfDate;
+        })
+        .sort((a, b) => {
+            const dateA = toFirestoreDate(a.effectiveDate);
+            const dateB = toFirestoreDate(b.effectiveDate);
+            return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+        })[0];
     
     return relevantLog ? relevantLog.newValue : initialValue;
 }
@@ -104,8 +113,15 @@ async function getFullDossier(db: Firestore, employeeId: string, asOfDate: Date)
     // --- Calculate Leave Balance ---
     const leaveBalance = calculateAnnualLeaveBalance(baseEmployee, asOfDate);
     const lastReturn = allLeaveRequests
-        .filter(lr => lr.isBackFromLeave && toFirestoreDate(lr.actualReturnDate)! <= asOfDate)
-        .sort((a,b) => toFirestoreDate(b.actualReturnDate)!.getTime() - toFirestoreDate(a.actualReturnDate)!.getTime())[0] || null;
+        .filter(lr => {
+            const returnDate = toFirestoreDate(lr.actualReturnDate);
+            return lr.isBackFromLeave && returnDate && returnDate <= asOfDate;
+        })
+        .sort((a,b) => {
+            const dateA = toFirestoreDate(a.actualReturnDate);
+            const dateB = toFirestoreDate(b.actualReturnDate);
+            return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+        })[0] || null;
 
     // --- Calculate EOSB ---
     const serviceDuration = intervalToDuration({ start: hireDate, end: asOfDate });
@@ -116,7 +132,7 @@ async function getFullDossier(db: Firestore, employeeId: string, asOfDate: Date)
         if (serviceInYears <= 5) {
             calculatedEosb = (15 / 26) * currentSalary * serviceInYears;
         } else {
-            calculatedEosb += (15 / 26) * currentSalary * 5; // First 5 years
+            calculatedEosb = (15 / 26) * currentSalary * 5; // First 5 years
             calculatedEosb += currentSalary * (serviceInYears - 5); // Years after 5
         }
     }
@@ -143,7 +159,11 @@ async function getFullDossier(db: Firestore, employeeId: string, asOfDate: Date)
         iban: baseEmployee.iban,
 
         // Calculated fields
-        auditLogs: auditLogs.sort((a,b) => toFirestoreDate(b.effectiveDate)!.getTime() - toFirestoreDate(a.effectiveDate)!.getTime()),
+        auditLogs: auditLogs.sort((a,b) => {
+            const dateA = toFirestoreDate(a.effectiveDate);
+            const dateB = toFirestoreDate(b.effectiveDate);
+            return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+        }),
         eosb: calculatedEosb,
         leaveBalance: leaveBalance,
         lastLeave: lastReturn,
