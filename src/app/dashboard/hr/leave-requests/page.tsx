@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2, Loader2, Printer } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -56,6 +56,7 @@ import { useRouter } from 'next/navigation';
 import { toFirestoreDate, fromFirestoreDate } from '@/services/date-converter';
 import { format, isPast } from 'date-fns';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import Link from 'next/link';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -426,64 +427,57 @@ export default function LeaveRequestsPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell className='text-center'>
-                                        {filter === 'pending' && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" dir="rtl">
-                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
-                                                        <Pencil className="ml-2 h-4 w-4" /> تعديل
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)} className="text-green-600 focus:text-green-700">
-                                                        <Check className="ml-2 h-4 w-4" /> قبول
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleRejectClick(req)} className="text-destructive focus:text-destructive">
-                                                        <X className="ml-2 h-4 w-4" /> رفض
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        )}
-                                        {filter === 'approved' && (
-                                            <div className='flex gap-2 justify-center'>
-                                                {req.isBackFromLeave ? (
-                                                    <div className='flex items-center justify-center gap-2 text-green-600'>
-                                                        <CheckCircle className="h-4 w-4" />
-                                                        <span className='text-xs'>عاد في: {formatDateDisplay(req.actualReturnDate)}</span>
-                                                    </div>
-                                                ) : (
-                                                    <TooltipProvider>
-                                                      <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                           <span tabIndex={0}> {/* Required for tooltip on disabled button */}
-                                                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)} disabled={!isLeaveStarted}>
-                                                                <LogIn className="ml-2 h-4 w-4" />
-                                                                تسجيل العودة
-                                                            </Button>
-                                                           </span>
-                                                        </TooltipTrigger>
-                                                        {!isLeaveStarted && <TooltipContent><p>لا يمكن تسجيل العودة قبل بدء الإجازة</p></TooltipContent>}
-                                                      </Tooltip>
-                                                    </TooltipProvider>
-                                                )}
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" dir="rtl">
-                                                        <DropdownMenuLabel>إجراءات إضافية</DropdownMenuLabel>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" dir="rtl">
+                                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/dashboard/hr/leave-requests/${req.id}`}>
+                                                        <Printer className="ml-2 h-4 w-4" /> عرض وطباعة
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                
+                                                {filter === 'pending' && (
+                                                    <>
                                                         <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
-                                                            <Pencil className="ml-2 h-4 w-4" /> تعديل الطلب
+                                                            <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => setRequestToDelete(req)} className="text-destructive focus:text-destructive">
-                                                            <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
+                                                        <DropdownMenuItem onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)} className="text-green-600 focus:text-green-700">
+                                                            <Check className="ml-2 h-4 w-4" /> قبول
                                                         </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        )}
+                                                        <DropdownMenuItem onClick={() => handleRejectClick(req)} className="text-destructive focus:text-destructive">
+                                                            <X className="ml-2 h-4 w-4" /> رفض
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                                {filter === 'approved' && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
+                                                            <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                                        </DropdownMenuItem>
+                                                        {!req.isBackFromLeave && (
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isLeaveStarted} onClick={() => handleReturnClick(req)}>
+                                                                            <LogIn className="ml-2 h-4 w-4" /> تسجيل العودة
+                                                                        </DropdownMenuItem>
+                                                                    </TooltipTrigger>
+                                                                    {!isLeaveStarted && <TooltipContent><p>لا يمكن تسجيل العودة قبل بدء الإجازة</p></TooltipContent>}
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        )}
+                                                    </>
+                                                )}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => setRequestToDelete(req)} className="text-destructive focus:text-destructive">
+                                                    <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
                             )})}
