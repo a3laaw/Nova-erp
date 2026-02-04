@@ -73,6 +73,7 @@ interface ReportOptions {
   statusFilter?: 'active' | 'all';
 }
 
+
 // --- Helper Functions ---
 
 function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, initialValue: any) {
@@ -132,7 +133,7 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
     const serviceDuration = intervalToDuration({ start: hireDate, end: asOfDate });
     const serviceInYears = (asOfDate.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
     let calculatedEosb = 0;
-    const currentSalary = reconstructedState.basicSalary || 0;
+    const currentSalary = Number(reconstructedState.basicSalary) || 0;
 
     if (serviceInYears > 0 && currentSalary > 0) {
       if (serviceInYears <= 5) {
@@ -154,8 +155,8 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         gender: baseData.gender,
         civilId: baseData.civilId,
         nationality: baseData.nationality,
-        residencyExpiry: toFirestoreDate(reconstructedState.residencyExpiry ?? baseData.residencyExpiry)?.toISOString() || null,
-        contractExpiry: toFirestoreDate(reconstructedState.contractExpiry ?? baseData.contractExpiry)?.toISOString() || null,
+        residencyExpiry: toFirestoreDate(baseData.residencyExpiry)?.toISOString() || null,
+        contractExpiry: toFirestoreDate(baseData.contractExpiry)?.toISOString() || null,
         mobile: baseData.mobile,
         emergencyContact: baseData.emergencyContact,
         email: baseData.email,
@@ -187,11 +188,6 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
             actualReturnDate: toFirestoreDate(lastReturn.actualReturnDate)?.toISOString() || null,
         } : null,
     };
-    
-    // Explicitly remove fields that might not be serializable
-    delete (finalData as any).lastVacationAccrualDate;
-    delete (finalData as any).lastLeaveResetDate;
-    delete (finalData as any).createdAt;
 
     return finalData as SerializableEmployee;
 
@@ -210,8 +206,8 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
 
     if (reportType === 'EmployeeRoster') {
       const q = options.statusFilter === 'all'
-        ? query(collection(db, 'employees'))
-        : query(collection(db, 'employees'), where('status', '==', 'active'));
+        ? query(collection(db, 'employees'), limit(100))
+        : query(collection(db, 'employees'), where('status', '==', 'active'), limit(100));
         
       const empSnap = await getDocs(q);
       const rows = empSnap.docs
@@ -260,7 +256,17 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
           ? query(collection(db, 'employees'), limit(50))
           : query(collection(db, 'employees'), where('status', '==', 'active'), limit(50));
         const empSnap = await getDocs(q);
-        const dossiers = await Promise.all(empSnap.docs.map(doc => reconstructEmployeeState(db, doc.id, asOfDate)));
+        
+        const dossiers: SerializableEmployee[] = [];
+        for (const doc of empSnap.docs) {
+          try {
+            const dossier = await reconstructEmployeeState(db, doc.id, asOfDate);
+            dossiers.push(dossier);
+          } catch(e) {
+             console.error(`Skipping employee ${doc.id} in bulk report due to error:`, e);
+          }
+        }
+        
         result = {
           type: 'BulkEmployeeDossiers',
           dossiers,

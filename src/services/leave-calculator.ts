@@ -11,8 +11,8 @@ import { toFirestoreDate } from './date-converter';
  */
 export function calculateAnnualLeaveBalance(employee: Employee | null, asOfDate: Date = new Date()): number {
     try {
-        if (!employee || !employee.hireDate) {
-            console.warn("Cannot calculate leave balance: employee or hire date is missing.");
+        if (!employee) {
+            console.warn("Cannot calculate leave balance: employee object is null.");
             return 0;
         }
 
@@ -32,8 +32,8 @@ export function calculateAnnualLeaveBalance(employee: Employee | null, asOfDate:
         // Total days accrued based on 30 days per year.
         const totalAccrued = (daysOfService / 365.25) * 30;
 
-        const used = employee.annualLeaveUsed || 0;
-        const carried = employee.carriedLeaveDays || 0;
+        const used = Number(employee.annualLeaveUsed) || 0;
+        const carried = Number(employee.carriedLeaveDays) || 0;
 
         const balance = totalAccrued + carried - used;
         
@@ -41,7 +41,7 @@ export function calculateAnnualLeaveBalance(employee: Employee | null, asOfDate:
         return Math.floor(Math.max(0, balance));
 
     } catch (error) {
-        console.error("Error in calculateAnnualLeaveBalance:", error);
+        console.error("Critical error in calculateAnnualLeaveBalance:", error);
         return 0; // Fail safely
     }
 }

@@ -133,7 +133,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="الراتب الأساسي" value={formatCurrency(employee.basicSalary || 0)} />
                     <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
                     <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
-                    <InfoItem label="الإجمالي" value={formatCurrency((employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0))} className="font-bold border-t pt-2" />
+                    <InfoItem label="الإجمالي" value={formatCurrency((employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0))} />
                 </Section>
 
                 {employee.auditLogs && employee.auditLogs.length > 0 && (
