@@ -125,7 +125,7 @@ export default function ReportsPage() {
                 querySnapshot.forEach(doc => {
                     fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
                 });
-                setEmployees(fetchedEmployees.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+                setEmployees(fetchedEmployees.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar')));
                  if (fetchedEmployees.length > 0) {
                    setSelectedEmployeeId(fetchedEmployees[0].id!);
                 }

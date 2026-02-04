@@ -179,8 +179,8 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
     
     if (reportType === 'EmployeeRoster') {
         const empQuery = options.statusFilter === 'all'
-            ? query(collection(db, 'employees'), orderBy('fullName'))
-            : query(collection(db, 'employees'), where('status', '==', 'active'), orderBy('fullName'));
+            ? query(collection(db, 'employees'))
+            : query(collection(db, 'employees'), where('status', '==', 'active'));
             
         const empSnap = await getDocs(empQuery);
         const rows = empSnap.docs.map(doc => {
@@ -191,6 +191,8 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
                 serviceYears: emp.hireDate ? differenceInYears(asOfDate, toFirestoreDate(emp.hireDate)!) : 0,
             };
         });
+        
+        rows.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
 
         return {
             type: 'EmployeeRoster',
