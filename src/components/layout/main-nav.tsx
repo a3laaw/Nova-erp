@@ -261,9 +261,9 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                         >
                           <div className="flex items-center gap-2">
                             <item.icon />
-                            <span>{item.label}</span>
+                            <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                           </div>
-                          <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden [&[data-state=open]]:rotate-180" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
@@ -337,7 +337,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                 >
                   <Link href={item.href}>
                     <item.icon />
-                    <span>{item.label}</span>
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                   </Link>
                 </SidebarMenuButton>
               )}
@@ -355,7 +355,7 @@ export function MainNav({ currentUser, onLogout }: MainNavProps) {
                 >
                     <Link href={currentSettingsItem.href}>
                         <Settings />
-                        <span>{currentSettingsItem.label}</span>
+                        <span className="group-data-[collapsible=icon]:hidden">{currentSettingsItem.label}</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>}
