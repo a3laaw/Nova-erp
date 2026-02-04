@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -18,46 +19,45 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Search, ArrowRight, FileText, Printer } from 'lucide-react';
+import { Loader2, Search, FileText, Printer, AlertTriangle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { ReportResults } from '@/components/hr/report-results';
 import { generateReport, ReportData, ReportType, BulkReportData, StandardReportData } from '@/services/report-generator';
-import type { Employee, AuditLog } from '@/lib/types';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import type { Employee } from '@/lib/types';
+import { collection, query, getDocs, where } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const REPORT_TYPES: { value: ReportType; label: string }[] = [
-    { value: 'EmployeeDossier', label: 'ملف الموظف الشامل' },
-    { value: 'EmployeeRoster', label: 'قائمة الموظفين (Roster)' },
+  { value: 'EmployeeDossier', label: 'ملف الموظف الشامل' },
+  { value: 'EmployeeRoster', label: 'قائمة الموظفين (Roster)' },
 ];
 
-const formatValueForHTML = (value: any, type?: 'date' | 'currency' | 'number' | 'component'): string => {    
+const generateReportHTML = (reportData: StandardReportData): string => {
+  const formatValueForHTML = (value: any, type?: 'date' | 'currency' | 'number' | 'component'): string => {
     if (value === null || value === undefined || value === '') return '-';
 
     if (type === 'date') {
-        try {
-            const d = value.toDate ? value.toDate() : new Date(value);
-            if (isNaN(d.getTime())) return String(value) || '-';
-            return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
-        } catch (e) {
-            return String(value) || '-';
-        }
+      try {
+        const d = value.toDate ? value.toDate() : new Date(value);
+        if (isNaN(d.getTime())) return String(value) || '-';
+        return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(d);
+      } catch (e) {
+        return String(value) || '-';
+      }
     }
     if (type === 'currency') {
-        const amount = Number(value) || 0;
-         return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'KWD', numberingSystem: 'latn' }).format(amount);
+      const amount = Number(value) || 0;
+      return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'KWD', numberingSystem: 'latn' }).format(amount);
     }
     
     return String(value);
-};
-
-
-const generateReportHTML = (reportData: StandardReportData): string => {
+  };
+  
   const headers = reportData.headers.map(h => `<th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${h.label}</th>`).join('');
   const rows = reportData.rows.map(row => {
     const cells = reportData.headers.map(header => {
@@ -93,133 +93,125 @@ const generateReportHTML = (reportData: StandardReportData): string => {
   `;
 };
 
-
 export default function ReportsPage() {
-    const { firestore } = useFirebase();
-    const router = useRouter();
-    const { toast } = useToast();
-    
-    const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
-    const [asOfDate, setAsOfDate] = useState<string>('');
-    
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [reportData, setReportData] = useState<ReportData | null>(null);
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  
+  const [reportType, setReportType] = useState<ReportType>('EmployeeDossier');
+  const [asOfDate, setAsOfDate] = useState<string>('');
+  
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
-    const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
-    
-    useEffect(() => {
-        // Set date on client-side to prevent hydration mismatch
-        setAsOfDate(format(new Date(), 'yyyy-MM-dd'));
-    }, []);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
+  
+  useEffect(() => {
+    setAsOfDate(format(new Date(), 'yyyy-MM-dd'));
+  }, []);
 
-    useEffect(() => {
-        if (!firestore) return;
-        const fetchEmployees = async () => {
-            try {
-                const q = query(collection(firestore, 'employees'));
-                const querySnapshot = await getDocs(q);
-                const fetchedEmployees: Employee[] = [];
-                querySnapshot.forEach(doc => {
-                    if (doc.exists() && doc.data()?.fullName) { // Ensure doc has data and a name
-                        fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
-                    }
-                });
-                
-                const sortedEmployees = fetchedEmployees.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
-                setEmployees(sortedEmployees);
-                
-                 if (sortedEmployees.length > 0) {
-                   setSelectedEmployeeId(sortedEmployees[0].id!);
-                }
-            } catch (error) {
-                console.error("Error fetching employees for HR reports:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchEmployees = async () => {
+      try {
+        const q = query(collection(firestore, 'employees'));
+        const querySnapshot = await getDocs(q);
+        const fetchedEmployees: Employee[] = [];
+        querySnapshot.forEach(doc => {
+            if (doc.exists() && doc.data()?.fullName) {
+                fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
             }
-        };
-        fetchEmployees();
-    }, [firestore, toast]);
-    
-    const employeeOptions = useMemo(() => [
-        { value: 'all', label: 'جميع الموظفين (تقرير جماعي)' },
-        ...employees
-            .filter(emp => emp?.id && emp?.fullName)
-            .map(emp => ({
-                value: emp.id!,
-                label: emp.fullName,
-                searchKey: emp.employeeNumber
-            }))
-    ], [employees]);
-
-
-    const handleGenerateReport = async () => {
-        if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
-            return;
-        }
-        if (reportType === 'EmployeeDossier' && !selectedEmployeeId) {
-             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار موظف لإنشاء التقرير الشامل.' });
-            return;
-        }
-
-        setIsGenerating(true);
-        setReportData(null);
+        });
         
-        const options = {
-            asOfDate,
-            employeeId: selectedEmployeeId,
-            statusFilter: statusFilter
-        };
-
-        try {
-            const data = await generateReport(firestore, reportType, options);
-            
-            if (('rows' in data && data.rows.length === 0) || ('dossiers' in data && data.dossiers.length === 0)) {
-                 toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على نتائج تطابق معايير البحث المحددة.' });
-            }
-            setReportData(data);
-        } catch (error) {
-            console.error("Error generating report: ", error);
-            const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير متوقع.';
-            toast({ variant: 'destructive', title: 'فشل إنشاء التقرير', description: errorMessage });
-        } finally {
-            setIsGenerating(false);
+        const sortedEmployees = fetchedEmployees.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
+        setEmployees(sortedEmployees);
+        
+        if (sortedEmployees.length > 0 && selectedEmployeeId === 'all') {
+           setSelectedEmployeeId(sortedEmployees[0].id!);
         }
+      } catch (error) {
+        console.error("Error fetching employees:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
+      }
     };
+    fetchEmployees();
+  }, [firestore, toast, selectedEmployeeId]);
     
-    const handlePrint = () => {
-        if (!reportData) return;
-        
-        if (reportData.type === 'EmployeeDossier' && reportData.employee.id) {
-             const printUrl = `/dashboard/hr/employees/${reportData.employee.id}/report`;
-             window.open(printUrl, '_blank', 'noopener,noreferrer');
-             return;
-        }
+  const employeeOptions = useMemo(() => [
+    { value: 'all', label: 'جميع الموظفين (تقرير جماعي)' },
+    ...employees.map(emp => ({
+        value: emp.id!,
+        label: emp.fullName,
+        searchKey: emp.employeeNumber
+    }))
+  ], [employees]);
 
-        if (reportData.type === 'EmployeeRoster') {
-            import('html2pdf.js').then(module => {
-                const html2pdf = module.default;
-                const htmlContent = generateReportHTML(reportData as StandardReportData);
-                const element = document.createElement('div');
-                element.innerHTML = htmlContent;
-                html2pdf().from(element).set({
-                    margin:       1,
-                    filename:     `${(reportData as StandardReportData).title}.pdf`,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, useCORS: true },
-                    jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-                }).save();
-            });
-        }
-        
-        if(reportData.type === 'BulkEmployeeDossiers') {
-            toast({ title: "غير متاح", description: "طباعة التقارير الجماعية غير متاحة حالياً بهذه الطريقة." });
-        }
-    };
+  const handleGenerateReport = async () => {
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات.' });
+      return;
+    }
+    if (reportType === 'EmployeeDossier' && !selectedEmployeeId) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار موظف لإنشاء التقرير الشامل.' });
+      return;
+    }
 
-    const isPrintable = reportData && (reportData.type === 'EmployeeDossier' || reportData.type === 'EmployeeRoster');
+    setIsGenerating(true);
+    setReportData(null);
+    setError(null);
+    
+    const options = { asOfDate, employeeId: selectedEmployeeId, statusFilter };
 
+    try {
+      const data = await generateReport(firestore, reportType, options);
+      
+      if (('rows' in data && data.rows.length === 0) || ('dossiers' in data && data.dossiers.length === 0)) {
+        toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على نتائج تطابق معايير البحث المحددة.' });
+      }
+      setReportData(data);
+    } catch (err: any) {
+      console.error("Error generating report: ", err);
+      const errorMessage = err instanceof Error ? err.message : 'حدث خطأ غير متوقع.';
+      setError(errorMessage);
+      toast({ variant: 'destructive', title: 'فشل إنشاء التقرير', description: errorMessage });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+    
+  const handlePrint = () => {
+    if (!reportData) return;
+    
+    if (reportData.type === 'EmployeeDossier' && reportData.employee.id) {
+      const printUrl = `/dashboard/hr/employees/${reportData.employee.id}/report`;
+      window.open(printUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (reportData.type === 'EmployeeRoster') {
+      import('html2pdf.js').then(module => {
+        const html2pdf = module.default;
+        const htmlContent = generateReportHTML(reportData as StandardReportData);
+        const element = document.createElement('div');
+        element.innerHTML = htmlContent;
+        html2pdf().from(element).set({
+          margin: 1,
+          filename: `${(reportData as StandardReportData).title}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        }).save();
+      });
+    }
+    
+    if(reportData.type === 'BulkEmployeeDossiers') {
+      toast({ title: "غير متاح", description: "طباعة التقارير الجماعية غير متاحة حالياً بهذه الطريقة." });
+    }
+  };
+
+  const isPrintable = reportData && (reportData.type === 'EmployeeDossier' || reportData.type === 'EmployeeRoster');
 
   return (
     <div className='space-y-6'>
@@ -292,6 +284,17 @@ export default function ReportsPage() {
                     </div>
                 )}
                  
+                 {error && !isGenerating && (
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>فشل إنشاء التقرير</AlertTitle>
+                        <AlertDescription>
+                            {error}
+                            <p className='mt-2 text-xs'>قد تكون المشكلة بسبب بيانات غير مكتملة لأحد الموظفين. الرجاء مراجعة البيانات والمحاولة مرة أخرى.</p>
+                        </AlertDescription>
+                    </Alert>
+                )}
+                 
                  <div id="report-content-to-print">
                     {reportData && !isGenerating && (
                         <div className="space-y-4">
@@ -307,7 +310,7 @@ export default function ReportsPage() {
                             </div>
 
                             {reportData.type === 'EmployeeDossier' && reportData.employee && (
-                            <EmployeeDossier employee={reportData.employee} reportDate={parseISO(asOfDate)} />
+                                <EmployeeDossier employee={reportData.employee} reportDate={parseISO(asOfDate)} />
                             )}
                             {reportData.type === 'BulkEmployeeDossiers' && (
                                 <div className='space-y-8'>
@@ -325,8 +328,7 @@ export default function ReportsPage() {
                     )}
                  </div>
                 
-
-                {!reportData && !isGenerating && (
+                {!reportData && !isGenerating && !error && (
                     <div className="p-8 text-center border-2 border-dashed rounded-lg">
                         <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                         <h3 className="mt-4 text-lg font-medium">جاهز لإنشاء التقارير</h3>
@@ -335,7 +337,6 @@ export default function ReportsPage() {
                         </p>
                     </div>
                 )}
-                
             </CardContent>
         </Card>
     </div>
