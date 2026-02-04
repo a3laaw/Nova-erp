@@ -53,6 +53,8 @@ class SmartCache {
       keys: keys as string[],
       threshold,
       includeScore: true,
+      minMatchCharLength: 2,
+      ignoreLocation: true,
     });
     return fuse.search(query).map(r => r.item);
   }
@@ -76,7 +78,11 @@ class SmartCache {
 
     return onSnapshot(q,
       (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as T[];
+        const data = snapshot.docs.map(doc => {
+            // Sanitize data to remove any non-serializable fields from Firestore
+            const plainData = JSON.parse(JSON.stringify(doc.data()));
+            return { id: doc.id, ...plainData } as T;
+        });
         onUpdate(data);
       },
       (err) => {
@@ -101,7 +107,9 @@ class SmartCache {
     return onSnapshot(doc(db, docPath),
       (snapshot) => {
         if(snapshot.exists()) {
-            const data = { id: snapshot.id, ...snapshot.data() } as T;
+            // Sanitize data to remove any non-serializable fields from Firestore
+            const plainData = JSON.parse(JSON.stringify(snapshot.data()));
+            const data = { id: snapshot.id, ...plainData } as T;
             onUpdate(data);
         } else {
             onUpdate(null);
@@ -112,6 +120,19 @@ class SmartCache {
         onError(err);
       }
     );
+  }
+
+  async get<T>(key: string, fetchFn: () => Promise<T>, ttl: number): Promise<T> {
+    const cached = await this.getFromStorage<T>(key);
+    const now = Date.now();
+    if (cached && now - cached.timestamp < cached.ttl) {
+      return cached.data;
+    }
+
+    const freshData = await fetchFn();
+    const plainData = JSON.parse(JSON.stringify(freshData));
+    await this.set(key, plainData, ttl);
+    return plainData;
   }
 }
 

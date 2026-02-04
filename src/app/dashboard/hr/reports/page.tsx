@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -62,12 +61,16 @@ export default function ReportsPage() {
       try {
         const q = query(collection(firestore, 'employees'));
         const querySnapshot = await getDocs(q);
-        const fetchedEmployees: Employee[] = [];
-        querySnapshot.forEach(doc => {
-            if (doc.exists() && doc.data()?.fullName) {
-                fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
-            }
-        });
+        
+        // Manually map to plain objects to avoid serialization issues
+        const fetchedEmployees: Employee[] = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                fullName: data.fullName,
+                employeeNumber: data.employeeNumber,
+            } as Employee;
+        }).filter(emp => emp.fullName); // Ensure fullName exists
         
         const sortedEmployees = fetchedEmployees.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
         setEmployees(sortedEmployees);

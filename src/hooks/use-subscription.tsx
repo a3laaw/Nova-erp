@@ -31,13 +31,14 @@ export function useSubscription<T extends { id?: string }>(
                     const valueObject = filter.value;
                     let value = 'unknown';
 
-                    if (valueObject.stringValue !== undefined) value = valueObject.stringValue;
-                    else if (valueObject.integerValue !== undefined) value = valueObject.integerValue;
-                    else if (valueObject.doubleValue !== undefined) value = valueObject.doubleValue;
-                    else if (valueObject.booleanValue !== undefined) value = String(valueObject.booleanValue);
-                    else if (valueObject.geoPointValue !== undefined) value = `${valueObject.geoPointValue.latitude},${valueObject.geoPointValue.longitude}`;
-                    else if (valueObject.timestampValue !== undefined) value = `${valueObject.timestampValue.seconds}_${valueObject.timestampValue.nanoseconds}`;
-                    else if (valueObject.nullValue !== undefined) value = 'null';
+                    if (valueObject?.stringValue !== undefined) value = valueObject.stringValue;
+                    else if (valueObject?.integerValue !== undefined) value = valueObject.integerValue;
+                    else if (valueObject?.doubleValue !== undefined) value = valueObject.doubleValue;
+                    else if (valueObject?.booleanValue !== undefined) value = String(valueObject.booleanValue);
+                    else if (valueObject?.arrayValue) return `where:${fieldPath}:${op}:[${valueObject.arrayValue.values.map((v:any) => v.stringValue).join(',')}]`
+                    else if (valueObject?.geoPointValue !== undefined) value = `${valueObject.geoPointValue.latitude},${valueObject.geoPointValue.longitude}`;
+                    else if (valueObject?.timestampValue !== undefined) value = `${valueObject.timestampValue.seconds}_${valueObject.timestampValue.nanoseconds}`;
+                    else if (valueObject?.nullValue !== undefined) value = 'null';
                     
                     return `where:${fieldPath}:${op}:${value}`;
                 }
@@ -45,6 +46,9 @@ export function useSubscription<T extends { id?: string }>(
                     const field = internal._query.orderBy[0].field.segments.join('.');
                     const dir = internal._query.orderBy[0].dir;
                     return `orderBy:${field}:${dir}`;
+                }
+                 if (internal._type === 'limit') {
+                    return `limit:${internal._query.limit}`;
                 }
             } catch {
                 return 'unknown_constraint';
@@ -81,7 +85,8 @@ export function useSubscription<T extends { id?: string }>(
                 if (isMounted) {
                     setData(newData);
                     setError(null);
-                    cache.set(cacheKey, newData); // Update cache on new data
+                    const plainData = JSON.parse(JSON.stringify(newData));
+                    cache.set(cacheKey, plainData); // Update cache on new data
                     if (isFirstLoad) {
                         setLoading(false);
                         isFirstLoad = false;

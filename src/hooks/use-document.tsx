@@ -39,7 +39,11 @@ export function useDocument<T extends { id?: string }>(
           setData(newData);
           setError(null);
           if (newData !== null) {
-            cache.set(cacheKey, newData);
+            // Sanitize before setting to cache to ensure serializability
+            const plainData = JSON.parse(JSON.stringify(newData));
+            cache.set(cacheKey, plainData);
+          } else {
+             cache.invalidate(cacheKey);
           }
           if (isFirstLoad) {
             setLoading(false);
