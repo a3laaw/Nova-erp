@@ -3,32 +3,27 @@
 
 import React, { useEffect, useState } from 'react';
 import type { Employee, AuditLog, LeaveRequest } from '@/lib/types';
-import { format, intervalToDuration } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { Logo } from '../layout/logo';
 import { formatCurrency } from '@/lib/utils';
 import { Banknote, Briefcase, Calendar, Gift, History, Phone, User, Wallet, AlertCircle } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
-import { fromFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
+// Props accept a serializable version of the employee
 interface DossierProps {
-  employee: Partial<Employee>;
+  employee: Partial<Employee & { hireDate: string | null; lastLeave: any; serviceDuration: any; auditLogs: any[] }>;
   reportDate: Date;
 }
 
-const formatDate = (dateValue: any, fallback = '-') => {
-  const dateStr = fromFirestoreDate(dateValue);
-  if (!dateStr) return fallback;
+const formatDate = (dateValue: string | null | undefined, fallback = '-') => {
+  if (!dateValue) return fallback;
   try {
-    const [year, month, day] = dateStr.split('-');
-    if (year && month && day) {
-      return `${day}/${month}/${year}`;
-    }
-    return dateStr;
+    const date = parseISO(dateValue);
+    return new Intl.DateTimeFormat('ar-KW', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' }).format(date);
   } catch (e) {
-    return dateStr;
+    return dateValue; // return the string if parsing fails
   }
 };
 
@@ -44,11 +39,11 @@ const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800', 'on-leave': 'bg-yellow-100 text-yellow-800', terminated: 'bg-red-100 text-red-800',
 };
 
-function InfoItem({ label, value }: { label: string, value: string | number | null | undefined }) {
+function InfoItem({ label, value }: { label: string, value: string | number | null | undefined | React.ReactNode }) {
   return (
       <div className="flex justify-between items-center py-1 print:py-0.5">
           <span className="text-muted-foreground">{label}:</span>
-          <span className="font-semibold text-right">{value || '-'}</span>
+          <span className="font-semibold text-right">{value ?? '-'}</span>
       </div>
   );
 }
@@ -65,11 +60,11 @@ function Section({ title, icon, children }: { title: string, icon: React.ReactNo
 }
 
 export function EmployeeDossier({ employee, reportDate }: DossierProps) {
-  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  const [currentDate, setCurrentDate] = useState<string | null>(null);
   const { branding } = useBranding();
 
   useEffect(() => {
-    setCurrentDate(new Date());
+    setCurrentDate(new Date().toISOString());
   }, []);
 
   if (!employee) {
@@ -81,11 +76,10 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
       </Alert>
     );
   }
-
-  const hireDate = employee.hireDate ? fromFirestoreDate(employee.hireDate) : null;
+  
   const serviceDuration = employee.serviceDuration;
-  const currentStatus = employee.status || 'active';
-  const lastLeave = employee.lastLeave as LeaveRequest | null;
+  const currentStatus = employee.status ?? 'active';
+  const lastLeave = employee.lastLeave;
 
   return (
     <div className="p-4 md:p-6 bg-background font-body print:p-0 printable-content" dir="rtl">
@@ -99,12 +93,12 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <div className='flex items-center gap-4'>
                         <Logo className="h-16 w-16 !p-3 print:hidden" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                         <div>
-                            <h1 className="text-2xl font-bold font-headline print:text-xl">{branding?.company_name || 'ملف الموظف الشامل'}</h1>
-                            <p className="text-muted-foreground print:text-sm">{branding?.letterhead_text || 'Nova ERP'}</p>
+                            <h1 className="text-2xl font-bold font-headline print:text-xl">{branding?.company_name ?? 'ملف الموظف الشامل'}</h1>
+                            <p className="text-muted-foreground print:text-sm">{branding?.letterhead_text ?? 'Nova ERP'}</p>
                         </div>
                     </div>
                     <div className="text-left text-xs text-muted-foreground mt-4">
-                        <p>تاريخ التقرير: {formatDate(reportDate)}</p>
+                        <p>تاريخ التقرير: {formatDate(reportDate.toISOString())}</p>
                         {currentDate && <p className="print:hidden">تاريخ الطباعة: {formatDate(currentDate)}</p>}
                     </div>
                 </div>
@@ -117,7 +111,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="الرقم المدني" value={employee.civilId} />
                     <InfoItem label="تاريخ الميلاد" value={formatDate(employee.dob)} />
                     <InfoItem label="النوع" value={employee.gender === 'male' ? 'ذكر' : employee.gender === 'female' ? 'أنثى' : '-'} />
-                    <InfoItem label="حالة الموظف" value={<Badge className={statusColors[currentStatus]}>{statusTranslations[currentStatus] || 'غير معروف'}</Badge>} />
+                    <InfoItem label="حالة الموظف" value={<Badge className={statusColors[currentStatus]}>{statusTranslations[currentStatus] ?? 'غير معروف'}</Badge>} />
                 </Section>
                 
                 <Section title="معلومات الاتصال" icon={<Phone />}>
@@ -133,12 +127,6 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="نوع العقد" value={employee.contractType} />
                     {employee.contractType !== 'permanent' && <InfoItem label="انتهاء العقد" value={formatDate(employee.contractExpiry)} />}
                     {employee.nationality !== 'كويتي' && <InfoItem label="انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
-                    {employee.status === 'terminated' && (
-                        <>
-                            <InfoItem label="تاريخ إنهاء الخدمة" value={formatDate(employee.terminationDate)} />
-                            <InfoItem label="سبب الإنهاء" value={employee.terminationReason === 'resignation' ? 'استقالة' : 'إنهاء من الشركة'} />
-                        </>
-                    )}
                 </Section>
 
                 <Section title="البيانات المالية" icon={<Wallet />}>
@@ -165,7 +153,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                 <Section title="حالة الإجازات" icon={<Calendar />}>
                     <div className="md:col-span-2 bg-muted/50 p-3 rounded-md text-center">
                         <p className="text-muted-foreground">رصيد الإجازات السنوية المتاح حتى تاريخ التقرير</p>
-                        <p className="text-2xl font-bold text-primary">{employee.leaveBalance?.toFixed(0) ?? 0} يوم</p>
+                        <p className="text-2xl font-bold text-primary">{(employee.leaveBalance ?? 0).toFixed(0)} يوم</p>
                     </div>
                     {lastLeave && (
                         <div className='md:col-span-2 border-t pt-4'>

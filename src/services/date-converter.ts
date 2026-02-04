@@ -49,10 +49,9 @@ export function fromFirestoreDate(dateValue: any): string {
 }
 
 /**
- * Safely converts a string from an HTML input, a Date object, or a Timestamp 
- * into a valid JavaScript Date object, suitable for Firestore.
+ * Safely converts a string, Date object, or Timestamp-like object into a valid JavaScript Date object.
+ * This function is non-recursive and designed to be safe from stack overflows.
  * Returns null if the input is empty, null, or results in an invalid date.
- * This is for PREPARING data TO BE SENT to Firestore.
  * @param dateInput The date value from any source.
  * @returns A Date object or null.
  */
@@ -61,44 +60,42 @@ export function toFirestoreDate(dateInput: any): Date | null {
     return null;
   }
 
-  // Handle existing Date object
-  if (dateInput instanceof Date) {
-    return isNaN(dateInput.getTime()) ? null : dateInput;
-  }
+  try {
+    // Handle existing Date object
+    if (dateInput instanceof Date) {
+      return isNaN(dateInput.getTime()) ? null : dateInput;
+    }
 
-  // Handle Firestore Timestamp
-  if (dateInput.toDate && typeof dateInput.toDate === 'function') {
-    const d = dateInput.toDate();
-    return isNaN(d.getTime()) ? null : d;
-  }
+    // Handle Firestore Timestamp
+    if (dateInput.toDate && typeof dateInput.toDate === 'function') {
+      const d = dateInput.toDate();
+      return isNaN(d.getTime()) ? null : d;
+    }
 
-  // Handle serialized Firestore Timestamp object from cache
-  if (typeof dateInput === 'object' && dateInput !== null && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
-    const d = new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  
-  // Handle string formats
-  if (typeof dateInput === 'string') {
-    let d: Date;
-    // Check for "dd/MM/yyyy" or "dd-MM-yyyy"
-    const dayFirstMatch = dateInput.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-    if (dayFirstMatch) {
-      // d = new Date(year, month - 1, day)
-      d = new Date(parseInt(dayFirstMatch[3]), parseInt(dayFirstMatch[2]) - 1, parseInt(dayFirstMatch[1]));
-    } else {
-      // Fallback to let the browser parse it (handles "yyyy-MM-dd", ISO strings, etc.)
-      // Adding T00:00:00 for "yyyy-MM-dd" to avoid timezone issues.
+    // Handle serialized Firestore Timestamp object (e.g., from cache or JSON.stringify)
+    if (typeof dateInput === 'object' && dateInput !== null && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
+      const d = new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    
+    // Handle string formats
+    if (typeof dateInput === 'string') {
+      let d: Date;
+      // Prefer creating date from ISO string to avoid timezone issues.
+      // Add T00:00:00 for "yyyy-MM-dd" to ensure it's parsed as local time start of day.
       const sanitizedInput = /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? `${dateInput}T00:00:00` : dateInput;
       d = new Date(sanitizedInput);
-    }
-    return isNaN(d.getTime()) ? null : d;
-  }
-  
-  // Handle number (milliseconds from epoch)
-  if (typeof dateInput === 'number') {
-      const d = new Date(dateInput);
       return isNaN(d.getTime()) ? null : d;
+    }
+    
+    // Handle number (milliseconds from epoch)
+    if (typeof dateInput === 'number') {
+        const d = new Date(dateInput);
+        return isNaN(d.getTime()) ? null : d;
+    }
+  } catch (error) {
+    console.error("Error converting value to Date:", dateInput, error);
+    return null;
   }
 
   // If the type is unknown or invalid, return null.

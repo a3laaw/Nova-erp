@@ -13,10 +13,23 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
-import type { Employee, LeaveRequest, AuditLog, Holiday } from '@/lib/types';
-import { format, differenceInYears, eachDayOfInterval, isFriday, intervalToDuration, parseISO } from 'date-fns';
-import { toFirestoreDate, fromFirestoreDate } from './date-converter';
+import type { Employee, LeaveRequest, AuditLog } from '@/lib/types';
+import { intervalToDuration, differenceInYears, parseISO } from 'date-fns';
+import { toFirestoreDate } from './date-converter';
 import { calculateAnnualLeaveBalance } from './leave-calculator';
+
+// Define a serializable Employee type for reports
+type SerializableEmployee = Omit<Employee, 'hireDate' | 'dob' | 'residencyExpiry' | 'contractExpiry' | 'terminationDate' | 'lastVacationAccrualDate' | 'lastLeaveResetDate' | 'createdAt' | 'lastLeave' | 'auditLogs'> & {
+  hireDate: string | null;
+  dob: string | null;
+  residencyExpiry: string | null;
+  contractExpiry: string | null;
+  terminationDate: string | null;
+  lastLeave: (Omit<LeaveRequest, 'startDate' | 'endDate' | 'actualReturnDate'> & { startDate: string, endDate: string, actualReturnDate: string | null }) | null;
+  auditLogs: (Omit<AuditLog, 'effectiveDate'> & { effectiveDate: string })[];
+  serviceDuration: Duration;
+};
+
 
 export type ReportType = 'EmployeeDossier' | 'EmployeeRoster';
 
@@ -44,12 +57,12 @@ export interface StandardReportData {
 
 export interface DossierReportData {
   type: 'EmployeeDossier';
-  employee: Employee;
+  employee: SerializableEmployee;
 }
 
 export interface BulkReportData {
   type: 'BulkEmployeeDossiers';
-  dossiers: Employee[];
+  dossiers: SerializableEmployee[];
 }
 
 export type ReportData = StandardReportData | DossierReportData | BulkReportData;
@@ -62,11 +75,7 @@ interface ReportOptions {
 
 // --- Helper Functions ---
 
-/**
- * Finds the correct value of a field as of a specific date by searching through sorted audit logs.
- */
 function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, initialValue: any) {
-  // .find() is efficient because the logs are pre-sorted by Firestore.
   const relevantLog = logs.find(log => {
     const effectiveDate = toFirestoreDate(log.effectiveDate);
     return log.field === field && effectiveDate && effectiveDate <= asOfDate;
@@ -74,11 +83,7 @@ function findValueAsOf(logs: AuditLog[], field: keyof Employee, asOfDate: Date, 
   return relevantLog ? relevantLog.newValue : initialValue;
 }
 
-/**
- * Fetches all necessary data for a single employee and reconstructs their state
- * as of a specific date. This is the core "time-travel" logic.
- */
-async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfDate: Date): Promise<Employee> {
+async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfDate: Date): Promise<SerializableEmployee> {
   try {
     const [empSnap, auditLogsSnap, leaveRequestsSnap] = await Promise.all([
       getDoc(doc(db, 'employees', employeeId)),
@@ -90,27 +95,32 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       throw new Error(`Employee with ID ${employeeId} not found.`);
     }
 
-    const baseEmployee = { id: empSnap.id, ...empSnap.data() } as Employee;
-    const auditLogs = auditLogsSnap.docs.map(d => d.data() as AuditLog);
-    const allLeaveRequests = leaveRequestsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
-
-    const hireDate = toFirestoreDate(baseEmployee.hireDate);
+    const baseData = empSnap.data();
+    const hireDate = toFirestoreDate(baseData.hireDate);
     if (!hireDate) {
-      throw new Error(`Invalid hire date for employee ID: ${employeeId}`);
+      throw new Error(`Invalid or missing hire date for employee ID: ${employeeId}`);
     }
 
-    // --- Reconstruct state as of the report date ---
+    const auditLogs = auditLogsSnap.docs.map(d => d.data() as AuditLog);
+    const allLeaveRequests = leaveRequestsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
+    
+    // --- Manual Mapping & Reconstruction ---
     const reconstructedState: Partial<Employee> = {
-      ...baseEmployee, // Start with current data, then override with historical values
-      jobTitle: findValueAsOf(auditLogs, 'jobTitle', asOfDate, baseEmployee.jobTitle),
-      department: findValueAsOf(auditLogs, 'department', asOfDate, baseEmployee.department),
-      basicSalary: findValueAsOf(auditLogs, 'basicSalary', asOfDate, baseEmployee.basicSalary),
-      housingAllowance: findValueAsOf(auditLogs, 'housingAllowance', asOfDate, baseEmployee.housingAllowance),
-      transportAllowance: findValueAsOf(auditLogs, 'transportAllowance', asOfDate, baseEmployee.transportAllowance),
+      jobTitle: findValueAsOf(auditLogs, 'jobTitle', asOfDate, baseData.jobTitle),
+      department: findValueAsOf(auditLogs, 'department', asOfDate, baseData.department),
+      basicSalary: findValueAsOf(auditLogs, 'basicSalary', asOfDate, baseData.basicSalary),
+      housingAllowance: findValueAsOf(auditLogs, 'housingAllowance', asOfDate, baseData.housingAllowance),
+      transportAllowance: findValueAsOf(auditLogs, 'transportAllowance', asOfDate, baseData.transportAllowance),
     };
 
-    // --- Calculate dynamic values based on reconstructed state ---
-    const leaveBalance = calculateAnnualLeaveBalance(baseEmployee, asOfDate);
+    // --- Safe Calculations ---
+    let leaveBalance = 0;
+    try {
+        leaveBalance = calculateAnnualLeaveBalance({ ...baseData, ...reconstructedState } as Employee, asOfDate);
+    } catch (e) {
+        console.error(`Could not calculate leave balance for ${employeeId}:`, e);
+    }
+    
     const lastReturn = allLeaveRequests
       .filter(lr => {
         const returnDate = toFirestoreDate(lr.actualReturnDate);
@@ -133,18 +143,56 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
       }
     }
 
-    // Combine base, reconstructed, and calculated data into a final object
-    const finalEmployeeData = {
-      ...baseEmployee,
-      ...reconstructedState,
-      auditLogs,
-      eosb: calculatedEosb,
-      leaveBalance,
-      lastLeave: lastReturn,
-      serviceDuration,
+    // --- Final Manual Mapping to Plain Serializable Object ---
+    const finalData = {
+        id: empSnap.id,
+        employeeNumber: baseData.employeeNumber,
+        fullName: baseData.fullName,
+        nameEn: baseData.nameEn,
+        dob: toFirestoreDate(baseData.dob)?.toISOString() || null,
+        gender: baseData.gender,
+        civilId: baseData.civilId,
+        nationality: baseData.nationality,
+        residencyExpiry: toFirestoreDate(reconstructedState.residencyExpiry ?? baseData.residencyExpiry)?.toISOString() || null,
+        contractExpiry: toFirestoreDate(reconstructedState.contractExpiry ?? baseData.contractExpiry)?.toISOString() || null,
+        mobile: baseData.mobile,
+        emergencyContact: baseData.emergencyContact,
+        email: baseData.email,
+        jobTitle: reconstructedState.jobTitle,
+        position: reconstructedState.position,
+        department: reconstructedState.department,
+        contractType: baseData.contractType,
+        hireDate: hireDate.toISOString(),
+        terminationDate: toFirestoreDate(baseData.terminationDate)?.toISOString() || null,
+        terminationReason: baseData.terminationReason,
+        status: baseData.status,
+        basicSalary: reconstructedState.basicSalary,
+        housingAllowance: reconstructedState.housingAllowance,
+        transportAllowance: reconstructedState.transportAllowance,
+        salaryPaymentType: baseData.salaryPaymentType,
+        bankName: baseData.bankName,
+        iban: baseData.iban,
+        eosb: calculatedEosb,
+        leaveBalance,
+        serviceDuration,
+        auditLogs: auditLogs.map(log => ({
+            ...log,
+            effectiveDate: toFirestoreDate(log.effectiveDate)?.toISOString() || ''
+        })),
+        lastLeave: lastReturn ? {
+            ...lastReturn,
+            startDate: toFirestoreDate(lastReturn.startDate)?.toISOString() || '',
+            endDate: toFirestoreDate(lastReturn.endDate)?.toISOString() || '',
+            actualReturnDate: toFirestoreDate(lastReturn.actualReturnDate)?.toISOString() || null,
+        } : null,
     };
+    
+    // Explicitly remove fields that might not be serializable
+    delete (finalData as any).lastVacationAccrualDate;
+    delete (finalData as any).lastLeaveResetDate;
+    delete (finalData as any).createdAt;
 
-    return finalEmployeeData;
+    return finalData as SerializableEmployee;
 
   } catch (error) {
     console.error(`Failed to reconstruct state for employee ${employeeId}:`, error);
@@ -152,7 +200,6 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
   }
 }
 
-// --- Main Exported Server Action ---
 
 export async function generateReport(db: Firestore, reportType: ReportType, options: ReportOptions): Promise<ReportData> {
   let result: ReportData;
@@ -172,8 +219,12 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
             const hireDate = toFirestoreDate(emp.hireDate);
             const serviceYears = hireDate ? differenceInYears(asOfDate, hireDate) : 0;
             return {
-                ...emp,
-                hireDate, // pass date object
+                employeeNumber: emp.employeeNumber,
+                fullName: emp.fullName,
+                department: emp.department,
+                jobTitle: emp.jobTitle,
+                status: emp.status,
+                hireDate: hireDate?.toISOString() || null,
                 serviceYears,
             };
         })
@@ -182,7 +233,7 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
       result = {
         type: 'EmployeeRoster',
         title: 'قائمة الموظفين',
-        subtitle: `الحالة كما في تاريخ: ${format(asOfDate, 'dd/MM/yyyy')}`,
+        subtitle: `الحالة كما في تاريخ: ${asOfDate.toLocaleDateString('ar-KW')}`,
         headers: [
           { key: 'employeeNumber', label: 'الرقم الوظيفي' },
           { key: 'fullName', label: 'الاسم الكامل' },
@@ -218,12 +269,11 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
       throw new Error(`Report type '${reportType}' is not implemented.`);
     }
 
-    // CRITICAL FIX: Serialize the result to remove any non-serializable Firestore objects
+    // CRITICAL: Final sanitization step to strip any remaining non-serializable prototypes.
     return JSON.parse(JSON.stringify(result));
 
   } catch (error) {
     console.error("Error in generateReport:", error);
-    // Re-throw a serializable error to the client
     throw new Error(error instanceof Error ? error.message : 'An unknown error occurred on the server.');
   }
 }
