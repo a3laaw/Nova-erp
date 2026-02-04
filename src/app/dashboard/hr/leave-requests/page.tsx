@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle } from 'lucide-react';
+import { ArrowRight, Check, PlusCircle, X, Pencil, LogIn, CheckCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -28,10 +28,24 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Badge } from '@/components/ui/badge';
 import { LeaveRequestForm } from '@/components/hr/leave-request-form';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, serverTimestamp, type DocumentData, orderBy, getDocs, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { LeaveRequest, Employee } from '@/lib/types';
@@ -86,6 +100,9 @@ export default function LeaveRequestsPage() {
     const [rejectionReason, setRejectionReason] = useState('');
     const [isRejectConfirmOpen, setIsRejectConfirmOpen] = useState(false);
     const [isProcessingReject, setIsProcessingReject] = useState(false);
+    
+    const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
     const [dataLoading, setDataLoading] = useState(true);
@@ -257,6 +274,45 @@ export default function LeaveRequestsPage() {
         setRequestToReject(null);
     };
 
+    const handleDeleteRequest = async () => {
+        if (!requestToDelete || !firestore) return;
+        setIsDeleting(true);
+        try {
+            const batch = writeBatch(firestore);
+            const requestRef = doc(firestore, 'leaveRequests', requestToDelete.id);
+            
+            batch.delete(requestRef);
+
+            if (requestToDelete.status === 'approved') {
+                const employeeRef = doc(firestore, 'employees', requestToDelete.employeeId);
+                const employeeSnap = await getDoc(employeeRef);
+
+                if (employeeSnap.exists()) {
+                    const today = new Date();
+                    const startDate = toFirestoreDate(requestToDelete.startDate);
+                    const endDate = toFirestoreDate(requestToDelete.endDate);
+                    
+                    if (startDate && endDate && today >= startDate && today <= endDate) {
+                        batch.update(employeeRef, { status: 'active' });
+                    }
+                }
+            }
+            
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم حذف طلب الإجازة بنجاح.' });
+        } catch (err) {
+            console.error("Error deleting leave request:", err);
+            toast({
+                variant: 'destructive',
+                title: 'خطأ',
+                description: 'فشل حذف طلب الإجازة.'
+            });
+        } finally {
+            setIsDeleting(false);
+            setRequestToDelete(null);
+        }
+    };
+
 
     const handleCloseForm = () => {
         setIsFormOpen(false);
@@ -339,7 +395,11 @@ export default function LeaveRequestsPage() {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && requests.map(req => (
+                            {!isLoading && requests.map(req => {
+                                const leaveStartDate = toFirestoreDate(req.startDate);
+                                const isLeaveStarted = leaveStartDate ? leaveStartDate <= new Date() : false;
+                                
+                                return (
                                 <TableRow key={req.id}>
                                     <TableCell className='font-medium'>{employeesMap.get(req.employeeId) || req.employeeName}</TableCell>
                                     <TableCell>
@@ -366,36 +426,66 @@ export default function LeaveRequestsPage() {
                                     </TableCell>
                                     <TableCell className='text-center'>
                                         {filter === 'pending' && (
-                                            <div className='flex gap-2 justify-center'>
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700" onClick={() => handleEditRequestClick(req)}>
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)}>
-                                                    <Check className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(req)}>
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" dir="rtl">
+                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
+                                                        <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(req.id, 'approved', req.employeeId)} className="text-green-600 focus:text-green-700">
+                                                        <Check className="ml-2 h-4 w-4" /> قبول
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleRejectClick(req)} className="text-destructive focus:text-destructive">
+                                                        <X className="ml-2 h-4 w-4" /> رفض
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         )}
                                         {filter === 'approved' && (
-                                            <>
+                                            <div className='flex gap-2 justify-center'>
                                                 {req.isBackFromLeave ? (
                                                     <div className='flex items-center justify-center gap-2 text-green-600'>
                                                         <CheckCircle className="h-4 w-4" />
                                                         <span className='text-xs'>عاد في: {formatDateDisplay(req.actualReturnDate)}</span>
                                                     </div>
                                                 ) : (
-                                                    <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)}>
-                                                        <LogIn className="ml-2 h-4 w-4" />
-                                                        تسجيل العودة
-                                                    </Button>
+                                                    <TooltipProvider>
+                                                      <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                           <span tabIndex={0}> {/* Required for tooltip on disabled button */}
+                                                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(req)} disabled={!isLeaveStarted}>
+                                                                <LogIn className="ml-2 h-4 w-4" />
+                                                                تسجيل العودة
+                                                            </Button>
+                                                           </span>
+                                                        </TooltipTrigger>
+                                                        {!isLeaveStarted && <TooltipContent><p>لا يمكن تسجيل العودة قبل بدء الإجازة</p></TooltipContent>}
+                                                      </Tooltip>
+                                                    </TooltipProvider>
                                                 )}
-                                            </>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" dir="rtl">
+                                                        <DropdownMenuLabel>إجراءات إضافية</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
+                                                            <Pencil className="ml-2 h-4 w-4" /> تعديل الطلب
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={() => setRequestToDelete(req)} className="text-destructive focus:text-destructive">
+                                                            <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                         )}
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                 </div>
@@ -454,6 +544,23 @@ export default function LeaveRequestsPage() {
                         <AlertDialogCancel disabled={isProcessingReject}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleConfirmReject} disabled={isProcessingReject || !rejectionReason} className="bg-destructive hover:bg-destructive/90">
                             {isProcessingReject ? 'جاري الرفض...' : 'تأكيد الرفض'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
+            <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            هل أنت متأكد من رغبتك في حذف طلب الإجازة هذا؟ سيتم التراجع عن أي تأثير له على رصيد الموظف. لا يمكن التراجع عن هذا الإجراء.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                            {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
