@@ -118,18 +118,23 @@ export default function ReportsPage() {
         if (!firestore) return;
         const fetchEmployees = async () => {
             try {
-                // Fetch all employees regardless of status to allow selection in dossier
                 const q = query(collection(firestore, 'employees'));
                 const querySnapshot = await getDocs(q);
                 const fetchedEmployees: Employee[] = [];
                 querySnapshot.forEach(doc => {
-                    fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
+                    if (doc.exists() && doc.data()) {
+                        fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
+                    }
                 });
-                setEmployees(fetchedEmployees.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar')));
-                 if (fetchedEmployees.length > 0) {
-                   setSelectedEmployeeId(fetchedEmployees[0].id!);
+                
+                const sortedEmployees = fetchedEmployees.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
+                setEmployees(sortedEmployees);
+                
+                 if (sortedEmployees.length > 0) {
+                   setSelectedEmployeeId(sortedEmployees[0].id!);
                 }
             } catch (error) {
+                console.error("Error fetching employees for HR reports:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الموظفين.' });
             }
         };
@@ -138,11 +143,13 @@ export default function ReportsPage() {
     
     const employeeOptions = useMemo(() => [
         { value: 'all', label: 'جميع الموظفين (تقرير جماعي)' },
-        ...employees.map(emp => ({
-            value: emp.id!,
-            label: emp.fullName,
-            searchKey: emp.employeeNumber
-        }))
+        ...employees
+            .filter(emp => emp?.id && emp?.fullName)
+            .map(emp => ({
+                value: emp.id!,
+                label: emp.fullName,
+                searchKey: emp.employeeNumber
+            }))
     ], [employees]);
 
 
