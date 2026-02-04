@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, getDocs, collection, query, where, limit, orderBy } from 'firebase/firestore';
 import type { LeaveRequest, Employee, Holiday } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,7 +53,43 @@ export default function LeaveRequestPrintPage() {
     }, [firestore, leaveRequest]);
     const { data: employee, loading: employeeLoading } = useDocument<Employee>(firestore, employeeRef?.path || null);
 
-    const loading = requestLoading || employeeLoading || brandingLoading;
+    const [lastLeave, setLastLeave] = useState<LeaveRequest | null>(null);
+    const [loadingLastLeave, setLoadingLastLeave] = useState(true);
+
+    useEffect(() => {
+        if (!firestore || !employee?.id) {
+            setLastLeave(null);
+            setLoadingLastLeave(false);
+            return;
+        }
+
+        const fetchLastLeave = async () => {
+            setLoadingLastLeave(true);
+            try {
+                const q = query(
+                    collection(firestore, 'leaveRequests'),
+                    where('employeeId', '==', employee.id),
+                    where('isBackFromLeave', '==', true),
+                    orderBy('actualReturnDate', 'desc'),
+                    limit(1)
+                );
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    setLastLeave({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as LeaveRequest);
+                } else {
+                    setLastLeave(null);
+                }
+            } catch (error) {
+                console.error("Failed to fetch last leave:", error);
+            } finally {
+                setLoadingLastLeave(false);
+            }
+        };
+
+        fetchLastLeave();
+    }, [firestore, employee]);
+
+    const loading = requestLoading || employeeLoading || brandingLoading || loadingLastLeave;
 
     const handlePrint = () => window.print();
 
@@ -62,8 +98,6 @@ export default function LeaveRequestPrintPage() {
 
         const asOfDate = toFirestoreDate(leaveRequest.startDate) || new Date();
         
-        // To get the balance *before* this request, we calculate it up to the start date
-        // and if the request was already approved, we add back its days.
         let balanceBeforeRequest = calculateAnnualLeaveBalance(employee, asOfDate);
         if (leaveRequest.status === 'approved' && leaveRequest.workingDays) {
             balanceBeforeRequest += leaveRequest.workingDays;
@@ -141,6 +175,18 @@ export default function LeaveRequestPrintPage() {
                                     <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} />
                                     <InfoRow label="القسم" value={employee.department} />
                                     <InfoRow label="المسمى الوظيفي" value={employee.jobTitle} />
+                                    {lastLeave && (
+                                        <div className="col-span-2 border-t mt-2 pt-2">
+                                            <InfoRow 
+                                                label="آخر عودة من إجازة" 
+                                                value={
+                                                    toFirestoreDate(lastLeave.actualReturnDate) 
+                                                    ? `${typeTranslations[lastLeave.leaveType] || lastLeave.leaveType} بتاريخ ${format(toFirestoreDate(lastLeave.actualReturnDate)!, 'yyyy/MM/dd')}`
+                                                    : '-'
+                                                } 
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </section>
 
