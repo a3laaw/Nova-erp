@@ -596,16 +596,14 @@ export default function LeaveRequestsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>تسجيل عودة الموظف</AlertDialogTitle>
                         <AlertDialogDescription>
-                            الرجاء تحديد تاريخ العودة الفعلي للموظف "{employeesMap.get(requestToReturn?.employeeId || '') || requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
+                            الرجاء تحديد تاريخ العودة الفعلي للموظف "{employeesMap.get(requestToReturn?.employeeId || '')?.fullName || requestToReturn?.employeeName}". سيتم تحديث حالة الموظف إلى "نشط".
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="grid gap-2 py-4">
                         <Label htmlFor="actualReturnDate">تاريخ العودة الفعلي</Label>
-                        <Input
-                            id="actualReturnDate"
-                            type="date"
+                        <DateInput
                             value={actualReturnDate}
-                            onChange={(e) => setActualReturnDate(e.target.value)}
+                            onChange={(v) => setActualReturnDate(v)}
                         />
                     </div>
                     <AlertDialogFooter>
@@ -622,7 +620,7 @@ export default function LeaveRequestsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>رفض طلب الإجازة</AlertDialogTitle>
                         <AlertDialogDescription>
-                            الرجاء كتابة سبب رفض طلب الإجازة للموظف "{employeesMap.get(requestToReject?.employeeId || '') || requestToReject?.employeeName}".
+                            الرجاء كتابة سبب رفض طلب الإجازة للموظف "{employeesMap.get(requestToReject?.employeeId || '')?.fullName || requestToReject?.employeeName}".
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="grid gap-2 py-4">
@@ -662,3 +660,5 @@ export default function LeaveRequestsPage() {
     </div>
   );
 }
+
+    
