@@ -185,10 +185,12 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
         const empSnap = await getDocs(empQuery);
         const rows = empSnap.docs.map(doc => {
             const emp = doc.data() as Employee;
+            const hireDate = toFirestoreDate(emp.hireDate);
+            const serviceYears = hireDate ? differenceInYears(asOfDate, hireDate) : 0;
             return {
                 ...emp,
                 hireDate: fromFirestoreDate(emp.hireDate),
-                serviceYears: emp.hireDate ? differenceInYears(asOfDate, toFirestoreDate(emp.hireDate)!) : 0,
+                serviceYears: serviceYears,
             };
         });
         
