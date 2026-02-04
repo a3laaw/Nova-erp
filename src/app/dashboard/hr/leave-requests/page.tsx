@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -103,9 +103,6 @@ export default function LeaveRequestsPage() {
     
     const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-
-    const [isDeleteAllAlertOpen, setIsDeleteAllAlertOpen] = useState(false);
-    const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
     const [dataLoading, setDataLoading] = useState(true);
@@ -316,44 +313,6 @@ export default function LeaveRequestsPage() {
         }
     };
 
-    const handleDeleteAllRequests = async () => {
-        if (!firestore) return;
-        setIsDeletingAll(true);
-        try {
-            const batch = writeBatch(firestore);
-
-            const requestsQuery = query(collection(firestore, 'leaveRequests'));
-            const requestsSnapshot = await getDocs(requestsQuery);
-            requestsSnapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-
-            const onLeaveEmployeesQuery = query(collection(firestore, 'employees'), where('status', '==', 'on-leave'));
-            const onLeaveEmployeesSnapshot = await getDocs(onLeaveEmployeesQuery);
-            onLeaveEmployeesSnapshot.forEach(doc => {
-                batch.update(doc.ref, { status: 'active' });
-            });
-
-            await batch.commit();
-            toast({
-                title: 'نجاح',
-                description: `تم حذف ${requestsSnapshot.size} طلب إجازة وتحديث حالة ${onLeaveEmployeesSnapshot.size} موظف بنجاح.`
-            });
-            
-        } catch (err) {
-            console.error("Error deleting all leave requests:", err);
-            toast({
-                variant: 'destructive',
-                title: 'خطأ فادح',
-                description: 'فشل حذف جميع طلبات الإجازة. يرجى المحاولة مرة أخرى.'
-            });
-        } finally {
-            setIsDeletingAll(false);
-            setIsDeleteAllAlertOpen(false);
-        }
-    };
-
-
     const handleCloseForm = () => {
         setIsFormOpen(false);
         setEditingRequest(null);
@@ -388,10 +347,6 @@ export default function LeaveRequestsPage() {
                         <Button onClick={handleNewRequestClick}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             طلب إجازة جديد
-                        </Button>
-                         <Button variant="destructive" onClick={() => setIsDeleteAllAlertOpen(true)}>
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            حذف جميع الإجازات
                         </Button>
                     </div>
                 </div>
@@ -607,23 +562,6 @@ export default function LeaveRequestsPage() {
                         <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
                             {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            
-            <AlertDialog open={isDeleteAllAlertOpen} onOpenChange={setIsDeleteAllAlertOpen}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد حذف جميع الإجازات؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            تحذير: سيتم حذف جميع طلبات الإجازة في النظام بشكل نهائي. سيؤدي هذا أيضًا إلى إعادة جميع الموظفين الذين هم "في إجازة" إلى الحالة "نشط". لا يمكن التراجع عن هذا الإجراء.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeletingAll}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteAllRequests} disabled={isDeletingAll} className="bg-destructive hover:bg-destructive/90">
-                            {isDeletingAll ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بحذف الكل'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
