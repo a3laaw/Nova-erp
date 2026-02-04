@@ -95,7 +95,7 @@ const generateReportHTML = (reportData: StandardReportData): string => {
 
 
 export default function ReportsPage() {
-    const firestore = useFirebase();
+    const { firestore } = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
     
@@ -122,7 +122,7 @@ export default function ReportsPage() {
                 const querySnapshot = await getDocs(q);
                 const fetchedEmployees: Employee[] = [];
                 querySnapshot.forEach(doc => {
-                    if (doc.exists() && doc.data()) {
+                    if (doc.exists() && doc.data()?.fullName) { // Ensure doc has data and a name
                         fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
                     }
                 });
