@@ -104,8 +104,9 @@ export default function LeaveRequestsPage() {
     
     const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-    const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+    const [employeesMap, setEmployeesMap] = useState<Map<string, Employee>>(new Map());
     const [dataLoading, setDataLoading] = useState(true);
 
     useEffect(() => {
@@ -121,10 +122,10 @@ export default function LeaveRequestsPage() {
             setDataLoading(true);
             try {
                 const employeesSnapshot = await getDocs(collection(firestore, 'employees'));
-                const newEmployeesMap = new Map<string, string>();
+                const newEmployeesMap = new Map<string, Employee>();
                 employeesSnapshot.forEach(doc => {
-                    const emp = doc.data() as Employee;
-                    newEmployeesMap.set(doc.id, emp.fullName);
+                    const emp = { id: doc.id, ...doc.data() } as Employee;
+                    newEmployeesMap.set(doc.id, emp);
                 });
                 setEmployeesMap(newEmployeesMap);
             } catch (error) {
@@ -175,11 +176,8 @@ export default function LeaveRequestsPage() {
         if (!firestore || !employeeId) return;
 
         const requestRef = doc(firestore, 'leaveRequests', requestId);
-        const employeeRef = doc(firestore, 'employees', employeeId);
 
         try {
-            const batch = writeBatch(firestore);
-
             const updateData: DocumentData = {
                 status: newStatus,
                 approvedAt: serverTimestamp(),
@@ -189,13 +187,7 @@ export default function LeaveRequestsPage() {
                 updateData.rejectionReason = rejectionReason || 'لم يتم تحديد سبب.';
             }
 
-            batch.update(requestRef, updateData);
-
-            if (newStatus === 'approved') {
-                batch.update(employeeRef, { status: 'on-leave' });
-            }
-
-            await batch.commit();
+            await updateDoc(requestRef, updateData);
             
             toast({
                 title: 'نجاح',
@@ -231,6 +223,32 @@ export default function LeaveRequestsPage() {
         setRejectionReason('');
         setIsRejectConfirmOpen(true);
     }
+    
+    const handleStartLeaveClick = async (request: LeaveRequest) => {
+        if (!firestore || !request.employeeId) return;
+        setIsProcessingAction(true);
+        try {
+            const employeeRef = doc(firestore, 'employees', request.employeeId);
+            await updateDoc(employeeRef, { status: 'on-leave' });
+            
+            setEmployeesMap(prev => {
+                const newMap = new Map(prev);
+                const emp = newMap.get(request.employeeId);
+                if (emp) {
+                    newMap.set(request.employeeId, { ...emp, status: 'on-leave' });
+                }
+                return newMap;
+            });
+
+            toast({ title: 'نجاح', description: 'تم تحديث حالة الموظف إلى "في إجازة".' });
+        } catch (err) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الموظف.' });
+        } finally {
+            setIsProcessingAction(false);
+        }
+    };
+
 
     const handleConfirmReturn = async () => {
         if (!firestore || !requestToReturn || !actualReturnDate) {
@@ -252,6 +270,15 @@ export default function LeaveRequestsPage() {
 
             batch.update(employeeRef, {
                 status: 'active'
+            });
+            
+            setEmployeesMap(prev => {
+                const newMap = new Map(prev);
+                const emp = newMap.get(requestToReturn.employeeId);
+                if (emp) {
+                    newMap.set(requestToReturn.employeeId, { ...emp, status: 'active' });
+                }
+                return newMap;
             });
 
             await batch.commit();
@@ -398,12 +425,13 @@ export default function LeaveRequestsPage() {
                                 </TableRow>
                             )}
                             {!isLoading && requests.map(req => {
+                                const employee = employeesMap.get(req.employeeId);
                                 const leaveStartDate = toFirestoreDate(req.startDate);
-                                const isLeaveStarted = leaveStartDate ? leaveStartDate <= new Date() : false;
-                                
+                                const canStartLeave = employee?.status === 'active' && leaveStartDate && leaveStartDate <= new Date();
+
                                 return (
                                 <TableRow key={req.id}>
-                                    <TableCell className='font-medium'>{employeesMap.get(req.employeeId) || req.employeeName}</TableCell>
+                                    <TableCell className='font-medium'>{employee?.fullName || req.employeeName}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={typeColors[req.leaveType]}>
                                             {typeTranslations[req.leaveType]}
@@ -429,7 +457,7 @@ export default function LeaveRequestsPage() {
                                     <TableCell className='text-center'>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isProcessingAction}><MoreHorizontal className="h-4 w-4" /></Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl">
                                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
@@ -455,6 +483,11 @@ export default function LeaveRequestsPage() {
                                                 )}
                                                 {filter === 'approved' && (
                                                     <>
+                                                        {canStartLeave && (
+                                                            <DropdownMenuItem onClick={() => handleStartLeaveClick(req)} className="text-blue-600 focus:text-blue-700">
+                                                                <CheckCircle className="ml-2 h-4 w-4" /> بدء الإجازة
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         <DropdownMenuItem onClick={() => handleEditRequestClick(req)}>
                                                             <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                         </DropdownMenuItem>
@@ -462,11 +495,11 @@ export default function LeaveRequestsPage() {
                                                             <TooltipProvider>
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
-                                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isLeaveStarted} onClick={() => handleReturnClick(req)}>
+                                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!(leaveStartDate && isPast(leaveStartDate))} onClick={() => handleReturnClick(req)}>
                                                                             <LogIn className="ml-2 h-4 w-4" /> تسجيل العودة
                                                                         </DropdownMenuItem>
                                                                     </TooltipTrigger>
-                                                                    {!isLeaveStarted && <TooltipContent><p>لا يمكن تسجيل العودة قبل بدء الإجازة</p></TooltipContent>}
+                                                                    {!(leaveStartDate && isPast(leaveStartDate)) && <TooltipContent><p>لا يمكن تسجيل العودة قبل بدء الإجازة</p></TooltipContent>}
                                                                 </Tooltip>
                                                             </TooltipProvider>
                                                         )}
