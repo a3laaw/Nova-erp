@@ -109,6 +109,7 @@ const navItems = {
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'الموظفين' },
+        { href: '/dashboard/hr/employees/new', label: 'إضافة موظف جديد' },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازة' },
         { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب والحضور' },
         { href: '/dashboard/hr/reports', label: 'التقارير الشاملة' },
@@ -159,7 +160,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                           <SidebarMenuSub>
                             {child.children.map((subChild: any) => (
                                <SidebarMenuSubItem key={subChild.href}>
-                                <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
+                                <Link href={subChild.href} onClick={() => setOpenMobile(false)} asChild>
                                   <SidebarMenuSubButton isActive={currentPath === subChild.href}>
                                     {subChild.label}
                                   </SidebarMenuSubButton>
@@ -174,7 +175,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                  <Link href={child.href} onClick={() => setOpenMobile(false)}>
+                  <Link href={child.href} onClick={() => setOpenMobile(false)} asChild>
                     <SidebarMenuSubButton isActive={currentPath === child.href}>
                       {child.label}
                     </SidebarMenuSubButton>
@@ -255,5 +256,3 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     </>
   );
 }
-
-    
