@@ -545,7 +545,7 @@ const SidebarMenuButton = React.forwardRef<
       isActive = false,
       tooltip,
       className,
-      asChild = false,
+      asChild,
       ...props
     },
     ref
@@ -707,11 +707,10 @@ const SidebarMenuSubButton = React.forwardRef<
     size?: "sm" | "md";
     isActive?: boolean;
   }
->(({ size = "md", isActive, className, asChild, ...props }, ref) => {
+>(({ size = "md", isActive, className, ...props }, ref) => {
   return (
     <Button
       ref={ref}
-      asChild={asChild}
       data-sidebar="menu-sub-button"
       data-size={size}
       data-active={isActive}
