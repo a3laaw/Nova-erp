@@ -1,3 +1,4 @@
+
 'use client';
 import React from 'react';
 import Link from 'next/link';
@@ -99,6 +100,19 @@ const navItems = {
             { href: '/dashboard/accounting/financial-forecast', label: 'التنبؤات المالية' },
           ]
         }
+      ]
+    },
+    { 
+      label: 'الموارد البشرية', 
+      icon: HeartHandshake, 
+      roles: ['Admin', 'HR'],
+      hrefPrefix: '/dashboard/hr',
+      children: [
+        { href: '/dashboard/hr/employees', label: 'الموظفين' },
+        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازة' },
+        { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب والحضور' },
+        { href: '/dashboard/hr/reports', label: 'التقارير الشاملة' },
+        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة' },
       ]
     },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
@@ -241,3 +255,5 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     </>
   );
 }
+
+    
