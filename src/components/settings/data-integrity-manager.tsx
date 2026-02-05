@@ -12,6 +12,7 @@ import { Loader2, ShieldCheck, Microscope, AlertTriangle, Trash2 } from 'lucide-
 import { InlineSearchList } from '../ui/inline-search-list';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
+import { Input } from '../ui/input';
 
 interface Discrepancy {
     nonStandardName: string;
@@ -165,12 +166,12 @@ export function DataIntegrityManager() {
     const [deptAnalysisResults, setDeptAnalysisResults] = useState<Discrepancy[] | null>(null);
     const [deptCorrections, setDeptCorrections] = useState<Record<string, string>>({});
     const [allDeptsOptions, setAllDeptsOptions] = useState<any[]>([]);
+    
+    // State for Data Deletion
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
 
-    // State for Voucher Account Analysis
-    const [isLoadingVoucherAccounts, setIsLoadingVoucherAccounts] = useState(false);
-    const [voucherAccountAnalysisResults, setVoucherAccountAnalysisResults] = useState<VoucherDiscrepancy[] | null>(null);
-    const [voucherAccountCorrections, setVoucherAccountCorrections] = useState<Record<string, string>>({});
-    const [allAccountsOptions, setAllAccountsOptions] = useState<any[]>([]);
 
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
@@ -270,95 +271,38 @@ export function DataIntegrityManager() {
         }
     };
     
-    // --- Specific Handlers for Voucher Accounts ---
-    const handleAnalyzeVoucherAccounts = async () => {
-        if (!firestore) return;
-        setIsLoadingVoucherAccounts(true);
-        setVoucherAccountAnalysisResults(null);
-        setVoucherAccountCorrections({});
-
-        try {
-            const accountsSnapshot = await getDocs(query(collection(firestore, 'chartOfAccounts')));
-            const canonicalNames = new Set(accountsSnapshot.docs.map(doc => doc.data().name as string));
-            
-            const vouchersSnapshot = await getDocs(collection(firestore, 'paymentVouchers'));
-            
-            const discrepanciesMap = new Map<string, VoucherDiscrepancy>();
-
-            vouchersSnapshot.forEach(doc => {
-                const item = { id: doc.id, ...doc.data() } as PaymentVoucher;
-
-                const checkField = (fieldName: 'debitAccountName' | 'creditAccountName') => {
-                    const value = item[fieldName];
-                    if (value && !canonicalNames.has(value)) {
-                        const existing = discrepanciesMap.get(value) || {
-                            nonStandardName: value,
-                            count: 0,
-                            occurrences: [],
-                        };
-                        existing.count++;
-                        existing.occurrences.push({ docId: item.id!, fieldName });
-                        discrepanciesMap.set(value, existing);
-                    }
-                };
-
-                checkField('debitAccountName');
-                checkField('creditAccountName');
-            });
-
-            const results = Array.from(discrepanciesMap.values());
-            setVoucherAccountAnalysisResults(results);
-            if (results.length === 0) {
-                toast({ title: 'فحص مكتمل', description: 'لم يتم العثور على أي أسماء حسابات غير متطابقة في سندات الصرف.' });
-            }
-
-        } catch (error) {
-            console.error("Error analyzing voucher accounts:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل فحص حسابات السندات.' });
-        } finally {
-            setIsLoadingVoucherAccounts(false);
-        }
-    };
-
-    const handleApplyVoucherAccountCorrections = async () => {
-        if (!firestore || !voucherAccountAnalysisResults) return;
-
-        const batch = writeBatch(firestore);
-        let correctionsCount = 0;
-
-        for (const nonStandardName in voucherAccountCorrections) {
-            const correctValue = voucherAccountCorrections[nonStandardName];
-            if (correctValue) {
-                const discrepancy = voucherAccountAnalysisResults.find(r => r.nonStandardName === nonStandardName);
-                if (discrepancy) {
-                    discrepancy.occurrences.forEach(({ docId, fieldName }) => {
-                        const docRef = doc(firestore, 'paymentVouchers', docId);
-                        batch.update(docRef, { [fieldName]: correctValue });
-                        correctionsCount++;
-                    });
-                }
-            }
-        }
-        
-        if (correctionsCount === 0) {
-            toast({ variant: 'default', title: 'لا توجد تعديلات', description: 'الرجاء اختيار قيم التصحيح أولاً.' });
-            return;
-        }
-
-        await batch.commit();
-        toast({ title: 'نجاح!', description: `تم تصحيح ${correctionsCount} سجل بنجاح. قم بإعادة الفحص للتأكيد.` });
-        
-        setVoucherAccountAnalysisResults(null);
-        setVoucherAccountCorrections({});
-    };
-
-
-    // --- Generic Handlers ---
+    // --- Specific Handlers ---
     const handleAnalyzeJobTitles = () => handleAnalyzeGeneric(setIsLoadingJobs, setJobAnalysisResults, setJobCorrections, 'jobs', 'employees', 'jobTitle', true);
     const handleApplyJobCorrections = () => handleApplyCorrectionsGeneric(jobCorrections, jobAnalysisResults, 'employees', 'jobTitle');
     
     const handleAnalyzeDepartments = () => handleAnalyzeGeneric(setIsLoadingDepts, setDeptAnalysisResults, setDeptCorrections, 'departments', 'employees', 'department', false);
     const handleApplyDepartmentCorrections = () => handleApplyCorrectionsGeneric(deptCorrections, deptAnalysisResults, 'employees', 'department');
+    
+    const handleDeleteAllEmployees = async () => {
+        if (!firestore) return;
+        setIsDeleting(true);
+        try {
+            const employeesRef = collection(firestore, 'employees');
+            const snapshot = await getDocs(employeesRef);
+            if (snapshot.empty) {
+                toast({ title: 'لا يوجد بيانات', description: 'مجموعة الموظفين فارغة بالفعل.' });
+                return;
+            }
+            const batch = writeBatch(firestore);
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم مسح جميع بيانات الموظفين بنجاح.' });
+        } catch (error) {
+            console.error("Error deleting all employees:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في مسح بيانات الموظفين.' });
+        } finally {
+            setIsDeleting(false);
+            setIsDeleteDialogOpen(false);
+            setConfirmText('');
+        }
+    };
 
 
     // Fetch options for dropdowns
@@ -373,11 +317,6 @@ export function DataIntegrityManager() {
         getDocs(query(collection(firestore, 'departments'))).then(snap => {
             const depts = snap.docs.map(d => d.data().name as string).sort();
             setAllDeptsOptions(depts.map(d => ({value: d, label: d})));
-        });
-
-        getDocs(query(collection(firestore, 'chartOfAccounts'))).then(snap => {
-            const accounts = snap.docs.map(d => d.data().name as string).sort();
-            setAllAccountsOptions(accounts.map(a => ({value: a, label: a})));
         });
     }, [firestore]);
 
@@ -420,7 +359,54 @@ export function DataIntegrityManager() {
                     onApplyCorrections={handleApplyDepartmentCorrections}
                     itemCountLabel="موظفين"
                 />
+
+                <Separator />
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold text-destructive">مسح البيانات القديمة (إجراء خطير)</h3>
+                            <p className="text-sm text-muted-foreground">استخدم هذا الخيار لمسح جميع البيانات في مجموعة محددة للبدء من جديد.</p>
+                        </div>
+                        <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive">
+                            <Trash2 className="ml-2 h-4 w-4" />
+                            مسح بيانات الموظفين
+                        </Button>
+                    </div>
+                </div>
+
             </CardContent>
+
+             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <span className="block font-bold">هذا الإجراء سيقوم بحذف جميع الموظفين من قاعدة البيانات بشكل نهائي. لا يمكن التراجع عن هذا الإجراء إطلاقًا.</span>
+                            <span className="block mt-4">للتأكيد، الرجاء كتابة العبارة التالية في المربع أدناه: <code className="font-mono text-destructive bg-destructive/10 px-1 py-0.5 rounded">مسح الموظفين</code></span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Input
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        placeholder="اكتب 'مسح الموظفين' هنا"
+                        className="mt-2"
+                        dir="ltr"
+                    />
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteAllEmployees}
+                            disabled={isDeleting || confirmText !== 'مسح الموظفين'}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
+                            {isDeleting ? 'جاري المسح...' : 'نعم، قم بالمسح'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }
+
