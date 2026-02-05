@@ -1,4 +1,3 @@
-
 'use client';
 import React from 'react';
 import Link from 'next/link';
@@ -160,11 +159,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                           <SidebarMenuSub>
                             {child.children.map((subChild: any) => (
                                <SidebarMenuSubItem key={subChild.href}>
-                                <Link href={subChild.href} onClick={() => setOpenMobile(false)} asChild>
-                                  <SidebarMenuSubButton isActive={currentPath === subChild.href}>
+                                <SidebarMenuSubButton isActive={currentPath === subChild.href} asChild>
+                                  <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
                                     {subChild.label}
-                                  </SidebarMenuSubButton>
-                                </Link>
+                                  </Link>
+                                </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
                             ))}
                           </SidebarMenuSub>
@@ -175,11 +174,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                  <Link href={child.href} onClick={() => setOpenMobile(false)} asChild>
-                    <SidebarMenuSubButton isActive={currentPath === child.href}>
+                  <SidebarMenuSubButton isActive={currentPath === child.href} asChild>
+                    <Link href={child.href} onClick={() => setOpenMobile(false)}>
                       {child.label}
-                    </SidebarMenuSubButton>
-                  </Link>
+                    </Link>
+                  </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
               );
             })}
@@ -191,12 +190,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   return (
     <SidebarMenuItem>
-      <Link href={item.href} onClick={() => setOpenMobile(false)}>
-        <SidebarMenuButton isActive={currentPath === item.href}>
+      <SidebarMenuButton isActive={currentPath === item.href} asChild>
+        <Link href={item.href} onClick={() => setOpenMobile(false)}>
           <item.icon />
           <span>{item.label}</span>
-        </SidebarMenuButton>
-      </Link>
+        </Link>
+      </SidebarMenuButton>
     </SidebarMenuItem>
   );
 }
