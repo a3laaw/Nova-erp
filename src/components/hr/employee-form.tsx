@@ -5,14 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import type { Employee, Department, Job, UserProfile, UserRole } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import { DateInput } from '../ui/date-input';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 
 interface EmployeeFormProps {
   onSave: (employeeData: Partial<Employee>, userData: Partial<UserProfile>) => Promise<void>;
@@ -29,14 +29,24 @@ const roleOptions: { value: UserProfile['role']; label: string }[] = [
     { value: 'HR', label: 'موارد بشرية' },
 ];
 
+const initialFormData: Partial<Employee> = {
+    status: 'active',
+    contractType: 'permanent',
+};
+
+const initialUserData: Partial<UserProfile> = {
+    role: 'Engineer',
+};
+
+
 export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false }: EmployeeFormProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const isEditing = !!initialData?.id;
 
     // Form state
-    const [formData, setFormData] = useState<Partial<Employee>>({});
-    const [userData, setUserData] = useState<Partial<UserProfile>>({});
+    const [formData, setFormData] = useState<Partial<Employee>>(initialFormData);
+    const [userData, setUserData] = useState<Partial<UserProfile>>(initialUserData);
     const [password, setPassword] = useState('');
 
     // Reference Data
@@ -60,8 +70,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
     
     const handleSelectChange = (id: keyof Employee | keyof UserProfile, value: string) => {
-        if (Object.keys(formData).includes(id)) {
-             setFormData(prev => ({ ...prev, [id]: value }));
+        if (id in initialFormData || id === 'department' || id === 'jobTitle' || id === 'contractType' || id === 'hireDate') {
+             setFormData(prev => ({ ...prev, [id as keyof Employee]: value }));
         } else {
             setUserData(prev => ({...prev, [id as keyof UserProfile]: value as UserRole}));
         }
@@ -75,10 +85,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setUserData(user || {});
         } else {
             setFormData({
-                status: 'active',
-                contractType: 'permanent',
+                ...initialFormData,
+                hireDate: new Date().toISOString().split('T')[0],
             });
-            setUserData({ role: 'Engineer' });
+            setUserData(initialUserData);
         }
     }, [initialData]);
 
@@ -171,7 +181,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </div>
                         <div className="grid gap-1.5">
                              <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                             <DateInput value={formData.hireDate || ''} onChange={(v) => handleSelectChange('hireDate', v)} />
+                             <Input id="hireDate" type="date" value={formData.hireDate || ''} onChange={e => handleSelectChange('hireDate', e.target.value)} required />
                         </div>
                          <div className="grid gap-1.5">
                             <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
@@ -211,7 +221,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <p className="text-xs text-muted-foreground">سيتم إنشاء بريد إلكتروني: <span dir="ltr">{userData.username || '...'}@scoop.local</span></p>
                         </div>
                         <div className="grid gap-1.5">
-                             <Label htmlFor="password">{isEditing ? 'كلمة مرور جديدة (اختياري)' : 'كلمة المرور'}</Label>
+                             <Label htmlFor="password">{isEditing ? 'كلمة مرور جديدة (اختياري)' : 'كلمة المرور'} <span className={!isEditing ? "text-destructive" : ""}>*</span></Label>
                             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" placeholder={isEditing ? 'اتركه فارغاً لعدم التغيير' : '8 أحرف على الأقل'} />
                         </div>
                         <div className="grid gap-1.5">
