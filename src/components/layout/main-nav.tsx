@@ -120,8 +120,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <Link href={item.href} passHref legacyBehavior>
-          <SidebarMenuButton as="a" isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
+        <Link href={item.href} passHref>
+          <SidebarMenuButton isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
           </SidebarMenuButton>
@@ -136,11 +136,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return (
       <Collapsible defaultOpen={isActive}>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="w-full justify-start h-8 px-2 text-sm">
-            <item.icon className="ml-2 h-4 w-4"/>
-            <span>{item.label}</span>
-            <ChevronDown className="mr-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-          </Button>
+          <SidebarMenuButton isActive={isActive} className="h-8 w-full justify-between">
+            <div className='flex items-center gap-2'>
+                <item.icon />
+                <span>{item.label}</span>
+            </div>
+            <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+          </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
@@ -156,8 +158,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                       {child.children.map((subChild: any) => (
                         // This is for the final link inside a sub-group
                         <SidebarMenuSubItem key={subChild.href}>
-                          <Link href={subChild.href} passHref legacyBehavior>
-                            <SidebarMenuSubButton as="a" isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
+                          <Link href={subChild.href} passHref>
+                            <SidebarMenuSubButton isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
                               {subChild.label}
                             </SidebarMenuSubButton>
                           </Link>
@@ -170,8 +172,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               // This is for a direct link inside the collapsible menu
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <Link href={child.href} passHref legacyBehavior>
-                      <SidebarMenuSubButton as="a" isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
+                   <Link href={child.href} passHref>
+                      <SidebarMenuSubButton isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
                         {child.label}
                       </SidebarMenuSubButton>
                   </Link>
