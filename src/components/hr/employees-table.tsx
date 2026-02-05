@@ -40,7 +40,7 @@ import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
 
@@ -61,7 +61,11 @@ export function EmployeesTable() {
     const { firestore } = useFirebase();
     const [searchQuery, setSearchQuery] = useState('');
     
-    const employeesQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
+    // Fetch only active employees
+    const employeesQuery = useMemo(() => [
+        where('status', '==', 'active'),
+        orderBy('createdAt', 'desc')
+    ], []);
     const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees', employeesQuery);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
@@ -69,6 +73,7 @@ export function EmployeesTable() {
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
 
     const filteredEmployees = useMemo(() => {
+        if (!employees) return [];
         return searchEmployees(employees, searchQuery);
     }, [employees, searchQuery]);
 
@@ -166,12 +171,12 @@ export function EmployeesTable() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                      <div className="mt-4 space-y-2">
-                             <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
-                             <div className="flex gap-4">
-                                <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
-                                <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
-                            </div>
+                        <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
+                        <div className="flex gap-4">
+                            <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
+                            <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
                         </div>
+                    </div>
                     <AlertDialogFooter className='mt-4'>
                         <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleTerminationConfirm} disabled={!terminationReason || isTerminating} className="bg-destructive hover:bg-destructive/90">
