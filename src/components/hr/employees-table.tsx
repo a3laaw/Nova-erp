@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useCallback } from 'react';
 import {
@@ -10,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +28,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '../ui/badge';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +39,7 @@ import { Input } from '@/components/ui/input';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
+import { Label } from '@/components/ui/label';
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
 
@@ -64,6 +64,11 @@ export function EmployeesTable() {
     
     const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees');
 
+    const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
+    const [isTerminating, setIsTerminating] = useState(false);
+    const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
+
+
     const filteredEmployees = useMemo(() => {
         return searchEmployees(employees, searchQuery);
     }, [employees, searchQuery]);
@@ -72,6 +77,25 @@ export function EmployeesTable() {
         const date = toFirestoreDate(dateValue);
         if (!date) return '-';
         return format(date, 'dd/MM/yyyy');
+    };
+
+    const handleTerminateClick = (employee: Employee) => {
+        setEmployeeToTerminate(employee);
+    };
+
+    const handleTerminationConfirm = async () => {
+        if (!employeeToTerminate || !firestore || !terminationReason) {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد سبب إنهاء الخدمة.' });
+             return;
+        };
+        setIsTerminating(true);
+        // Add termination logic here
+        console.log(`Terminating ${employeeToTerminate.fullName} for ${terminationReason}`);
+        await new Promise(res => setTimeout(res, 1000));
+        setIsTerminating(false);
+        setEmployeeToTerminate(null);
+        setTerminationReason(null);
+        toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف بنجاح.'});
     };
 
     return (
@@ -124,7 +148,7 @@ export function EmployeesTable() {
                                             <DropdownMenuItem>عرض الملف</DropdownMenuItem>
                                             <DropdownMenuItem>تعديل</DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="text-destructive">إنهاء الخدمة</DropdownMenuMenuItem>
+                                            <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -133,8 +157,31 @@ export function EmployeesTable() {
                     </TableBody>
                 </Table>
             </div>
+
+            <AlertDialog open={!!employeeToTerminate} onOpenChange={() => setEmployeeToTerminate(null)}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد إنهاء الخدمة</AlertDialogTitle>
+                        <AlertDialogDescription>
+                        سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
+                        <div className="mt-4 space-y-2">
+                             <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
+                             <div className="flex gap-4">
+                                <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
+                                <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
+                            </div>
+                        </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={!terminationReason || isTerminating} className="bg-destructive hover:bg-destructive/90">
+                            {isTerminating ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالإنهاء'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
         </div>
     );
 }
-
-    
