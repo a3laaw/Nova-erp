@@ -14,7 +14,11 @@ import {
   SidebarMenuSubButton,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Home,
   Briefcase,
@@ -28,7 +32,7 @@ import {
   FileText,
   ChevronDown,
   ShoppingCart,
-  LogOut
+  LogOut,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -37,7 +41,6 @@ import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Button } from '@/components/ui/button';
-
 
 const navItems = {
   ar: [
@@ -116,12 +119,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return null;
   }
 
-  // This is for top-level, non-collapsible items
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <Link href={item.href} passHref>
-          <SidebarMenuButton isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
+        <Link href={item.href} passHref legacyBehavior>
+          <SidebarMenuButton as="a" isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
           </SidebarMenuButton>
@@ -129,25 +131,25 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       </SidebarMenuItem>
     );
   }
-  
-  // This is for collapsible items (the menu container)
+
   if (item.children) {
     const isActive = currentPath.startsWith(item.hrefPrefix);
     return (
       <Collapsible defaultOpen={isActive}>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton isActive={isActive} className="h-8 w-full justify-between">
-            <div className='flex items-center gap-2'>
+        <SidebarMenuItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton as="button" isActive={isActive} className="h-8 w-full justify-between pr-2">
+              <div className='flex items-center gap-2'>
                 <item.icon />
                 <span>{item.label}</span>
-            </div>
-            <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+              </div>
+              <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+        </SidebarMenuItem>
         <CollapsibleContent>
           <SidebarMenuSub>
             {item.children.map((child: any, index: number) => {
-              // This is for sub-groups like "Reports"
               if (child.children) {
                 return (
                   <SidebarMenuSubItem key={`${child.label}-${index}`}>
@@ -156,10 +158,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     </div>
                     <SidebarMenuSub>
                       {child.children.map((subChild: any) => (
-                        // This is for the final link inside a sub-group
                         <SidebarMenuSubItem key={subChild.href}>
-                          <Link href={subChild.href} passHref>
-                            <SidebarMenuSubButton isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
+                          <Link href={subChild.href} passHref legacyBehavior>
+                            <SidebarMenuSubButton as="a" isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
                               {subChild.label}
                             </SidebarMenuSubButton>
                           </Link>
@@ -169,13 +170,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   </SidebarMenuSubItem>
                 );
               }
-              // This is for a direct link inside the collapsible menu
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <Link href={child.href} passHref>
-                      <SidebarMenuSubButton isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
-                        {child.label}
-                      </SidebarMenuSubButton>
+                  <Link href={child.href} passHref legacyBehavior>
+                    <SidebarMenuSubButton as="a" isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
+                      {child.label}
+                    </SidebarMenuSubButton>
                   </Link>
                 </SidebarMenuSubItem>
               );
@@ -186,7 +186,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
 
-  // Fallback for items that are neither links nor have children (shouldn't happen)
   return null;
 }
 
@@ -221,19 +220,19 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
       </SidebarContent>
       <SidebarFooter>
         <div className="p-2">
-            <Button variant="ghost" className="h-auto w-full justify-start p-2">
+            <div className="flex h-auto w-full items-center justify-start rounded-md p-2">
                 <Avatar className="h-9 w-9">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback>{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div className="ml-2 text-right">
+                <div className="ml-2 flex-grow text-right">
                     <p className="text-sm font-medium">{currentUser.fullName}</p>
                     <p className="text-xs text-muted-foreground">{currentUser.email}</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" onClick={onLogout}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onLogout}>
                     <LogOut className="h-4 w-4"/>
                 </Button>
-            </Button>
+            </div>
         </div>
       </SidebarFooter>
     </>
