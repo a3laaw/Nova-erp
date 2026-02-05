@@ -14,7 +14,6 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info, Save, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-
 interface EmployeeFormProps {
   onSave: (employeeData: Partial<Employee>, userData: Partial<UserProfile>) => Promise<void>;
   onClose: () => void;
@@ -144,10 +143,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto px-2">
                 <section>
                     <h3 className="font-semibold text-lg mb-2">المعلومات الأساسية</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="fullName">الاسم الكامل (بالعربية) <span className="text-destructive">*</span></Label>
                             <Input id="fullName" value={formData.fullName || ''} onChange={handleInputChange} required />
@@ -171,7 +170,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 
                  <section>
                     <h3 className="font-semibold text-lg mb-2">معلومات التوظيف</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
                             <InlineSearchList value={formData.department || ''} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder="اختر قسم..." disabled={refDataLoading} />
@@ -215,7 +214,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             </AlertDescription>
                         </Alert>
                     )}
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="username">اسم المستخدم <span className="text-destructive">*</span></Label>
                             <Input id="username" value={userData.username || ''} onChange={handleUserInputChange} dir="ltr" disabled={isEditing} />
