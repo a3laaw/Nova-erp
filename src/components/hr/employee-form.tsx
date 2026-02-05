@@ -11,8 +11,9 @@ import { Separator } from '@/components/ui/separator';
 import type { Employee, Department, Job, UserProfile, UserRole } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info } from 'lucide-react';
-import { Save, Loader2 } from 'lucide-react';
+import { Info, Save, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 interface EmployeeFormProps {
   onSave: (employeeData: Partial<Employee>, userData: Partial<UserProfile>) => Promise<void>;
