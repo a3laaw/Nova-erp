@@ -229,7 +229,46 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
     const asOfDate = parseISO(options.asOfDate);
     if (!isValid(asOfDate)) throw new Error("التاريخ المحدد غير صالح.");
 
-    if (reportType === 'EmployeeDossier') {
+    if (reportType === 'EmployeeRoster') {
+      const q = options.statusFilter === 'all'
+        ? query(collection(db, 'employees'))
+        : query(collection(db, 'employees'), where('status', '==', 'active'));
+        
+      const empSnap = await getDocs(q);
+      const rows = empSnap.docs
+        .map(doc => doc.data() as Employee)
+        .map(emp => {
+            const hireDate = toFirestoreDate(emp.hireDate);
+            const serviceYears = hireDate ? differenceInYears(asOfDate, hireDate) : 0;
+            return {
+                employeeNumber: emp.employeeNumber,
+                fullName: emp.fullName,
+                department: emp.department,
+                jobTitle: emp.jobTitle,
+                status: emp.status,
+                hireDate: hireDate?.toISOString() || null,
+                serviceYears,
+            };
+        })
+        .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
+
+      return {
+        type: 'EmployeeRoster',
+        title: 'قائمة الموظفين',
+        subtitle: `الحالة كما في تاريخ: ${asOfDate.toLocaleDateString('ar-KW')}`,
+        headers: [
+          { key: 'employeeNumber', label: 'الرقم الوظيفي' },
+          { key: 'fullName', label: 'الاسم الكامل' },
+          { key: 'department', label: 'القسم' },
+          { key: 'jobTitle', label: 'المسمى الوظيفي' },
+          { key: 'status', label: 'الحالة', type: 'component' },
+          { key: 'hireDate', label: 'تاريخ التعيين', type: 'date' },
+          { key: 'serviceYears', label: 'سنوات الخدمة', type: 'number' },
+        ],
+        rows,
+      };
+
+    } else if (reportType === 'EmployeeDossier') {
       if (!options.employeeId) throw new Error("مطلوب تحديد الموظف لتقرير الملف الشامل.");
 
       if (options.employeeId === 'all') { // Bulk Dossier Report
