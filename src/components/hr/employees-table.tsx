@@ -33,14 +33,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
-import { Input } from '@/components/ui/input';
-import { searchEmployees } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
-import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useSubscription } from '@/hooks/use-subscription';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { searchEmployees } from '@/lib/cache/fuse-search';
+
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
 
@@ -56,12 +57,14 @@ const statusColors: Record<EmployeeStatus, string> = {
   terminated: 'bg-red-100 text-red-800',
 };
 
-export function EmployeesTable() {
+interface EmployeesTableProps {
+    searchQuery: string;
+}
+
+export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
-    const [searchQuery, setSearchQuery] = useState('');
     
-    // Fetch only active employees
     const employeesQuery = useMemo(() => [
         where('status', '==', 'active'),
         orderBy('createdAt', 'desc')
@@ -93,23 +96,26 @@ export function EmployeesTable() {
              return;
         };
         setIsTerminating(true);
-        // Add termination logic here in the future
-        console.log(`Terminating ${employeeToTerminate.fullName} for ${terminationReason}`);
-        await new Promise(res => setTimeout(res, 1000));
-        setIsTerminating(false);
-        setEmployeeToTerminate(null);
-        setTerminationReason(null);
-        toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف بنجاح.'});
+        try {
+            const employeeRef = doc(firestore, 'employees', employeeToTerminate.id!);
+            await updateDoc(employeeRef, {
+                status: 'terminated',
+                terminationDate: new Date(),
+                terminationReason: terminationReason
+            });
+            toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف بنجاح.'});
+        } catch (error) {
+            console.error("Error terminating employee:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنهاء خدمة الموظف.' });
+        } finally {
+            setIsTerminating(false);
+            setEmployeeToTerminate(null);
+            setTerminationReason(null);
+        }
     };
 
     return (
-        <div className="space-y-4">
-            <Input
-              placeholder="ابحث بالاسم، الرقم الوظيفي، أو الرقم المدني..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
+        <>
             <div className="border rounded-lg">
                 <Table>
                     <TableHeader>
@@ -170,9 +176,9 @@ export function EmployeesTable() {
                             سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                     <div className="mt-4 space-y-2">
-                        <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
-                        <div className="flex gap-4">
+                    <div className="mt-4 space-y-2">
+                         <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
+                         <div className="flex gap-4">
                             <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
                             <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
                         </div>
@@ -186,6 +192,6 @@ export function EmployeesTable() {
                 </AlertDialogContent>
             </AlertDialog>
 
-        </div>
+        </>
     );
 }
