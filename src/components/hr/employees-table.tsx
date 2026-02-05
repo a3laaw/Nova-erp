@@ -120,7 +120,7 @@ export function EmployeesTable() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {loading && Array.from({length: 5}).map((_, i) => (
+                        {loading && Array.from({ length: 5 }).map((_, i) => (
                             <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                         ))}
                         {!loading && filteredEmployees.length === 0 && (
@@ -164,14 +164,14 @@ export function EmployeesTable() {
                         <AlertDialogTitle>تأكيد إنهاء الخدمة</AlertDialogTitle>
                         <AlertDialogDescription>
                         سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
-                        <div className="mt-4 space-y-2">
+                        </AlertDialogDescription>
+                        <div className="mt-4 space-y-2 text-right">
                              <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
                              <div className="flex gap-4">
                                 <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
                                 <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
                             </div>
                         </div>
-                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
