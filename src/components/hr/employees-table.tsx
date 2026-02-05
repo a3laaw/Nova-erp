@@ -65,11 +65,12 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    const employeesQuery = useMemo(() => [
-        where('status', '==', 'active'),
-        orderBy('createdAt', 'desc')
-    ], []);
-    const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees', employeesQuery);
+    // --- TEMPORARY FIX ---
+    // Data fetching is temporarily disabled to provide a clean visual slate.
+    // The permanent solution is to use the "Delete Employee Data" tool in Settings > Data Integrity.
+    const employees: Employee[] = [];
+    const loading = false;
+    // --- END TEMPORARY FIX ---
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
