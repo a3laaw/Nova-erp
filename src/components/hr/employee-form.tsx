@@ -99,7 +99,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             try {
                 const [deptsSnap, jobsSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'), orderBy('order'))),
-                    getDocs(query(collectionGroup(firestore, 'jobs'), orderBy('order'))),
+                    getDocs(query(collectionGroup(firestore, 'jobs'))),
                 ]);
                 setDepartments(deptsSnap.docs.map(d => ({id: d.id, ...d.data()} as Department)));
                 
@@ -110,9 +110,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         uniqueJobs.set(job.name, job);
                     }
                 });
-                setJobs(Array.from(uniqueJobs.values()));
+                const sortedJobs = Array.from(uniqueJobs.values()).sort((a, b) => (a.order || 99) - (b.order || 99));
+                setJobs(sortedJobs);
 
             } catch (e) {
+                console.error("Error fetching depts/jobs:", e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب الأقسام والوظائف.' });
             } finally {
                 setRefDataLoading(false);
