@@ -1,22 +1,20 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Construction } from 'lucide-react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader } from 'lucide-react';
 
-export default function HrPlaceholderPage() {
+export default function HrRedirectPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/hr/employees');
+  }, [router]);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>وحدة الموارد البشرية</CardTitle>
-        <CardDescription>
-          هذه الوحدة قيد إعادة البناء والتطوير.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground min-h-[300px]">
-        <Construction className="h-16 w-16 mb-4" />
-        <p className="text-lg font-semibold">قيد الإنشاء</p>
-        <p>نعمل حاليًا على إعادة تصميم هذه الوحدة بالكامل. شكرًا لصبركم.</p>
-      </CardContent>
-    </Card>
+    <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
+    </div>
   );
 }

@@ -97,10 +97,6 @@ const navItems = {
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'الموظفين' },
-        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازة' },
-        { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب والحضور' },
-        { href: '/dashboard/hr/reports', label: 'التقارير الشاملة' },
-        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة' },
       ]
     },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
@@ -122,7 +118,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <Link href={item.href} passHref legacyBehavior>
+        <Link href={item.href} legacyBehavior passHref>
           <SidebarMenuButton as="a" isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
@@ -131,7 +127,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       </SidebarMenuItem>
     );
   }
-
+  
   if (item.children) {
     const isActive = currentPath.startsWith(item.hrefPrefix);
     return (
@@ -153,17 +149,17 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               if (child.children) {
                 return (
                   <SidebarMenuSubItem key={`${child.label}-${index}`}>
-                    <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md">
-                      <span className="text-sm font-semibold text-sidebar-foreground/70">{child.label}</span>
+                     <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md">
+                        <span className="text-sm font-semibold text-sidebar-foreground/70">{child.label}</span>
                     </div>
                     <SidebarMenuSub>
                       {child.children.map((subChild: any) => (
                         <SidebarMenuSubItem key={subChild.href}>
-                          <Link href={subChild.href} passHref legacyBehavior>
-                            <SidebarMenuSubButton as="a" isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
-                              {subChild.label}
-                            </SidebarMenuSubButton>
-                          </Link>
+                            <Link href={subChild.href} legacyBehavior passHref>
+                                <SidebarMenuSubButton as="a" isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
+                                    {subChild.label}
+                                </SidebarMenuSubButton>
+                            </Link>
                         </SidebarMenuSubItem>
                       ))}
                     </SidebarMenuSub>
@@ -172,11 +168,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                  <Link href={child.href} passHref legacyBehavior>
-                    <SidebarMenuSubButton as="a" isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
-                      {child.label}
-                    </SidebarMenuSubButton>
-                  </Link>
+                   <Link href={child.href} legacyBehavior passHref>
+                        <SidebarMenuSubButton as="a" isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
+                            {child.label}
+                        </SidebarMenuSubButton>
+                    </Link>
                 </SidebarMenuSubItem>
               );
             })}
@@ -185,6 +181,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       </Collapsible>
     );
   }
+
 
   return null;
 }
