@@ -1,4 +1,3 @@
-
 'use server';
 
 import {
@@ -187,7 +186,7 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         serviceDuration,
         // *** CRITICAL FIX: Manually map audit logs to prevent prototype pollution ***
         auditLogs: auditLogs.map(log => ({
-            field: log.field,
+            field: String(log.field ?? ''),
             oldValue: String(log.oldValue ?? '-'),
             newValue: String(log.newValue ?? '-'),
             effectiveDate: toFirestoreDate(log.effectiveDate)?.toISOString() || ''
@@ -300,4 +299,3 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
     throw new Error(error instanceof Error ? error.message : 'An unknown server error occurred during report generation.');
   }
 }
-

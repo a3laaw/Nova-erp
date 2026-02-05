@@ -109,7 +109,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
             </header>
 
             <main className="space-y-4 pt-8">
-                <Section title="المعلومات الشخصية والأساسية" icon={<User />}>
+                <Section title="المعلومات الشخصية والأساسية" icon={<User />}}>
                     <InfoItem label="الاسم بالعربية" value={employee.fullName} />
                     <InfoItem label="الاسم بالإنجليزية" value={employee.nameEn} />
                     <InfoItem label="الرقم المدني" value={employee.civilId} />
@@ -118,13 +118,13 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     <InfoItem label="حالة الموظف" value={<Badge className={statusColors[currentStatus]}>{statusTranslations[currentStatus] ?? 'غير معروف'}</Badge>} />
                 </Section>
                 
-                <Section title="معلومات الاتصال" icon={<Phone />}>
+                <Section title="معلومات الاتصال" icon={<Phone />}}>
                     <InfoItem label="رقم الجوال" value={employee.mobile} />
                     <InfoItem label="رقم الطوارئ" value={employee.emergencyContact} />
                     <InfoItem label="البريد الإلكتروني" value={employee.email} />
                 </Section>
                 
-                <Section title="البيانات الوظيفية والعقد" icon={<Briefcase />}>
+                <Section title="البيانات الوظيفية والعقد" icon={<Briefcase />}}>
                     <InfoItem label="القسم" value={employee.department} />
                     <InfoItem label="المسمى الوظيفي" value={employee.jobTitle} />
                     <InfoItem label="تاريخ التعيين" value={formatDate(employee.hireDate)} />
@@ -133,7 +133,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     {(employee.nationality && employee.nationality !== 'كويتي') && <InfoItem label="انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} />}
                 </Section>
 
-                <Section title="البيانات المالية" icon={<Wallet />}>
+                <Section title="البيانات المالية" icon={<Wallet />}}>
                     <InfoItem label="الراتب الأساسي" value={formatCurrency(employee.basicSalary || 0)} />
                     <InfoItem label="بدل السكن" value={formatCurrency(employee.housingAllowance || 0)} />
                     <InfoItem label="بدل النقل" value={formatCurrency(employee.transportAllowance || 0)} />
@@ -154,7 +154,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     </div>
                 )}
                 
-                <Section title="حالة الإجازات" icon={<Calendar />}>
+                <Section title="حالة الإجازات" icon={<Calendar />}}>
                     <div className="md:col-span-2 bg-muted/50 p-3 rounded-md text-center">
                         <p className="text-muted-foreground">رصيد الإجازات السنوية المتاح حتى تاريخ التقرير</p>
                         <p className="text-2xl font-bold text-primary">{(employee.leaveBalance ?? 0).toFixed(0)} يوم</p>
@@ -169,7 +169,7 @@ export function EmployeeDossier({ employee, reportDate }: DossierProps) {
                     )}
                 </Section>
 
-                <Section title="استحقاق نهاية الخدمة" icon={<Gift />}>
+                <Section title="استحقاق نهاية الخدمة" icon={<Gift />}}>
                     <div className="md:col-span-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md border border-blue-200 dark:border-blue-800">
                         {serviceDuration && (
                              <InfoItem label="مدة الخدمة حتى تاريخ التقرير" value={`${serviceDuration.years || 0} سنة, ${serviceDuration.months || 0} شهر, ${serviceDuration.days || 0} يوم`} />
