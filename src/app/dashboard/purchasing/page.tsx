@@ -7,8 +7,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
+import { PurchaseOrdersList } from '@/components/purchasing/purchase-orders-list';
 
 export default function PurchasingPage() {
     return (
@@ -28,13 +29,7 @@ export default function PurchasingPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                    <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-medium">لا توجد أوامر شراء بعد</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        انقر على "أمر شراء جديد" للبدء.
-                    </p>
-                </div>
+                <PurchaseOrdersList />
             </CardContent>
         </Card>
     );

@@ -34,7 +34,6 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
-import { DateInput } from '@/components/ui/date-input';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const itemSchema = z.object({
@@ -208,7 +207,7 @@ export default function NewPurchaseOrderPage() {
                             <Controller
                                 name="orderDate"
                                 control={control}
-                                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />}
+                                render={({ field }) => <Input type="date" {...field} />}
                             />
                             {errors.orderDate && <p className="text-xs text-destructive">{errors.orderDate.message}</p>}
                         </div>
@@ -283,4 +282,3 @@ export default function NewPurchaseOrderPage() {
         </Card>
     );
 }
-    

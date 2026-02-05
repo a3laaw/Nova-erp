@@ -1,5 +1,5 @@
 import { cache } from './smart-cache';
-import type { Client, Employee, Account, JournalEntry, CashReceipt, PaymentVoucher, Quotation } from '@/lib/types';
+import type { Client, Employee, Account, JournalEntry, CashReceipt, PaymentVoucher, Quotation, PurchaseOrder } from '@/lib/types';
 
 export const searchClients = (items: Client[], query: string) => {
     return cache.search(items, query, ['nameAr', 'nameEn', 'fileId', 'mobile'], 0.4);
@@ -27,4 +27,8 @@ export const searchPaymentVouchers = (items: PaymentVoucher[], query: string) =>
 
 export const searchQuotations = (items: Quotation[], query: string) => {
     return cache.search(items, query, ['quotationNumber', 'clientName', 'subject'], 0.4);
+};
+
+export const searchPurchaseOrders = (items: PurchaseOrder[], query: string) => {
+    return cache.search(items, query, ['poNumber', 'vendorName'], 0.4);
 };
