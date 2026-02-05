@@ -2,9 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { UserNav } from '@/components/layout/user-nav';
 import { Button } from '@/components/ui/button';
-import { Languages, Calendar } from 'lucide-react';
+import { Languages, Calendar, LogOut } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -15,6 +14,16 @@ import { useBranding } from '@/context/branding-context';
 import { Logo } from './logo';
 import { Skeleton } from '../ui/skeleton';
 import { UpdateIndicator } from '@/context/sync-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+
 
 interface HeaderProps {
     currentUser: AuthenticatedUser;
@@ -56,7 +65,35 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                 <Button variant="outline" size="icon" onClick={toggleLanguage} aria-label="Toggle language">
                     <Languages className="h-4 w-4" />
                 </Button>
-                <UserNav currentUser={currentUser} onLogout={onLogout} />
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                            <Avatar className="h-9 w-9">
+                                <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} />
+                                <AvatarFallback>{currentUser.fullName?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end" forceMount dir="rtl">
+                        <DropdownMenuLabel className="font-normal">
+                            <div className="flex flex-col space-y-1">
+                                <p className="text-sm font-medium leading-none">{currentUser.fullName}</p>
+                                <p className="text-xs leading-none text-muted-foreground">
+                                {currentUser.email}
+                                </p>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href="/dashboard/settings">الإعدادات</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={onLogout}>
+                            <LogOut className="ml-2 h-4 w-4" />
+                            <span>تسجيل الخروج</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </header>
     );

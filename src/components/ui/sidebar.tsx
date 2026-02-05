@@ -373,7 +373,7 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-2", className)}
       {...props}
     />
   )
@@ -534,16 +534,17 @@ const sidebarMenuButtonVariants = cva(
 )
 
 const SidebarMenuButton = React.forwardRef<
-  HTMLAnchorElement,
-  React.ComponentProps<"a"> & {
-    asChild?: boolean
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & {
+    as?: "a" | "button"
+    href?: string
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>
 >(
   (
     {
-      asChild = false,
+      as: Comp = "button",
       isActive = false,
       variant = "default",
       size = "default",
@@ -553,10 +554,9 @@ const SidebarMenuButton = React.forwardRef<
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : "a"
     const { isMobile, state } = useSidebar()
 
-    const linkEl = (
+    const buttonEl = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
@@ -568,7 +568,7 @@ const SidebarMenuButton = React.forwardRef<
     )
 
     if (!tooltip) {
-      return linkEl
+      return buttonEl
     }
 
     if (typeof tooltip === "string") {
@@ -579,7 +579,7 @@ const SidebarMenuButton = React.forwardRef<
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+        <TooltipTrigger asChild>{buttonEl}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
@@ -706,15 +706,14 @@ const SidebarMenuSubItem = React.forwardRef<
 SidebarMenuSubItem.displayName = "SidebarMenuSubItem"
 
 const SidebarMenuSubButton = React.forwardRef<
-  HTMLAnchorElement,
-  React.ComponentProps<"a"> & {
-    asChild?: boolean
-    size?: "sm" | "md"
-    isActive?: boolean
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & {
+    as?: "a" | "button";
+    href?: string;
+    size?: "sm" | "md";
+    isActive?: boolean;
   }
->(({ asChild = false, size = "md", isActive, className, ...props }, ref) => {
-  const Comp = asChild ? Slot : "a"
-
+>(({ as: Comp = "button", size = "md", isActive, className, ...props }, ref) => {
   return (
     <Comp
       ref={ref}
