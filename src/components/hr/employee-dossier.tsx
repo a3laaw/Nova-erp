@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -12,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 // Props accept a serializable version of the employee where dates are strings
 interface DossierProps {
-  employee: Partial<Employee & { hireDate: string | null; dob: string | null; lastLeave: any; serviceDuration: any; auditLogs: any[] }>;
+  employee: Partial<Employee & { hireDate: string | null; dob: string | null; residencyExpiry: string | null; contractExpiry: string | null; lastLeave: any; serviceDuration: any; auditLogs: any[] }>;
   reportDate: Date;
 }
 
