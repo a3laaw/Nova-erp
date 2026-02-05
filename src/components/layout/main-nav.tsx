@@ -13,7 +13,6 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   useSidebar,
-  sidebarMenuButtonVariants,
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -29,12 +28,15 @@ import {
   FileText,
   ChevronDown,
   ShoppingCart,
+  LogOut
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Button } from '@/components/ui/button';
 
 
 const navItems = {
@@ -134,11 +136,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return (
       <Collapsible defaultOpen={isActive}>
         <CollapsibleTrigger asChild>
-           <button className={cn(sidebarMenuButtonVariants({ variant: 'default', size: 'default' }), "w-full group/button")}>
-                <item.icon />
-                <span>{item.label}</span>
-                <ChevronDown className="mr-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-            </button>
+          <Button variant="ghost" className="w-full justify-start h-8 px-2 text-sm">
+            <item.icon className="ml-2 h-4 w-4"/>
+            <span>{item.label}</span>
+            <ChevronDown className="mr-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+          </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
