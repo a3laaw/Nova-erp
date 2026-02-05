@@ -38,6 +38,9 @@ import { searchEmployees } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
+import { useSubscription } from '@/hooks/use-subscription';
+import { useFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
 
@@ -55,18 +58,15 @@ const statusColors: Record<EmployeeStatus, string> = {
 
 export function EmployeesTable() {
     const { toast } = useToast();
-    
+    const { firestore } = useFirebase();
     const [searchQuery, setSearchQuery] = useState('');
     
-    // Temporarily using an empty array to reflect a clean slate, as requested.
-    // The connection to Firestore has been temporarily disabled in this component.
-    const employees: Employee[] = [];
-    const loading = false;
+    const employeesQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
+    const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees', employeesQuery);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
-
 
     const filteredEmployees = useMemo(() => {
         return searchEmployees(employees, searchQuery);
@@ -162,17 +162,17 @@ export function EmployeesTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد إنهاء الخدمة</AlertDialogTitle>
                         <AlertDialogDescription>
-                        سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
-                        <div className="mt-4 space-y-2">
+                            سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                     <div className="mt-4 space-y-2">
                              <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
                              <div className="flex gap-4">
                                 <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
                                 <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
                             </div>
                         </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
+                    <AlertDialogFooter className='mt-4'>
                         <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleTerminationConfirm} disabled={!terminationReason || isTerminating} className="bg-destructive hover:bg-destructive/90">
                             {isTerminating ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالإنهاء'}

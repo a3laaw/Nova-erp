@@ -1,5 +1,7 @@
-
 'use client';
+
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -7,25 +9,104 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Construction } from 'lucide-react';
+import { useFirebase } from '@/firebase';
+import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/auth-context';
+import type { Employee } from '@/lib/types';
+import { EmployeeForm } from '@/components/hr/employee-form';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 export default function NewEmployeePage() {
-    // This will be replaced with the actual form in a future step.
+    const router = useRouter();
+    const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
+    const { toast } = useToast();
+    
+    const [isSaving, setIsSaving] = useState(false);
+    
+    const handleSave = useCallback(async (newEmployeeData: Partial<Employee>) => {
+        if (!firestore || !currentUser) return;
+        
+        setIsSaving(true);
+        let newEmployeeId = '';
+
+        try {
+            // --- VALIDATION LOGIC ---
+            if (newEmployeeData.mobile) {
+                const mobileQuery = query(collection(firestore, 'employees'), where('mobile', '==', newEmployeeData.mobile));
+                const mobileSnapshot = await getDocs(mobileQuery);
+                if (!mobileSnapshot.empty) {
+                    throw new Error('رقم الهاتف هذا مسجل بالفعل لموظف آخر.');
+                }
+            }
+            if (newEmployeeData.civilId) {
+                const civilIdQuery = query(collection(firestore, 'employees'), where('civilId', '==', newEmployeeData.civilId));
+                const civilIdSnapshot = await getDocs(civilIdQuery);
+                if (!civilIdSnapshot.empty) {
+                    throw new Error('الرقم المدني هذا مسجل بالفعل لموظف آخر.');
+                }
+            }
+
+            await runTransaction(firestore, async (transaction) => {
+                const employeeCounterRef = doc(firestore, 'counters', 'employees');
+                const employeeCounterDoc = await transaction.get(employeeCounterRef);
+                
+                let nextNumber = 1;
+                if (employeeCounterDoc.exists()) {
+                    const counts = employeeCounterDoc.data()?.counts || {};
+                    const currentYear = new Date().getFullYear();
+                    nextNumber = (counts[currentYear] || 0) + 1;
+                    transaction.set(employeeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+                } else {
+                     transaction.set(employeeCounterRef, { counts: { [new Date().getFullYear()]: nextNumber } });
+                }
+                
+                const newEmployeeNumber = `${new Date().getFullYear().toString().slice(-2)}-${String(nextNumber).padStart(4, '0')}`;
+
+                const finalEmployeeData = {
+                  ...newEmployeeData,
+                  employeeNumber: newEmployeeNumber,
+                  status: 'active' as const,
+                  createdAt: serverTimestamp(),
+                  lastLeaveResetDate: new Date(),
+                  annualLeaveBalance: 0,
+                  annualLeaveAccrued: 0,
+                  annualLeaveUsed: 0,
+                  carriedLeaveDays: 0,
+                  sickLeaveUsed: 0,
+                  emergencyLeaveUsed: 0,
+                };
+
+                const newEmployeeRef = doc(collection(firestore, 'employees'));
+                newEmployeeId = newEmployeeRef.id;
+                transaction.set(newEmployeeRef, finalEmployeeData);
+            });
+
+            toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
+            router.push(`/dashboard/hr/employees`);
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'فشل إضافة الموظف.';
+            toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
+    }, [firestore, currentUser, toast, router]);
+
     return (
-        <Card>
+        <Card className="max-w-4xl mx-auto" dir="rtl">
             <CardHeader>
                 <CardTitle>إضافة موظف جديد</CardTitle>
-                <CardDescription>
-                هذه الصفحة قيد الإنشاء حاليًا.
-                </CardDescription>
+                <CardDescription>قم بتعبئة بيانات الموظف الجديد لإنشاء ملف له في النظام.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground min-h-[300px]">
-                <Construction className="h-16 w-16 mb-4" />
-                <p className="text-lg font-semibold">قيد الإنشاء</p>
-                <p>سيتم هنا وضع نموذج مفصل لإضافة موظف جديد.</p>
+            <CardContent>
+                <EmployeeForm
+                    onSave={handleSave}
+                    onClose={() => router.back()}
+                    isSaving={isSaving}
+                />
             </CardContent>
         </Card>
     );
 }
-
-    
