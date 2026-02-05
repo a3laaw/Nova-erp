@@ -534,7 +534,7 @@ const sidebarMenuButtonVariants = cva(
 )
 
 const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
+  React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button> & {
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
@@ -545,6 +545,7 @@ const SidebarMenuButton = React.forwardRef<
       isActive = false,
       tooltip,
       className,
+      asChild = false,
       ...props
     },
     ref
@@ -557,6 +558,7 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants(), className)}
+        asChild={asChild}
         {...props}
       />
     )
@@ -705,10 +707,11 @@ const SidebarMenuSubButton = React.forwardRef<
     size?: "sm" | "md";
     isActive?: boolean;
   }
->(({ size = "md", isActive, className, ...props }, ref) => {
+>(({ size = "md", isActive, className, asChild, ...props }, ref) => {
   return (
     <Button
       ref={ref}
+      asChild={asChild}
       data-sidebar="menu-sub-button"
       data-size={size}
       data-active={isActive}
