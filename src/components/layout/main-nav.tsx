@@ -102,7 +102,6 @@ const navItems = {
       ]
     },
     { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
-    { href: '/dashboard/hr', label: 'الموارد البشرية', icon: HeartHandshake, roles: ['Admin', 'HR', 'Secretary'] },
     { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
   ],
