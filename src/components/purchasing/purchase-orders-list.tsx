@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { toFirestoreDate } from '@/services/date-converter';
 import { searchPurchaseOrders } from '@/lib/cache/fuse-search';
 
@@ -52,13 +53,27 @@ export function PurchaseOrdersList() {
   const [itemToDelete, setItemToDelete] = useState<PurchaseOrder | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const poQueryConstraints = useMemo(() => [orderBy('orderDate', 'desc')], []);
   const { data: purchaseOrders, loading, error } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', poQueryConstraints);
 
   const filteredPOs = useMemo(() => {
-    return searchPurchaseOrders(purchaseOrders, searchQuery);
-  }, [purchaseOrders, searchQuery]);
+    const dateFiltered = purchaseOrders.filter(po => {
+        const poDate = toFirestoreDate(po.orderDate);
+        
+        if (!dateFrom && !dateTo) return true;
+        if (!poDate) return false;
+      
+        const matchesDateFrom = !dateFrom || (poDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
+        const matchesDateTo = !dateTo || (poDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+        
+        return matchesDateFrom && matchesDateTo;
+    });
+
+    return searchPurchaseOrders(dateFiltered, searchQuery);
+  }, [purchaseOrders, searchQuery, dateFrom, dateTo]);
 
 
   const formatDate = (dateValue: any) => {
@@ -97,15 +112,41 @@ export function PurchaseOrdersList() {
 
   return (
     <>
-        <div className="mb-4">
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="ابحث بالرقم، اسم المورد..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 max-w-sm"
-                />
+        <div className="bg-muted/50 p-4 rounded-lg mb-6">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid gap-2 md:col-span-1">
+                    <Label htmlFor="search">بحث ذكي</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            id="search"
+                            placeholder="رقم الطلب, اسم المورد..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 rtl:pr-10"
+                        />
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                    <Input
+                        id="dateFrom"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="bg-background"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                     <Input
+                        id="dateTo"
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="bg-background"
+                    />
+                </div>
             </div>
         </div>
 
@@ -124,7 +165,7 @@ export function PurchaseOrdersList() {
             <TableBody>
                 {filteredPOs.length === 0 ? (
                      <TableRow><TableCell colSpan={6} className="h-24 text-center">
-                        {searchQuery ? 'لا توجد نتائج تطابق بحثك.' : 'لا توجد أوامر شراء بعد.'}
+                        {searchQuery || dateFrom || dateTo ? 'لا توجد نتائج تطابق بحثك.' : 'لا توجد أوامر شراء بعد.'}
                      </TableCell></TableRow>
                 ) : (
                     filteredPOs.map((po) => (
