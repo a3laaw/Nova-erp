@@ -22,7 +22,6 @@ import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { DateInput } from '@/components/ui/date-input';
 
 interface BalanceSheetData {
     assets: {
@@ -198,7 +197,7 @@ export default function BalanceSheetPage() {
                 <CardContent>
                     <div className="grid gap-2 max-w-xs">
                         <Label htmlFor="asOfDate">حتى تاريخ</Label>
-                        <DateInput value={asOfDate} onChange={setAsOfDate} />
+                        <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
                      </div>
                 </CardContent>
             </Card>

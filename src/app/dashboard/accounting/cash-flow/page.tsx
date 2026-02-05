@@ -21,7 +21,7 @@ import { Loader2, Printer, ArrowLeftRight } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
-import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
 
 interface StatementLineProps {
     label: string;
@@ -182,11 +182,11 @@ export default function CashFlowStatementPage() {
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">من تاريخ</Label>
-                        <DateInput value={dateFrom} onChange={setDateFrom} />
+                        <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                      </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">إلى تاريخ</Label>
-                        <DateInput value={dateTo} onChange={setDateTo} />
+                        <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                      </div>
                 </CardContent>
             </Card>

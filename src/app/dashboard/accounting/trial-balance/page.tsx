@@ -30,7 +30,6 @@ import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, Scale } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
-import { DateInput } from '@/components/ui/date-input';
 
 interface TrialBalanceLine {
   accountId: string;
@@ -175,11 +174,11 @@ export default function TrialBalancePage() {
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">التاريخ من</Label>
-                        <DateInput value={dateFrom} onChange={setDateFrom} />
+                        <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                      </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">التاريخ إلى</Label>
-                        <DateInput value={dateTo} onChange={setDateTo} />
+                        <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                      </div>
                 </CardContent>
             </Card>

@@ -186,6 +186,7 @@ export default function ClientStatementPage() {
                     debit: tx.debit || 0,
                     credit: tx.credit || 0,
                     balance: runningBalance,
+                    entryId: tx.id,
                 });
             }
         });
