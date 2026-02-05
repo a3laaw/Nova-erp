@@ -174,12 +174,12 @@ export type CashReceipt = {
     projectNameAr?: string;
     amount: number;
     amountInWords: string;
-    receiptDate: any; // Timestamp
+    receiptDate: any; 
     paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'K-Net';
     description: string;
     reference?: string;
     journalEntryId?: string;
-    createdAt: any; // Timestamp
+    createdAt: any; 
 };
 
 export interface PaymentVoucher {
@@ -191,7 +191,7 @@ export interface PaymentVoucher {
   payeeType: 'vendor' | 'employee' | 'other';
   amount: number;
   amountInWords: string;
-  paymentDate: any; // Timestamp
+  paymentDate: any; 
   paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'EmployeeCustody';
   description: string;
   reference?: string;
@@ -201,7 +201,7 @@ export interface PaymentVoucher {
   creditAccountName: string;
   status: 'draft' | 'paid' | 'cancelled';
   journalEntryId?: string;
-  createdAt: any; // Timestamp
+  createdAt: any; 
   clientId?: string;
   transactionId?: string;
 }
@@ -221,7 +221,7 @@ export type Employee = {
     employeeNumber?: string;
     fullName: string; 
     nameEn?: string;
-    dob?: string;
+    dob?: any;
     gender?: 'male' | 'female';
     civilId: string;
     nationality?: string;
@@ -232,34 +232,33 @@ export type Employee = {
     email?: string;
     jobTitle?: string;
     position?: 'head' | 'employee' | 'assistant' | 'contractor';
-    workStartTime?: string; // e.g., "08:00"
-    workEndTime?: string; // e.g., "17:00"
+    workStartTime?: string; 
+    workEndTime?: string; 
     salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
     bankName?: string;
     accountNumber?: string;
     iban?: string;
     profilePicture?: string;
-    hireDate: any; // ISO String
-    noticeStartDate: string | null; // Date when notice is given
+    hireDate: any; 
+    noticeStartDate: any | null; 
     terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor';
     department: string;
-    basicSalary: number; // KWD
+    basicSalary: number; 
     housingAllowance?: number;
     transportAllowance?: number;
     status: 'active' | 'on-leave' | 'terminated';
-    lastVacationAccrualDate: any; // ISO String
+    lastVacationAccrualDate: any; 
     annualLeaveAccrued?: number;
     annualLeaveUsed?: number;
     carriedLeaveDays?: number;
     sickLeaveUsed?: number;
     emergencyLeaveUsed?: number;
     maxEmergencyLeave?: number;
-    lastLeaveResetDate?: any; // ISO String
+    lastLeaveResetDate?: any; 
     annualLeaveBalance?: number;
     createdAt?: any; 
-    // Fields below are calculated/reconstructed and not stored in DB
     auditLogs?: AuditLog[];
     eosb?: number;
     leaveBalance?: number;
@@ -291,7 +290,7 @@ export interface LeaveRequest {
 export interface Holiday {
     id?: string;
     name: string;
-    date: any; // Can be string or Timestamp
+    date: any; 
 }
 
 
@@ -299,18 +298,18 @@ export type AuditLog = {
     id?: string;
     employeeId: string;
     changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate';
-    field: string | string[]; // e.g., 'basicSalary', ['jobTitle', 'department']
+    field: string | string[]; 
     oldValue: any;
     newValue: any;
-    effectiveDate: any; // Timestamp or ISO String
-    changedBy: string; // User ID
+    effectiveDate: any; 
+    changedBy: string; 
     notes?: string;
 };
 
 export type AttendanceRecord = {
-    date: string; // YYYY-MM-DD
-    checkIn?: string; // HH:MM
-    checkOut?: string; // HH:MM
+    date: string; 
+    checkIn?: string; 
+    checkOut?: string; 
     status: 'present' | 'absent' | 'late' | 'leave';
 };
 
@@ -364,7 +363,6 @@ export interface TransactionStage {
   expectedEndDate?: any | null;
   completedCount?: number;
   
-  // Properties inherited from WorkStage template
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
@@ -387,8 +385,7 @@ export type ClientTransaction = {
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;
-    stages?: Partial<TransactionStage>[]; // Now stores progress
-    // For display
+    stages?: Partial<TransactionStage>[]; 
     engineerName?: string;
     contract?: {
         clauses: ContractClause[];
@@ -469,7 +466,7 @@ export type ContractClause = {
   id: string;
   name: string;
   amount: number;
-  status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; // Paid, Due, Not Due
+  status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; 
   percentage?: number;
   condition?: string;
 };
@@ -571,7 +568,7 @@ export interface JournalEntryLine {
 export interface JournalEntry {
   id?: string;
   entryNumber: string;
-  date: any; // Timestamp
+  date: any; 
   narration: string;
   reference?: string;
   totalDebit: number;
@@ -580,7 +577,7 @@ export interface JournalEntry {
   lines: JournalEntryLine[];
   clientId?: string;
   transactionId?: string;
-  createdAt: any; // Timestamp
+  createdAt: any; 
   createdBy?: string;
 }
 
@@ -590,8 +587,8 @@ export interface WorkStageProgress {
   visitId: string;
   stageId: string;
   stageName: string;
-  selectedBy: string; // Employee ID
-  selectedAt: any; // Timestamp
+  selectedBy: string; 
+  selectedAt: any; 
 }
 
 export interface QuotationItem {
@@ -610,8 +607,8 @@ export interface Quotation {
   quotationYear: number;
   clientId: string;
   clientName: string;
-  date: any; // Timestamp
-  validUntil: any; // Timestamp
+  date: any; 
+  validUntil: any; 
   subject: string;
   departmentId?: string;
   transactionTypeId?: string;
@@ -619,7 +616,7 @@ export interface Quotation {
   totalAmount: number;
   notes?: string;
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-  createdAt: any; // Timestamp
+  createdAt: any; 
   createdBy?: string;
   scopeOfWork?: ContractScopeItem[];
   termsAndConditions?: ContractTerm[];
@@ -657,3 +654,5 @@ export interface PurchaseOrder {
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
+
+    
