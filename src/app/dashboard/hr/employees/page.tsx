@@ -14,7 +14,7 @@ export default function EmployeesPage() {
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>الموظفين</CardTitle>
+                        <CardTitle>إدارة الموظفين</CardTitle>
                         <CardDescription>
                         عرض وإدارة جميع الموظفين في الشركة.
                         </CardDescription>
