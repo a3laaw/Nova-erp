@@ -29,10 +29,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '../ui/badge';
-import { useFirebase } from '@/firebase';
-import { useSubscription } from '@/hooks/use-subscription';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -56,13 +54,14 @@ const statusColors: Record<EmployeeStatus, string> = {
 };
 
 export function EmployeesTable() {
-    const { firestore } = useFirebase();
-    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
     const [searchQuery, setSearchQuery] = useState('');
     
-    const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees');
+    // Temporarily using an empty array to reflect a clean slate, as requested.
+    // The connection to Firestore has been temporarily disabled in this component.
+    const employees: Employee[] = [];
+    const loading = false;
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
@@ -84,12 +83,12 @@ export function EmployeesTable() {
     };
 
     const handleTerminationConfirm = async () => {
-        if (!employeeToTerminate || !firestore || !terminationReason) {
+        if (!employeeToTerminate || !terminationReason) {
              toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد سبب إنهاء الخدمة.' });
              return;
         };
         setIsTerminating(true);
-        // Add termination logic here
+        // Add termination logic here in the future
         console.log(`Terminating ${employeeToTerminate.fullName} for ${terminationReason}`);
         await new Promise(res => setTimeout(res, 1000));
         setIsTerminating(false);
@@ -164,14 +163,14 @@ export function EmployeesTable() {
                         <AlertDialogTitle>تأكيد إنهاء الخدمة</AlertDialogTitle>
                         <AlertDialogDescription>
                         سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
-                        </AlertDialogDescription>
-                        <div className="mt-4 space-y-2 text-right">
+                        <div className="mt-4 space-y-2">
                              <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
                              <div className="flex gap-4">
                                 <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
                                 <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
                             </div>
                         </div>
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
