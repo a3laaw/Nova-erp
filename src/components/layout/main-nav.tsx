@@ -118,8 +118,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <Link href={item.href} legacyBehavior passHref>
-          <SidebarMenuButton as="a" isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
+        <Link href={item.href} asChild>
+          <SidebarMenuButton isActive={currentPath === item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
           </SidebarMenuButton>
@@ -155,8 +155,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSub>
                       {child.children.map((subChild: any) => (
                         <SidebarMenuSubItem key={subChild.href}>
-                            <Link href={subChild.href} legacyBehavior passHref>
-                                <SidebarMenuSubButton as="a" isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
+                            <Link href={subChild.href} asChild>
+                                <SidebarMenuSubButton isActive={currentPath === subChild.href} onClick={() => setOpenMobile(false)}>
                                     {subChild.label}
                                 </SidebarMenuSubButton>
                             </Link>
@@ -168,8 +168,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <Link href={child.href} legacyBehavior passHref>
-                        <SidebarMenuSubButton as="a" isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
+                   <Link href={child.href} asChild>
+                        <SidebarMenuSubButton isActive={currentPath === child.href} onClick={() => setOpenMobile(false)}>
                             {child.label}
                         </SidebarMenuSubButton>
                     </Link>
@@ -181,7 +181,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       </Collapsible>
     );
   }
-
 
   return null;
 }
