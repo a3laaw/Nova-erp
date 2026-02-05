@@ -534,8 +534,8 @@ const sidebarMenuButtonVariants = cva(
 )
 
 const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & {
+  HTMLAnchorElement,
+  React.ComponentProps<"a"> & {
     asChild?: boolean
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
@@ -553,10 +553,10 @@ const SidebarMenuButton = React.forwardRef<
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : "button"
+    const Comp = asChild ? Slot : "a"
     const { isMobile, state } = useSidebar()
 
-    const button = (
+    const linkEl = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
@@ -568,7 +568,7 @@ const SidebarMenuButton = React.forwardRef<
     )
 
     if (!tooltip) {
-      return button
+      return linkEl
     }
 
     if (typeof tooltip === "string") {
@@ -579,7 +579,7 @@ const SidebarMenuButton = React.forwardRef<
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"

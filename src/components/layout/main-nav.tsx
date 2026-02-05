@@ -22,10 +22,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
-  DropdownMenuSubContent
 } from '@/components/ui/dropdown-menu';
 import {
   Home,
@@ -151,7 +147,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSub>
                       {child.children.map((subChild: any) => (
                         <SidebarMenuSubItem key={subChild.href}>
-                          <Link href={subChild.href} onClick={() => setOpenMobile(false)} asChild>
+                          <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
                             <SidebarMenuSubButton isActive={currentPath === subChild.href}>
                               {subChild.label}
                             </SidebarMenuSubButton>
@@ -164,7 +160,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                  <Link href={child.href} onClick={() => setOpenMobile(false)} asChild>
+                  <Link href={child.href} onClick={() => setOpenMobile(false)}>
                     <SidebarMenuSubButton isActive={currentPath === child.href}>
                       {child.label}
                     </SidebarMenuSubButton>
@@ -180,7 +176,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   return (
     <SidebarMenuItem>
-      <Link href={item.href} onClick={() => setOpenMobile(false)} asChild>
+      <Link href={item.href} onClick={() => setOpenMobile(false)}>
         <SidebarMenuButton isActive={currentPath === item.href}>
           <item.icon />
           <span>{item.label}</span>
