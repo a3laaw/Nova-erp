@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -30,6 +29,7 @@ import { collection, query, getDocs } from 'firebase/firestore';
 import { EmployeeDossier } from '@/components/hr/employee-dossier';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DateInput } from '@/components/ui/date-input';
 
 const REPORT_TYPES: { value: ReportType; label: string }[] = [
   { value: 'EmployeeDossier', label: 'ملف الموظف الشامل' },
@@ -171,7 +171,7 @@ export default function ReportsPage() {
                         
                          <div className="grid gap-2">
                             <Label htmlFor="asOfDate">تاريخ التقرير</Label>
-                            <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+                            <DateInput value={asOfDate} onChange={setAsOfDate} />
                         </div>
                         
                         {reportType === 'EmployeeDossier' && (

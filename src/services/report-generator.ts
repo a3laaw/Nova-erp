@@ -203,7 +203,7 @@ async function reconstructEmployeeState(db: Firestore, employeeId: string, asOfD
         } : null,
     };
     
-    return finalData as SerializableEmployee;
+    return finalData as unknown as SerializableEmployee;
 
   } catch (error) {
     console.error(`Failed to reconstruct state for employee ${employeeId}:`, error);
@@ -301,4 +301,3 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
   }
 }
 
-    
