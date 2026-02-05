@@ -1,4 +1,3 @@
-
 'use client';
 // This file has been restored with the correct implementation.
 // It was previously marked for deletion.
@@ -27,6 +26,7 @@ import { Input } from '../ui/input';
 import { useSubscription } from '@/hooks/use-subscription';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
+import { Label } from '@/components/ui/label';
 
 const statusColors: { [key: string]: string } = {
   active: 'bg-green-100 text-green-800 border-green-200',
@@ -238,5 +238,3 @@ export function EmployeesTable() {
     </div>
   );
 }
-
-    
