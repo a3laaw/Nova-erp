@@ -12,7 +12,8 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  useSidebar, // Import useSidebar
+  useSidebar,
+  sidebarMenuButtonVariants,
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -101,7 +102,6 @@ const navItems = {
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'الموظفين' },
-        { href: '/dashboard/hr/employees/new', label: 'إضافة موظف جديد' },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازة' },
         { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب والحضور' },
         { href: '/dashboard/hr/reports', label: 'التقارير الشاملة' },
@@ -129,11 +129,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return (
       <Collapsible defaultOpen={isActive}>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton isActive={isActive}>
-            <item.icon />
-            <span>{item.label}</span>
-            <ChevronDown className="mr-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-          </SidebarMenuButton>
+           <button className={cn(sidebarMenuButtonVariants({ variant: 'default', size: 'default' }), "w-full group/button")}>
+                <item.icon />
+                <span>{item.label}</span>
+                <ChevronDown className="mr-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+            </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
@@ -147,7 +147,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSub>
                       {child.children.map((subChild: any) => (
                         <SidebarMenuSubItem key={subChild.href}>
-                          <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
+                          <Link href={subChild.href} onClick={() => setOpenMobile(false)} asChild>
                             <SidebarMenuSubButton isActive={currentPath === subChild.href}>
                               {subChild.label}
                             </SidebarMenuSubButton>
@@ -160,7 +160,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                  <Link href={child.href} onClick={() => setOpenMobile(false)}>
+                  <Link href={child.href} onClick={() => setOpenMobile(false)} asChild>
                     <SidebarMenuSubButton isActive={currentPath === child.href}>
                       {child.label}
                     </SidebarMenuSubButton>
@@ -176,7 +176,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   return (
     <SidebarMenuItem>
-      <Link href={item.href} onClick={() => setOpenMobile(false)}>
+      <Link href={item.href} onClick={() => setOpenMobile(false)} asChild>
         <SidebarMenuButton isActive={currentPath === item.href}>
           <item.icon />
           <span>{item.label}</span>
