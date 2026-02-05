@@ -69,7 +69,6 @@ const navItems = {
         { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
         {
           label: 'قيود وسندات',
-          hrefPrefix: '/dashboard/accounting',
           children: [
             { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
             { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
@@ -79,7 +78,6 @@ const navItems = {
         },
         {
           label: 'التقارير المالية',
-          hrefPrefix: '/dashboard/accounting',
           children: [
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
@@ -89,7 +87,6 @@ const navItems = {
         },
         {
           label: 'القوائم المالية',
-          hrefPrefix: '/dashboard/accounting',
           children: [
             { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل' },
             { href: '/dashboard/accounting/balance-sheet', label: 'قائمة المركز المالي' },
@@ -148,37 +145,30 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               if (child.children) {
                 return (
                   <SidebarMenuSubItem key={`${child.label}-${index}`}>
-                    <Collapsible defaultOpen={currentPath.startsWith(child.hrefPrefix)}>
-                       <CollapsibleTrigger asChild>
-                         <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md hover:bg-sidebar-accent">
-                          <span className="text-sm font-medium">{child.label}</span>
-                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-                         </div>
-                       </CollapsibleTrigger>
-                       <CollapsibleContent>
-                          <SidebarMenuSub>
-                            {child.children.map((subChild: any) => (
-                               <SidebarMenuSubItem key={subChild.href}>
-                                <SidebarMenuSubButton isActive={currentPath === subChild.href} asChild>
-                                  <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
-                                    {subChild.label}
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            ))}
-                          </SidebarMenuSub>
-                       </CollapsibleContent>
-                    </Collapsible>
+                    <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md">
+                      <span className="text-sm font-semibold text-sidebar-foreground/70">{child.label}</span>
+                    </div>
+                    <SidebarMenuSub>
+                      {child.children.map((subChild: any) => (
+                        <SidebarMenuSubItem key={subChild.href}>
+                          <Link href={subChild.href} onClick={() => setOpenMobile(false)} asChild>
+                            <SidebarMenuSubButton isActive={currentPath === subChild.href}>
+                              {subChild.label}
+                            </SidebarMenuSubButton>
+                          </Link>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
                   </SidebarMenuSubItem>
-                )
+                );
               }
               return (
                 <SidebarMenuSubItem key={child.href}>
-                  <SidebarMenuSubButton isActive={currentPath === child.href} asChild>
-                    <Link href={child.href} onClick={() => setOpenMobile(false)}>
+                  <Link href={child.href} onClick={() => setOpenMobile(false)} asChild>
+                    <SidebarMenuSubButton isActive={currentPath === child.href}>
                       {child.label}
-                    </Link>
-                  </SidebarMenuSubButton>
+                    </SidebarMenuSubButton>
+                  </Link>
                 </SidebarMenuSubItem>
               );
             })}
@@ -190,12 +180,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={currentPath === item.href} asChild>
-        <Link href={item.href} onClick={() => setOpenMobile(false)}>
+      <Link href={item.href} onClick={() => setOpenMobile(false)} asChild>
+        <SidebarMenuButton isActive={currentPath === item.href}>
           <item.icon />
           <span>{item.label}</span>
-        </Link>
-      </SidebarMenuButton>
+        </SidebarMenuButton>
+      </Link>
     </SidebarMenuItem>
   );
 }
