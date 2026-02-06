@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
@@ -14,6 +15,8 @@ export interface BrandingSettings {
   tax_number?: string;
   letterhead_text?: string;
   letterhead_image_url?: string;
+  footer_image_url?: string;
+  watermark_image_url?: string;
   system_background_url?: string;
 }
 
@@ -78,3 +81,5 @@ export const useBranding = () => {
   }
   return context;
 };
+
+    

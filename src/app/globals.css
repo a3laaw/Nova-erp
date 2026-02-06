@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 @import "react-day-picker/dist/style.css";
 
@@ -92,6 +93,8 @@
     @media print {
         body {
             background: white !important;
+            -webkit-print-color-adjust: exact; /* Chrome, Safari */
+            color-adjust: exact; /* Firefox */
         }
         .no-print {
             display: none !important;
@@ -102,6 +105,36 @@
         }
         .printable-content {
           padding: 0 !important;
+        }
+
+        .printable-container {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .print-header {
+            display: table-header-group;
+        }
+
+        .print-footer {
+            display: table-footer-group;
+        }
+
+        .print-content {
+            display: table-row-group;
+            position: relative; /* For watermark positioning */
+        }
+        
+        .print-watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            opacity: 0.08;
+            z-index: 10;
+            pointer-events: none;
         }
     }
 }
@@ -121,6 +154,8 @@
 }
 
 @page {
-    size: A4 portrait;
-    margin: 1.5cm;
+    size: A4;
+    margin: 0;
 }
+
+    

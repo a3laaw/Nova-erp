@@ -2,18 +2,11 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/layout/logo';
 import { formatCurrency } from '@/lib/utils';
-import { Printer, ArrowRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import type { Client, ClientTransaction, ContractClause } from '@/lib/types';
-import { contractTemplates } from '@/lib/contract-templates';
-import { Checkbox } from '../ui/checkbox';
-import { Label } from '../ui/label';
-import { useBranding, type BrandingSettings } from '@/context/branding-context';
-import Image from 'next/image';
+import type { Client, ClientTransaction } from '@/lib/types';
+import { useBranding } from '@/context/branding-context';
+import { PrintableDocument } from '../layout/printable-document';
 
 interface TransactionContractProps {
   client: Client;
@@ -22,9 +15,7 @@ interface TransactionContractProps {
 
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
 
-
 export function TransactionContract({ client, transaction }: TransactionContractProps) {
-    const router = useRouter();
     const { branding } = useBranding();
     const [contractDate, setContractDate] = useState('');
     const [contractNumber, setContractNumber] = useState('');
@@ -58,45 +49,18 @@ export function TransactionContract({ client, transaction }: TransactionContract
     
     const contractTitle = transaction.transactionType;
 
-    if (!transaction.contract) {
-        return (
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto text-center" dir="rtl">
-                <h2 className="text-xl font-bold text-destructive">لا يوجد عقد لهذه المعاملة</h2>
-                <p className="text-muted-foreground mt-2">
-                    الرجاء إنشاء عقد من صفحة العميل أولاً.
-                </p>
-                <Button onClick={() => router.back()} className="mt-4">
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                    العودة
-                </Button>
-            </div>
-        )
-    }
+    if (!transaction.contract) return null;
 
     return (
-        <div id="contract-content" className="printable-content">
-             {branding?.letterhead_image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img 
-                    src={branding.letterhead_image_url} 
-                    alt="Letterhead"
-                    className="w-full h-auto"
-                />
-            )}
-            <div className="space-y-8 p-8 md:p-12">
+        <PrintableDocument>
+            <div className="space-y-8">
                 <header className="pb-4 border-b">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
+                         <div className="flex items-center gap-4">
                             <Logo className="h-20 w-20 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                             <div>
                                 <h1 className="text-xl font-bold">{branding?.company_name}</h1>
                                 <p className="text-sm text-gray-500">{branding?.letterhead_text}</p>
-                                <p className="text-xs text-gray-500 mt-2">{branding?.address}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    {branding?.phone && `Phone: ${branding.phone}`}
-                                    {branding?.phone && branding?.email && ' | '}
-                                    {branding?.email && `Email: ${branding.email}`}
-                                </p>
                             </div>
                         </div>
                         <div className="text-left">
@@ -218,6 +182,8 @@ export function TransactionContract({ client, transaction }: TransactionContract
                     </div>
                 </section>
             </div>
-        </div>
+        </PrintableDocument>
     );
 }
+
+    

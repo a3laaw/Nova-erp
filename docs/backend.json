@@ -1,5 +1,4 @@
 
-
 {
   "entities": {
     "CompanyBranding": {
@@ -40,7 +39,17 @@
         "letterhead_image_url": {
             "type": "string",
             "format": "uri",
-            "description": "URL to the company's full letterhead image."
+            "description": "URL to the company's full letterhead image (for document headers)."
+        },
+        "footer_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the company's full footer image (for document footers)."
+        },
+        "watermark_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the company's watermark image for documents."
         },
         "system_background_url": {
             "type": "string",
@@ -383,6 +392,7 @@
           "enum": ["duration", "occurrence", "none"],
           "description": "The tracking type of the stage, copied from the template."
         },
+        "enableModificationTracking": { "type": "boolean", "description": "If true, enables a counter for modifications on this stage." },
         "expectedDurationDays": {
             "type": ["number", "null"],
             "description": "The expected duration in days for this stage (if trackingType is 'duration')."
@@ -515,7 +525,7 @@
         "description": "Records changes made to employee data for historical tracking.",
         "type": "object",
         "properties": {
-            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate"] },
+            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate", "StatusChange", "ResidencyUpdate"] },
             "field": { "type": "string", "description": "The name of the field that was changed." },
             "oldValue": { "description": "The value of the field before the change." },
             "newValue": { "description": "The value of the field after the change." },
@@ -1365,3 +1375,5 @@
     }
   }
 }
+
+    

@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirebase, useDoc } from '@/firebase';
+import { useFirebase, useDocument } from '@/firebase';
 import { doc, collection, query, getDocs, limit } from 'firebase/firestore';
 import { TransactionContract } from '@/components/clients/transaction-contract';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,25 +53,7 @@ export default function TransactionContractPage() {
   const isLoading = clientLoading || transactionLoading || brandingLoading;
   
   const handlePrint = () => {
-    const element = document.getElementById('contract-content');
-    if (!element) return;
-    
-    // Temporarily add a class to the root for print-specific styles
-    document.documentElement.classList.add('print-mode');
-
-    import('html2pdf.js').then(module => {
-        const html2pdf = module.default;
-        const opt = {
-          margin: 0.5,
-          filename: `Contract_${client?.nameAr}_${transaction?.transactionType}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
-          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().from(element).set(opt).save().then(() => {
-             document.documentElement.classList.remove('print-mode');
-        });
-    });
+    window.print();
   };
 
   if (isLoading) {
@@ -107,8 +90,8 @@ export default function TransactionContractPage() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-4xl mx-auto print:shadow-none print:p-0">
-        <div className="print:hidden mb-6 flex justify-end items-center no-print">
+    <div className="printable-wrapper">
+        <div className="mb-6 flex justify-end items-center gap-4 no-print">
             <Button variant="outline" onClick={() => router.back()}>
                 <ArrowRight className="ml-2 h-4 w-4" />
                 العودة
@@ -119,3 +102,5 @@ export default function TransactionContractPage() {
     </div>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -92,50 +93,33 @@ export function BrandingManager() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-                <div className="space-y-4 p-4 border rounded-lg">
-                    <h3 className="font-semibold text-base">شعار الشركة (اللوجو)</h3>
-                     <div className="grid gap-2">
-                        <Label htmlFor="logo_url">مسار الصورة من الإنترنت</Label>
-                        <div className="flex items-center gap-4">
-                            {formData.logo_url && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={formData.logo_url} alt="Logo Preview" width={64} height={64} className="rounded-md border object-contain p-1" />
-                            )}
-                             <div className="flex-1">
-                                <Input id="logo_url" value={formData.logo_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/logo.png" />
-                            </div>
+                 <div className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-semibold text-base">صور الهوية البصرية</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="logo_url">شعار الشركة (اللوجو)</Label>
+                            <Input id="logo_url" value={formData.logo_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../logo.png" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="system_background_url">خلفية صفحات النظام</Label>
+                            <Input id="system_background_url" value={formData.system_background_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../background.jpg" />
                         </div>
                     </div>
                 </div>
 
                 <div className="space-y-4 p-4 border rounded-lg">
-                    <h3 className="font-semibold text-base">ترويسة الشركة (Letterhead)</h3>
-                     <div className="grid gap-2">
-                        <Label htmlFor="letterhead_image_url">مسار الصورة من الإنترنت</Label>
-                        <div className="flex items-center gap-4">
-                             {formData.letterhead_image_url && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={formData.letterhead_image_url} alt="Letterhead Preview" width={128} height={64} className="rounded-md border object-contain p-1" />
-                            )}
-                             <div className="flex-1">
-                                <Input id="letterhead_image_url" value={formData.letterhead_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/letterhead.png" />
-                            </div>
-                        </div>
+                    <h3 className="font-semibold text-base">عناصر الطباعة</h3>
+                    <div className="grid gap-2">
+                        <Label htmlFor="letterhead_image_url">صورة الترويسة (Header)</Label>
+                        <Input id="letterhead_image_url" value={formData.letterhead_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../header.png" />
                     </div>
-                </div>
-
-                <div className="space-y-4 p-4 border rounded-lg">
-                    <h3 className="font-semibold text-base">خلفية صفحات النظام</h3>
                      <div className="grid gap-2">
-                        <Label htmlFor="system_background_url">مسار الصورة من الإنترنت</Label>
-                        <div className="flex items-center gap-4">
-                            {formData.system_background_url && (
-                                <img src={formData.system_background_url} alt="System Background Preview" width={128} height={64} className="rounded-md border object-contain p-1" />
-                            )}
-                             <div className="flex-1">
-                                <Input id="system_background_url" value={formData.system_background_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://example.com/background.jpg" />
-                            </div>
-                        </div>
+                        <Label htmlFor="footer_image_url">صورة التذييل (Footer)</Label>
+                        <Input id="footer_image_url" value={formData.footer_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../footer.png" />
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="watermark_image_url">صورة العلامة المائية (Watermark)</Label>
+                        <Input id="watermark_image_url" value={formData.watermark_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../watermark.png" />
                     </div>
                 </div>
                 
@@ -179,3 +163,5 @@ export function BrandingManager() {
         </Card>
     );
 }
+
+    
