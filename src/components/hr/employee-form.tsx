@@ -93,10 +93,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([
-                  getDocs(deptsQuery),
-                  getDocs(jobsQuery),
-                ]);
+                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
                 const fetchedDepartments = deptsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
@@ -112,7 +109,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         uniqueJobs.set(jobData.name, { id: doc.id, ...jobData });
                     }
                 });
-                setJobs(Array.from(uniqueJobs.values()));
+                setJobs(Array.from(uniqueJobs.values()).sort((a,b) => a.name.localeCompare(b.name, 'ar')));
 
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });

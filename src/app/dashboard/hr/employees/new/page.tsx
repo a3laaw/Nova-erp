@@ -110,14 +110,12 @@ export default function NewEmployeePage() {
 
             toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
 
-            // Corrected Notification logic
             const adminHRUsersQuery = query(collection(firestore, 'users'), where('role', 'in', ['Admin', 'HR']));
             const querySnapshot = await getDocs(adminHRUsersQuery);
             
             const notificationPromises: Promise<void>[] = [];
             querySnapshot.forEach(userDoc => {
                 const userId = userDoc.id;
-                // Don't notify the user who performed the action
                 if (userId !== currentUser.id) {
                     const notificationPromise = createNotification(firestore, {
                         userId: userId,
@@ -158,5 +156,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-    
