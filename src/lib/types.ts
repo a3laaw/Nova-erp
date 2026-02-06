@@ -225,13 +225,6 @@ export type Employee = {
     gender?: 'male' | 'female';
     civilId: string;
     nationality?: string;
-    address?: {
-        governorate: string;
-        area: string;
-        block: string;
-        street: string;
-        houseNumber: string;
-    };
     residencyExpiry?: any;
     contractExpiry?: any;
     mobile: string;
