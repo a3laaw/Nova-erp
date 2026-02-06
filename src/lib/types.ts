@@ -244,6 +244,7 @@ export type Employee = {
     terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'subcontractor' | 'percentage' | 'part-time';
+    contractPercentage?: number;
     department: string;
     basicSalary: number; 
     housingAllowance?: number;
@@ -341,6 +342,7 @@ export type Payslip = {
         basicSalary: number;
         housingAllowance?: number;
         transportAllowance?: number;
+        commission?: number;
     };
     deductions: {
         absenceDeduction: number;
@@ -571,6 +573,7 @@ export interface JournalEntry {
   date: any; 
   narration: string;
   reference?: string;
+  linkedReceiptId?: string;
   totalDebit: number;
   totalCredit: number;
   status: 'draft' | 'posted';

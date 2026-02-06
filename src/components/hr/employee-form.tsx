@@ -35,6 +35,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         accountNumber: string;
         iban: string;
         contractPercentage: string;
+        gender: Employee['gender'];
+        dob: string;
+        nationality: string;
+        residencyExpiry: string;
     }>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date().toISOString().split('T')[0], department: '', jobTitle: '',
@@ -44,6 +48,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         accountNumber: '',
         iban: '',
         contractPercentage: '',
+        gender: 'male',
+        dob: '',
+        nationality: '',
+        residencyExpiry: '',
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -72,6 +80,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 accountNumber: initialData.accountNumber || '',
                 iban: initialData.iban || '',
                 contractPercentage: String(initialData.contractPercentage || ''),
+                gender: initialData.gender || 'male',
+                dob: initialData.dob ? new Date(initialData.dob).toISOString().split('T')[0] : '',
+                nationality: initialData.nationality || '',
+                residencyExpiry: initialData.residencyExpiry ? new Date(initialData.residencyExpiry).toISOString().split('T')[0] : '',
             });
         }
     }, [initialData]);
@@ -92,7 +104,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
                     const jobData = doc.data() as Job;
-                    if (!uniqueJobs.has(jobData.name)) {
+                    if (jobData.name && !uniqueJobs.has(jobData.name)) {
                         uniqueJobs.set(jobData.name, { id: doc.id, ...jobData });
                     }
                 });
@@ -146,6 +158,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
             iban: formData.salaryPaymentType === 'transfer' ? formData.iban : '',
             contractPercentage: formData.contractType === 'percentage' ? parseFloat(formData.contractPercentage) : undefined,
+            gender: formData.gender,
+            dob: formData.dob ? new Date(formData.dob) : undefined,
+            nationality: formData.nationality,
+            residencyExpiry: formData.nationality && formData.nationality !== 'كويتي' && formData.residencyExpiry ? new Date(formData.residencyExpiry) : undefined,
         };
         
         await onSave(dataToSave);
@@ -173,6 +189,34 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
                         <Input id="mobile" value={formData.mobile} onChange={handleInputChange} dir="ltr" required />
                     </div>
+                </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="dob">تاريخ الميلاد</Label>
+                        <DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} />
+                    </div>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="gender">الجنس</Label>
+                        <Select value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl">
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="male">ذكر</SelectItem>
+                                <SelectItem value="female">أنثى</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="nationality">الجنسية</Label>
+                        <Input id="nationality" value={formData.nationality} onChange={handleInputChange} />
+                    </div>
+                    {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
+                            <DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} />
+                        </div>
+                    )}
                 </div>
                  <Separator />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
