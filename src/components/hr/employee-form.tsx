@@ -188,12 +188,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                      <div className="grid gap-1.5">
                         <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
-                        <Select value={formData.contractType || ''} onValueChange={(v) => handleSelectChange('contractType', v)} dir="rtl">
+                        <Select value={formData.contractType || ''} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])} dir="rtl">
                             <SelectTrigger><SelectValue/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="permanent">دائم</SelectItem>
                                 <SelectItem value="temporary">مؤقت</SelectItem>
                                 <SelectItem value="subcontractor">مقاول باطن</SelectItem>
+                                <SelectItem value="percentage">نسبة من العقود</SelectItem>
+                                <SelectItem value="part-time">دوام جزئي</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

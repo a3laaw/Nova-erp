@@ -243,7 +243,7 @@ export type Employee = {
     noticeStartDate: any | null; 
     terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
-    contractType: 'permanent' | 'temporary' | 'subcontractor';
+    contractType: 'permanent' | 'temporary' | 'subcontractor' | 'percentage' | 'part-time';
     department: string;
     basicSalary: number; 
     housingAllowance?: number;
