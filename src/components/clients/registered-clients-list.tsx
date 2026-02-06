@@ -94,7 +94,7 @@ export function RegisteredClientsList() {
       if (!employees) return new Map<string, string>();
       const newMap = new Map<string, string>();
       employees.forEach(emp => {
-          newMap.set(emp.id!, emp.fullName);
+          if (emp.id) newMap.set(emp.id, emp.fullName);
       });
       return newMap;
   }, [employees]);

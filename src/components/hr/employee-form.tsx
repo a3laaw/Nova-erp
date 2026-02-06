@@ -98,7 +98,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                   getDocs(jobsQuery),
                 ]);
 
-                // Robustly filter and sort departments
                 const fetchedDepartments = deptsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
                     .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
@@ -106,7 +105,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 fetchedDepartments.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
                 setDepartments(fetchedDepartments);
 
-                // Robustly filter and collect unique jobs
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
                     const jobData = doc.data() as Job;

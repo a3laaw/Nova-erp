@@ -132,8 +132,8 @@ export default function NewCashReceiptPage() {
                 getDocs(query(collection(firestore, 'departments')))
             ]);
 
-            const fetchedClients = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-            fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
+            const fetchedClients = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).filter(c => c && c.nameAr);
+            fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
             setClients(fetchedClients);
             
             setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
@@ -704,6 +704,3 @@ export default function NewCashReceiptPage() {
     </Card>
   );
 }
-
-    
-    

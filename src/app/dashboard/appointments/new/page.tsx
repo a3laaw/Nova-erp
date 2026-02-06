@@ -91,8 +91,10 @@ export default function NewArchitecturalAppointmentPage() {
                     getDocs(engQuery)
                 ]);
 
-                const fetchedClients: Client[] = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
+                const fetchedClients: Client[] = clientSnap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as Client))
+                    .filter(c => c && c.nameAr);
+                fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
                 setClients(fetchedClients);
                 
                 const allEmployees = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
@@ -292,7 +294,7 @@ export default function NewArchitecturalAppointmentPage() {
                      await createNotification(firestore, {
                         userId: targetUserId,
                         title: `موعد جديد: ${title}`,
-                        body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : client?.nameAr} يوم ${format(date, 'PPP', { locale: ar })} الساعة ${time}.`,
+                        body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : client?.nameAr} يوم ${date ? format(date, 'PPP', { locale: ar }) : ''} الساعة ${time}.`,
                         link: `/dashboard/appointments/${newApptRef.id}`
                     });
                 }
@@ -418,4 +420,3 @@ export default function NewArchitecturalAppointmentPage() {
         </Card>
     );
 }
-    

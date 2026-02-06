@@ -69,7 +69,7 @@ export default function NewOtherAppointmentPage() {
             try {
                 const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
                 const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const deptQuery = query(collection(firestore, 'departments'), orderBy('name'));
+                const deptQuery = query(collection(firestore, 'departments'));
 
                 const [clientSnap, engSnap, deptSnap] = await Promise.all([
                     getDocs(clientQuery),
@@ -77,14 +77,14 @@ export default function NewOtherAppointmentPage() {
                     getDocs(deptQuery)
                 ]);
 
-                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr));
+                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).filter(c => c && c.nameAr);
+                fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
                 setClients(fetchedClients);
                 
                 const engineeringDeptNames = ['ميكانيك', 'واجهات', 'كهرباء', 'انشائي'];
                 const fetchedDepts = deptSnap.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
-                    .filter(dept => engineeringDeptNames.some(name => dept.name.includes(name)));
+                    .filter(dept => dept && dept.name && engineeringDeptNames.some(name => dept.name.includes(name)));
                 setDepartments(fetchedDepts);
 
 
@@ -435,5 +435,3 @@ export default function NewOtherAppointmentPage() {
         </Card>
     );
 }
-
-    

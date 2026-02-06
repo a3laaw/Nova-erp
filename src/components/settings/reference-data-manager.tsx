@@ -141,7 +141,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         const snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
         let items = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as T))
-            .filter(item => typeof item.name === 'string'); // Filter out items without a name
+            .filter(item => item && typeof item.name === 'string'); // Filter out items without a name
         
         items.sort((a, b) => {
             const orderA = a.order ?? Infinity;
@@ -173,7 +173,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         const snapshot = await getDocs(query(collection(firestore, collectionPath)));
         let items = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as S))
-            .filter(item => typeof item.name === 'string'); // Filter out items without a name
+            .filter(item => item && typeof item.name === 'string'); // Filter out items without a name
         
         items.sort((a, b) => {
             const orderA = a.order ?? Infinity;
@@ -662,7 +662,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
         getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
       ]);
       
-      let typesData = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
+      let typesData = typesSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as TransactionType))
+        .filter(t => t && t.name);
       
       typesData.sort((a, b) => {
           const orderA = a.order ?? Infinity;
@@ -672,7 +674,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
       });
       
       setTransactionTypes(typesData);
-      setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+      setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)).filter(d => d && d.name));
     } catch (e) {
       console.error("Error fetching transaction types:", e);
       toast({ variant: 'destructive', title: `فشل جلب أنواع المعاملات` });
