@@ -365,7 +365,7 @@ export interface TransactionStage {
   notes?: string;
   expectedEndDate?: any | null;
   completedCount?: number;
-  
+  modificationCount?: number;
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
@@ -460,6 +460,7 @@ export interface WorkStage {
   nextStageIds?: string[];
   allowedDuringStages?: string[];
   trackingType: 'duration' | 'occurrence' | 'none';
+  enableModificationTracking?: boolean;
   expectedDurationDays?: number | null;
   maxOccurrences?: number | null;
   allowManualCompletion?: boolean;
@@ -671,5 +672,3 @@ export interface ResidencyRenewal {
     lastAmortizationDate?: any;
 }
     
-
-  

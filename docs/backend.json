@@ -1,4 +1,5 @@
 
+
 {
   "entities": {
     "CompanyBranding": {
@@ -398,7 +399,8 @@
         "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
         "expectedEndDate": { "type": ["string", "null"], "format": "date-time", "description": "The expected completion date for countdowns." },
         "notes": { "type": ["string", "null"], "description": "Notes specific to this stage." },
-        "completedCount": { "type": ["number", "null"], "description": "How many times this stage has been completed (if trackingType is 'occurrence')."}
+        "completedCount": { "type": ["number", "null"], "description": "How many times this stage has been completed (if trackingType is 'occurrence')."},
+        "modificationCount": { "type": ["number", "null"], "description": "How many times modifications were requested during this stage."}
       },
       "required": ["stageId", "name", "status"]
     },
@@ -513,7 +515,7 @@
         "description": "Records changes made to employee data for historical tracking.",
         "type": "object",
         "properties": {
-            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate", "StatusChange", "ResidencyUpdate"] },
+            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate"] },
             "field": { "type": "string", "description": "The name of the field that was changed." },
             "oldValue": { "description": "The value of the field before the change." },
             "newValue": { "description": "The value of the field after the change." },
@@ -707,6 +709,7 @@
         "nextStageIds": { "type": "array", "description": "A list of possible next stage IDs to transition to from this stage.", "items": { "type": "string" } },
         "allowedDuringStages": { "type": "array", "description": "For parallel stages only. A list of sequential stage IDs during which this parallel stage can be initiated.", "items": { "type": "string" } },
         "trackingType": { "type": "string", "enum": ["duration", "occurrence", "none"], "description": "How to track progress: by time, occurrences, or as a single event." },
+        "enableModificationTracking": { "type": "boolean", "description": "If true, enables a counter for modifications on this stage." },
         "expectedDurationDays": { "type": ["number", "null"], "description": "The expected duration in days for this stage (if trackingType is 'duration')." },
         "maxOccurrences": { "type": ["number", "null"], "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')." },
         "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." }
@@ -1062,8 +1065,6 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
-        "employeeId": { "type": "string", "description": "The ID of the employee if this payment is related to them." },
-        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "If this voucher is for residency renewal, this holds the new expiry date." },
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
@@ -1192,22 +1193,6 @@
         }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
-    },
-    "ResidencyRenewal": {
-      "title": "Residency Renewal",
-      "description": "Tracks details for automated amortization of residency renewal costs.",
-      "type": "object",
-      "properties": {
-        "employeeId": { "type": "string" },
-        "renewalDate": { "type": "string", "format": "date-time" },
-        "newExpiryDate": { "type": "string", "format": "date-time" },
-        "cost": { "type": "number" },
-        "paymentVoucherId": { "type": "string" },
-        "monthlyAmortizationAmount": { "type": "number" },
-        "amortizationStatus": { "type": "string", "enum": ["in-progress", "completed"] },
-        "lastAmortizationDate": { "type": "string", "format": "date-time" }
-      },
-      "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId"]
     }
   },
   "auth": {
@@ -1377,14 +1362,6 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
-    },
-    "/residencyRenewals/{renewalId}": {
-      "schema": {
-        "$ref": "#/entities/ResidencyRenewal"
-      },
-      "description": "Stores records for automated amortization of employee residency renewals."
     }
   }
 }
-
-  

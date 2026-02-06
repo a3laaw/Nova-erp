@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -73,7 +74,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 
 
 // Reusable component for the management UI
-function ManagerView<T extends {id: string, name: string, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel'}>({
+function ManagerView<T extends {id: string, name: string, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -120,6 +121,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [itemAllowManualCompletion, setItemAllowManualCompletion] = useState(false);
   const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
   const [itemAllowedDuringStages, setItemAllowedDuringStages] = useState<string[]>([]);
+  const [itemEnableModificationTracking, setItemEnableModificationTracking] = useState(false);
 
   // States for numerical ordering
   const [primaryOrderValues, setPrimaryOrderValues] = useState<Record<string, string>>({});
@@ -264,6 +266,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         setItemDuration(item?.expectedDurationDays ?? '');
         setItemMaxOccurrences(item?.maxOccurrences ?? '');
         setItemAllowManualCompletion(item?.allowManualCompletion || false);
+        setItemEnableModificationTracking(item?.enableModificationTracking || false);
         setItemNextStageIds(item?.nextStageIds || []);
         setItemAllowedDuringStages(item?.allowedDuringStages || []);
     }
@@ -282,6 +285,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     setItemDuration('');
     setItemMaxOccurrences('');
     setItemAllowManualCompletion(false);
+    setItemEnableModificationTracking(false);
     setItemNextStageIds([]);
     setItemAllowedDuringStages([]);
   }
@@ -300,6 +304,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
           dataToSave.nextStageIds = itemNextStageIds;
           dataToSave.allowManualCompletion = itemAllowManualCompletion;
           dataToSave.allowedDuringStages = itemAllowedDuringStages;
+          dataToSave.enableModificationTracking = itemEnableModificationTracking;
           
           if (itemTrackingType === 'duration') {
               dataToSave.expectedDurationDays = Number(itemDuration) || null;
@@ -471,6 +476,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                             {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
                             {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
                             {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
+                            {isWorkStageView && item.enableModificationTracking && <Badge variant="outline" className="bg-orange-100 text-orange-800">تتبع التعديلات</Badge>}
                             {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
                                 <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                             ))}
@@ -580,6 +586,10 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                             </div>
                           </>
                         )}
+                        <div className="flex items-center space-x-2">
+                           <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} />
+                           <Label htmlFor="enableModificationTracking">تفعيل عداد التعديلات لهذه المرحلة</Label>
+                        </div>
                         <div className="grid gap-2">
                             <Label>الأدوار المسؤولة (المسميات الوظيفية)</Label>
                             <MultiSelect
