@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
@@ -24,9 +24,35 @@ export default function NewEmployeePage() {
     const { toast } = useToast();
     
     const [isSaving, setIsSaving] = useState(false);
+    const [employeeNumber, setEmployeeNumber] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!firestore) return;
+        const generateEmployeeNumber = async () => {
+            try {
+                const currentYear = new Date().getFullYear();
+                const counterRef = doc(firestore, 'counters', 'employees');
+                const counterDoc = await getDoc(counterRef);
+                let nextNumber = 101;
+                if (counterDoc.exists()) {
+                    const counts = counterDoc.data()?.counts || {};
+                    nextNumber = (counts[currentYear] || 100) + 1;
+                }
+                setEmployeeNumber(`${String(currentYear).slice(-2)}-${String(nextNumber).padStart(4, '0')}`);
+            } catch (error) {
+                console.error("Error generating employee number:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في توليد الرقم الوظيفي.' });
+                setEmployeeNumber('Error');
+            }
+        };
+        generateEmployeeNumber();
+    }, [firestore, toast]);
     
     const handleSave = useCallback(async (newEmployeeData: Partial<Employee>) => {
-        if (!firestore || !currentUser) return;
+        if (!firestore || !currentUser || !employeeNumber || employeeNumber === 'Error') {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الحفظ، الرقم الوظيفي غير متاح.' });
+             return;
+        }
         
         setIsSaving(true);
         let newEmployeeId = '';
@@ -63,6 +89,10 @@ export default function NewEmployeePage() {
                 
                 const newEmployeeNumber = `${String(currentYear).slice(-2)}-${String(nextNumber).padStart(4, '0')}`;
 
+                if (newEmployeeNumber !== employeeNumber) {
+                    console.warn(`Race condition detected for employee number. UI showed ${employeeNumber}, saved as ${newEmployeeNumber}`);
+                }
+
                 const finalEmployeeData = {
                   ...newEmployeeData,
                   employeeNumber: newEmployeeNumber,
@@ -91,7 +121,7 @@ export default function NewEmployeePage() {
         } finally {
             setIsSaving(false);
         }
-    }, [firestore, currentUser, toast, router]);
+    }, [firestore, currentUser, toast, router, employeeNumber]);
 
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
@@ -104,6 +134,7 @@ export default function NewEmployeePage() {
                     onSave={handleSave}
                     onClose={() => router.back()}
                     isSaving={isSaving}
+                    employeeNumber={employeeNumber}
                 />
             </CardContent>
         </Card>

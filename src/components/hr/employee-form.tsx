@@ -9,7 +9,7 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import type { Employee, Governorate, Area } from '@/lib/types';
+import type { Employee, Governorate, Area, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -21,6 +21,7 @@ interface EmployeeFormProps {
     onClose: () => void;
     initialData?: Partial<Employee> | null;
     isSaving?: boolean;
+    employeeNumber?: string | null;
 }
 
 const commonNationalities = [
@@ -33,7 +34,7 @@ const commonNationalities = [
 const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n }));
 
 
-export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false }: EmployeeFormProps) {
+export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false, employeeNumber = null }: EmployeeFormProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
@@ -68,7 +69,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [jobs, setJobs] = useState<any[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
     const [isAreaLoading, setIsAreaLoading] = useState(false);
-    
+
     const handleAddressChange = (field: keyof typeof formData.address, value: string) => {
         setFormData(prev => ({...prev, address: { ...prev.address, [field]: value }}));
     };
@@ -119,7 +120,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             const initialGov = governorates.find(g => g.name === initialData.address?.governorate);
             if(initialGov) {
                 handleGovernorateChange(initialGov.id);
-                handleAddressChange('area', initialData.address?.area || '');
             }
         }
     }, [initialData, governorates, handleGovernorateChange]);
@@ -215,6 +215,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     return (
         <form onSubmit={handleSubmit}>
             <div className="space-y-6 py-4 px-1 max-h-[70vh] overflow-y-auto">
+                {(initialData?.employeeNumber || employeeNumber) && (
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="employeeNumber">الرقم الوظيفي</Label>
+                        <Input id="employeeNumber" value={initialData?.employeeNumber || employeeNumber || ''} disabled readOnly />
+                    </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-1.5">
                         <Label htmlFor="fullName">الاسم الكامل <span className="text-destructive">*</span></Label>
