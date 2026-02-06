@@ -61,7 +61,6 @@ const navItems = {
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
-    { href: '/dashboard/purchasing', label: 'المشتريات', icon: ShoppingCart, roles: ['Admin', 'Accountant'] },
     { 
       label: 'المحاسبة', 
       icon: Wallet, 
@@ -111,8 +110,18 @@ const navItems = {
         { href: '/dashboard/hr/employees', label: 'الموظفين' },
       ]
     },
-    { href: '/dashboard/warehouse', label: 'المستودع', icon: Warehouse, roles: ['Admin', 'Accountant'] },
-    { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { 
+      label: 'المخازن',
+      icon: Warehouse,
+      roles: ['Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse', label: 'عرض المخزون' },
+        { href: '/dashboard/purchasing', label: 'المشتريات' },
+        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
+        { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
+      ]
+    },
     { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
   ],
   en: [
