@@ -407,7 +407,7 @@ export default function NewCashReceiptPage() {
 
             const journalEntryData = {
                 entryNumber: `CRV-JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
-                narration: `[إشعار مالي] ${description}` || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
+                narration: `${description}` || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
                 lines: [
                     { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
@@ -553,7 +553,7 @@ export default function NewCashReceiptPage() {
             const timelineCollectionRef = collection(transactionRefForUpdate!, 'timelineEvents');
             const historyCollectionRef = collection(firestore, `clients/${selectedClientId}/history`);
             
-            const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لهذه المعاملة. (سند قبض رقم: ${voucherNumber})`;
+            const commentContent = `**[إشعار مالي - دفعة جديدة]**\n${description}\n\n(سند قبض رقم: ${voucherNumber} بقيمة إجمالية ${formatCurrency(parseFloat(amount))})`;
             const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
             batch.set(doc(timelineCollectionRef), commentData);
             

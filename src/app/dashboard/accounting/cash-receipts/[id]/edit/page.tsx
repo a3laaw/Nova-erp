@@ -421,7 +421,7 @@ export default function EditCashReceiptPage() {
             
             // 2. Add Timeline log & comment for the edit
             const timelineRef = collection(txRef, 'timelineEvents');
-            const commentContent = `**[إشعار مالي]**\nقام ${currentUser.fullName} بتعديل سند القبض رقم ${originalReceipt.voucherNumber}. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`;
+            const commentContent = `**[إشعار مالي - تعديل دفعة]**\n${description}\n\n(تم تعديل سند قبض رقم ${originalReceipt.voucherNumber} لتصبح القيمة الجديدة ${formatCurrency(parseFloat(amount))})`;
             const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
             batch.set(doc(timelineRef), commentData);
 
@@ -580,4 +580,3 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
-    
