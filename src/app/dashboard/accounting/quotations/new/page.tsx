@@ -136,7 +136,7 @@ export default function NewQuotationPage() {
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
 
 
-  const { register, handleSubmit, control, formState: { errors }, watch, setValue, replace } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, formState: { errors }, watch, setValue } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     mode: 'onChange',
     defaultValues: {
@@ -151,7 +151,7 @@ export default function NewQuotationPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
