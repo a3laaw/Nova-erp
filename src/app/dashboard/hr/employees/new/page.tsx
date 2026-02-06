@@ -109,6 +109,28 @@ export default function NewEmployeePage() {
             });
 
             toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
+
+            // Corrected Notification logic
+            const adminHRUsersQuery = query(collection(firestore, 'users'), where('role', 'in', ['Admin', 'HR']));
+            const querySnapshot = await getDocs(adminHRUsersQuery);
+            
+            const notificationPromises: Promise<void>[] = [];
+            querySnapshot.forEach(userDoc => {
+                const userId = userDoc.id;
+                // Don't notify the user who performed the action
+                if (userId !== currentUser.id) {
+                    const notificationPromise = createNotification(firestore, {
+                        userId: userId,
+                        title: 'تمت إضافة موظف جديد',
+                        body: `قام ${currentUser.fullName} بإضافة الموظف الجديد "${newEmployeeData.fullName}".`,
+                        link: `/dashboard/hr/employees`
+                    });
+                    notificationPromises.push(notificationPromise);
+                }
+            });
+
+            await Promise.all(notificationPromises);
+            
             router.push(`/dashboard/hr/employees`);
 
         } catch (error) {
@@ -136,3 +158,5 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+    
