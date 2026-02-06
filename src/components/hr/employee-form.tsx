@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import type { Employee, Department, Job } from '@/lib/types';
@@ -87,7 +87,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments'));
+                const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
