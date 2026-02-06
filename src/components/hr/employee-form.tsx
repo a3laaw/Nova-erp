@@ -90,14 +90,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         if (!firestore) return;
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
-            // IMPROVED: Added try-catch for better error handling during data fetch.
             try {
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
-                // FIXED: Filter out any department or job that doesn't have a name to prevent crashes.
                 const fetchedDepartments = deptsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
                     .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
@@ -127,7 +125,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
-        if (id === 'fullName') sanitizedValue = value.replace(/[^ \\u0600-\\u06FF]/g, '');
+        if (id === 'fullName') sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
         else if (id === 'nameEn') sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };

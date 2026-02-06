@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
@@ -30,7 +29,6 @@ export default function NewEmployeePage() {
     useEffect(() => {
         if (!firestore) return;
         const generateEmployeeNumber = async () => {
-            // IMPROVED: Added try-catch for better error handling.
             try {
                 const counterRef = doc(firestore, 'counters', 'employees');
                 const counterDoc = await getDoc(counterRef);
@@ -57,11 +55,8 @@ export default function NewEmployeePage() {
         setIsSaving(true);
         let newEmployeeId = '';
 
-        // IMPROVED: Added comprehensive try/catch block.
         try {
             // --- VALIDATION LOGIC ---
-            // FIXED: The validation was incorrectly checking against the 'clients' collection.
-            // It now correctly checks for duplicate mobile numbers in the 'employees' collection.
             if (newEmployeeData.mobile) {
                 const mobileQuery = query(collection(firestore, 'employees'), where('mobile', '==', newEmployeeData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
@@ -91,7 +86,6 @@ export default function NewEmployeePage() {
                 const newEmployeeNumber = String(nextNumber);
 
                 if (newEmployeeNumber !== employeeNumber) {
-                    // This is a race condition, but the transaction handles it. We can log it for monitoring.
                     console.warn(`Race condition detected for employee number. UI showed ${employeeNumber}, saved as ${newEmployeeNumber}`);
                 }
 
@@ -116,7 +110,6 @@ export default function NewEmployeePage() {
 
             toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
 
-            // IMPROVED: Notification logic now targets only Admin and HR roles.
             const adminHRUsersQuery = query(collection(firestore, 'users'), where('role', 'in', ['Admin', 'HR']));
             const querySnapshot = await getDocs(adminHRUsersQuery);
             
@@ -128,7 +121,7 @@ export default function NewEmployeePage() {
                         userId: userId,
                         title: 'تمت إضافة موظف جديد',
                         body: `قام ${currentUser.fullName} بإضافة الموظف الجديد "${newEmployeeData.fullName}".`,
-                        link: `/dashboard/hr/employees/${newEmployeeId}`
+                        link: `/dashboard/hr/employees`
                     });
                     notificationPromises.push(notificationPromise);
                 }
