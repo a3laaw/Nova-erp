@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+@import "react-day-picker/dist/style.css";
 
 @tailwind base;
 @tailwind components;
@@ -102,6 +103,20 @@
         .printable-content {
           padding: 0 !important;
         }
+    }
+}
+
+@layer components {
+    .rdp {
+        --rdp-cell-size: 40px;
+        --rdp-caption-font-size: 18px;
+        --rdp-accent-color: hsl(var(--primary));
+        --rdp-background-color: hsl(var(--card));
+        --rdp-accent-color-dark: hsl(var(--primary));
+        --rdp-background-color-dark: hsl(var(--card));
+        --rdp-outline: 2px solid hsl(var(--ring));
+        --rdp-outline-selected: 3px solid hsl(var(--primary));
+        --rdp-selected-color: hsl(var(--primary-foreground));
     }
 }
 

@@ -13,6 +13,8 @@ import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { DateInput } from '../ui/date-input';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -35,32 +37,19 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [formData, setFormData] = useState<{
-        fullName: string; nameEn: string; civilId: string; mobile: string;
-        hireDate: string; department: string; jobTitle: string;
-        contractType: Employee['contractType']; basicSalary: string;
-        salaryPaymentType: Employee['salaryPaymentType'];
-        bankName: string;
-        accountNumber: string;
-        iban: string;
-        contractPercentage: string;
-        gender: Employee['gender'];
-        dob: string;
-        nationality: string;
-        residencyExpiry: string;
-    }>({
+    const [formData, setFormData] = useState({
         fullName: '', nameEn: '', civilId: '', mobile: '',
-        hireDate: new Date().toISOString().split('T')[0], department: '', jobTitle: '',
-        contractType: 'permanent', basicSalary: '',
-        salaryPaymentType: 'cash',
+        hireDate: new Date(), department: '', jobTitle: '',
+        contractType: 'permanent' as Employee['contractType'], basicSalary: '',
+        salaryPaymentType: 'cash' as Employee['salaryPaymentType'],
         bankName: '',
         accountNumber: '',
         iban: '',
         contractPercentage: '',
-        gender: 'male',
-        dob: '',
+        gender: 'male' as Employee['gender'],
+        dob: undefined as Date | undefined,
         nationality: '',
-        residencyExpiry: '',
+        residencyExpiry: undefined as Date | undefined,
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -74,12 +63,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     
     useEffect(() => {
         if (initialData) {
+            const initialGov = governorates.find(g => g.name === initialData.address?.governorate);
             setFormData({
                 fullName: initialData.fullName || '',
                 nameEn: initialData.nameEn || '',
                 civilId: initialData.civilId || '',
                 mobile: initialData.mobile || '',
-                hireDate: initialData.hireDate ? new Date(initialData.hireDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                hireDate: toFirestoreDate(initialData.hireDate) || new Date(),
                 department: initialData.department || '',
                 jobTitle: initialData.jobTitle || '',
                 contractType: initialData.contractType || 'permanent',
@@ -90,12 +80,15 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 iban: initialData.iban || '',
                 contractPercentage: String(initialData.contractPercentage || ''),
                 gender: initialData.gender || 'male',
-                dob: initialData.dob ? new Date(initialData.dob).toISOString().split('T')[0] : '',
+                dob: toFirestoreDate(initialData.dob) || undefined,
                 nationality: initialData.nationality || '',
-                residencyExpiry: initialData.residencyExpiry ? new Date(initialData.residencyExpiry).toISOString().split('T')[0] : '',
+                residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
             });
+            if(initialGov?.id) {
+                handleGovernorateChange(initialGov.id, initialData.address?.area);
+            }
         }
-    }, [initialData]);
+    }, [initialData, governorates, handleGovernorateChange]);
 
 
     useEffect(() => {
@@ -137,7 +130,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
     
-    const handleSelectChange = (id: keyof typeof formData, value: string) => {
+    const handleSelectChange = (id: keyof typeof formData, value: any) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
@@ -157,7 +150,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             nameEn: formData.nameEn,
             civilId: formData.civilId,
             mobile: formData.mobile,
-            hireDate: new Date(formData.hireDate),
+            hireDate: formData.hireDate,
             department: formData.department,
             jobTitle: formData.jobTitle,
             contractType: formData.contractType,
@@ -168,9 +161,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             iban: formData.salaryPaymentType === 'transfer' ? formData.iban : '',
             contractPercentage: formData.contractType === 'percentage' ? parseFloat(formData.contractPercentage) : undefined,
             gender: formData.gender,
-            dob: formData.dob ? new Date(formData.dob) : undefined,
+            dob: formData.dob,
             nationality: formData.nationality,
-            residencyExpiry: formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry ? new Date(formData.residencyExpiry) : undefined,
+            residencyExpiry: formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry ? formData.residencyExpiry : undefined,
         };
         
         await onSave(dataToSave);
@@ -202,7 +195,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-1.5">
                         <Label htmlFor="dob">تاريخ الميلاد</Label>
-                        <Input type="date" value={formData.dob} onChange={(e) => handleSelectChange('dob', e.target.value)} />
+                        <DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} />
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor="gender">الجنس</Label>
@@ -228,7 +221,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
                         <div className="grid gap-1.5">
                             <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                            <Input type="date" value={formData.residencyExpiry} onChange={(e) => handleSelectChange('residencyExpiry', e.target.value)} />
+                            <DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} />
                         </div>
                     )}
                 </div>
@@ -246,7 +239,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="grid gap-1.5">
                         <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                        <Input type="date" value={formData.hireDate} onChange={(e) => handleSelectChange('hireDate', e.target.value)} />
+                        <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date)} />
                     </div>
                      <div className="grid gap-1.5">
                         <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
