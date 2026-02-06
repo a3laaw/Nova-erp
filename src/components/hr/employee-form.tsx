@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +13,7 @@ import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { DateInput } from '@/components/ui/date-input';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -24,10 +26,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        fullName: string; nameEn: string; civilId: string; mobile: string;
+        hireDate: string; department: string; jobTitle: string;
+        contractType: Employee['contractType']; basicSalary: string;
+    }>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date().toISOString().split('T')[0], department: '', jobTitle: '',
-        contractType: 'permanent' as Employee['contractType'], basicSalary: ''
+        contractType: 'permanent', basicSalary: ''
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -86,10 +92,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
+        let sanitizedValue = value;
+        if (id === 'fullName') sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
+        else if (id === 'nameEn') sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
+        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
     
-    const handleSelectChange = (id: string, value: string) => {
+    const handleSelectChange = (id: keyof typeof formData, value: string) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
@@ -156,7 +165,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="grid gap-1.5">
                         <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                        <Input id="hireDate" type="date" value={formData.hireDate} onChange={handleInputChange} required />
+                        <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date)} />
                     </div>
                      <div className="grid gap-1.5">
                         <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
