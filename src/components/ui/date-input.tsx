@@ -21,7 +21,21 @@ interface DateInputProps {
 // The format seen by the user
 const displayFormat = 'PPP';
 // Formats to try parsing when user types manually
-const parseableFormats = ['yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yy', 'M/d/yy', 'MM/dd/yy'];
+const parseableFormats = [
+    // Standard formats
+    'yyyy-MM-dd', 
+    'dd/MM/yyyy', 
+    'dd-MM-yyyy',
+    'yyyy/MM/dd',
+    'dd.MM.yyyy',
+    // Short formats
+    'd/M/yy', 
+    'd.M.yy',
+    'd-M-yy',
+    // No separator
+    'ddMMyyyy',
+    'yyyyMMdd',
+];
 
 export function DateInput({ value, onChange, disabled, className }: DateInputProps) {
   const [open, setOpen] = React.useState(false);
