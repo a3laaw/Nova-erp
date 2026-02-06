@@ -20,6 +20,18 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub as DropdownSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
   Home,
   Briefcase,
   Users,
@@ -166,17 +178,22 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state: sidebarState, isMobile } = useSidebar();
   const { direction } = useLanguage();
 
   if (!item.roles.includes(userRole)) {
     return null;
   }
 
+  // For items without children (simple links)
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={currentPath === item.href} asChild className={cn(direction === 'rtl' ? 'text-right' : 'text-left')}>
+        <SidebarMenuButton
+          isActive={currentPath === item.href}
+          asChild
+          tooltip={item.label}
+        >
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
@@ -185,14 +202,65 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       </SidebarMenuItem>
     );
   }
-  
+
+  // For items with children (collapsible/dropdown)
   if (item.children) {
     const isActive = currentPath.startsWith(item.hrefPrefix);
+
+    // Collapsed state on DESKTOP
+    if (sidebarState === 'collapsed' && !isMobile) {
+      return (
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  as="button"
+                  isActive={isActive}
+                  className="h-8 w-full justify-center"
+                >
+                  <item.icon />
+                  <span className="sr-only">{item.label}</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center">{item.label}</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent side="right" align="start" className="w-56">
+            <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {item.children.map((child: any, index: number) => {
+              if (child.children) {
+                return (
+                  <DropdownSub key={`${child.label}-${index}`}>
+                    <DropdownMenuSubTrigger>{child.label}</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                       {child.children.map((subChild: any) => (
+                          <DropdownMenuItem key={subChild.href} asChild>
+                            <Link href={subChild.href}>{subChild.label}</Link>
+                          </DropdownMenuItem>
+                       ))}
+                    </DropdownMenuSubContent>
+                  </DropdownSub>
+                )
+              }
+              return (
+                <DropdownMenuItem key={child.href} asChild>
+                  <Link href={child.href}>{child.label}</Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+    
+    // Expanded state on DESKTOP or any state on MOBILE
     return (
       <Collapsible defaultOpen={isActive}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-8 w-full justify-between pr-2">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-8 w-full justify-between">
               <div className='flex items-center gap-2'>
                 <item.icon />
                 <span>{item.label}</span>
