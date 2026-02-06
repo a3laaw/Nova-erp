@@ -19,11 +19,19 @@ export default function EmployeesPage() {
     return (
         <Card dir="rtl">
             <CardHeader>
-                <div>
-                    <CardTitle>إدارة الموظفين</CardTitle>
-                    <CardDescription>
-                        عرض وتحديث ملفات الموظفين وإدارة حساباتهم.
-                    </CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>إدارة الموظفين</CardTitle>
+                        <CardDescription>
+                            عرض وتحديث ملفات الموظفين وإدارة حساباتهم.
+                        </CardDescription>
+                    </div>
+                     <Button asChild size="sm" className="gap-1">
+                        <Link href="/dashboard/hr/employees/new">
+                            <PlusCircle className="h-4 w-4" />
+                            إضافة موظف جديد
+                        </Link>
+                    </Button>
                 </div>
             </CardHeader>
             <CardContent>
@@ -34,12 +42,6 @@ export default function EmployeesPage() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="max-w-sm"
                     />
-                    <Button asChild size="sm" className="gap-1">
-                        <Link href="/dashboard/hr/employees/new">
-                            <PlusCircle className="h-4 w-4" />
-                            إضافة موظف جديد
-                        </Link>
-                    </Button>
                 </div>
                 <EmployeesTable searchQuery={searchQuery} />
             </CardContent>
