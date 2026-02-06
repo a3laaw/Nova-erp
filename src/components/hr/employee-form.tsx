@@ -90,7 +90,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments')); // Removed orderBy('name')
+                // Fetch departments without server-side ordering to prevent crashes on null values.
+                const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([
@@ -98,10 +99,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                   getDocs(jobsQuery),
                 ]);
 
-                const fetchedDepartments = deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Safe client-side sorting
+                // Safely sort and filter departments on the client-side.
+                const fetchedDepartments = deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
                 fetchedDepartments.sort((a,b) => (a.name || '').localeCompare(b.name || '', 'ar'));
-                setDepartments(fetchedDepartments.filter(d => d.name)); // Filter after sorting
+                setDepartments(fetchedDepartments.filter(d => d.name)); // CRITICAL: Only use departments with a name.
 
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
@@ -136,13 +137,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     
     const departmentOptions = useMemo(() => {
         return departments
-            .filter(d => d && d.name)
+            .filter(d => d && d.name) // Defensive check
             .map(d => ({ value: d.name, label: d.name }));
     }, [departments]);
 
     const jobOptions = useMemo(() => {
         return jobs
-            .filter(j => j && j.name)
+            .filter(j => j && j.name) // Defensive check
             .map(j => ({ value: j.name, label: j.name }));
     }, [jobs]);
 
