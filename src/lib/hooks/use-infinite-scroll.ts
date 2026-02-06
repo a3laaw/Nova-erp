@@ -15,10 +15,11 @@ import {
 import { useFirebase } from '@/firebase';
 
 const PAGE_SIZE = 15;
+const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 
 export function useInfiniteScroll<T extends { id?: string }>(
   collectionPath: string | null,
-  constraints: QueryConstraint[] = []
+  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS
 ) {
   const { firestore } = useFirebase();
   const [items, setItems] = useState<T[]>([]);
