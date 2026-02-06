@@ -243,7 +243,7 @@ export function QuotationsList() {
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ?  'جاري الحذف...' : 'نعم، قم بالحذف'}
+                        {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -251,5 +251,4 @@ export function QuotationsList() {
     </>
   );
 }
-
     

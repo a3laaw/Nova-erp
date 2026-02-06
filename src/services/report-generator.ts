@@ -137,5 +137,4 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
         throw new Error(error.message || "حدث خطأ غير متوقع في السيرفر");
     }
 }
-
     

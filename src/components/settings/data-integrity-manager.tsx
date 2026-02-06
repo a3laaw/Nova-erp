@@ -409,4 +409,3 @@ export function DataIntegrityManager() {
         </Card>
     );
 }
-

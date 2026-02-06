@@ -236,147 +236,152 @@ export default function NewJournalEntryPage() {
   };
 
   return (
-    Card className="max-w-5xl mx-auto" dir="rtl">
-        form onSubmit={handleSubmit}>
-            CardHeader>
-                div className="flex justify-between items-start">
-                    div>
-                        CardTitle>قيد يومية جديدCardTitle>
-                        CardDescription>أدخل تفاصيل القيد وتأكد من توازن المدين والدائن.CardDescription>
-                    div>
-                     div className="text-right">
-                        Label>رقم القيدLabel>
-                        div className="font-mono text-lg font-semibold h-7">
+    <Card className="max-w-5xl mx-auto" dir="rtl">
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>قيد يومية جديد</CardTitle>
+                        <CardDescription>أدخل تفاصيل القيد وتأكد من توازن المدين والدائن.</CardDescription>
+                    </div>
+                     <div className="text-right">
+                        <Label>رقم القيد</Label>
+                        <div className="font-mono text-lg font-semibold h-7">
                             {entryNumber}
-                        div>
-                    div>
-                div>
-            CardHeader>
-            CardContent className="space-y-6">
-                div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    div className="grid gap-2">
-                        Label htmlFor="date">التاريخLabel>
-                        Controller control={control} name="date" render={({ field }) => ( DateInput value={field.value} onChange={field.onChange} /> )} />
-                        {errors.date && p className="text-xs text-destructive">{errors.date.message}p>}
-                    div>
-                     div className="grid gap-2">
-                        Label htmlFor="narration">البيان (الوصف)Label>
-                        Input id="narration" {...register('narration')} />
-                        {errors.narration && p className="text-xs text-destructive">{errors.narration.message}p>}
-                    div>
-                     div className="grid gap-2">
-                        Label htmlFor="reference">المرجع (اختياري)Label>
-                        Input id="reference" {...register('reference')} />
-                    div>
-                div>
+                        </div>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="date">التاريخ</Label>
+                        <Controller control={control} name="date" render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} />
+                        {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="narration">البيان (الوصف)</Label>
+                        <Input id="narration" {...register('narration')} />
+                        {errors.narration && <p className="text-xs text-destructive">{errors.narration.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="reference">المرجع (اختياري)</Label>
+                        <Input id="reference" {...register('reference')} />
+                    </div>
+                </div>
                 
-                div className="overflow-x-auto">
-                     Table>
-                        TableHeader>
-                            TableRow>
-                                TableHead className="min-w-[250px]">الحسابTableHead>
-                                TableHead className="min-w-[200px]">ربط بمشروعTableHead>
-                                TableHead className="min-w-[120px]">مدينTableHead>
-                                TableHead className="min-w-[120px]">دائنTableHead>
-                                TableHead className="min-w-[200px]">ملاحظاتTableHead>
-                                TableHead><span className="sr-only">ترتيبspan>TableHead>
-                                TableHead><span className="sr-only">حذفspan>TableHead>
-                            TableRow>
-                        TableHeader>
-                        TableBody>
+                <div className="overflow-x-auto">
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="min-w-[250px]">الحساب</TableHead>
+                                <TableHead className="min-w-[200px]">ربط بمشروع</TableHead>
+                                <TableHead className="min-w-[120px]">مدين</TableHead>
+                                <TableHead className="min-w-[120px]">دائن</TableHead>
+                                <TableHead className="min-w-[200px]">ملاحظات</TableHead>
+                                <TableHead><span className="sr-only">ترتيب</span></TableHead>
+                                <TableHead><span className="sr-only">حذف</span></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
                                 const showProjectLink = selectedAccount && selectedAccount.code.startsWith('5');
                                 return (
-                                TableRow key={field.id}>
-                                    TableCell>
-                                        Controller control={control} name={`lines.${index}.accountId`} render={({ field }) => (
-                                                InlineSearchList value={field.value} onSelect={field.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} />
+                                <TableRow key={field.id}>
+                                    <TableCell>
+                                        <Controller control={control} name={`lines.${index}.accountId`} render={({ field }) => (
+                                                <InlineSearchList value={field.value} onSelect={field.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} />
                                             )}
                                         />
-                                    TableCell>
-                                    TableCell>
+                                    </TableCell>
+                                    <TableCell>
                                         {showProjectLink && (
-                                            Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
-                                                InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مشروع..." disabled={refDataLoading} />
+                                            <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
+                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مشروع..." disabled={refDataLoading} />
                                             )} />
                                         )}
-                                    TableCell>
-                                        Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
-                                                Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
+                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
-                                    TableCell>
-                                        Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
-                                                Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
+                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
-                                    TableCell>
-                                        Controller name={`lines.${index}.notes`} control={control} render={({ field }) => (
-                                                Input {...field} value={field.value || ''} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller name={`lines.${index}.notes`} control={control} render={({ field }) => (
+                                                <Input {...field} value={field.value || ''} />
                                             )}
                                         />
-                                    TableCell>
-                                        div className="flex flex-col items-center">
-                                            Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index - 1)} disabled={index === 0}>
-                                                ArrowUp className="h-4 w-4" />
-                                            Button>
-                                            Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index + 1)} disabled={index === fields.length - 1}>
-                                                ArrowDown className="h-4 w-4" />
-                                            Button>
-                                        div>
-                                    TableCell>
-                                        Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2}>
-                                            Trash2 className="h-4 w-4 text-destructive" />
-                                        Button>
-                                    TableCell>
-                                TableRow>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col items-center">
+                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index - 1)} disabled={index === 0}>
+                                                <ArrowUp className="h-4 w-4" />
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index + 1)} disabled={index === fields.length - 1}>
+                                                <ArrowDown className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
                             )})}
-                        TableBody>
-                        TableFooter>
-                            TableRow>
-                                TableCell colSpan={2} className="font-bold">الإجماليTableCell>
-                                TableCell className="font-bold font-mono text-left">{formatCurrency(totalDebit)}TableCell>
-                                TableCell className="font-bold font-mono text-left">{formatCurrency(totalCredit)}TableCell>
-                                TableCell colSpan={3}>TableCell>
-                            TableRow>
-                            TableRow>
-                                TableCell colSpan={2} className="font-bold">الفرقTableCell>
-                                TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow>
+                                <TableCell colSpan={2} className="font-bold">الإجمالي</TableCell>
+                                <TableCell className="font-bold font-mono text-left">{formatCurrency(totalDebit)}</TableCell>
+                                <TableCell className="font-bold font-mono text-left">{formatCurrency(totalCredit)}</TableCell>
+                                <TableCell colSpan={3}></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell colSpan={2} className="font-bold">الفرق</TableCell>
+                                <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrency(balance)}
-                                TableCell>
-                                TableCell colSpan={3}>TableCell>
-                            TableRow>
-                        TableFooter>
-                    Table>
-                     div className="flex justify-start mt-2">
-                        Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })}>
-                            PlusCircle className="ml-2 h-4 w-4" />
+                                </TableCell>
+                                <TableCell colSpan={3}></TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                     <div className="flex justify-start mt-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })}>
+                            <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة سطر
-                        Button>
-                     div>
-                div>
+                        </Button>
+                     </div>
+                </div>
 
                  {errors.lines && (
-                    Alert variant="destructive">
-                        AlertTriangle className="h-4 w-4" />
-                        AlertTitle>خطأ في القيدAlertTitle>
-                        AlertDescription>
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>خطأ في القيد</AlertTitle>
+                        <AlertDescription>
                             {errors.lines.message || (errors.lines.root && errors.lines.root.message) || 'الرجاء التأكد من أن جميع الحقول مملوءة بشكل صحيح وأن القيد متوازن.'}
-                        AlertDescription>
-                    Alert>
+                        </AlertDescription>
+                    </Alert>
                 )}
-            CardContent>
-            CardFooter className="flex justify-end gap-2">
-                Button type="button" variant="outline" onClick={() => router.back()}>
-                    X className="ml-2 h-4 w-4"/> إلغاء
-                Button>
-                Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? Loader2 className="ml-2 h-4 w-4 animate-spin"/> : Save className="ml-2 h-4 w-4"/>}
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => router.back()}>
+                    <X className="ml-2 h-4 w-4"/> إلغاء
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
                     {isSubmitting ? 'جاري الحفظ...' : 'حفظ كمسودة'}
-                Button>
-            CardFooter>
-        form>
-    Card>
+                </Button>
+            </CardFooter>
+        </form>
+    </Card>
   );
 }

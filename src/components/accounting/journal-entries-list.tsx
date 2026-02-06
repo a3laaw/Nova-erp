@@ -130,175 +130,175 @@ export function JournalEntriesList() {
 
   if (loading) {
     return (
-        div className="border rounded-lg">
-            Table>
-                TableHeader>
-                    TableRow>
-                        TableHead>رقم القيدTableHead>
-                        TableHead>التاريخTableHead>
-                        TableHead>البيانTableHead>
-                        TableHead>الإجماليTableHead>
-                        TableHead>الحالةTableHead>
-                        TableHead>الإجراءاتTableHead>
-                    TableRow>
-                TableHeader>
-                TableBody>
+        <div className="border rounded-lg">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>رقم القيد</TableHead>
+                        <TableHead>التاريخ</TableHead>
+                        <TableHead>البيان</TableHead>
+                        <TableHead>الإجمالي</TableHead>
+                        <TableHead>الحالة</TableHead>
+                        <TableHead>الإجراءات</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
                     {Array.from({ length: 5 }).map((_, i) => (
-                        TableRow key={i}>
-                            TableCell colSpan={6}>Skeleton className="h-6 w-full" />TableCell>
-                        TableRow>
+                        <TableRow key={i}>
+                            <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+                        </TableRow>
                     ))}
-                TableBody>
-            Table>
-        div>
+                </TableBody>
+            </Table>
+        </div>
     );
   }
   
   if (error) {
-      return div className="text-center py-10 text-destructive">فشل تحميل قائمة القيود.div>;
+      return <div className="text-center py-10 text-destructive">فشل تحميل قائمة القيود.</div>;
   }
 
   return (
     <>
-         div className="bg-muted/50 p-4 rounded-lg mb-6">
-            div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                div className="grid gap-2 md:col-span-1">
-                    Label htmlFor="search">بحث ذكيLabel>
-                    div className="relative">
-                        Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        Input
+         <div className="bg-muted/50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid gap-2 md:col-span-1">
+                    <Label htmlFor="search">بحث ذكي</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
                             id="search"
                             placeholder="ابحث بالرقم أو البيان..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
                         />
-                    div>
-                div>
-                div className="grid gap-2">
-                    Label htmlFor="dateFrom">من تاريخLabel>
-                    DateInput 
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateFrom">من تاريخ</Label>
+                    <DateInput 
                         value={dateFrom}
                         onChange={setDateFrom}
                     />
-                div>
-                div className="grid gap-2">
-                    Label htmlFor="dateTo">إلى تاريخLabel>
-                    DateInput 
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dateTo">إلى تاريخ</Label>
+                    <DateInput 
                         value={dateTo}
                         onChange={setDateTo}
                     />
-                div>
-            div>
-        div>
+                </div>
+            </div>
+        </div>
 
-        div className="border rounded-lg">
-          Table>
-            TableHeader>
-              TableRow>
-                TableHead>رقم القيدTableHead>
-                TableHead>التاريخTableHead>
-                TableHead>البيانTableHead>
-                TableHead className="text-left">الإجماليTableHead>
-                TableHead>الحالةTableHead>
-                TableHead>الإجراءاتTableHead>
-              TableRow>
-            TableHeader>
-            TableBody>
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>رقم القيد</TableHead>
+                <TableHead>التاريخ</TableHead>
+                <TableHead>البيان</TableHead>
+                <TableHead className="text-left">الإجمالي</TableHead>
+                <TableHead>الحالة</TableHead>
+                <TableHead>الإجراءات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
                 {entries.length === 0 ? (
-                    TableRow>
-                        TableCell colSpan={6}>
-                            div className="p-8 text-center border-2 border-dashed rounded-lg">
-                                BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-                                h3 className="mt-4 text-lg font-medium">لا توجد قيود يوميةh3>
-                                p className="mt-2 text-sm text-muted-foreground">
+                    <TableRow>
+                        <TableCell colSpan={6}>
+                            <div className="p-8 text-center border-2 border-dashed rounded-lg">
+                                <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h3 className="mt-4 text-lg font-medium">لا توجد قيود يومية</h3>
+                                <p className="mt-2 text-sm text-muted-foreground">
                                     ابدأ بإنشاء قيد يومية جديد ليظهر هنا.
-                                p>
-                            div>
-                        TableCell>
-                    TableRow>
+                                </p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
                 ) : filteredEntries.length === 0 ? (
-                     TableRow>
-                        TableCell colSpan={6} className="h-24 text-center">
+                     <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center">
                             لا توجد نتائج تطابق بحثك.
-                        TableCell>
-                    TableRow>
+                        </TableCell>
+                    </TableRow>
                 ) : (
                     filteredEntries.map((entry) => (
-                        TableRow key={entry.id} className={cn(entry.entryNumber?.startsWith('CRV-JE-') && 'bg-blue-50 dark:bg-blue-900/20')}>
-                        TableCell className="font-mono">
-                            Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline text-primary">
+                        <TableRow key={entry.id} className={cn(entry.entryNumber?.startsWith('CRV-JE-') && 'bg-blue-50 dark:bg-blue-900/20')}>
+                        <TableCell className="font-mono">
+                            <Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline text-primary">
                                 {entry.entryNumber}
-                            Link>
-                        TableCell>
-                        TableCell>{formatDate(entry.date)}TableCell>
-                        TableCell className="max-w-xs truncate">{entry.narration}TableCell>
-                        TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}TableCell>
-                        TableCell>
-                            Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}Badge>
-                        TableCell>
-                        TableCell>
-                                DropdownMenu>
-                                    DropdownMenuTrigger asChild>
-                                        Button variant="ghost" size="icon" className="h-8 w-8">MoreHorizontal className="h-4 w-4" />Button>
-                                    DropdownMenuTrigger>
-                                    DropdownMenuContent align="end" dir="rtl">
-                                        DropdownMenuLabel>الإجراءاتDropdownMenuLabel>
-                                        DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)}>
-                                            Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                        DropdownMenuItem>
+                            </Link>
+                        </TableCell>
+                        <TableCell>{formatDate(entry.date)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{entry.narration}</TableCell>
+                        <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" dir="rtl">
+                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)}>
+                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                        </DropdownMenuItem>
                                         
                                         {entry.status === 'draft' && (
                                             <>
-                                                DropdownMenuSeparator />
-                                                DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} disabled={isPosting || isUnposting} className="text-green-600 focus:text-green-700 focus:bg-green-50">
-                                                    CheckCircle className="ml-2 h-4 w-4" />
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} disabled={isPosting || isUnposting} className="text-green-600 focus:text-green-700 focus:bg-green-50">
+                                                    <CheckCircle className="ml-2 h-4 w-4" />
                                                     ترحيل القيد
-                                                DropdownMenuItem>
-                                                DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)}>
-                                                    Pencil className="ml-2 h-4 w-4" /> تعديل
-                                                DropdownMenuItem>
-                                                DropdownMenuSeparator />
-                                                DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-destructive focus:text-destructive">
-                                                    Trash2 className="ml-2 h-4 w-4" /> حذف
-                                                DropdownMenuItem>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)}>
+                                                    <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-destructive focus:text-destructive">
+                                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                                </DropdownMenuItem>
                                             </>
                                         )}
                                         {entry.status === 'posted' && (
                                             <>
-                                                DropdownMenuSeparator />
-                                                DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} disabled={isUnposting || isPosting} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
-                                                    Undo2 className="ml-2 h-4 w-4" />
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} disabled={isUnposting || isPosting} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
+                                                    <Undo2 className="ml-2 h-4 w-4" />
                                                     التراجع عن الترحيل
-                                                DropdownMenuItem>
+                                                </DropdownMenuItem>
                                             </>
                                         )}
-                                    DropdownMenuContent>
-                                DropdownMenu>
-                        TableCell>
-                        TableRow>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                        </TableCell>
+                        </TableRow>
                     ))
                 )}
-            TableBody>
-          Table>
-        div>
+            </TableBody>
+          </Table>
+        </div>
         
-         AlertDialog open={!!entryToDelete} onOpenChange={() => setEntryToDelete(null)}>
-            AlertDialogContent dir="rtl">
-                AlertDialogHeader>
-                    AlertDialogTitle>هل أنت متأكد من الحذف؟AlertDialogTitle>
-                    AlertDialogDescription>
+         <AlertDialog open={!!entryToDelete} onOpenChange={() => setEntryToDelete(null)}>
+            <AlertDialogContent dir="rtl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                    <AlertDialogDescription>
                         سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
-                    AlertDialogDescription>
-                AlertDialogHeader>
-                AlertDialogFooter>
-                    AlertDialogCancel disabled={isDeleting}>إلغاءAlertDialogCancel>
-                    AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ?  جاري الحذف... : 'نعم، قم بالحذف'}
-                    AlertDialogAction>
-                AlertDialogFooter>
-            AlertDialogContent>
-        AlertDialog>
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                        {isDeleting ?  'جاري الحذف...' : 'نعم، قم بالحذف'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </>
   );
 }

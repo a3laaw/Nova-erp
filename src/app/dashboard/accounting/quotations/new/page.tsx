@@ -469,8 +469,10 @@ export default function NewQuotationPage() {
                                             </div>
                                         )}
                                     </TableCell>
+                                    <TableCell>
                                         <Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" />
                                     </TableCell>
+                                    <TableCell>
                                         <Input type="number" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
                                     </TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>

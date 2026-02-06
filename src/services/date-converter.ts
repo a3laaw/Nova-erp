@@ -43,5 +43,4 @@ export function fromFirestoreDate(dateValue: any): string {
     return '';
   }
 }
-
     

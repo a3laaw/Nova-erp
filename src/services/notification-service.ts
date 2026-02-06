@@ -47,5 +47,4 @@ export async function findUserIdByEmployeeId(db: Firestore, employeeId: string):
         return null;
     }
 }
-
     

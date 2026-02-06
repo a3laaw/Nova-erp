@@ -12,74 +12,63 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './input';
 
 interface DateInputProps {
-  value?: Date;
+  value?: Date | string;
   onChange: (date: Date | undefined) => void;
   disabled?: boolean;
   className?: string;
+  required?: boolean;
 }
 
 // The format seen by the user
 const displayFormat = 'PPP';
 // Formats to try parsing when user types manually
 const parseableFormats = [
-    // Most common with slashes (4-digit year)
-    'dd/MM/yyyy',
-    'd/M/yyyy',
-    'dd/M/yyyy',
-    'd/MM/yyyy',
-    // Most common with hyphens (4-digit year)
-    'dd-MM-yyyy',
-    'd-M-yyyy',
-    'dd-M-yyyy',
-    'd-MM-yyyy',
-    // Most common with dots (4-digit year)
-    'dd.MM.yyyy',
-    'd.M.yyyy',
-    // Most common with slashes (2-digit year)
-    'dd/MM/yy',
-    'd/M/yy',
-    'dd/M/yy',
-    'd/MM/yy',
-    // Most common with hyphens (2-digit year)
-    'dd-MM-yy',
-    'd-M-yy',
-    'dd-M-yy',
-    'd-MM-yy',
-    // ISO format
+    'dd/MM/yyyy', 'd/M/yyyy', 'dd/M/yyyy', 'd/MM/yyyy',
+    'dd-MM-yyyy', 'd-M-yyyy', 'dd-M-yyyy', 'd-MM-yyyy',
+    'dd.MM.yyyy', 'd.M.yyyy',
+    'dd/MM/yy', 'd/M/yy', 'dd/M/yy', 'd/MM/yy',
+    'dd-MM-yy', 'd-M-yy', 'dd-M-yy', 'd-MM-yy',
     'yyyy-MM-dd',
-    // No separator
-    'ddMMyyyy',
-    'yyyyMMdd',
+    'ddMMyyyy', 'yyyyMMdd',
 ];
 
 
-export function DateInput({ value, onChange, disabled, className }: DateInputProps) {
+export function DateInput({ value, onChange, disabled, className, ...props }: DateInputProps) {
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState('');
 
-  // When the external `value` (Date object) changes, update the internal text input `inputValue`.
+  const dateValue = React.useMemo(() => {
+    if (value instanceof Date && isValid(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseDate(value, 'yyyy-MM-dd', new Date());
+      if (isValid(parsed)) return parsed;
+    }
+    return undefined;
+  }, [value]);
+
   React.useEffect(() => {
-    if (value && isValid(value)) {
+    if (dateValue) {
       try {
-        setInputValue(formatDate(value, displayFormat, { locale: ar }));
+        setInputValue(formatDate(dateValue, 'dd/MM/yyyy'));
       } catch (e) {
         setInputValue('');
       }
     } else {
-      setInputValue('');
+        setInputValue('');
     }
-  }, [value]);
+  }, [dateValue]);
 
   const handleDateSelect = (newDate: Date | undefined) => {
-    onChange(newDate); // Update the external state
-    setOpen(false); // Close popover on selection
+    onChange(newDate); 
+    setOpen(false); 
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
   };
 
-  // When the user leaves the input field, try to parse what they typed.
   const handleInputBlur = () => {
     if (!inputValue.trim()) {
       onChange(undefined);
@@ -88,7 +77,6 @@ export function DateInput({ value, onChange, disabled, className }: DateInputPro
 
     let parsedDate: Date | null = null;
     
-    // Try parsing with different common formats
     for (const format of parseableFormats) {
       const parsed = parseDate(inputValue, format, new Date());
       if (isValid(parsed)) {
@@ -97,7 +85,6 @@ export function DateInput({ value, onChange, disabled, className }: DateInputPro
       }
     }
     
-    // As a last resort, try the browser's native, less reliable parser
     if (!parsedDate) {
       const nativeParsed = new Date(inputValue);
       if (isValid(nativeParsed)) {
@@ -106,19 +93,20 @@ export function DateInput({ value, onChange, disabled, className }: DateInputPro
     }
 
     if (parsedDate) {
-      if (!value || parsedDate.getTime() !== value.getTime()) {
+      if (!dateValue || parsedDate.getTime() !== dateValue.getTime()) {
         onChange(parsedDate);
+      } else {
+        setInputValue(formatDate(parsedDate, 'dd/MM/yyyy'));
       }
-    } else if (value) {
-      // If parsing fails, revert to the last valid date to avoid confusion
-      setInputValue(formatDate(value, displayFormat, { locale: ar }));
+    } else if (dateValue) {
+      setInputValue(formatDate(dateValue, 'dd/MM/yyyy'));
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleInputBlur();
-      (e.target as HTMLInputElement).blur(); // Remove focus from input
+      (e.target as HTMLInputElement).blur();
     }
   };
 
@@ -144,13 +132,14 @@ export function DateInput({ value, onChange, disabled, className }: DateInputPro
           onKeyDown={handleKeyDown}
           placeholder={`مثال: ${formatDate(new Date(), 'dd/MM/yyyy')}`}
           disabled={disabled}
-          className="w-full pl-10 rtl:pr-10" // Padding to make space for the icon
+          className="w-full pl-10 rtl:pr-10"
+          {...props}
         />
       </div>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
-          selected={value}
+          selected={dateValue}
           onSelect={handleDateSelect}
           initialFocus
           disabled={disabled}
