@@ -57,7 +57,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
-    const [jobs, setJobs] = useState<Job[]>([]);
+    const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
 
     useEffect(() => {
@@ -91,7 +91,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments'));
+                const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
@@ -100,17 +100,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
                     .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
 
-                fetchedDepartments.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
                 setDepartments(fetchedDepartments);
 
-                const uniqueJobs = new Map<string, Job>();
-                jobsSnapshot.forEach(doc => {
-                    const jobData = doc.data() as Job;
-                    if (jobData && typeof jobData.name === 'string' && jobData.name.trim() !== '' && !uniqueJobs.has(jobData.name)) {
-                        uniqueJobs.set(jobData.name, { id: doc.id, ...jobData });
-                    }
-                });
-                setJobs(Array.from(uniqueJobs.values()).sort((a,b) => a.name.localeCompare(b.name, 'ar')));
+                const fetchedJobs = jobsSnapshot.docs.map(doc => {
+                    const departmentId = doc.ref.parent.parent!.id;
+                    return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
+                }).filter(job => job && job.name);
+                
+                setJobs(fetchedJobs);
 
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
@@ -131,11 +128,25 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
     
     const handleSelectChange = (id: keyof typeof formData, value: any) => {
-        setFormData(prev => ({ ...prev, [id]: value }));
+        const newFormData = { ...formData, [id]: value };
+        if (id === 'department') {
+            newFormData.jobTitle = ''; // Reset job title when department changes
+        }
+        setFormData(newFormData);
     };
     
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
-    const jobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
+
+    const filteredJobOptions = useMemo(() => {
+        if (!formData.department) return [];
+        const selectedDept = departments.find(d => d.name === formData.department);
+        if (!selectedDept) return [];
+        
+        return jobs
+            .filter(j => j.departmentId === selectedDept.id)
+            .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+            .map(j => ({ value: j.name, label: j.name }));
+    }, [formData.department, departments, jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -155,17 +166,24 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             department: formData.department,
             jobTitle: formData.jobTitle,
             contractType: formData.contractType,
-            basicSalary: parseFloat(formData.basicSalary),
+            basicSalary: parseFloat(formData.basicSalary) || 0,
             salaryPaymentType: formData.salaryPaymentType,
             bankName: formData.salaryPaymentType === 'transfer' ? formData.bankName : '',
             accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
             iban: formData.salaryPaymentType === 'transfer' ? formData.iban : '',
-            contractPercentage: formData.contractType === 'percentage' ? parseFloat(formData.contractPercentage) : undefined,
             gender: formData.gender,
             dob: formData.dob,
             nationality: formData.nationality,
-            residencyExpiry: formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry ? formData.residencyExpiry : undefined,
         };
+
+        if (formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry) {
+            dataToSave.residencyExpiry = formData.residencyExpiry;
+        }
+        
+        // FIXED: Only include contractPercentage if contractType is 'percentage'
+        if (formData.contractType === 'percentage') {
+            dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
+        }
         
         await onSave(dataToSave);
     };
@@ -240,7 +258,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor="jobTitle">المسمى الوظيفي <span className="text-destructive">*</span></Label>
-                        <InlineSearchList value={formData.jobTitle} onSelect={(v) => handleSelectChange('jobTitle', v)} options={jobOptions} placeholder={refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} disabled={refDataLoading}/>
+                        <InlineSearchList 
+                            value={formData.jobTitle} 
+                            onSelect={(v) => handleSelectChange('jobTitle', v)} 
+                            options={filteredJobOptions} 
+                            placeholder={!formData.department ? "اختر قسمًا أولاً" : refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} 
+                            disabled={refDataLoading || !formData.department}
+                        />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -317,3 +341,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    

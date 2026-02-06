@@ -1,3 +1,5 @@
+
+          
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
@@ -16,6 +18,7 @@ import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { cleanFirestoreData } from '@/lib/utils'; // IMPROVED: Import the data cleaning utility.
 
 export default function NewEmployeePage() {
     const router = useRouter();
@@ -105,7 +108,8 @@ export default function NewEmployeePage() {
 
                 const newEmployeeRef = doc(collection(firestore, 'employees'));
                 newEmployeeId = newEmployeeRef.id;
-                transaction.set(newEmployeeRef, finalEmployeeData);
+                // FIXED: Use cleanFirestoreData to prevent 'undefined' values from being sent.
+                transaction.set(newEmployeeRef, cleanFirestoreData(finalEmployeeData));
             });
 
             toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
@@ -156,3 +160,6 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
+
+          
+      
