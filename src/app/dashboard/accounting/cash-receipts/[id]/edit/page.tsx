@@ -372,7 +372,7 @@ export default function EditCashReceiptPage() {
                 lines: newLines,
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
-                narration: description || `تحديث سند قبض رقم ${originalReceipt.voucherNumber}`,
+                narration: `[إشعار مالي - تعديل دفعة] ${description}` || `تحديث سند قبض رقم ${originalReceipt.voucherNumber}`,
                 transactionId: projectId,
                 clientId: originalReceipt.clientId,
             };

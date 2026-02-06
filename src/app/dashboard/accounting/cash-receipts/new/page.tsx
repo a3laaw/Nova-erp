@@ -407,7 +407,7 @@ export default function NewCashReceiptPage() {
 
             const journalEntryData = {
                 entryNumber: `CRV-JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
-                narration: `${description}` || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
+                narration: `[إشعار مالي - دفعة جديدة] ${description}` || `سند قبض رقم ${newVoucherNumber} من العميل ${selectedClient?.nameAr}`,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
                 lines: [
                     { accountId: debitAccount.id!, accountName: debitAccount.name, debit: parseFloat(amount), credit: 0 },
