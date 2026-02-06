@@ -57,7 +57,6 @@ import { Button } from '@/components/ui/button';
 const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { href: '/dashboard/notifications', label: 'تنبيهات النظام', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
@@ -117,7 +116,6 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
@@ -178,22 +176,16 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile, state: sidebarState, isMobile } = useSidebar();
-  const { direction } = useLanguage();
+  const { setOpenMobile } = useSidebar();
 
   if (!item.roles.includes(userRole)) {
     return null;
   }
 
-  // For items without children (simple links)
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton
-          isActive={currentPath === item.href}
-          asChild
-          tooltip={item.label}
-        >
+        <SidebarMenuButton isActive={currentPath === item.href} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
@@ -202,65 +194,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       </SidebarMenuItem>
     );
   }
-
-  // For items with children (collapsible/dropdown)
+  
   if (item.children) {
     const isActive = currentPath.startsWith(item.hrefPrefix);
-
-    // Collapsed state on DESKTOP
-    if (sidebarState === 'collapsed' && !isMobile) {
-      return (
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  as="button"
-                  isActive={isActive}
-                  className="h-8 w-full justify-center"
-                >
-                  <item.icon />
-                  <span className="sr-only">{item.label}</span>
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="right" align="center">{item.label}</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent side="right" align="start" className="w-56">
-            <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {item.children.map((child: any, index: number) => {
-              if (child.children) {
-                return (
-                  <DropdownSub key={`${child.label}-${index}`}>
-                    <DropdownMenuSubTrigger>{child.label}</DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                       {child.children.map((subChild: any) => (
-                          <DropdownMenuItem key={subChild.href} asChild>
-                            <Link href={subChild.href}>{subChild.label}</Link>
-                          </DropdownMenuItem>
-                       ))}
-                    </DropdownMenuSubContent>
-                  </DropdownSub>
-                )
-              }
-              return (
-                <DropdownMenuItem key={child.href} asChild>
-                  <Link href={child.href}>{child.label}</Link>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
-    
-    // Expanded state on DESKTOP or any state on MOBILE
     return (
       <Collapsible defaultOpen={isActive}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-8 w-full justify-between">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-8 w-full justify-between pr-2">
               <div className='flex items-center gap-2'>
                 <item.icon />
                 <span>{item.label}</span>
