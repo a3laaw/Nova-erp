@@ -1,5 +1,4 @@
 
-
 {
   "entities": {
     "CompanyBranding": {
@@ -1064,6 +1063,7 @@
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
         "employeeId": { "type": "string", "description": "The ID of the employee if this payment is related to them." },
+        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "If this voucher is for residency renewal, this holds the new expiry date." },
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
@@ -1192,6 +1192,22 @@
         }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
+    },
+    "ResidencyRenewal": {
+      "title": "Residency Renewal",
+      "description": "Tracks details for automated amortization of residency renewal costs.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "renewalDate": { "type": "string", "format": "date-time" },
+        "newExpiryDate": { "type": "string", "format": "date-time" },
+        "cost": { "type": "number" },
+        "paymentVoucherId": { "type": "string" },
+        "monthlyAmortizationAmount": { "type": "number" },
+        "amortizationStatus": { "type": "string", "enum": ["in-progress", "completed"] },
+        "lastAmortizationDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId"]
     }
   },
   "auth": {
@@ -1361,7 +1377,14 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
+    },
+    "/residencyRenewals/{renewalId}": {
+      "schema": {
+        "$ref": "#/entities/ResidencyRenewal"
+      },
+      "description": "Stores records for automated amortization of employee residency renewals."
     }
   }
 }
+
     
