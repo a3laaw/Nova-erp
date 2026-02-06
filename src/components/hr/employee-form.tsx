@@ -91,7 +91,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
+                const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
@@ -100,6 +100,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
                     .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
 
+                fetchedDepartments.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
                 setDepartments(fetchedDepartments);
 
                 const fetchedJobs = jobsSnapshot.docs.map(doc => {
@@ -180,7 +181,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dataToSave.residencyExpiry = formData.residencyExpiry;
         }
         
-        // FIXED: Only include contractPercentage if contractType is 'percentage'
         if (formData.contractType === 'percentage') {
             dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
         }
@@ -190,116 +190,118 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     return (
         <form onSubmit={handleSubmit}>
-            <div className="space-y-6 py-4 px-1 max-h-[70vh] overflow-y-auto">
-                {(initialData?.employeeNumber || employeeNumber) && (
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="employeeNumber">الرقم الوظيفي</Label>
-                        <Input id="employeeNumber" value={initialData?.employeeNumber || employeeNumber || ''} disabled readOnly />
-                    </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="fullName">الاسم الكامل <span className="text-destructive">*</span></Label>
-                        <Input id="fullName" value={formData.fullName} onChange={handleInputChange} required />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="nameEn">الاسم (بالإنجليزية)</Label>
-                        <Input id="nameEn" dir="ltr" value={formData.nameEn} onChange={handleInputChange} />
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label>
-                        <Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" required />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                        <Input id="mobile" value={formData.mobile} onChange={handleInputChange} dir="ltr" required />
-                    </div>
-                </div>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="dob">تاريخ الميلاد</Label>
-                        <DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="gender">الجنس</Label>
-                        <Select value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl">
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="male">ذكر</SelectItem>
-                                <SelectItem value="female">أنثى</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="nationality">الجنسية</Label>
-                        <InlineSearchList
-                            value={formData.nationality}
-                            onSelect={(value) => handleSelectChange('nationality', value)}
-                            options={nationalityOptions}
-                            placeholder="اختر الجنسية..."
-                        />
-                    </div>
-                    {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                            <DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} />
-                        </div>
-                    )}
-                </div>
-                 <Separator />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div className="grid gap-1.5">
-                        <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                        <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder={refDataLoading ? "تحميل..." : "اختر قسمًا..."} disabled={refDataLoading} />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="jobTitle">المسمى الوظيفي <span className="text-destructive">*</span></Label>
-                        <InlineSearchList 
-                            value={formData.jobTitle} 
-                            onSelect={(v) => handleSelectChange('jobTitle', v)} 
-                            options={filteredJobOptions} 
-                            placeholder={!formData.department ? "اختر قسمًا أولاً" : refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} 
-                            disabled={refDataLoading || !formData.department}
-                        />
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div className="grid gap-1.5">
-                        <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                        <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
-                    </div>
-                     <div className="grid gap-1.5">
-                        <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
-                        <Select value={formData.contractType || ''} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])} dir="rtl">
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="permanent">دائم</SelectItem>
-                                <SelectItem value="temporary">مؤقت</SelectItem>
-                                <SelectItem value="subcontractor">مقاول باطن</SelectItem>
-                                <SelectItem value="percentage">نسبة من العقود</SelectItem>
-                                <SelectItem value="part-time">دوام جزئي</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                {formData.contractType === 'percentage' && (
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="contractPercentage">نسبة العقد (%) <span className="text-destructive">*</span></Label>
-                        <Input id="contractPercentage" type="number" step="0.01" value={formData.contractPercentage} onChange={handleInputChange} dir="ltr" required />
-                    </div>
-                )}
-                <Separator />
-                <div className="grid gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                        <Input id="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required />
-                    </div>
+            <div className="space-y-8 py-4 px-1 max-h-[70vh] overflow-y-auto">
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Section 1: Personal Information */}
+                <section className="space-y-4">
+                    <h3 className="font-semibold text-lg border-b pb-2">المعلومات الشخصية</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {(initialData?.employeeNumber || employeeNumber) && (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="employeeNumber">الرقم الوظيفي</Label>
+                                <Input id="employeeNumber" value={initialData?.employeeNumber || employeeNumber || ''} disabled readOnly />
+                            </div>
+                        )}
+                        <div className="grid gap-1.5 md:col-span-2">
+                            <Label htmlFor="fullName">الاسم الكامل <span className="text-destructive">*</span></Label>
+                            <Input id="fullName" value={formData.fullName} onChange={handleInputChange} required />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="nameEn">الاسم (بالإنجليزية)</Label>
+                            <Input id="nameEn" dir="ltr" value={formData.nameEn} onChange={handleInputChange} />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label>
+                            <Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" required />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
+                            <Input id="mobile" value={formData.mobile} onChange={handleInputChange} dir="ltr" required />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="dob">تاريخ الميلاد</Label>
+                            <DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="gender">الجنس</Label>
+                            <Select value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl">
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="male">ذكر</SelectItem>
+                                    <SelectItem value="female">أنثى</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="nationality">الجنسية</Label>
+                            <InlineSearchList
+                                value={formData.nationality}
+                                onSelect={(value) => handleSelectChange('nationality', value)}
+                                options={nationalityOptions}
+                                placeholder="اختر الجنسية..."
+                            />
+                        </div>
+                        {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
+                                <DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} />
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Section 2: Job Information */}
+                <section className="space-y-4">
+                     <h3 className="font-semibold text-lg border-b pb-2">المعلومات الوظيفية</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div className="grid gap-1.5">
+                            <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
+                            <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder={refDataLoading ? "تحميل..." : "اختر قسمًا..."} disabled={refDataLoading} />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="jobTitle">المسمى الوظيفي <span className="text-destructive">*</span></Label>
+                            <InlineSearchList 
+                                value={formData.jobTitle} 
+                                onSelect={(v) => handleSelectChange('jobTitle', v)} 
+                                options={filteredJobOptions} 
+                                placeholder={!formData.department ? "اختر قسمًا أولاً" : refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} 
+                                disabled={refDataLoading || !formData.department}
+                            />
+                        </div>
+                         <div className="grid gap-1.5">
+                            <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
+                            <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
+                        </div>
+                         <div className="grid gap-1.5">
+                            <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
+                            <Select value={formData.contractType || ''} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])} dir="rtl">
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="permanent">دائم</SelectItem>
+                                    <SelectItem value="temporary">مؤقت</SelectItem>
+                                    <SelectItem value="subcontractor">مقاول باطن</SelectItem>
+                                    <SelectItem value="percentage">نسبة من العقود</SelectItem>
+                                    <SelectItem value="part-time">دوام جزئي</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                         {formData.contractType === 'percentage' && (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="contractPercentage">نسبة العقد (%) <span className="text-destructive">*</span></Label>
+                                <Input id="contractPercentage" type="number" step="0.01" value={formData.contractPercentage} onChange={handleInputChange} dir="ltr" required />
+                            </div>
+                        )}
+                     </div>
+                </section>
+
+                {/* Section 3: Financial Information */}
+                <section className="space-y-4">
+                    <h3 className="font-semibold text-lg border-b pb-2">المعلومات المالية</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
+                            <Input id="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required />
+                        </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
                             <Select value={formData.salaryPaymentType || 'cash'} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl">
@@ -312,9 +314,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             </Select>
                         </div>
                     </div>
-                    
                     {formData.salaryPaymentType === 'transfer' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/50">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-md bg-muted/50">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="bankName">اسم البنك</Label>
                                 <Input id="bankName" value={formData.bankName} onChange={handleInputChange} />
@@ -323,13 +324,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <Label htmlFor="accountNumber">رقم الحساب</Label>
                                 <Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr" />
                             </div>
-                            <div className="grid gap-1.5 sm:col-span-2">
+                            <div className="grid gap-1.5">
                                 <Label htmlFor="iban">IBAN</Label>
                                 <Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" />
                             </div>
                         </div>
                     )}
-                </div>
+                </section>
             </div>
             <DialogFooter className="mt-6 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
