@@ -38,8 +38,7 @@ import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 
 
@@ -52,9 +51,9 @@ const statusTranslations: Record<EmployeeStatus, string> = {
 };
 
 const statusColors: Record<EmployeeStatus, string> = {
-  active: 'bg-green-100 text-green-800',
-  'on-leave': 'bg-yellow-100 text-yellow-800',
-  terminated: 'bg-red-100 text-red-800',
+  active: 'bg-green-100 text-green-800 border-green-200',
+  'on-leave': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  terminated: 'bg-red-100 text-red-800 border-red-200',
 };
 
 interface EmployeesTableProps {
@@ -65,12 +64,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // --- TEMPORARY FIX ---
-    // Data fetching is temporarily disabled to provide a clean visual slate.
-    // The permanent solution is to use the "Delete Employee Data" tool in Settings > Data Integrity.
-    const employees: Employee[] = [];
-    const loading = false;
-    // --- END TEMPORARY FIX ---
+    const { items: employees, loading: employeesLoading, hasMore, loaderRef, loadingMore } = useInfiniteScroll<Employee>('employees');
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
@@ -80,6 +74,8 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
         if (!employees) return [];
         return searchEmployees(employees, searchQuery);
     }, [employees, searchQuery]);
+
+    const loading = employeesLoading && employees.length === 0;
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
@@ -92,7 +88,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     };
 
     const handleTerminationConfirm = async () => {
-        if (!employeeToTerminate || !terminationReason) {
+        if (!employeeToTerminate || !terminationReason || !firestore) {
              toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد سبب إنهاء الخدمة.' });
              return;
         };
@@ -135,7 +131,9 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                             <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                         ))}
                         {!loading && filteredEmployees.length === 0 && (
-                            <TableRow><TableCell colSpan={7} className="h-24 text-center">لا يوجد موظفون لعرضهم.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} className="h-24 text-center">
+                                {searchQuery ? 'لا توجد نتائج تطابق البحث.' : 'لا يوجد موظفون لعرضهم.'}
+                            </TableCell></TableRow>
                         )}
                         {!loading && filteredEmployees.map((employee) => (
                             <TableRow key={employee.id}>
@@ -156,10 +154,12 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent>
                                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                            <DropdownMenuItem>عرض الملف</DropdownMenuItem>
-                                            <DropdownMenuItem>تعديل</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>عرض الملف</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>تعديل</DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
+                                            {employee.status !== 'terminated' && (
+                                                <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
+                                            )}
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -167,6 +167,9 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                         ))}
                     </TableBody>
                 </Table>
+            </div>
+             <div ref={loaderRef} className="flex justify-center p-4">
+                {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
             </div>
 
             <AlertDialog open={!!employeeToTerminate} onOpenChange={() => setEmployeeToTerminate(null)}>
