@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Save, X, Loader2, Info } from 'lucide-react';
 import { useFirebase, useDocument } from '@/firebase';
-import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, orderBy, runTransaction, Timestamp, collectionGroup } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, orderBy, runTransaction, Timestamp, collectionGroup, writeBatch } from 'firebase/firestore';
 import type { Account, PaymentVoucher, Employee, ClientTransaction, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +37,7 @@ import { useAuth } from '@/context/auth-context';
 import { format as formatDateFns } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
@@ -48,6 +50,7 @@ const paymentVoucherSchema = z.object({
     debitAccountId: z.string().min(1, 'حساب المدين مطلوب'),
     creditAccountId: z.string().min(1, 'حساب الدائن مطلوب'),
     projectLink: z.string().optional(),
+    status: z.enum(['draft', 'paid', 'cancelled']),
 });
 
 type PaymentVoucherFormValues = z.infer<typeof paymentVoucherSchema>;
@@ -66,7 +69,6 @@ export default function EditPaymentVoucherPage() {
   const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
-  const [journalEntryIsPosted, setJournalEntryIsPosted] = useState(false);
 
   const voucherRef = useMemo(() => {
     if (!firestore || !id) return null;
@@ -92,17 +94,9 @@ export default function EditPaymentVoucherPage() {
             reference: data.reference || '',
             debitAccountId: data.debitAccountId,
             creditAccountId: data.creditAccountId,
-            projectLink: data.clientId && data.transactionId ? `${data.clientId}/${data.transactionId}` : ''
+            projectLink: data.clientId && data.transactionId ? `${data.clientId}/${data.transactionId}` : '',
+            status: data.status,
         });
-
-        if (data.journalEntryId && firestore) {
-            const jeRef = doc(firestore, 'journalEntries', data.journalEntryId);
-            getDoc(jeRef).then(jeSnap => {
-                if (jeSnap.exists()) {
-                    setJournalEntryIsPosted(jeSnap.data().status === 'posted');
-                }
-            });
-        }
     }
   }, [voucherSnap, reset, firestore]);
 
@@ -119,7 +113,6 @@ export default function EditPaymentVoucherPage() {
   const selectedAccount = useMemo(() => accounts.find(a => a.id === debitAccountIdValue), [accounts, debitAccountIdValue]);
   const showProjectLink = useMemo(() => selectedAccount && selectedAccount.code.startsWith('51'), [selectedAccount]);
 
-  // Fetch Reference Data
   useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
@@ -155,7 +148,6 @@ export default function EditPaymentVoucherPage() {
   const employeePayeeOptions = useMemo(() => employees.map(e => ({ value: e.fullName, label: e.fullName })), [employees]);
   const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
 
-
   const onSubmit = async (data: PaymentVoucherFormValues) => {
     if (!firestore || !currentUser || !id || !voucherSnap) return;
     
@@ -163,7 +155,6 @@ export default function EditPaymentVoucherPage() {
     try {
        await runTransaction(firestore, async (transaction_fs) => {
            const voucherRefDoc = doc(firestore, 'paymentVouchers', id);
-           const originalVoucherData = voucherSnap;
            
            const debitAccount = accounts.find(a => a.id === data.debitAccountId);
            const creditAccount = accounts.find(a => a.id === data.creditAccountId);
@@ -216,29 +207,42 @@ export default function EditPaymentVoucherPage() {
                 { accountId: data.creditAccountId, accountName: creditAccount.name, debit: 0, credit: data.amount }
            ];
 
-           const jeUpdatePayload = {
+           const jeUpdatePayload: any = {
                 date: Timestamp.fromDate(new Date(data.paymentDate)),
                 lines: newLines,
                 totalDebit: data.amount,
                 totalCredit: data.amount,
-                narration: data.description || `تحديث سند صرف رقم ${originalVoucherData.voucherNumber} إلى ${data.payeeName}`,
+                narration: data.description || `تحديث سند صرف رقم ${voucherSnap.voucherNumber} إلى ${data.payeeName}`,
            };
-
-           if (originalVoucherData.journalEntryId) {
-                const jeRef = doc(firestore, 'journalEntries', originalVoucherData.journalEntryId);
-                transaction_fs.update(jeRef, jeUpdatePayload);
-           } else {
-                const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-                transaction_fs.set(newJournalEntryRef, {
-                    ...jeUpdatePayload,
-                    status: 'posted',
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser.id,
-                    entryNumber: `PV-JE-${originalVoucherData.voucherNumber}`,
-                });
-                transaction_fs.update(voucherRefDoc, { journalEntryId: newJournalEntryRef.id });
+            
+           if(voucherSnap.status === 'draft' && data.status === 'paid') {
+              jeUpdatePayload.status = 'posted';
            }
 
+           if (voucherSnap.journalEntryId) {
+                const jeRef = doc(firestore, 'journalEntries', voucherSnap.journalEntryId);
+                transaction_fs.update(jeRef, jeUpdatePayload);
+           }
+
+            // If a residency renewal is being paid, update the employee record
+            if (voucherSnap.employeeId && voucherSnap.renewalExpiryDate && data.status === 'paid' && voucherSnap.status !== 'paid') {
+                const employeeRef = doc(firestore, 'employees', voucherSnap.employeeId);
+                const employeeSnap = await transaction_fs.get(employeeRef);
+                if (employeeSnap.exists()) {
+                    transaction_fs.update(employeeRef, { residencyExpiry: toFirestoreDate(voucherSnap.renewalExpiryDate) });
+                    
+                    const auditLogRef = doc(collection(firestore, `employees/${voucherSnap.employeeId}/auditLogs`));
+                    transaction_fs.set(auditLogRef, {
+                        changeType: 'ResidencyUpdate',
+                        field: 'residencyExpiry',
+                        oldValue: employeeSnap.data().residencyExpiry || null,
+                        newValue: voucherSnap.renewalExpiryDate,
+                        effectiveDate: serverTimestamp(),
+                        changedBy: currentUser.id,
+                        notes: `تجديد الإقامة عبر سند الصرف ${voucherSnap.voucherNumber}.`,
+                    });
+                }
+            }
        });
         
         toast({ title: 'نجاح', description: 'تم تحديث سند الصرف والقيد المحاسبي بنجاح.' });
@@ -276,13 +280,26 @@ export default function EditPaymentVoucherPage() {
                             تعديل بيانات سند الصرف رقم: {voucherSnap?.voucherNumber}
                         </CardDescription>
                     </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="status">حالة السند</Label>
+                        <Controller name="status" control={control} render={({ field }) => (
+                            <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving || voucherSnap?.status !== 'draft'}>
+                                <SelectTrigger id="status" className="w-[180px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="draft">مسودة</SelectItem>
+                                    <SelectItem value="paid">مدفوع</SelectItem>
+                                    <SelectItem value="cancelled">ملغي</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}/>
+                    </div>
                 </div>
-                 {journalEntryIsPosted && (
+                 {voucherSnap?.employeeId && voucherSnap?.renewalExpiryDate && (
                     <Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
                         <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
-                        <AlertTitle>ملاحظة</AlertTitle>
+                        <AlertTitle>سند تجديد إقامة</AlertTitle>
                         <AlertDescription>
-                            سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
+                            عند تغيير حالة هذا السند إلى "مدفوع"، سيتم تحديث تاريخ انتهاء إقامة الموظف تلقائيًا.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -430,3 +447,5 @@ export default function EditPaymentVoucherPage() {
     </Card>
   );
 }
+
+  

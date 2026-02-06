@@ -190,6 +190,7 @@ export interface PaymentVoucher {
   payeeName: string;
   payeeType: 'vendor' | 'employee' | 'other';
   employeeId?: string;
+  renewalExpiryDate?: any;
   amount: number;
   amountInWords: string;
   paymentDate: any; 
@@ -658,4 +659,17 @@ export interface PurchaseOrder {
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
 
+export interface ResidencyRenewal {
+    id?: string;
+    employeeId: string;
+    renewalDate: any;
+    newExpiryDate: any;
+    cost: number;
+    paymentVoucherId: string;
+    monthlyAmortizationAmount: number;
+    amortizationStatus: 'in-progress' | 'completed';
+    lastAmortizationDate?: any;
+}
     
+
+  
