@@ -41,6 +41,18 @@ import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const navItems = {
   ar: [
@@ -108,7 +120,7 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state: sidebarState } = useSidebar();
 
   if (!item.roles.includes(userRole)) {
     return null;
@@ -117,10 +129,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={currentPath === item.href} asChild>
+        <SidebarMenuButton isActive={currentPath === item.href} asChild tooltip={item.label}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
-            <span>{item.label}</span>
+            <span className="group-data-[state=collapsed]:hidden">{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -129,6 +141,49 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   
   if (item.children) {
     const isActive = currentPath.startsWith(item.hrefPrefix);
+
+    if (sidebarState === 'collapsed') {
+      return (
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SidebarMenuButton as="button" isActive={isActive}>
+                <item.icon />
+                <span className="sr-only">{item.label}</span>
+              </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" sideOffset={5} className="w-56">
+              <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {item.children.map((child: any, index: number) => {
+                if (child.children) {
+                  return (
+                    <DropdownMenuSub key={`${child.label}-${index}`}>
+                      <DropdownMenuSubTrigger>{child.label}</DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          {child.children.map((subChild: any) => (
+                            <DropdownMenuItem key={subChild.href} asChild>
+                              <Link href={subChild.href}>{subChild.label}</Link>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  );
+                }
+                return (
+                  <DropdownMenuItem key={child.href} asChild>
+                    <Link href={child.href}>{child.label}</Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      );
+    }
+    
     return (
       <Collapsible defaultOpen={isActive}>
         <SidebarMenuItem>
