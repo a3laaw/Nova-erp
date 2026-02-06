@@ -66,7 +66,7 @@ export function RoomBookingCalendar() {
     const { toast } = useToast();
 
     const [date, setDate] = useState<Date | undefined>(undefined);
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -80,16 +80,15 @@ export function RoomBookingCalendar() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        // Set date on client-side to avoid hydration mismatch
         if (!date) {
             setDate(new Date());
         }
     }, [date]);
 
-    // Fetch static data (clients and engineers) once
     useEffect(() => {
         if (!firestore) return;
         const fetchStaticData = async () => {
+            setLoading(true);
             try {
                 const [clientSnap, engSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
@@ -104,12 +103,13 @@ export function RoomBookingCalendar() {
             } catch (error) {
                 console.error("Error fetching static booking data:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
+            } finally {
+                setLoading(false);
             }
         };
         fetchStaticData();
     }, [firestore, toast]);
     
-    // Fetch appointments when date or static data changes
     const fetchAppointments = useCallback(async (d: Date) => {
         if (!firestore) return;
         setLoading(true);
@@ -123,31 +123,32 @@ export function RoomBookingCalendar() {
                 where('appointmentDate', '<=', dayEnd)
             ));
             
-            const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            const roomAppointments = apptSnap.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
+                .filter(appt => appt.type === 'room');
 
-            const augmentedAppointments = allAppointmentsForDay
-                .filter(appt => appt.type === 'room')
-                .map(appt => ({
-                    ...appt,
-                    clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-                    engineerName: appt.engineerId ? engineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
-                }));
-            setAppointments(augmentedAppointments);
+            setRawAppointments(roomAppointments);
         } catch (error) {
             console.error("Error fetching room appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث قائمة الحجوزات.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast, clients, engineers]);
+    }, [firestore, toast]);
 
     useEffect(() => {
-        if(date && (clients.length > 0 || engineers.length > 0)) {
-            fetchAppointments(date);
-        } else if (date && !loading) {
+        if(date) {
             fetchAppointments(date);
         }
-    }, [date, clients, engineers, fetchAppointments, loading]);
+    }, [date, fetchAppointments]);
+
+    const appointments = useMemo(() => {
+        return rawAppointments.map(appt => ({
+            ...appt,
+            clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
+            engineerName: appt.engineerId ? engineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
+        }));
+    }, [rawAppointments, clients, engineers]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -166,13 +167,11 @@ export function RoomBookingCalendar() {
             
             const startTime = toFirestoreDate(appt.appointmentDate);
             if (!startTime) {
-                console.error("Could not process appointment with invalid date:", appt);
                 return;
             }
 
             try {
                 const timeKey = format(startTime, 'HH:mm');
-
                 if (timeKey in grid[appt.meetingRoom]) {
                     grid[appt.meetingRoom][timeKey] = appt;
                 }
@@ -225,10 +224,7 @@ export function RoomBookingCalendar() {
         try {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
-            
-            // Local state update to avoid race conditions with fetching
-            setAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
-            
+            setRawAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
         } catch (error) {
             console.error("Error deleting appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
