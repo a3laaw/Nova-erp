@@ -34,6 +34,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         bankName: string;
         accountNumber: string;
         iban: string;
+        contractPercentage: string;
     }>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date().toISOString().split('T')[0], department: '', jobTitle: '',
@@ -42,6 +43,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         bankName: '',
         accountNumber: '',
         iban: '',
+        contractPercentage: '',
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -69,6 +71,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 bankName: initialData.bankName || '',
                 accountNumber: initialData.accountNumber || '',
                 iban: initialData.iban || '',
+                contractPercentage: String(initialData.contractPercentage || ''),
             });
         }
     }, [initialData]);
@@ -142,6 +145,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             bankName: formData.salaryPaymentType === 'transfer' ? formData.bankName : '',
             accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
             iban: formData.salaryPaymentType === 'transfer' ? formData.iban : '',
+            contractPercentage: formData.contractType === 'percentage' ? parseFloat(formData.contractPercentage) : undefined,
         };
         
         await onSave(dataToSave);
@@ -200,6 +204,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </Select>
                     </div>
                 </div>
+                {formData.contractType === 'percentage' && (
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="contractPercentage">نسبة العقد (%) <span className="text-destructive">*</span></Label>
+                        <Input id="contractPercentage" type="number" step="0.01" value={formData.contractPercentage} onChange={handleInputChange} dir="ltr" required />
+                    </div>
+                )}
                 <Separator />
                 <div className="grid gap-4">
                     <div className="grid gap-1.5">
@@ -249,3 +259,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    

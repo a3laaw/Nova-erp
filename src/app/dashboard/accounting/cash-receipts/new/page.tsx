@@ -23,7 +23,7 @@ import {
 import { Printer, Save, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy, writeBatch, limit, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, updateDoc, orderBy, writeBatch, limit, collectionGroup, addDoc } from 'firebase/firestore';
 import type { Client, Company, ClientTransaction, Account, Employee, Department, TransactionStage, WorkStage } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -311,6 +311,7 @@ export default function NewCashReceiptPage() {
 
     setIsSaving(true);
     let newReceiptId = '';
+    let newVoucherNumberForCommission = '';
     
     // --- PRE-TRANSACTION READS AND LOGIC ---
     let isFirstReceiptForProject = false;
@@ -371,6 +372,7 @@ export default function NewCashReceiptPage() {
             }
             
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+            newVoucherNumberForCommission = newVoucherNumber;
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             newReceiptId = newReceiptRef.id;
 
@@ -478,7 +480,52 @@ export default function NewCashReceiptPage() {
         
         toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
         
-        // POST-TRANSACTION WRITES (CAN BE IN A BATCH)
+        // --- POST-TRANSACTION WRITES (Batch) ---
+        // Commission Journal Entry
+        if (selectedProjectId && transactionDataForCheck?.assignedEngineerId) {
+            const engineer = employees.find(e => e.id === transactionDataForCheck!.assignedEngineerId);
+            if (engineer && engineer.contractType === 'percentage' && engineer.contractPercentage && engineer.contractPercentage > 0) {
+                const commissionAmount = parseFloat(amount) * (engineer.contractPercentage / 100);
+                if (commissionAmount > 0) {
+                    const commissionBatch = writeBatch(firestore);
+                    const salaryExpenseAccount = accounts.find(a => a.code === '5201'); // مصروف الرواتب والأجور
+                    const accruedSalaryAccount = accounts.find(a => a.code === '210201'); // رواتب وأجور مستحقة
+                    
+                    if(salaryExpenseAccount && accruedSalaryAccount) {
+                        const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
+                        const jeCounterDoc = await getDoc(jeCounterRef);
+                        let jeNextNumber = 1;
+                        const currentYear = new Date().getFullYear();
+                        if (jeCounterDoc.exists()) {
+                             const counts = jeCounterDoc.data()?.counts || {};
+                             jeNextNumber = (counts[currentYear] || 0) + 1;
+                        }
+                        const commissionJeNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
+
+                        const commissionJeRef = doc(collection(firestore, 'journalEntries'));
+                        commissionBatch.set(commissionJeRef, {
+                            entryNumber: commissionJeNumber,
+                            date: Timestamp.fromDate(new Date(date)),
+                            narration: `إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${newVoucherNumberForCommission}`,
+                            totalDebit: commissionAmount,
+                            totalCredit: commissionAmount,
+                            status: 'posted',
+                            lines: [
+                                { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: commissionAmount, credit: 0, auto_resource_id: engineer.id },
+                                { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: 0, credit: commissionAmount, auto_resource_id: engineer.id }
+                            ],
+                            linkedReceiptId: newReceiptId,
+                            createdAt: serverTimestamp(),
+                            createdBy: 'system-auto-commission',
+                        });
+                        commissionBatch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber } }, { merge: true });
+                        await commissionBatch.commit();
+                        toast({ title: 'إشعار', description: `تم إنشاء قيد عمولة تلقائي للمهندس ${engineer.fullName}.` });
+                    }
+                }
+            }
+        }
+
         if (selectedProjectId && transactionDataForCheck) {
             const batch = writeBatch(firestore);
             
@@ -654,8 +701,10 @@ export default function NewCashReceiptPage() {
         <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher}>
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ وإنشاء السند'}
-        Button>
+        </Button>
       </CardFooter>
     </Card>
   );
 }
+
+    
