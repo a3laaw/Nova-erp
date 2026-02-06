@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -35,7 +34,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
-import { DateInput } from '@/components/ui/date-input';
 
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
@@ -226,115 +224,115 @@ export default function NewPaymentVoucherPage() {
 
 
   return (
-    Card className="max-w-4xl mx-auto" dir="rtl">
-        form onSubmit={handleSubmit}>
-            CardHeader>
-                div className="flex justify-between items-start">
-                    div>
-                        CardTitle>سـنـد صـرف / Payment VoucherCardTitle>
-                        CardDescription>{isGeneratingVoucher ? Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السندCardDescription>
-                    div>
-                div>
-            CardHeader>
-            CardContent className="space-y-6">
-                 div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    div className="grid gap-2">
-                        Label htmlFor="payeeType">نوع المستفيد <span className="text-destructive">*span>Label>
-                        Controller name="payeeType" control={control} render={({ field }) => (
-                            Select dir='rtl' onValueChange={field.onChange} value={field.value}>
-                                SelectTrigger id="payeeType">SelectValue placeholder="اختر نوع المستفيد..." />SelectTrigger>
-                                SelectContent>SelectItem value="vendor">موردSelectItem>SelectItem value="employee">موظفSelectItem>SelectItem value="other">أخرىSelectItem>SelectContent>
-                            Select>
+    <Card className="max-w-4xl mx-auto" dir="rtl">
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>سـنـد صـرف / Payment Voucher</CardTitle>
+                        <CardDescription>{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="payeeType">نوع المستفيد <span className="text-destructive">*</span></Label>
+                        <Controller name="payeeType" control={control} render={({ field }) => (
+                            <Select dir='rtl' onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger id="payeeType"><SelectValue placeholder="اختر نوع المستفيد..." /></SelectTrigger>
+                                <SelectContent><SelectItem value="vendor">مورد</SelectItem><SelectItem value="employee">موظف</SelectItem><SelectItem value="other">أخرى</SelectItem></SelectContent>
+                            </Select>
                         )} />
-                        {errors.payeeType && p className="text-xs text-destructive">{errors.payeeType.message}p>}
-                    div>
-                     div className="grid gap-2">
-                        Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*span>Label>
+                        {errors.payeeType && <p className="text-xs text-destructive">{errors.payeeType.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
                          {payeeType === 'employee' ? (
-                              Controller name="payeeName" control={control} render={({ field }) => (
-                                InlineSearchList value={field.value} onSelect={field.onChange} options={employeePayeeOptions} placeholder={refDataLoading ? "تحميل..." : "اختر موظفًا..."} disabled={refDataLoading} />
+                              <Controller name="payeeName" control={control} render={({ field }) => (
+                                <InlineSearchList value={field.value} onSelect={field.onChange} options={employeePayeeOptions} placeholder={refDataLoading ? "تحميل..." : "اختر موظفًا..."} disabled={refDataLoading} />
                               )} />
                          ) : (
-                            Input id="payeeName" {...register('payeeName')} />
+                            <Input id="payeeName" {...register('payeeName')} />
                          )}
-                        {errors.payeeName && p className="text-xs text-destructive">{errors.payeeName.message}p>}
-                    div>
-                div>
-                 div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    div className="grid gap-2">
-                        Label htmlFor="amount">المبلغ <span className="text-destructive">*span>Label>
-                        Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} />
-                        {errors.amount && p className="text-xs text-destructive">{errors.amount.message}p>}
-                    div>
-                    div className="md:col-span-2 grid gap-2">
-                        Label>مبلغ وقدره (كتابة)Label>
-                        div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
+                        {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
+                    </div>
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
+                        <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} />
+                        {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+                    </div>
+                    <div className="md:col-span-2 grid gap-2">
+                        <Label>مبلغ وقدره (كتابة)</Label>
+                        <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
                             {amountInWords || '(سيتم ملؤه تلقائياً)'}
-                        div>
-                    div>
-                div>
-                div className="grid gap-2">
-                    Label htmlFor="description">وذلك عن / البيان <span className="text-destructive">*span>Label>
-                    Textarea id="description" placeholder="وصف عملية الصرف..." {...register('description')} />
-                     {errors.description && p className="text-xs text-destructive">{errors.description.message}p>}
-                div>
-                div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    div className="grid gap-2">
-                         Label htmlFor="paymentDate">تاريخ الدفع <span className="text-destructive">*span>Label>
-                        Controller name="paymentDate" control={control} render={({ field }) => ( DateInput value={field.value} onChange={field.onChange} /> )} />
-                        {errors.paymentDate && p className="text-xs text-destructive">{errors.paymentDate.message}p>}
-                    div>
-                    div className="grid gap-2">
-                        Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*span>Label>
-                        Controller name="paymentMethod" control={control} render={({ field }) => (
-                            Select dir='rtl' onValueChange={field.onChange} value={field.value}>
-                                SelectTrigger id="paymentMethod">SelectValue placeholder="اختر طريقة الدفع" />SelectTrigger>
-                                SelectContent>SelectItem value="Cash">نقداًSelectItem>SelectItem value="Cheque">شيكSelectItem>SelectItem value="Bank Transfer">تحويل بنكيSelectItem>SelectItem value="EmployeeCustody">عهدة موظفSelectItem>SelectContent>
-                            Select>
+                        </div>
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="description">وذلك عن / البيان <span className="text-destructive">*</span></Label>
+                    <Textarea id="description" placeholder="وصف عملية الصرف..." {...register('description')} />
+                     {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                         <Label htmlFor="paymentDate">تاريخ الدفع <span className="text-destructive">*</span></Label>
+                        <Controller name="paymentDate" control={control} render={({ field }) => ( <Input id="paymentDate" type="date" value={field.value} onChange={field.onChange} /> )} />
+                        {errors.paymentDate && <p className="text-xs text-destructive">{errors.paymentDate.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
+                        <Controller name="paymentMethod" control={control} render={({ field }) => (
+                            <Select dir='rtl' onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger id="paymentMethod"><SelectValue placeholder="اختر طريقة الدفع" /></SelectTrigger>
+                                <SelectContent><SelectItem value="Cash">نقداً</SelectItem><SelectItem value="Cheque">شيك</SelectItem><SelectItem value="Bank Transfer">تحويل بنكي</SelectItem><SelectItem value="EmployeeCustody">عهدة موظف</SelectItem></SelectContent>
+                            </Select>
                         )} />
-                         {errors.paymentMethod && p className="text-xs text-destructive">{errors.paymentMethod.message}p>}
-                    div>
-                    div className="grid gap-2">
-                        Label htmlFor="reference">رقم الشيك/المرجعLabel>
-                        Input id="reference" placeholder="رقم المرجع..." {...register('reference')} />
-                    div>
-                div>
-                 div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t", showProjectLink && "md:grid-cols-3")}>
-                    div className="grid gap-2">
-                        Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*span>Label>
-                        Controller name="debitAccountId" control={control} render={({ field }) => (
-                            InlineSearchList value={field.value} onSelect={field.onChange} options={debitAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."} disabled={refDataLoading} />
+                         {errors.paymentMethod && <p className="text-xs text-destructive">{errors.paymentMethod.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="reference">رقم الشيك/المرجع</Label>
+                        <Input id="reference" placeholder="رقم المرجع..." {...register('reference')} />
+                    </div>
+                </div>
+                 <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t", showProjectLink && "md:grid-cols-3")}>
+                    <div className="grid gap-2">
+                        <Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*</span></Label>
+                        <Controller name="debitAccountId" control={control} render={({ field }) => (
+                            <InlineSearchList value={field.value} onSelect={field.onChange} options={debitAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."} disabled={refDataLoading} />
                         )} />
-                         {errors.debitAccountId && p className="text-xs text-destructive">{errors.debitAccountId.message}p>}
-                    div>
-                    div className="grid gap-2">
-                        Label htmlFor="creditAccountId">الحساب الدائنLabel>
-                         Controller name="creditAccountId" control={control} render={({ field }) => (
-                            InlineSearchList value={field.value || ''} onSelect={field.onChange} options={creditAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."} disabled={refDataLoading || paymentMethod === 'EmployeeCustody'} />
+                         {errors.debitAccountId && <p className="text-xs text-destructive">{errors.debitAccountId.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="creditAccountId">الحساب الدائن</Label>
+                         <Controller name="creditAccountId" control={control} render={({ field }) => (
+                            <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={creditAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب الصندوق أو البنك..."} disabled={refDataLoading || paymentMethod === 'EmployeeCustody'} />
                         )} />
-                         {errors.creditAccountId && p className="text-xs text-destructive">{errors.creditAccountId.message}p>}
-                    div>
+                         {errors.creditAccountId && <p className="text-xs text-destructive">{errors.creditAccountId.message}</p>}
+                    </div>
                     {showProjectLink && (
-                        div className="grid gap-2">
-                            Label htmlFor="projectLink">ربط بمشروع (مركز تكلفة)Label>
-                            Controller name="projectLink" control={control} render={({ field }) => (
-                                InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder={refDataLoading ? "تحميل..." : "اختر مشروعًا..."} disabled={refDataLoading} />
+                        <div className="grid gap-2">
+                            <Label htmlFor="projectLink">ربط بمشروع (مركز تكلفة)</Label>
+                            <Controller name="projectLink" control={control} render={({ field }) => (
+                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder={refDataLoading ? "تحميل..." : "اختر مشروعًا..."} disabled={refDataLoading} />
                             )} />
-                        div>
+                        </div>
                     )}
-                 div>
-            CardContent>
-            CardFooter className="flex justify-end gap-2">
-                Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
-                    X className="ml-2 h-4 w-4" />
+                 </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
+                    <X className="ml-2 h-4 w-4" />
                     إلغاء
-                Button>
-                Button type="submit" disabled={isSaving || isGeneratingVoucher}>
-                    {isSaving ? Loader2 className="ml-2 h-4 w-4 animate-spin" /> : Save className="ml-2 h-4 w-4" />}
+                </Button>
+                <Button type="submit" disabled={isSaving || isGeneratingVoucher}>
+                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                     {isSaving ? 'جاري الحفظ...' : 'حفظ'}
-                Button>
-            CardFooter>
-        form>
-    Card>
+                </Button>
+            </CardFooter>
+        </form>
+    </Card>
   );
 }

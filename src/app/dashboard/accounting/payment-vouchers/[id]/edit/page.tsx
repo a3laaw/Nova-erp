@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -37,7 +36,6 @@ import { useAuth } from '@/context/auth-context';
 import { format as formatDateFns } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { DateInput } from '@/components/ui/date-input';
 
 const paymentVoucherSchema = z.object({
     payeeName: z.string().min(1, 'اسم المستفيد مطلوب'),
@@ -256,121 +254,121 @@ export default function EditPaymentVoucherPage() {
   
   if (voucherLoading || refDataLoading) {
       return (
-          Card className="max-w-4xl mx-auto" dir="rtl">
-              CardHeader>Skeleton className="h-8 w-48" />CardHeader>
-              CardContent className="space-y-6">
-                  Skeleton className="h-10 w-full" />
-                  Skeleton className="h-10 w-full" />
-                  Skeleton className="h-24 w-full" />
-              CardContent>
-          Card>
+          <Card className="max-w-4xl mx-auto" dir="rtl">
+              <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
+              <CardContent className="space-y-6">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-24 w-full" />
+              </CardContent>
+          </Card>
       );
   }
 
   return (
-    Card className="max-w-4xl mx-auto" dir="rtl">
-        form onSubmit={handleSubmit(onSubmit)}>
-            CardHeader>
-                div className="flex justify-between items-start">
-                    div>
-                        CardTitle>تعديل سند صرفCardTitle>
-                        CardDescription>
+    <Card className="max-w-4xl mx-auto" dir="rtl">
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>تعديل سند صرف</CardTitle>
+                        <CardDescription>
                             تعديل بيانات سند الصرف رقم: {voucherSnap?.voucherNumber}
-                        CardDescription>
-                    div>
-                div>
+                        </CardDescription>
+                    </div>
+                </div>
                  {journalEntryIsPosted && (
-                    Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
-                        Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
-                        AlertTitle>ملاحظةAlertTitle>
-                        AlertDescription>
+                    <Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
+                        <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
+                        <AlertTitle>ملاحظة</AlertTitle>
+                        <AlertDescription>
                             سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
-                        AlertDescription>
-                    Alert>
+                        </AlertDescription>
+                    </Alert>
                 )}
-            CardHeader>
-            CardContent className="space-y-6">
-                 div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    div className="grid gap-2">
-                        Label htmlFor="payeeType">نوع المستفيد <span className="text-destructive">*span>Label>
-                        Controller
+            </CardHeader>
+            <CardContent className="space-y-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="payeeType">نوع المستفيد <span className="text-destructive">*</span></Label>
+                        <Controller
                             name="payeeType"
                             control={control}
                             render={({ field }) => (
-                                Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving}>
-                                    SelectTrigger id="payeeType">SelectValue placeholder="اختر نوع المستفيد..." />SelectTrigger>
-                                    SelectContent>
-                                        SelectItem value="vendor">موردSelectItem>
-                                        SelectItem value="employee">موظفSelectItem>
-                                        SelectItem value="other">أخرىSelectItem>
-                                    SelectContent>
-                                Select>
+                                <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving}>
+                                    <SelectTrigger id="payeeType"><SelectValue placeholder="اختر نوع المستفيد..." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="vendor">مورد</SelectItem>
+                                        <SelectItem value="employee">موظف</SelectItem>
+                                        <SelectItem value="other">أخرى</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             )}
                         />
-                        {errors.payeeType && p className="text-xs text-destructive">{errors.payeeType.message}p>}
-                    div>
-                     div className="grid gap-2">
-                        Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*span>Label>
-                        Input id="payeeName" {...register('payeeName')} disabled={isSaving} />
-                        {errors.payeeName && p className="text-xs text-destructive">{errors.payeeName.message}p>}
-                    div>
-                div>
-                 div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    div className="grid gap-2">
-                        Label htmlFor="amount">المبلغ <span className="text-destructive">*span>Label>
-                        Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} disabled={isSaving} />
-                        {errors.amount && p className="text-xs text-destructive">{errors.amount.message}p>}
-                    div>
-                    div className="md:col-span-2 grid gap-2">
-                        Label>مبلغ وقدره (كتابة)Label>
-                        div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
+                        {errors.payeeType && <p className="text-xs text-destructive">{errors.payeeType.message}</p>}
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
+                        <Input id="payeeName" {...register('payeeName')} disabled={isSaving} />
+                        {errors.payeeName && <p className="text-xs text-destructive">{errors.payeeName.message}</p>}
+                    </div>
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
+                        <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' {...register('amount')} disabled={isSaving} />
+                        {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+                    </div>
+                    <div className="md:col-span-2 grid gap-2">
+                        <Label>مبلغ وقدره (كتابة)</Label>
+                        <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
                             {amountInWords || '(سيتم ملؤه تلقائياً)'}
-                        div>
-                    div>
-                div>
-                div className="grid gap-2">
-                    Label htmlFor="description">وذلك عن / البيان <span className="text-destructive">*span>Label>
-                    Textarea id="description" placeholder="وصف عملية الصرف..." {...register('description')} disabled={isSaving}/>
-                     {errors.description && p className="text-xs text-destructive">{errors.description.message}p>}
-                div>
-                div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    div className="grid gap-2">
-                         Label htmlFor="paymentDate">تاريخ الدفع <span className="text-destructive">*span>Label>
-                        Controller name="paymentDate" control={control} render={({ field }) => ( DateInput value={field.value} onChange={field.onChange} disabled={isSaving} /> )} />
-                        {errors.paymentDate && p className="text-xs text-destructive">{errors.paymentDate.message}p>}
-                    div>
-                    div className="grid gap-2">
-                        Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*span>Label>
-                        Controller
+                        </div>
+                    </div>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="description">وذلك عن / البيان <span className="text-destructive">*</span></Label>
+                    <Textarea id="description" placeholder="وصف عملية الصرف..." {...register('description')} disabled={isSaving}/>
+                     {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid gap-2">
+                         <Label htmlFor="paymentDate">تاريخ الدفع <span className="text-destructive">*</span></Label>
+                        <Controller name="paymentDate" control={control} render={({ field }) => ( <Input id="paymentDate" type="date" value={field.value} onChange={field.onChange} disabled={isSaving} /> )} />
+                        {errors.paymentDate && <p className="text-xs text-destructive">{errors.paymentDate.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
+                        <Controller
                             name="paymentMethod"
                             control={control}
                             render={({ field }) => (
-                                Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving}>
-                                    SelectTrigger id="paymentMethod">SelectValue placeholder="اختر طريقة الدفع" />SelectTrigger>
-                                    SelectContent>
-                                        SelectItem value="Cash">نقداًSelectItem>
-                                        SelectItem value="Cheque">شيكSelectItem>
-                                        SelectItem value="Bank Transfer">تحويل بنكيSelectItem>
-                                        SelectItem value="EmployeeCustody">عهدة موظفSelectItem>
-                                    SelectContent>
-                                Select>
+                                <Select dir='rtl' onValueChange={field.onChange} value={field.value} disabled={isSaving}>
+                                    <SelectTrigger id="paymentMethod"><SelectValue placeholder="اختر طريقة الدفع" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Cash">نقداً</SelectItem>
+                                        <SelectItem value="Cheque">شيك</SelectItem>
+                                        <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
+                                        <SelectItem value="EmployeeCustody">عهدة موظف</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             )}
                         />
-                         {errors.paymentMethod && p className="text-xs text-destructive">{errors.paymentMethod.message}p>}
-                    div>
-                    div className="grid gap-2">
-                        Label htmlFor="reference">رقم الشيك/المرجعLabel>
-                        Input id="reference" placeholder="رقم المرجع..." {...register('reference')} disabled={isSaving}/>
-                    div>
-                div>
-                 div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t", showProjectLink && "md:grid-cols-3")}>
-                    div className="grid gap-2">
-                        Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*span>Label>
-                        Controller
+                         {errors.paymentMethod && <p className="text-xs text-destructive">{errors.paymentMethod.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="reference">رقم الشيك/المرجع</Label>
+                        <Input id="reference" placeholder="رقم المرجع..." {...register('reference')} disabled={isSaving}/>
+                    </div>
+                </div>
+                 <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t", showProjectLink && "md:grid-cols-3")}>
+                    <div className="grid gap-2">
+                        <Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*</span></Label>
+                        <Controller
                             name="debitAccountId"
                             control={control}
                             render={({ field }) => (
-                                InlineSearchList 
+                                <InlineSearchList 
                                     value={field.value}
                                     onSelect={field.onChange}
                                     options={debitAccountOptions}
@@ -379,15 +377,15 @@ export default function EditPaymentVoucherPage() {
                                 />
                             )}
                         />
-                         {errors.debitAccountId && p className="text-xs text-destructive">{errors.debitAccountId.message}p>}
-                    div>
-                    div className="grid gap-2">
-                        Label htmlFor="creditAccountId">الحساب الدائن (الصندوق/البنك) <span className="text-destructive">*span>Label>
-                         Controller
+                         {errors.debitAccountId && <p className="text-xs text-destructive">{errors.debitAccountId.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="creditAccountId">الحساب الدائن (الصندوق/البنك) <span className="text-destructive">*</span></Label>
+                         <Controller
                             name="creditAccountId"
                             control={control}
                             render={({ field }) => (
-                                InlineSearchList 
+                                <InlineSearchList 
                                     value={field.value}
                                     onSelect={field.onChange}
                                     options={creditAccountOptions}
@@ -396,16 +394,16 @@ export default function EditPaymentVoucherPage() {
                                 />
                             )}
                         />
-                         {errors.creditAccountId && p className="text-xs text-destructive">{errors.creditAccountId.message}p>}
-                    div>
+                         {errors.creditAccountId && <p className="text-xs text-destructive">{errors.creditAccountId.message}</p>}
+                    </div>
                     {showProjectLink && (
-                        div className="grid gap-2 md:col-span-1">
-                            Label htmlFor="projectLink">ربط بمشروع (مركز تكلفة)Label>
-                            Controller
+                        <div className="grid gap-2 md:col-span-1">
+                            <Label htmlFor="projectLink">ربط بمشروع (مركز تكلفة)</Label>
+                            <Controller
                                 name="projectLink"
                                 control={control}
                                 render={({ field }) => (
-                                    InlineSearchList
+                                    <InlineSearchList
                                         value={field.value || ''}
                                         onSelect={field.onChange}
                                         options={projectOptions}
@@ -414,21 +412,21 @@ export default function EditPaymentVoucherPage() {
                                     />
                                 )}
                             />
-                        div>
+                        </div>
                     )}
-                 div>
-            CardContent>
-            CardFooter className="flex justify-end gap-2">
-                Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
-                    X className="ml-2 h-4 w-4" />
+                 </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
+                    <X className="ml-2 h-4 w-4" />
                     إلغاء
-                Button>
-                Button type="submit" disabled={isSaving}>
-                    {isSaving ? Loader2 className="ml-2 h-4 w-4 animate-spin" /> : Save className="ml-2 h-4 w-4" />}
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                     {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
-                Button>
-            CardFooter>
-        form>
-    Card>
+                </Button>
+            </CardFooter>
+        </form>
+    </Card>
   );
 }

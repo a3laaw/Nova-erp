@@ -33,7 +33,6 @@ import { useAuth } from '@/context/auth-context';
 import { format } from 'date-fns';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { DateInput } from '@/components/ui/date-input';
 
 const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
@@ -504,7 +503,7 @@ export default function EditCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving}/>
+                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
                 </div>
             </div>
             
@@ -575,7 +574,7 @@ export default function EditCashReceiptPage() {
             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
         </Button>
-      CardFooter>
+      </CardFooter>
     </Card>
   );
 }

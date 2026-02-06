@@ -13,7 +13,6 @@ import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { DateInput } from '@/components/ui/date-input';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -203,7 +202,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-1.5">
                         <Label htmlFor="dob">تاريخ الميلاد</Label>
-                        <DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} />
+                        <Input type="date" value={formData.dob} onChange={(e) => handleSelectChange('dob', e.target.value)} />
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor="gender">الجنس</Label>
@@ -229,7 +228,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
                         <div className="grid gap-1.5">
                             <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
-                            <DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} />
+                            <Input type="date" value={formData.residencyExpiry} onChange={(e) => handleSelectChange('residencyExpiry', e.target.value)} />
                         </div>
                     )}
                 </div>
@@ -247,7 +246,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="grid gap-1.5">
                         <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                        <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date)} />
+                        <Input type="date" value={formData.hireDate} onChange={(e) => handleSelectChange('hireDate', e.target.value)} />
                     </div>
                      <div className="grid gap-1.5">
                         <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>

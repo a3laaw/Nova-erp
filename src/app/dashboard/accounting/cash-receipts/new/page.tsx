@@ -33,7 +33,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format, addDays } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { DateInput } from '@/components/ui/date-input';
 
 const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
@@ -631,7 +630,7 @@ export default function NewCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving}/>
+                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
                 </div>
             </div>
             
