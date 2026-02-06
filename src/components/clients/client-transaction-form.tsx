@@ -142,6 +142,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                             expectedDurationDays: stageData.expectedDurationDays || null,
                             maxOccurrences: stageData.maxOccurrences || null,
                             allowManualCompletion: stageData.allowManualCompletion || false,
+                            enableModificationTracking: stageData.enableModificationTracking || false,
                         });
                         stageIds.add(doc.id);
                     }

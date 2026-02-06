@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, ChevronsUpDown, CheckSquare, FileSignature, MessageSquare, Undo2, ArrowUp, ArrowDown, Save, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -216,6 +216,52 @@ export default function TransactionDetailPage() {
       if (isNaN(date.getTime())) return '-';
       return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
   }
+
+  const handleModificationIncrement = async (stageId: string) => {
+    if (!firestore || !currentUser || !transaction) return;
+
+    setIsProcessing(true);
+    try {
+        const batch = writeBatch(firestore);
+        const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+
+        const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+        const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+
+        if (stageIndex === -1) throw new Error("Stage not found");
+
+        const stageToUpdate = currentStages[stageIndex];
+        stageToUpdate.modificationCount = (stageToUpdate.modificationCount || 0) + 1;
+        
+        batch.update(transactionRef, { stages: currentStages });
+
+        const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stageToUpdate.name}" (التعديل رقم ${stageToUpdate.modificationCount}).`;
+        
+        const logData = {
+            type: 'log' as const,
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp(),
+        };
+
+        const timelineRef = collection(transactionRef, 'timelineEvents');
+        batch.set(doc(timelineRef), logData);
+        
+        const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
+        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
+        
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
+        toast({ variant: 'destructive', title: 'خطأ', description: message });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
 
   const handleRevertStage = async (stageIdToRevert: string) => {
     if (!firestore || !currentUser || currentUser.role !== 'Admin' || !transaction) return;
@@ -706,12 +752,20 @@ export default function TransactionDetailPage() {
                                                 {stage.trackingType === 'occurrence' && stage.maxOccurrences && (
                                                     <Badge variant="secondary">الإنجاز: {stage.completedCount || 0} / {stage.maxOccurrences}</Badge>
                                                 )}
-                                                {stage.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
+                                                {stage.modificationCount && stage.modificationCount > 0 && (
+                                                    <Badge variant="outline" className="bg-orange-100 text-orange-800">التعديلات: {stage.modificationCount}</Badge>
+                                                )}
                                                 {stage.allowedRoles && stage.allowedRoles.map(role => (
                                                     <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                                                 ))}
                                             </div>
                                             <div className="flex gap-2 items-center">
+                                                {stage.status === 'in-progress' && stage.enableModificationTracking && (
+                                                    <Button size="sm" variant="outline" className="h-7 px-2 text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
+                                                        <Plus className="ml-1 h-3 w-3" />
+                                                        إضافة تعديل
+                                                    </Button>
+                                                )}
                                                 {stage.status === 'pending' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || !canStart.allowed} title={!canStart.allowed ? canStart.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
@@ -787,6 +841,7 @@ export default function TransactionDetailPage() {
     
 
     
+
 
 
 
