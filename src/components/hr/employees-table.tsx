@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useCallback } from 'react';
 import {
@@ -10,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Trash2, Edit, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit, Loader2, Calendar } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,9 +36,8 @@ import type { Employee } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
-import { useFirebase } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
+import { useFirebase, useSubscription } from '@/firebase';
+import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 
 
@@ -65,8 +63,14 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // IMPROVED: Using a robust infinite scroll hook for better performance.
-    const { items: employees, loading: employeesLoading, hasMore, loaderRef, loadingMore } = useInfiniteScroll<Employee>('employees');
+    // IMPROVED: Switched from a one-time fetch hook to a real-time subscription hook.
+    // This ensures that any new employees added will appear in the table instantly.
+    const employeesQuery = useMemo(() => {
+        if (!firestore) return null;
+        return [orderBy('createdAt', 'desc')];
+    }, [firestore]);
+
+    const { data: employees, loading, error } = useSubscription<Employee>(firestore, 'employees', employeesQuery || []);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
@@ -77,10 +81,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
         return searchEmployees(employees, searchQuery);
     }, [employees, searchQuery]);
 
-    const loading = employeesLoading && employees.length === 0;
-
     const formatDate = (dateValue: any) => {
-        // FIXED: Using a safe date converter to prevent null crashes.
         const date = toFirestoreDate(dateValue);
         if (!date) return '-';
         return format(date, 'dd/MM/yyyy');
@@ -96,7 +97,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
              return;
         };
         setIsTerminating(true);
-        // IMPROVED: Added try/catch block for better error handling.
         try {
             const employeeRef = doc(firestore, 'employees', employeeToTerminate.id!);
             await updateDoc(employeeRef, {
@@ -172,9 +172,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                     </TableBody>
                 </Table>
             </div>
-             <div ref={loaderRef} className="flex justify-center p-4">
-                {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-            </div>
 
             <AlertDialog open={!!employeeToTerminate} onOpenChange={() => setEmployeeToTerminate(null)}>
                 <AlertDialogContent dir="rtl">
@@ -199,7 +196,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-
         </>
     );
 }
