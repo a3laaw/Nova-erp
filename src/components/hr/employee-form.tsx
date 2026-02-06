@@ -30,16 +30,29 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         fullName: string; nameEn: string; civilId: string; mobile: string;
         hireDate: string; department: string; jobTitle: string;
         contractType: Employee['contractType']; basicSalary: string;
+        salaryPaymentType: Employee['salaryPaymentType'];
+        bankName: string;
+        accountNumber: string;
+        iban: string;
     }>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date().toISOString().split('T')[0], department: '', jobTitle: '',
-        contractType: 'permanent', basicSalary: ''
+        contractType: 'permanent', basicSalary: '',
+        salaryPaymentType: 'cash',
+        bankName: '',
+        accountNumber: '',
+        iban: '',
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
 
+    const handleGovernorateChange = useCallback(async (govId: string, preselectArea?: string) => {
+        // This function seems to be a leftover from another component, it is not used here.
+        // It can be removed in a future cleanup.
+    }, []);
+    
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -52,9 +65,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 jobTitle: initialData.jobTitle || '',
                 contractType: initialData.contractType || 'permanent',
                 basicSalary: String(initialData.basicSalary || ''),
+                salaryPaymentType: initialData.salaryPaymentType || 'cash',
+                bankName: initialData.bankName || '',
+                accountNumber: initialData.accountNumber || '',
+                iban: initialData.iban || '',
             });
         }
     }, [initialData]);
+
 
     useEffect(() => {
         if (!firestore) return;
@@ -64,10 +82,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([
-                    getDocs(deptsQuery),
-                    getDocs(jobsQuery)
-                ]);
+                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
                 setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
                 
@@ -123,6 +138,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             jobTitle: formData.jobTitle,
             contractType: formData.contractType,
             basicSalary: parseFloat(formData.basicSalary),
+            salaryPaymentType: formData.salaryPaymentType,
+            bankName: formData.salaryPaymentType === 'transfer' ? formData.bankName : '',
+            accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
+            iban: formData.salaryPaymentType === 'transfer' ? formData.iban : '',
         };
         
         await onSave(dataToSave);
@@ -180,9 +199,42 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </div>
                 <Separator />
-                <div className="grid gap-1.5">
-                    <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                    <Input id="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required />
+                <div className="grid gap-4">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
+                        <Input id="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
+                            <Select value={formData.salaryPaymentType || 'cash'} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl">
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="cash">نقداً</SelectItem>
+                                    <SelectItem value="cheque">شيك</SelectItem>
+                                    <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    
+                    {formData.salaryPaymentType === 'transfer' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/50">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="bankName">اسم البنك</Label>
+                                <Input id="bankName" value={formData.bankName} onChange={handleInputChange} />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="accountNumber">رقم الحساب</Label>
+                                <Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr" />
+                            </div>
+                            <div className="grid gap-1.5 sm:col-span-2">
+                                <Label htmlFor="iban">IBAN</Label>
+                                <Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
             <DialogFooter className="mt-6 pt-4 border-t">
