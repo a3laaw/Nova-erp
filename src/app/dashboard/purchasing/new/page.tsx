@@ -35,6 +35,7 @@ import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DateInput } from '@/components/ui/date-input';
 
 const itemSchema = z.object({
   description: z.string().min(1, "الوصف مطلوب"),
@@ -44,7 +45,7 @@ const itemSchema = z.object({
 
 const purchaseOrderSchema = z.object({
   vendorId: z.string().min(1, "المورد مطلوب"),
-  orderDate: z.string().min(1, "تاريخ الطلب مطلوب"),
+  orderDate: z.date({ required_error: 'تاريخ الطلب مطلوب' }),
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
@@ -67,7 +68,7 @@ export default function NewPurchaseOrderPage() {
         resolver: zodResolver(purchaseOrderSchema),
         mode: 'onChange',
         defaultValues: {
-            orderDate: new Date().toISOString().split('T')[0],
+            orderDate: new Date(),
             items: [{ description: '', quantity: 1, unitPrice: 0 }],
         },
     });
@@ -140,7 +141,7 @@ export default function NewPurchaseOrderPage() {
 
                 const poData: Omit<PurchaseOrder, 'id'> = {
                     poNumber: newPoNumber,
-                    orderDate: new Date(data.orderDate),
+                    orderDate: data.orderDate,
                     vendorId: data.vendorId,
                     vendorName: vendor?.name || '',
                     items: processedItems,
@@ -207,7 +208,7 @@ export default function NewPurchaseOrderPage() {
                             <Controller
                                 name="orderDate"
                                 control={control}
-                                render={({ field }) => <Input type="date" {...field} />}
+                                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />}
                             />
                             {errors.orderDate && <p className="text-xs text-destructive">{errors.orderDate.message}</p>}
                         </div>
@@ -282,3 +283,4 @@ export default function NewPurchaseOrderPage() {
         </Card>
     );
 }
+    

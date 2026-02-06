@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useAnalyticalData from '@/hooks/use-analytical-data';
+import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
-import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
-import { Input } from '@/components/ui/input';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
 
@@ -19,14 +18,14 @@ interface OverheadItem {
 
 export function OverheadReport() {
   const { journalEntries, accounts, loading } = useAnalyticalData();
-  const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [dateTo, setDateTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
   const reportData = useMemo(() => {
     if (loading || !dateFrom || !dateTo) return [];
 
-    const startDate = parseISO(dateFrom);
-    const endDate = parseISO(dateTo);
+    const startDate = dateFrom;
+    const endDate = new Date(dateTo);
     endDate.setHours(23, 59, 59, 999);
 
     const overheadMap = new Map<string, OverheadItem>();
@@ -65,53 +64,54 @@ export function OverheadReport() {
 
   return (
     <div className="space-y-4">
-      div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-muted/50 p-4 rounded-lg">
-        div className="grid gap-2">
-          Label htmlFor="dateFrom-ov">من تاريخLabel>
-          DateInput id="dateFrom-ov" value={dateFrom} onChange={setDateFrom} />
-        div>
-        div className="grid gap-2">
-          Label htmlFor="dateTo-ov">إلى تاريخLabel>
-          DateInput id="dateTo-ov" value={dateTo} onChange={setDateTo} />
-        div>
-      div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-muted/50 p-4 rounded-lg">
+        <div className="grid gap-2">
+          <Label htmlFor="dateFrom-ov">من تاريخ</Label>
+          <DateInput id="dateFrom-ov" value={dateFrom} onChange={setDateFrom} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="dateTo-ov">إلى تاريخ</Label>
+          <DateInput id="dateTo-ov" value={dateTo} onChange={setDateTo} />
+        </div>
+      </div>
       
-      div className="border rounded-lg">
-          Table>
-            TableHeader>
-              TableRow>
-                TableHead>كود الحسابTableHead>
-                TableHead>اسم حساب المصروفTableHead>
-                TableHead className="text-left">إجمالي المصروفTableHead>
-              TableRow>
-            TableHeader>
-            TableBody>
+      <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>كود الحساب</TableHead>
+                <TableHead>اسم حساب المصروف</TableHead>
+                <TableHead className="text-left">إجمالي المصروف</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {loading && Array.from({length: 3}).map((_, i) => (
-                TableRow key={i}>
-                  TableCell colSpan={3}>Skeleton className="h-6 w-full" />TableCell>
-                TableRow>
+                <TableRow key={i}>
+                  <TableCell colSpan={3}><Skeleton className="h-6 w-full" /></TableCell>
+                </TableRow>
               ))}
               {!loading && reportData.length === 0 && (
-                TableRow>
-                  TableCell colSpan={3} className="h-24 text-center">لا توجد مصاريف عامة في هذه الفترة.TableCell>
-                TableRow>
+                <TableRow>
+                  <TableCell colSpan={3} className="h-24 text-center">لا توجد مصاريف عامة في هذه الفترة.</TableCell>
+                </TableRow>
               )}
               {!loading && reportData.map(item => (
-                TableRow key={item.accountId}>
-                  TableCell className="font-mono">{item.accountCode}TableCell>
-                  TableCell className="font-medium">{item.accountName}TableCell>
-                  TableCell className="text-left font-mono">{formatCurrency(item.totalAmount)}TableCell>
-                TableRow>
+                <TableRow key={item.accountId}>
+                  <TableCell className="font-mono">{item.accountCode}</TableCell>
+                  <TableCell className="font-medium">{item.accountName}</TableCell>
+                  <TableCell className="text-left font-mono">{formatCurrency(item.totalAmount)}</TableCell>
+                </TableRow>
               ))}
-            TableBody>
-             TableFooter>
-                TableRow className="font-bold text-base">
-                    TableCell colSpan={2}>إجمالي المصاريف العامةTableCell>
-                    TableCell className="text-left font-mono">{formatCurrency(totalOverhead)}TableCell>
-                TableRow>
-             TableFooter>
-          Table>
-        div>
-    div>
+            </TableBody>
+             <TableFooter>
+                <TableRow className="font-bold text-base">
+                    <TableCell colSpan={2}>إجمالي المصاريف العامة</TableCell>
+                    <TableCell className="text-left font-mono">{formatCurrency(totalOverhead)}</TableCell>
+                </TableRow>
+             </TableFooter>
+          </Table>
+        </div>
+    </div>
   );
 }
+    

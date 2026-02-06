@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, ArrowRight, Search } from 'lucide-react';
@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import Link from 'next/link';
 import { useBranding } from '@/context/branding-context';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 
 interface StatementLine {
     date: Date;
@@ -57,15 +57,15 @@ export default function GeneralLedgerPage() {
     
     // --- Filters ---
     const [accountId, setAccountId] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [dateFrom, setDateFrom] = useState<Date | undefined>();
+    const [dateTo, setDateTo] = useState<Date | undefined>();
     const [statusFilter, setStatusFilter] = useState<'all' | 'posted' | 'draft'>('posted');
 
     useEffect(() => {
         // Set default date range on client-side to avoid hydration mismatch
         const now = new Date();
-        setDateFrom(format(startOfMonth(now), 'yyyy-MM-dd'));
-        setDateTo(format(endOfMonth(now), 'yyyy-MM-dd'));
+        setDateFrom(startOfMonth(now));
+        setDateTo(endOfMonth(now));
     }, []);
 
     // --- Data Fetching ---
@@ -112,8 +112,8 @@ export default function GeneralLedgerPage() {
             return { openingBalance: 0, lines: [], totalDebit: 0, totalCredit: 0, finalBalance: 0 };
         }
 
-        const startDate = parseISO(dateFrom);
-        const endDate = parseISO(dateTo);
+        const startDate = dateFrom;
+        const endDate = new Date(dateTo);
         endDate.setHours(23, 59, 59, 999);
         
         let relevantEntries = journalEntries;
@@ -199,11 +199,11 @@ export default function GeneralLedgerPage() {
                      </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateFrom">التاريخ من</Label>
-                        <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                        <DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
                      </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">التاريخ إلى</Label>
-                        <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                        <DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
                      </div>
                       <div className="grid gap-2">
                         <Label htmlFor="statusFilter">حالة القيود</Label>
@@ -229,7 +229,7 @@ export default function GeneralLedgerPage() {
 
             {isLoading && accountId && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
-            {accountId && !isLoading && (
+            {accountId && !isLoading && dateFrom && dateTo && (
                 <Card id="printable-area" className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
                     <CardHeader className="p-8 md:p-12">
                         {branding?.letterhead_image_url ? (
@@ -258,7 +258,7 @@ export default function GeneralLedgerPage() {
                         )}
                          <div className="mt-6 text-sm">
                             <p><span className="font-semibold w-24 inline-block">الحساب:</span> {selectedAccount?.name} ({selectedAccount?.code})</p>
-                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(parseISO(dateFrom), 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(parseISO(dateTo), 'dd/MM/yyyy')}</p>
+                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(dateFrom, 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(dateTo, 'dd/MM/yyyy')}</p>
                          </div>
                     </CardHeader>
                     <CardContent className="px-8 md:px-12">
@@ -275,7 +275,7 @@ export default function GeneralLedgerPage() {
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell colSpan={5} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
+                                    <TableCell colSpan={6} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
                                 </TableRow>
                                 {statementData.lines.map((line, index) => (
@@ -306,7 +306,7 @@ export default function GeneralLedgerPage() {
                                     <TableCell colSpan={1}></TableCell>
                                 </TableRow>
                                 <TableRow className="font-bold text-lg bg-muted">
-                                    <TableCell colSpan={5}>الرصيد النهائي</TableCell>
+                                    <TableCell colSpan={6}>الرصيد النهائي</TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
                                 </TableRow>
                             </TableFooter>
@@ -323,3 +323,4 @@ export default function GeneralLedgerPage() {
         </div>
     );
 }
+    

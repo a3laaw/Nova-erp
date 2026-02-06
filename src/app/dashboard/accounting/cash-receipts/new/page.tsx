@@ -30,9 +30,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { DateInput } from '@/components/ui/date-input';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
@@ -54,7 +56,7 @@ export default function NewCashReceiptPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [clients, setClients] = useState<Client[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -105,10 +107,6 @@ export default function NewCashReceiptPage() {
 
     generateVoucherNumber();
   }, [firestore, toast]);
-
-  useEffect(() => {
-    setDate(new Date().toISOString().split('T')[0]);
-  }, []);
 
   useEffect(() => {
     if (amount && !isNaN(parseFloat(amount))) {
@@ -266,7 +264,8 @@ export default function NewCashReceiptPage() {
   })), [clients]);
 
   const projectOptions = useMemo(() => clientProjects.map(p => {
-    const dateString = p.createdAt?.toDate ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '';
+    const date = toFirestoreDate(p.createdAt);
+    const dateString = date ? format(date, 'dd/MM/yyyy') : '';
     return {
         value: p.id!,
         label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
@@ -396,7 +395,7 @@ export default function NewCashReceiptPage() {
             const newReceiptData: any = { 
                 voucherNumber: newVoucherNumber, voucherSequence: nextNumber, voucherYear: currentYear,
                 clientId: selectedClientId, clientNameAr: selectedClient?.nameAr || '', clientNameEn: selectedClient?.nameEn || '',
-                amount: parseFloat(amount), amountInWords: amountInWords, receiptDate: Timestamp.fromDate(new Date(date)),
+                amount: parseFloat(amount), amountInWords: amountInWords, receiptDate: date,
                 paymentMethod: paymentMethod, description: description, reference: reference, journalEntryId: newJournalEntryRef.id,
                 createdAt: serverTimestamp(),
             };
@@ -490,7 +489,7 @@ export default function NewCashReceiptPage() {
                     const salaryExpenseAccount = accounts.find(a => a.code === '5201'); // مصروف الرواتب والأجور
                     const accruedSalaryAccount = accounts.find(a => a.code === '210201'); // رواتب وأجور مستحقة
                     
-                    if(salaryExpenseAccount && accruedSalaryAccount) {
+                    if(salaryExpenseAccount && accruedSalaryAccount && date) {
                         const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
                         const jeCounterDoc = await getDoc(jeCounterRef);
                         let jeNextNumber = 1;
@@ -504,7 +503,7 @@ export default function NewCashReceiptPage() {
                         const commissionJeRef = doc(collection(firestore, 'journalEntries'));
                         commissionBatch.set(commissionJeRef, {
                             entryNumber: commissionJeNumber,
-                            date: Timestamp.fromDate(new Date(date)),
+                            date: Timestamp.fromDate(date),
                             narration: `إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${newVoucherNumberForCommission}`,
                             totalDebit: commissionAmount,
                             totalCredit: commissionAmount,
@@ -630,7 +629,7 @@ export default function NewCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
+                    <DateInput value={date} onChange={setDate} disabled={isSaving}/>
                 </div>
             </div>
             
@@ -706,4 +705,5 @@ export default function NewCashReceiptPage() {
   );
 }
 
+    
     

@@ -27,6 +27,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { toFirestoreDate } from '@/services/date-converter';
 import { searchPurchaseOrders } from '@/lib/cache/fuse-search';
+import { DateInput } from '../ui/date-input';
 
 
 const statusColors: Record<string, string> = {
@@ -53,8 +54,8 @@ export function PurchaseOrdersList() {
   const [itemToDelete, setItemToDelete] = useState<PurchaseOrder | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const poQueryConstraints = useMemo(() => [orderBy('orderDate', 'desc')], []);
   const { data: purchaseOrders, loading, error } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', poQueryConstraints);
@@ -129,22 +130,18 @@ export function PurchaseOrdersList() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="dateFrom">من تاريخ</Label>
-                    <Input
+                    <DateInput
                         id="dateFrom"
-                        type="date"
                         value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="bg-background"
+                        onChange={setDateFrom}
                     />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="dateTo">إلى تاريخ</Label>
-                     <Input
+                     <DateInput
                         id="dateTo"
-                        type="date"
                         value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="bg-background"
+                        onChange={setDateTo}
                     />
                 </div>
             </div>
@@ -217,3 +214,4 @@ export function PurchaseOrdersList() {
     </>
   );
 }
+    

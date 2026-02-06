@@ -10,18 +10,18 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
-import { format, endOfYear, parseISO } from 'date-fns';
+import { format, endOfYear } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Loader2, Printer, Scale, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DateInput } from '@/components/ui/date-input';
 
 interface BalanceSheetData {
     assets: {
@@ -58,11 +58,7 @@ export default function BalanceSheetPage() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
     
-    const [asOfDate, setAsOfDate] = useState<string>('');
-
-    useEffect(() => {
-        setAsOfDate(format(endOfYear(new Date()), 'yyyy-MM-dd'));
-    }, []);
+    const [asOfDate, setAsOfDate] = useState<Date | undefined>(endOfYear(new Date()));
 
     // Fetch accounts once
     useEffect(() => {
@@ -84,7 +80,7 @@ export default function BalanceSheetPage() {
         const fetchEntries = async () => {
             setLoading(true);
             try {
-                const endDate = parseISO(asOfDate);
+                const endDate = new Date(asOfDate);
                 endDate.setHours(23, 59, 59, 999);
 
                 const entriesQuery = query(
@@ -108,7 +104,7 @@ export default function BalanceSheetPage() {
     const balanceSheetData = useMemo((): BalanceSheetData | null => {
         if (loading || !asOfDate || accounts.length === 0) return null;
 
-        const endDate = parseISO(asOfDate);
+        const endDate = asOfDate;
 
         const accountBalances = new Map<string, number>();
 
@@ -197,7 +193,7 @@ export default function BalanceSheetPage() {
                 <CardContent>
                     <div className="grid gap-2 max-w-xs">
                         <Label htmlFor="asOfDate">حتى تاريخ</Label>
-                        <Input id="asOfDate" type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+                        <DateInput value={asOfDate} onChange={setAsOfDate} />
                      </div>
                 </CardContent>
             </Card>
@@ -237,7 +233,7 @@ export default function BalanceSheetPage() {
                              <div className="mt-6 text-sm text-center">
                                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
                                 <p className="font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
-                                <p><span className="font-semibold w-24 inline-block">كما في:</span> {asOfDate ? format(parseISO(asOfDate), 'dd/MM/yyyy') : ''}</p>
+                                <p><span className="font-semibold w-24 inline-block">كما في:</span> {asOfDate ? format(asOfDate, 'dd/MM/yyyy') : ''}</p>
                             </div>
                             <CardContent className="px-0 pt-6 space-y-6">
                                 {!balanceSheetData.isBalanced && (
@@ -285,3 +281,4 @@ export default function BalanceSheetPage() {
         </div>
     );
 }
+    

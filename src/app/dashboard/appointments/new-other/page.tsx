@@ -34,6 +34,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { DateInput } from '@/components/ui/date-input';
 
 const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -55,7 +56,7 @@ export default function NewOtherAppointmentPage() {
     const [engineerId, setEngineerId] = useState('');
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
-    const [date, setDate] = useState('');
+    const [date, setDate] = useState<Date | undefined>();
     const [time, setTime] = useState('');
 
     const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' | 'room' }[]>([]);
@@ -131,7 +132,7 @@ export default function NewOtherAppointmentPage() {
             setIsLoadingSchedule(true);
 
             try {
-                const appointmentDate = toFirestoreDate(date);
+                const appointmentDate = date;
                 if (!appointmentDate) {
                     setIsLoadingSchedule(false);
                     return;
@@ -213,8 +214,10 @@ export default function NewOtherAppointmentPage() {
 
         setIsSaving(true);
         try {
-            const appointmentDateTime = new Date(`${date}T${time}`);
-            
+            const [hours, minutes] = time.split(':').map(Number);
+            const appointmentDateTime = new Date(date);
+            appointmentDateTime.setHours(hours, minutes, 0, 0);
+
             // --- Conflict Validation ---
             const dayStart = new Date(appointmentDateTime);
             dayStart.setHours(0, 0, 0, 0);
@@ -298,7 +301,7 @@ export default function NewOtherAppointmentPage() {
                      await createNotification(firestore, {
                         userId: targetUserId,
                         title: `موعد جديد: ${title}`,
-                        body: `تم تحديد موعد لك مع العميل ${client?.nameAr} في ${meetingRoom} يوم ${date} الساعة ${time}.`,
+                        body: `تم تحديد موعد لك مع العميل ${client?.nameAr} في ${meetingRoom} يوم ${date ? format(date, 'PPP', { locale: ar }) : ''} الساعة ${time}.`,
                         link: `/dashboard/appointments`
                     });
                 }
@@ -382,7 +385,7 @@ export default function NewOtherAppointmentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                            <DateInput id="date" value={date} onChange={setDate} required />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="time">الوقت <span className="text-destructive">*</span></Label>
@@ -432,3 +435,5 @@ export default function NewOtherAppointmentPage() {
         </Card>
     );
 }
+
+    

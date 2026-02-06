@@ -10,17 +10,17 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
-import { format, startOfYear, endOfYear, parseISO } from 'date-fns';
+import { format, startOfYear, endOfYear } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, LineChart } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
+import { DateInput } from '@/components/ui/date-input';
 
 interface IncomeStatementData {
     totalRevenue: number;
@@ -40,13 +40,13 @@ export default function IncomeStatementPage() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
     
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [dateFrom, setDateFrom] = useState<Date | undefined>();
+    const [dateTo, setDateTo] = useState<Date | undefined>();
 
     useEffect(() => {
         const now = new Date();
-        setDateFrom(format(startOfYear(now), 'yyyy-MM-dd'));
-        setDateTo(format(endOfYear(now), 'yyyy-MM-dd'));
+        setDateFrom(startOfYear(now));
+        setDateTo(endOfYear(now));
     }, []);
 
     // Fetch accounts once
@@ -69,9 +69,9 @@ export default function IncomeStatementPage() {
         const fetchEntries = async () => {
             setLoading(true);
             try {
-                const startDate = parseISO(dateFrom);
+                const startDate = new Date(dateFrom);
                 startDate.setHours(0, 0, 0, 0);
-                const endDate = parseISO(dateTo);
+                const endDate = new Date(dateTo);
                 endDate.setHours(23, 59, 59, 999);
 
                 const entriesQuery = query(
@@ -173,18 +173,18 @@ export default function IncomeStatementPage() {
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">من تاريخ</Label>
-                        <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                        <DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
                      </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">إلى تاريخ</Label>
-                        <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                        <DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
                      </div>
                 </CardContent>
             </Card>
 
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
-            {!isLoading && incomeStatementData && (
+            {!isLoading && incomeStatementData && dateFrom && dateTo && (
                  <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
                     <div id="printable-area" className="printable-content">
                         {branding?.letterhead_image_url && (
@@ -213,7 +213,7 @@ export default function IncomeStatementPage() {
                                     </div>
                                 </div>
                                 <div className="mt-6 text-sm">
-                                    <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
+                                    <p><span className="font-semibold w-24 inline-block">عن الفترة من:</span> {format(dateFrom, 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(dateTo, 'dd/MM/yyyy')}</p>
                                 </div>
                             </CardHeader>
                             <CardContent className="px-0 pt-6 space-y-6">
@@ -294,3 +294,4 @@ export default function IncomeStatementPage() {
         </div>
     );
 }
+    

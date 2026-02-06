@@ -30,9 +30,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
-import { format } from 'date-fns';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DateInput } from '@/components/ui/date-input';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
@@ -69,7 +70,7 @@ export default function EditCashReceiptPage() {
   const [journalEntryIsPosted, setJournalEntryIsPosted] = useState(false);
 
   // Form state
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState<Date | undefined>();
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [amount, setAmount] = useState('');
   const [amountInWords, setAmountInWords] = useState('');
@@ -99,7 +100,7 @@ export default function EditCashReceiptPage() {
     setOriginalReceipt(receiptData);
 
     // Populate form
-    setDate(receiptData.receiptDate?.toDate ? format(receiptData.receiptDate.toDate(), 'yyyy-MM-dd') : '');
+    setDate(toFirestoreDate(receiptData.receiptDate) || undefined);
     setSelectedProjectId(receiptData.projectId || '');
     setAmount(String(receiptData.amount));
     setAmountInWords(receiptData.amountInWords);
@@ -245,7 +246,8 @@ export default function EditCashReceiptPage() {
 
 
   const projectOptions = useMemo(() => clientProjects.map(p => {
-    const dateString = p.createdAt?.toDate ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '';
+    const date = toFirestoreDate(p.createdAt);
+    const dateString = date ? format(date, 'dd/MM/yyyy') : '';
     return {
         value: p.id!,
         label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
@@ -336,7 +338,7 @@ export default function EditCashReceiptPage() {
             }
 
             const receiptUpdatePayload = {
-                receiptDate: new Date(date),
+                receiptDate: date,
                 projectId: selectedProjectId || null,
                 amount: parseFloat(amount),
                 amountInWords: amountInWords,
@@ -366,7 +368,7 @@ export default function EditCashReceiptPage() {
             ];
 
             const jeUpdatePayload = {
-                date: Timestamp.fromDate(new Date(date)),
+                date: Timestamp.fromDate(date),
                 lines: newLines,
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
@@ -503,7 +505,7 @@ export default function EditCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={isSaving}/>
+                    <DateInput value={date} onChange={setDate} disabled={isSaving}/>
                 </div>
             </div>
             
@@ -578,3 +580,4 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
+    

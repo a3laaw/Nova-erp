@@ -22,14 +22,14 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, Scale } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
+import { DateInput } from '@/components/ui/date-input';
 
 interface TrialBalanceLine {
   accountId: string;
@@ -50,13 +50,13 @@ export default function TrialBalancePage() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
 
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [dateFrom, setDateFrom] = useState<Date | undefined>();
+    const [dateTo, setDateTo] = useState<Date | undefined>();
 
     useEffect(() => {
         const now = new Date();
-        setDateFrom(format(startOfMonth(now), 'yyyy-MM-dd'));
-        setDateTo(format(endOfMonth(now), 'yyyy-MM-dd'));
+        setDateFrom(startOfMonth(now));
+        setDateTo(endOfMonth(now));
     }, []);
 
     // Fetch accounts once
@@ -79,7 +79,7 @@ export default function TrialBalancePage() {
         const fetchEntries = async () => {
             setLoading(true);
             try {
-                const endDate = parseISO(dateTo);
+                const endDate = new Date(dateTo);
                 endDate.setHours(23, 59, 59, 999);
 
                 const entriesQuery = query(
@@ -103,9 +103,9 @@ export default function TrialBalancePage() {
     const trialBalanceData = useMemo(() => {
         if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: {} };
 
-        const startDate = parseISO(dateFrom);
+        const startDate = new Date(dateFrom);
         startDate.setHours(0, 0, 0, 0);
-        const endDate = parseISO(dateTo);
+        const endDate = new Date(dateTo);
         endDate.setHours(23, 59, 59, 999);
 
 
@@ -174,18 +174,18 @@ export default function TrialBalancePage() {
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div className="grid gap-2">
                         <Label htmlFor="dateFrom">التاريخ من</Label>
-                        <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                        <DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
                      </div>
                      <div className="grid gap-2">
                         <Label htmlFor="dateTo">التاريخ إلى</Label>
-                        <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                        <DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
                      </div>
                 </CardContent>
             </Card>
             
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
-            {!isLoading && (
+            {!isLoading && dateFrom && dateTo &&(
                  <Card id="printable-area" className="max-w-6xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
                     <CardHeader className="p-8 md:p-12">
                         {branding?.letterhead_image_url ? (
@@ -208,7 +208,7 @@ export default function TrialBalancePage() {
                             </div>
                         )}
                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {dateFrom ? format(parseISO(dateFrom), 'dd/MM/yyyy') : ''} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {dateTo ? format(parseISO(dateTo), 'dd/MM/yyyy') : ''}</p>
+                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(dateFrom, 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(dateTo, 'dd/MM/yyyy')}</p>
                          </div>
                     </CardHeader>
                     <CardContent className="px-8 md:px-12">
@@ -266,5 +266,4 @@ export default function TrialBalancePage() {
         </div>
     );
 }
-
     

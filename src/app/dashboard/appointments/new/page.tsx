@@ -28,6 +28,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DateInput } from '@/components/ui/date-input';
 
 export default function NewArchitecturalAppointmentPage() {
     const router = useRouter();
@@ -45,7 +46,7 @@ export default function NewArchitecturalAppointmentPage() {
     const [engineerId, setEngineerId] = useState('');
     const [title, setTitle] = useState('');
     const [notes, setNotes] = useState('');
-    const [date, setDate] = useState('');
+    const [date, setDate] = useState<Date | undefined>();
     const [time, setTime] = useState('');
     
     const [isNewClient, setIsNewClient] = useState(false);
@@ -138,11 +139,7 @@ export default function NewArchitecturalAppointmentPage() {
             setIsLoadingSchedule(true);
             
             try {
-                const appointmentDate = toFirestoreDate(date);
-                if (!appointmentDate) {
-                    setIsLoadingSchedule(false);
-                    return;
-                }
+                const appointmentDate = date;
 
                 const dayStart = new Date(appointmentDate);
                 dayStart.setHours(0, 0, 0, 0);
@@ -217,8 +214,10 @@ export default function NewArchitecturalAppointmentPage() {
 
         setIsSaving(true);
         try {
-            const appointmentDateTime = new Date(`${date}T${time}`);
-            
+            const [hours, minutes] = time.split(':').map(Number);
+            const appointmentDateTime = new Date(date);
+            appointmentDateTime.setHours(hours, minutes, 0, 0);
+
             if (isNewClient) {
                 const clientsRef = collection(firestore, 'clients');
                 const q = query(clientsRef, where('mobile', '==', newClientMobile));
@@ -293,7 +292,7 @@ export default function NewArchitecturalAppointmentPage() {
                      await createNotification(firestore, {
                         userId: targetUserId,
                         title: `موعد جديد: ${title}`,
-                        body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : client?.nameAr} يوم ${date} الساعة ${time}.`,
+                        body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : client?.nameAr} يوم ${format(date, 'PPP', { locale: ar })} الساعة ${time}.`,
                         link: `/dashboard/appointments/${newApptRef.id}`
                     });
                 }
@@ -369,7 +368,7 @@ export default function NewArchitecturalAppointmentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                            <DateInput id="date" value={date} onChange={setDate} required />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="time">الوقت <span className="text-destructive">*</span></Label>
@@ -419,3 +418,4 @@ export default function NewArchitecturalAppointmentPage() {
         </Card>
     );
 }
+    
