@@ -22,6 +22,16 @@ interface EmployeeFormProps {
     isSaving?: boolean;
 }
 
+const commonNationalities = [
+  "كويتي", "سعودي", "إماراتي", "بحريني", "قطري", "عماني",
+  "مصري", "سوري", "لبناني", "أردني", "فلسطيني", "يمني",
+  "هندي", "باكستاني", "فلبيني", "بنغلاديشي", "نيبالي", "إيراني",
+  "بريطاني", "أمريكي"
+].sort((a,b) => a.localeCompare(b, 'ar'));
+
+const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n }));
+
+
 export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false }: EmployeeFormProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -161,7 +171,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             gender: formData.gender,
             dob: formData.dob ? new Date(formData.dob) : undefined,
             nationality: formData.nationality,
-            residencyExpiry: formData.nationality && formData.nationality !== 'كويتي' && formData.residencyExpiry ? new Date(formData.residencyExpiry) : undefined,
+            residencyExpiry: formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry ? new Date(formData.residencyExpiry) : undefined,
         };
         
         await onSave(dataToSave);
@@ -209,7 +219,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-1.5">
                         <Label htmlFor="nationality">الجنسية</Label>
-                        <Input id="nationality" value={formData.nationality} onChange={handleInputChange} />
+                        <InlineSearchList
+                            value={formData.nationality}
+                            onSelect={(value) => handleSelectChange('nationality', value)}
+                            options={nationalityOptions}
+                            placeholder="اختر الجنسية..."
+                        />
                     </div>
                     {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
                         <div className="grid gap-1.5">
@@ -303,5 +318,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
-    
