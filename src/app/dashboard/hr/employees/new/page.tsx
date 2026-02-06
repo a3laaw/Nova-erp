@@ -30,15 +30,13 @@ export default function NewEmployeePage() {
         if (!firestore) return;
         const generateEmployeeNumber = async () => {
             try {
-                const currentYear = new Date().getFullYear();
                 const counterRef = doc(firestore, 'counters', 'employees');
                 const counterDoc = await getDoc(counterRef);
                 let nextNumber = 101;
                 if (counterDoc.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 100) + 1;
+                    nextNumber = (counterDoc.data()?.lastNumber || 100) + 1;
                 }
-                setEmployeeNumber(`${String(currentYear).slice(-2)}-${String(nextNumber).padStart(4, '0')}`);
+                setEmployeeNumber(String(nextNumber));
             } catch (error) {
                 console.error("Error generating employee number:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في توليد الرقم الوظيفي.' });
@@ -75,19 +73,17 @@ export default function NewEmployeePage() {
             }
 
             await runTransaction(firestore, async (transaction) => {
-                const currentYear = new Date().getFullYear();
                 const employeeCounterRef = doc(firestore, 'counters', 'employees');
                 const employeeCounterDoc = await transaction.get(employeeCounterRef);
                 
                 let nextNumber = 101;
                 if (employeeCounterDoc.exists()) {
-                    const counts = employeeCounterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 100) + 1;
+                    nextNumber = (employeeCounterDoc.data()?.lastNumber || 100) + 1;
                 }
                 
-                transaction.set(employeeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+                transaction.set(employeeCounterRef, { lastNumber: nextNumber }, { merge: true });
                 
-                const newEmployeeNumber = `${String(currentYear).slice(-2)}-${String(nextNumber).padStart(4, '0')}`;
+                const newEmployeeNumber = String(nextNumber);
 
                 if (newEmployeeNumber !== employeeNumber) {
                     console.warn(`Race condition detected for employee number. UI showed ${employeeNumber}, saved as ${newEmployeeNumber}`);
