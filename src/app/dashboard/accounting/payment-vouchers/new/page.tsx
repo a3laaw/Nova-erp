@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,9 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Printer, Save, X, Loader2 } from 'lucide-react';
+import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, query, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy, collectionGroup, writeBatch } from 'firebase/firestore';
 import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +53,7 @@ type PaymentVoucherFormValues = z.infer<typeof paymentVoucherSchema>;
 
 export default function NewPaymentVoucherPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -66,13 +68,34 @@ export default function NewPaymentVoucherPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
 
-  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<PaymentVoucherFormValues>({
+  const { register, handleSubmit, control, watch, formState: { errors }, setValue } = useForm<PaymentVoucherFormValues>({
       resolver: zodResolver(paymentVoucherSchema),
       defaultValues: {
           paymentDate: new Date().toISOString().split('T')[0],
           amount: '',
       }
   });
+  
+  // Pre-fill from URL
+  useEffect(() => {
+    const payeeType = searchParams.get('payeeType');
+    const payeeName = searchParams.get('payeeName');
+    const amount = searchParams.get('amount');
+    const description = searchParams.get('description');
+    const debitAccountCode = searchParams.get('debitAccountCode');
+    const employeeId = searchParams.get('employeeId');
+
+    if (payeeType) setValue('payeeType', payeeType);
+    if (payeeName) setValue('payeeName', payeeName);
+    if (amount) setValue('amount', parseFloat(amount));
+    if (description) setValue('description', description);
+    
+    if (debitAccountCode && accounts.length > 0) {
+        const acc = accounts.find(a => a.code === debitAccountCode);
+        if (acc) setValue('debitAccountId', acc.id!);
+    }
+  }, [searchParams, setValue, accounts]);
+
 
   const amountValue = watch('amount');
   const selectedDebitAccountId = watch('debitAccountId');
@@ -174,7 +197,8 @@ export default function NewPaymentVoucherPage() {
                 debitAccountId: data.debitAccountId, debitAccountName: debitAccount.name,
                 creditAccountId: data.creditAccountId, creditAccountName: creditAccount.name,
                 status: 'draft' as const, createdAt: serverTimestamp(), journalEntryId: newJournalEntryRef.id,
-                ...(showProjectLink && data.projectLink ? { clientId: data.projectLink.split('/')[0], transactionId: data.projectLink.split('/')[1] } : {})
+                ...(showProjectLink && data.projectLink ? { clientId: data.projectLink.split('/')[0], transactionId: data.projectLink.split('/')[1] } : {}),
+                ...(searchParams.get('employeeId') && { employeeId: searchParams.get('employeeId') })
             };
 
             const newVoucherRef = doc(collection(firestore, 'paymentVouchers'));
@@ -211,6 +235,34 @@ export default function NewPaymentVoucherPage() {
             transaction.set(newJournalEntryRef, journalEntryData);
         });
 
+        // Post-transaction logic for residency renewal
+        if (searchParams.get('source') === 'residency_renewal') {
+            const employeeId = searchParams.get('employeeId');
+            const newExpiryDateISO = searchParams.get('newExpiryDate');
+            if (employeeId && newExpiryDateISO) {
+                const employeeRef = doc(firestore, 'employees', employeeId);
+                const employeeSnap = await getDoc(employeeRef);
+                if (employeeSnap.exists()) {
+                    const batch = writeBatch(firestore);
+                    const newExpiryDate = new Date(newExpiryDateISO);
+                    batch.update(employeeRef, { residencyExpiry: newExpiryDate });
+
+                    const auditLogRef = doc(collection(firestore, `employees/${employeeId}/auditLogs`));
+                    const logData = {
+                        changeType: 'ResidencyUpdate',
+                        field: 'residencyExpiry',
+                        oldValue: employeeSnap.data().residencyExpiry || null,
+                        newValue: newExpiryDate,
+                        effectiveDate: serverTimestamp(),
+                        changedBy: currentUser.id,
+                        notes: `تجديد الإقامة عبر سند الصرف رقم ${voucherNumber}. التكلفة: ${formatCurrency(Number(data.amount))}`,
+                    };
+                    batch.set(auditLogRef, logData);
+                    await batch.commit();
+                }
+            }
+        }
+        
         toast({ title: 'نجاح', description: 'تم إنشاء سند الصرف والقيد المحاسبي بنجاح.' });
         router.push(`/dashboard/accounting/payment-vouchers/${newVoucherId}`);
 
@@ -250,7 +302,7 @@ export default function NewPaymentVoucherPage() {
                         <Label htmlFor="payeeName">اسم المستفيد <span className="text-destructive">*</span></Label>
                          {payeeType === 'employee' ? (
                               <Controller name="payeeName" control={control} render={({ field }) => (
-                                <InlineSearchList value={field.value} onSelect={field.onChange} options={employeePayeeOptions} placeholder={refDataLoading ? "تحميل..." : "اختر موظفًا..."} disabled={refDataLoading} />
+                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={employeePayeeOptions} placeholder={refDataLoading ? "تحميل..." : "اختر موظفًا..."} disabled={refDataLoading} />
                               )} />
                          ) : (
                             <Input id="payeeName" {...register('payeeName')} />
@@ -301,7 +353,7 @@ export default function NewPaymentVoucherPage() {
                     <div className="grid gap-2">
                         <Label htmlFor="debitAccountId">الحساب المدين (المصروف) <span className="text-destructive">*</span></Label>
                         <Controller name="debitAccountId" control={control} render={({ field }) => (
-                            <InlineSearchList value={field.value} onSelect={field.onChange} options={debitAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."} disabled={refDataLoading} />
+                            <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={debitAccountOptions} placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."} disabled={refDataLoading} />
                         )} />
                          {errors.debitAccountId && <p className="text-xs text-destructive">{errors.debitAccountId.message}</p>}
                     </div>

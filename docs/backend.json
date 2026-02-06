@@ -1,4 +1,5 @@
 
+
 {
   "entities": {
     "CompanyBranding": {
@@ -513,7 +514,7 @@
         "description": "Records changes made to employee data for historical tracking.",
         "type": "object",
         "properties": {
-            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate"] },
+            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate", "StatusChange", "ResidencyUpdate"] },
             "field": { "type": "string", "description": "The name of the field that was changed." },
             "oldValue": { "description": "The value of the field before the change." },
             "newValue": { "description": "The value of the field after the change." },
@@ -1062,6 +1063,7 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
+        "employeeId": { "type": "string", "description": "The ID of the employee if this payment is related to them." },
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
@@ -1362,3 +1364,4 @@
     }
   }
 }
+    
