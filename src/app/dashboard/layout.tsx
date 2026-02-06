@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import { Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
@@ -63,7 +63,6 @@ export default function DashboardLayout({
 
   return (
     <div className="relative min-h-screen" style={backgroundStyle}>
-      <SidebarProvider>
         <div className="flex min-h-screen">
           <Sidebar
             side={language === 'ar' ? 'right' : 'left'}
@@ -82,7 +81,6 @@ export default function DashboardLayout({
             <OfflineIndicator />
           </SidebarInset>
         </div>
-      </SidebarProvider>
     </div>
   );
 }

@@ -104,12 +104,70 @@ const navItems = {
     { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
   ],
   en: [
-    // ... english translations ...
+    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
+    { href: '/dashboard/purchasing', label: 'Purchasing', icon: ShoppingCart, roles: ['Admin', 'Accountant'] },
+    { 
+      label: 'Accounting', 
+      icon: Wallet, 
+      roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
+      hrefPrefix: '/dashboard/accounting',
+      children: [
+        { href: '/dashboard/accounting/quotations', label: 'Quotations' },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
+        { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
+        {
+          label: 'Vouchers & Entries',
+          children: [
+            { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
+            { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
+            { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
+            { href: '/dashboard/accounting/invoices', label: 'Invoices' },
+          ]
+        },
+        {
+          label: 'Financial Reports',
+          children: [
+            { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
+            { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
+            { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
+            { href: '/dashboard/accounting/reports', label: 'Analytical Reports' },
+          ]
+        },
+        {
+          label: 'Financial Statements',
+          children: [
+            { href: '/dashboard/accounting/income-statement', label: 'Income Statement' },
+            { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet' },
+            { href: '/dashboard/accounting/cash-flow', label: 'Cash Flow Statement' },
+            { href: '/dashboard/accounting/equity-statement', label: 'Statement of Equity' },
+            { href: '/dashboard/accounting/financial-statement-notes', label: 'Notes' },
+            { href: '/dashboard/accounting/financial-forecast', label: 'Financial Forecast' },
+          ]
+        }
+      ]
+    },
+    { 
+      label: 'Human Resources', 
+      icon: HeartHandshake, 
+      roles: ['Admin', 'HR'],
+      hrefPrefix: '/dashboard/hr',
+      children: [
+        { href: '/dashboard/hr/employees', label: 'Employees' },
+      ]
+    },
+    { href: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['Admin', 'Accountant'] },
+    { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
   ]
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile } = useSidebar();
+  const { direction } = useLanguage();
 
   if (!item.roles.includes(userRole)) {
     return null;
@@ -118,7 +176,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={currentPath === item.href} asChild>
+        <SidebarMenuButton isActive={currentPath === item.href} asChild className={cn(direction === 'rtl' ? 'text-right' : 'text-left')}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             <item.icon />
             <span>{item.label}</span>
