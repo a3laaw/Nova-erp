@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -128,9 +129,18 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSelectChange = (id: keyof typeof formData, value: any) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
+    
+    const departmentOptions = useMemo(() => {
+        return departments
+            .filter(d => d && d.name) // Ensure department and its name exist
+            .map(d => ({ value: d.name, label: d.name }));
+    }, [departments]);
 
-    const departmentOptions = useMemo(() => departments.filter(d => d.name).map(d => ({ value: d.name, label: d.name })), [departments]);
-    const jobOptions = useMemo(() => jobs.filter(j => j.name).map(j => ({ value: j.name, label: j.name })), [jobs]);
+    const jobOptions = useMemo(() => {
+        return jobs
+            .filter(j => j && j.name) // Ensure job and its name exist
+            .map(j => ({ value: j.name, label: j.name }));
+    }, [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
