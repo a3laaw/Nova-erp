@@ -53,8 +53,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         residencyExpiry: undefined as Date | undefined,
     });
     
-    const [assignedEngineerId, setAssignedEngineerId] = useState('');
-    
     const [departments, setDepartments] = useState<any[]>([]);
     const [jobs, setJobs] = useState<any[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
@@ -81,7 +79,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 nationality: initialData.nationality || '',
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
             });
-            setAssignedEngineerId(initialData.assignedEngineer || '');
         }
     }, [initialData]);
 
@@ -243,7 +240,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="grid gap-1.5">
                         <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                        <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date)} />
+                        <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
                     </div>
                      <div className="grid gap-1.5">
                         <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
@@ -314,3 +311,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    
