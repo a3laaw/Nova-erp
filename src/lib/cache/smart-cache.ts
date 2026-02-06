@@ -19,12 +19,8 @@ interface CacheEntry<T> {
   ttl: number;
 }
 
-/**
- * A replacer function for JSON.stringify to handle non-serializable objects like Firestore Timestamps.
- * @param key The key of the property being stringified.
- * @param value The value of the property being stringified.
- * @returns A serializable version of the value.
- */
+// FIXED: Added a safe replacer for JSON.stringify to handle Firestore Timestamps.
+// This prevents serialization errors when caching data that contains date objects.
 function safeJsonReplacer(key: string, value: any) {
     if (value && typeof value === 'object' && typeof value.toDate === 'function') {
         // This is a Firestore Timestamp object. Convert it to a serializable ISO string.
@@ -48,7 +44,9 @@ class SmartCache {
   async set<T>(key: string, data: T, ttl: number = 30 * 60 * 1000): Promise<void> {
     try {
       const entry: CacheEntry<T> = { data, timestamp: Date.now(), ttl };
-      await localforage.setItem(key, entry);
+      // IMPROVED: Use the safe replacer before setting data to localforage.
+      const plainData = JSON.parse(JSON.stringify(entry, safeJsonReplacer));
+      await localforage.setItem(key, plainData);
     } catch (error) {
       console.error('Error saving to cache:', error);
     }
@@ -94,7 +92,7 @@ class SmartCache {
     return onSnapshot(q,
       (snapshot) => {
         const data = snapshot.docs.map(doc => {
-            // **FIX**: Use the safe replacer to handle Timestamps before JSON parsing.
+            // FIXED: Use the safe replacer here as well to ensure data passed to `onUpdate` is clean.
             const plainData = JSON.parse(JSON.stringify(doc.data(), safeJsonReplacer));
             return { id: doc.id, ...plainData } as T;
         });
@@ -122,7 +120,7 @@ class SmartCache {
     return onSnapshot(doc(db, docPath),
       (snapshot) => {
         if(snapshot.exists()) {
-            // **FIX**: Use the safe replacer to handle Timestamps before JSON parsing.
+            // FIXED: Use the safe replacer for single documents.
             const plainData = JSON.parse(JSON.stringify(snapshot.data(), safeJsonReplacer));
             const data = { id: snapshot.id, ...plainData } as T;
             onUpdate(data);
@@ -145,7 +143,7 @@ class SmartCache {
     }
 
     const freshData = await fetchFn();
-    // **FIX**: Use the safe replacer to handle Timestamps before JSON parsing.
+    // FIXED: Use the safe replacer before caching the fetched data.
     const plainData = JSON.parse(JSON.stringify(freshData, safeJsonReplacer));
     await this.set(key, plainData, ttl);
     return plainData;

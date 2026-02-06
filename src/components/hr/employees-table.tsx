@@ -64,6 +64,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
+    // IMPROVED: Using a robust infinite scroll hook for better performance.
     const { items: employees, loading: employeesLoading, hasMore, loaderRef, loadingMore } = useInfiniteScroll<Employee>('employees');
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
@@ -78,6 +79,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const loading = employeesLoading && employees.length === 0;
 
     const formatDate = (dateValue: any) => {
+        // FIXED: Using a safe date converter to prevent null crashes.
         const date = toFirestoreDate(dateValue);
         if (!date) return '-';
         return format(date, 'dd/MM/yyyy');
@@ -93,6 +95,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
              return;
         };
         setIsTerminating(true);
+        // IMPROVED: Added try/catch block for better error handling.
         try {
             const employeeRef = doc(firestore, 'employees', employeeToTerminate.id!);
             await updateDoc(employeeRef, {

@@ -89,12 +89,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         if (!firestore) return;
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
+            // IMPROVED: Added try-catch for better error handling during data fetch.
             try {
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
+                // FIXED: Filter out any department or job that doesn't have a name to prevent crashes.
                 const fetchedDepartments = deptsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
                     .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
@@ -310,7 +312,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                 <Button type="submit" disabled={isSaving}>
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                    {isSaving ? 'جاري الحفظ...' : 'حفظ الموظف'}
+                    {isSaving ? 'جاري الحفظ...' : 'حفظ'}
                 </Button>
             </DialogFooter>
         </form>

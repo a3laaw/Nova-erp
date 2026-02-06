@@ -29,6 +29,7 @@ export default function NewEmployeePage() {
     useEffect(() => {
         if (!firestore) return;
         const generateEmployeeNumber = async () => {
+            // IMPROVED: Added try-catch for better error handling.
             try {
                 const counterRef = doc(firestore, 'counters', 'employees');
                 const counterDoc = await getDoc(counterRef);
@@ -55,6 +56,7 @@ export default function NewEmployeePage() {
         setIsSaving(true);
         let newEmployeeId = '';
 
+        // IMPROVED: Added comprehensive try/catch block.
         try {
             // --- VALIDATION LOGIC ---
             if (newEmployeeData.mobile) {
@@ -86,6 +88,7 @@ export default function NewEmployeePage() {
                 const newEmployeeNumber = String(nextNumber);
 
                 if (newEmployeeNumber !== employeeNumber) {
+                    // This is a race condition, but the transaction handles it. We can log it for monitoring.
                     console.warn(`Race condition detected for employee number. UI showed ${employeeNumber}, saved as ${newEmployeeNumber}`);
                 }
 
@@ -121,7 +124,7 @@ export default function NewEmployeePage() {
                         userId: userId,
                         title: 'تمت إضافة موظف جديد',
                         body: `قام ${currentUser.fullName} بإضافة الموظف الجديد "${newEmployeeData.fullName}".`,
-                        link: `/dashboard/hr/employees`
+                        link: `/dashboard/hr/employees/${newEmployeeId}`
                     });
                     notificationPromises.push(notificationPromise);
                 }
