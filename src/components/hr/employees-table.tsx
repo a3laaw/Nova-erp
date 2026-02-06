@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -63,8 +64,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // IMPROVED: Switched from a one-time fetch hook to a real-time subscription hook.
-    // This ensures that any new employees added will appear in the table instantly.
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
         return [orderBy('createdAt', 'desc')];
@@ -158,8 +157,13 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent>
                                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                            <DropdownMenuItem disabled>عرض الملف</DropdownMenuItem>
-                                            <DropdownMenuItem disabled>تعديل</DropdownMenuItem>
+                                            {/* FIXED: Enabled menu items and linked them to the correct pages. */}
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف</Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
+                                            </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             {employee.status !== 'terminated' && (
                                                 <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
