@@ -1,13 +1,15 @@
+
 'use client';
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore'; // FIXED: Added missing import for 'doc'
 import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote } from 'lucide-react';
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature } from 'lucide-react'; // FIXED: Added missing FileSignature icon
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -101,7 +103,7 @@ export default function EmployeeProfilePage() {
                         <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} icon={<Briefcase className="h-4 w-4"/>} />
                         <InfoRow label="تاريخ التعيين" value={formatDate(employee.hireDate)} icon={<CalendarIcon className="h-4 w-4"/>} />
                         <InfoRow label="نوع العقد" value={employee.contractType} icon={<FileSignature className="h-4 w-4"/>} />
-                        <InfoRow label="الراتب الأساسي" value={`${employee.basicSalary} د.ك`} icon={<Banknote className="h-4 w-4"/>} />
+                        <InfoRow label="الراتب الأساسي" value={`${formatCurrency(employee.basicSalary)}`} icon={<Banknote className="h-4 w-4"/>} />
                      </div>
                 </section>
             </CardContent>
