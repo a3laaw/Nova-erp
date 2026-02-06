@@ -139,9 +139,10 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     setLoadingPrimary(true);
     try {
         const snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
-        let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+        let items = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as T))
+            .filter(item => typeof item.name === 'string'); // Filter out items without a name
         
-        // Client-side sorting
         items.sort((a, b) => {
             const orderA = a.order ?? Infinity;
             const orderB = b.order ?? Infinity;
@@ -170,7 +171,9 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     try {
         const collectionPath = `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`;
         const snapshot = await getDocs(query(collection(firestore, collectionPath)));
-        let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as S));
+        let items = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as S))
+            .filter(item => typeof item.name === 'string'); // Filter out items without a name
         
         items.sort((a, b) => {
             const orderA = a.order ?? Infinity;

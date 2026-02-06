@@ -55,8 +55,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         residencyExpiry: undefined as Date | undefined,
     });
     
-    const [departments, setDepartments] = useState<any[]>([]);
-    const [jobs, setJobs] = useState<any[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [jobs, setJobs] = useState<Job[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
 
     useEffect(() => {
@@ -90,7 +90,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                // Fetch departments without server-side ordering to prevent crashes on null values.
                 const deptsQuery = query(collection(firestore, 'departments'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
@@ -99,15 +98,19 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                   getDocs(jobsQuery),
                 ]);
 
-                // Safely sort and filter departments on the client-side.
-                const fetchedDepartments = deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
-                fetchedDepartments.sort((a,b) => (a.name || '').localeCompare(b.name || '', 'ar'));
-                setDepartments(fetchedDepartments.filter(d => d.name)); // CRITICAL: Only use departments with a name.
+                // Robustly filter and sort departments
+                const fetchedDepartments = deptsSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as Department))
+                    .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
 
+                fetchedDepartments.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+                setDepartments(fetchedDepartments);
+
+                // Robustly filter and collect unique jobs
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
                     const jobData = doc.data() as Job;
-                    if (jobData.name && !uniqueJobs.has(jobData.name)) {
+                    if (jobData && typeof jobData.name === 'string' && jobData.name.trim() !== '' && !uniqueJobs.has(jobData.name)) {
                         uniqueJobs.set(jobData.name, { id: doc.id, ...jobData });
                     }
                 });
@@ -135,17 +138,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         setFormData(prev => ({ ...prev, [id]: value }));
     };
     
-    const departmentOptions = useMemo(() => {
-        return departments
-            .filter(d => d && d.name) // Defensive check
-            .map(d => ({ value: d.name, label: d.name }));
-    }, [departments]);
-
-    const jobOptions = useMemo(() => {
-        return jobs
-            .filter(j => j && j.name) // Defensive check
-            .map(j => ({ value: j.name, label: j.name }));
-    }, [jobs]);
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
+    const jobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
