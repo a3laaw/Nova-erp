@@ -8,19 +8,93 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useStorage } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, ImageIcon, X } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
+import Image from 'next/image';
+
+// Reusable Image Upload Component
+function ImageUploadField({
+  id,
+  label,
+  currentUrl,
+  onUrlChange,
+  onFileChange,
+}: {
+  id: keyof BrandingSettings;
+  label: string;
+  currentUrl?: string;
+  onUrlChange: (url: string) => void;
+  onFileChange: (file: File | null) => void;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setPreview(URL.createObjectURL(file));
+      onFileChange(file);
+      onUrlChange(''); // Clear URL if a file is chosen
+    }
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onUrlChange(e.target.value);
+    setPreview(null); // Clear file preview if URL is typed
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    onFileChange(null);
+  };
+  
+  const displayUrl = preview || currentUrl;
+
+  return (
+    <div className="space-y-2">
+        <Label htmlFor={id}>{label}</Label>
+        <div className="flex items-center gap-4">
+            <div className="w-24 h-24 rounded-md border flex items-center justify-center bg-muted/50 flex-shrink-0">
+                {displayUrl ? (
+                    <Image src={displayUrl} alt={label} width={96} height={96} className="object-contain rounded-md" />
+                ) : (
+                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                )}
+            </div>
+            <div className="flex-grow space-y-2">
+                <Input
+                    type="file"
+                    id={id + '-file'}
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    accept="image/png, image/jpeg, image/gif, image/svg+xml"
+                    className="text-xs"
+                />
+                 <Input
+                    id={id + '-url'}
+                    type="text"
+                    value={currentUrl || ''}
+                    onChange={handleUrlChange}
+                    placeholder="أو الصق رابط صورة هنا..."
+                    dir="ltr"
+                />
+            </div>
+        </div>
+    </div>
+  );
+}
+
 
 export function BrandingManager() {
     const { firestore } = useFirebase();
+    const storage = useStorage();
     const { branding, loading } = useBranding();
     const { toast } = useToast();
     
     const [formData, setFormData] = useState<Partial<BrandingSettings>>({});
+    const [filesToUpload, setFilesToUpload] = useState<Record<string, File | null>>({});
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -29,13 +103,16 @@ export function BrandingManager() {
         }
     }, [branding]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { id, value } = e.target;
-        setFormData(prev => ({...prev, [id]: value}));
+    const handleFieldChange = (field: keyof BrandingSettings, value: any) => {
+        setFormData(prev => ({...prev, [field]: value}));
     };
     
+    const handleFileChange = (field: keyof BrandingSettings, file: File | null) => {
+        setFilesToUpload(prev => ({ ...prev, [field]: file }));
+    };
+
     const handleSave = async () => {
-        if (!firestore) {
+        if (!firestore || !storage) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بالخدمات السحابية.'});
             return;
         }
@@ -47,9 +124,23 @@ export function BrandingManager() {
         setIsSaving(true);
         
         try {
+            const dataToSave = { ...formData };
+
+            // Upload files and get URLs
+            for (const key in filesToUpload) {
+                const file = filesToUpload[key as keyof typeof filesToUpload];
+                if (file) {
+                    const storageRef = ref(storage, `branding/${key}_${Date.now()}_${file.name}`);
+                    const uploadResult = await uploadBytes(storageRef, file);
+                    const downloadURL = await getDownloadURL(uploadResult.ref);
+                    dataToSave[key as keyof BrandingSettings] = downloadURL;
+                }
+            }
+
             const settingsRef = doc(firestore, 'company_settings', 'main');
-            await setDoc(settingsRef, formData, { merge: true });
+            await setDoc(settingsRef, dataToSave, { merge: true });
             
+            setFilesToUpload({}); // Clear uploaded files
             toast({ title: 'نجاح', description: 'تم حفظ إعدادات العلامة التجارية بنجاح.' });
 
         } catch (error: any) {
@@ -73,8 +164,8 @@ export function BrandingManager() {
                     <Skeleton className="h-4 w-64 mt-2" />
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <Skeleton className="h-10" />
-                    <Skeleton className="h-10" />
+                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24" />
                     <Skeleton className="h-24" />
                 </CardContent>
                 <CardFooter className="flex justify-end">
@@ -93,34 +184,22 @@ export function BrandingManager() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-                 <div className="space-y-4 p-4 border rounded-lg">
+                 <div className="space-y-6 p-4 border rounded-lg">
                     <h3 className="font-semibold text-base">صور الهوية البصرية</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="logo_url">شعار الشركة (اللوجو)</Label>
-                            <Input id="logo_url" value={formData.logo_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../logo.png" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="system_background_url">خلفية صفحات النظام</Label>
-                            <Input id="system_background_url" value={formData.system_background_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../background.jpg" />
-                        </div>
+                    <p className="text-sm text-muted-foreground">يمكنك إما لصق رابط صورة مباشرة أو رفع ملف من جهازك.</p>
+                     <div className="grid md:grid-cols-2 gap-8">
+                        <ImageUploadField id="logo_url" label="شعار الشركة (اللوجو)" currentUrl={formData.logo_url} onUrlChange={(url) => handleFieldChange('logo_url', url)} onFileChange={(file) => handleFileChange('logo_url', file)} />
+                        <ImageUploadField id="system_background_url" label="خلفية صفحات النظام" currentUrl={formData.system_background_url} onUrlChange={(url) => handleFieldChange('system_background_url', url)} onFileChange={(file) => handleFileChange('system_background_url', file)} />
                     </div>
                 </div>
 
-                <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-6 p-4 border rounded-lg">
                     <h3 className="font-semibold text-base">عناصر الطباعة</h3>
-                    <div className="grid gap-2">
-                        <Label htmlFor="letterhead_image_url">صورة الترويسة (Header)</Label>
-                        <Input id="letterhead_image_url" value={formData.letterhead_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../header.png" />
-                    </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="footer_image_url">صورة التذييل (Footer)</Label>
-                        <Input id="footer_image_url" value={formData.footer_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../footer.png" />
-                    </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="watermark_image_url">صورة العلامة المائية (Watermark)</Label>
-                        <Input id="watermark_image_url" value={formData.watermark_image_url || ''} onChange={handleInputChange} dir="ltr" placeholder="https://.../watermark.png" />
-                    </div>
+                     <div className="grid md:grid-cols-2 gap-8">
+                        <ImageUploadField id="letterhead_image_url" label="صورة الترويسة (Header)" currentUrl={formData.letterhead_image_url} onUrlChange={(url) => handleFieldChange('letterhead_image_url', url)} onFileChange={(file) => handleFileChange('letterhead_image_url', file)} />
+                        <ImageUploadField id="footer_image_url" label="صورة التذييل (Footer)" currentUrl={formData.footer_image_url} onUrlChange={(url) => handleFieldChange('footer_image_url', url)} onFileChange={(file) => handleFileChange('footer_image_url', file)} />
+                     </div>
+                     <ImageUploadField id="watermark_image_url" label="صورة العلامة المائية (Watermark)" currentUrl={formData.watermark_image_url} onUrlChange={(url) => handleFieldChange('watermark_image_url', url)} onFileChange={(file) => handleFileChange('watermark_image_url', file)} />
                 </div>
                 
                 <Separator />
@@ -128,30 +207,30 @@ export function BrandingManager() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="company_name">اسم الشركة <span className="text-destructive">*</span></Label>
-                        <Input id="company_name" value={formData.company_name || ''} onChange={handleInputChange} required />
+                        <Input id="company_name" value={formData.company_name || ''} onChange={(e) => handleFieldChange('company_name', e.target.value)} required />
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="tax_number">الرقم الضريبي (إن وجد)</Label>
-                        <Input id="tax_number" value={formData.tax_number || ''} onChange={handleInputChange} />
+                        <Input id="tax_number" value={formData.tax_number || ''} onChange={(e) => handleFieldChange('tax_number', e.target.value)} />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="phone">رقم الهاتف</Label>
-                        <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} dir="ltr" />
+                        <Input id="phone" value={formData.phone || ''} onChange={(e) => handleFieldChange('phone', e.target.value)} dir="ltr" />
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="email">البريد الإلكتروني</Label>
-                        <Input id="email" type="email" value={formData.email || ''} onChange={handleInputChange} dir="ltr" />
+                        <Input id="email" type="email" value={formData.email || ''} onChange={(e) => handleFieldChange('email', e.target.value)} dir="ltr" />
                     </div>
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="address">العنوان</Label>
-                    <Textarea id="address" value={formData.address || ''} onChange={handleInputChange} rows={3} />
+                    <Textarea id="address" value={formData.address || ''} onChange={(e) => handleFieldChange('address', e.target.value)} rows={3} />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="letterhead_text">نص إضافي في الترويسة (اختياري)</Label>
-                    <Input id="letterhead_text" value={formData.letterhead_text || ''} onChange={handleInputChange} placeholder="مثال: سجل تجاري رقم..." />
+                    <Input id="letterhead_text" value={formData.letterhead_text || ''} onChange={(e) => handleFieldChange('letterhead_text', e.target.value)} placeholder="مثال: سجل تجاري رقم..." />
                 </div>
             </CardContent>
             <CardFooter className="flex justify-end">
@@ -163,5 +242,3 @@ export function BrandingManager() {
         </Card>
     );
 }
-
-    
