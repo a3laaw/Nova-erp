@@ -9,7 +9,7 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import type { Employee, Department, Job } from '@/lib/types';
+import type { Employee, Governorate, Area } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -50,11 +50,42 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         dob: undefined as Date | undefined,
         nationality: '',
         residencyExpiry: undefined as Date | undefined,
+        address: {
+            governorate: '',
+            area: '',
+            block: '',
+            street: '',
+            houseNumber: '',
+        },
     });
     
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [jobs, setJobs] = useState<Job[]>([]);
+    const [assignedEngineerId, setAssignedEngineerId] = useState('');
+    
+    const [engineers, setEngineers] = useState<Employee[]>([]);
+    const [governorates, setGovernorates] = useState<Governorate[]>([]);
+    const [areas, setAreas] = useState<Area[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [jobs, setJobs] = useState<any[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
+    const [isAreaLoading, setIsAreaLoading] = useState(false);
+    
+    const handleAddressChange = (field: keyof typeof formData.address, value: string) => {
+        setFormData(prev => ({...prev, address: { ...prev.address, [field]: value }}));
+    };
+    
+    const handleGovernorateChange = useCallback(async (govId: string) => {
+        const govName = governorates.find(g => g.id === govId)?.name || '';
+        setFormData(prev => ({ ...prev, address: { ...prev.address, governorate: govName, area: '' }}));
+        setAreas([]);
+        if (govId && firestore) {
+            setIsAreaLoading(true);
+            const areasQuery = query(collection(firestore, `governorates/${govId}/areas`), orderBy('name'));
+            const areasSnapshot = await getDocs(areasQuery);
+            setAreas(areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area)));
+            setIsAreaLoading(false);
+        }
+    }, [firestore, governorates]);
+
 
     useEffect(() => {
         if (initialData) {
@@ -77,9 +108,21 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 dob: toFirestoreDate(initialData.dob) || undefined,
                 nationality: initialData.nationality || '',
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
+                address: {
+                    governorate: initialData.address?.governorate || '',
+                    area: initialData.address?.area || '',
+                    block: initialData.address?.block || '',
+                    street: initialData.address?.street || '',
+                    houseNumber: initialData.address?.houseNumber || '',
+                },
             });
+            const initialGov = governorates.find(g => g.name === initialData.address?.governorate);
+            if(initialGov) {
+                handleGovernorateChange(initialGov.id);
+                handleAddressChange('area', initialData.address?.area || '');
+            }
         }
-    }, [initialData]);
+    }, [initialData, governorates, handleGovernorateChange]);
 
 
     useEffect(() => {
@@ -89,11 +132,15 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             try {
                 const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
+                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
                 
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
+                const [deptsSnapshot, jobsSnapshot, govSnapshot] = await Promise.all([
+                  getDocs(deptsQuery),
+                  getDocs(jobsQuery),
+                  getDocs(govQuery)
+                ]);
 
-                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
-                
+                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
                     const jobData = doc.data() as Job;
@@ -102,9 +149,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     }
                 });
                 setJobs(Array.from(uniqueJobs.values()));
+                setGovernorates(govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Governorate)));
 
             } catch (error) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب الأقسام والوظائف.' });
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
             } finally {
                 setRefDataLoading(false);
             }
@@ -127,6 +175,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
     const jobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
+    const governorateOptions = useMemo(() => governorates.map(g => ({value: g.id, label: g.name})), [governorates]);
+    const areaOptions = useMemo(() => areas.map(a => ({value: a.name, label: a.name})), [areas]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -155,6 +206,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dob: formData.dob,
             nationality: formData.nationality,
             residencyExpiry: formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry ? formData.residencyExpiry : undefined,
+            address: formData.address
         };
         
         await onSave(dataToSave);
@@ -215,6 +267,34 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} />
                         </div>
                     )}
+                </div>
+                <Separator />
+                 <div className="space-y-4">
+                    <Label className="font-semibold">عنوان الموظف</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="grid gap-2">
+                            <Label htmlFor="governorate">المحافظة</Label>
+                            <InlineSearchList value={governorates.find(g => g.name === formData.address.governorate)?.id || ''} onSelect={handleGovernorateChange} options={governorateOptions} placeholder={refDataLoading ? "تحميل..." : "اختر محافظة..."} disabled={refDataLoading}/>
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="area">المنطقة</Label>
+                            <InlineSearchList value={formData.address.area} onSelect={(v) => handleAddressChange('area', v)} options={areaOptions} placeholder={!formData.address.governorate ? "اختر محافظة أولاً" : isAreaLoading ? "تحميل..." : "اختر منطقة..."} disabled={!formData.address.governorate || isAreaLoading}/>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="block">القطعة</Label>
+                            <Input id="block" value={formData.address.block} onChange={(e) => handleAddressChange('block', e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="street">الشارع</Label>
+                            <Input id="street" value={formData.address.street} onChange={(e) => handleAddressChange('street', e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="houseNumber">رقم المنزل</Label>
+                            <Input id="houseNumber" value={formData.address.houseNumber} onChange={(e) => handleAddressChange('houseNumber', e.target.value)} />
+                        </div>
+                    </div>
                 </div>
                  <Separator />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

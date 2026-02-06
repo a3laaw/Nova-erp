@@ -424,6 +424,17 @@
         "gender": { "type": "string", "enum": ["male", "female"] },
         "civilId": { "type": "string" },
         "nationality": { "type": "string", "description": "The employee's nationality." },
+        "address": {
+            "type": "object",
+            "description": "The employee's address.",
+            "properties": {
+                "governorate": { "type": "string" },
+                "area": { "type": "string" },
+                "block": { "type": "string" },
+                "street": { "type": "string" },
+                "houseNumber": { "type": "string" }
+            }
+        },
         "residencyExpiry": { "type": "string", "format": "date" },
         "contractExpiry": { "type": "string", "format": "date" },
         "mobile": { "type": "string" },
@@ -443,6 +454,7 @@
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
         "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor", "percentage", "part-time"] },
+        "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
         "department": { "type": "string" },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
@@ -573,7 +585,8 @@
           "properties": {
             "basicSalary": { "type": "number" },
             "housingAllowance": { "type": "number" },
-            "transportAllowance": { "type": "number" }
+            "transportAllowance": { "type": "number" },
+            "commission": { "type": "number", "description": "Commission earned in the period." }
           },
            "required": ["basicSalary"]
         },
@@ -1008,6 +1021,10 @@
           "type": "string",
           "description": "An optional external reference number."
         },
+        "linkedReceiptId": {
+          "type": "string",
+          "description": "The ID of the cash receipt that triggered this entry, if any."
+        },
         "totalDebit": {
           "type": "number",
           "description": "The total of all debit lines, for validation."
@@ -1356,4 +1373,3 @@
     }
   }
 }
-
