@@ -4,15 +4,16 @@
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore'; // FIXED: Added missing import for 'doc'
+import { doc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature } from 'lucide-react'; // FIXED: Added missing FileSignature icon
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 function InfoRow({ label, value, icon }: { label: string, value: React.ReactNode, icon: React.ReactNode }) {
     return (
