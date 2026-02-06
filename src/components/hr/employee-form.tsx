@@ -56,14 +56,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [jobs, setJobs] = useState<Job[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
 
-    const handleGovernorateChange = useCallback(async (govId: string, preselectArea?: string) => {
-        // This function seems to be a leftover from another component, it is not used here.
-        // It can be removed in a future cleanup.
-    }, []);
-    
     useEffect(() => {
         if (initialData) {
-            const initialGov = governorates.find(g => g.name === initialData.address?.governorate);
             setFormData({
                 fullName: initialData.fullName || '',
                 nameEn: initialData.nameEn || '',
@@ -84,11 +78,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 nationality: initialData.nationality || '',
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
             });
-            if(initialGov?.id) {
-                handleGovernorateChange(initialGov.id, initialData.address?.area);
-            }
         }
-    }, [initialData, governorates, handleGovernorateChange]);
+    }, [initialData]);
 
 
     useEffect(() => {
