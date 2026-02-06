@@ -189,6 +189,7 @@ export interface PaymentVoucher {
   voucherYear: number;
   payeeName: string;
   payeeType: 'vendor' | 'employee' | 'other';
+  employeeId?: string; // <-- ADDED
   amount: number;
   amountInWords: string;
   paymentDate: any; 
@@ -297,8 +298,7 @@ export interface Holiday {
 
 export type AuditLog = {
     id?: string;
-    employeeId: string;
-    changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate';
+    changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'StatusChange' | 'ResidencyUpdate';
     field: string | string[]; 
     oldValue: any;
     newValue: any;
