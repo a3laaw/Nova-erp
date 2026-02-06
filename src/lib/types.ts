@@ -1,5 +1,6 @@
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -189,7 +190,7 @@ export interface PaymentVoucher {
   voucherYear: number;
   payeeName: string;
   payeeType: 'vendor' | 'employee' | 'other';
-  employeeId?: string; // <-- ADDED
+  employeeId?: string;
   amount: number;
   amountInWords: string;
   paymentDate: any; 
