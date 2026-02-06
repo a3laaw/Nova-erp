@@ -1,5 +1,5 @@
-
 'use client';
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -90,7 +90,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments'), orderBy('name'));
+                const deptsQuery = query(collection(firestore, 'departments')); // Removed orderBy('name')
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([
@@ -98,7 +98,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                   getDocs(jobsQuery),
                 ]);
 
-                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => d.name));
+                const fetchedDepartments = deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Safe client-side sorting
+                fetchedDepartments.sort((a,b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+                setDepartments(fetchedDepartments.filter(d => d.name)); // Filter after sorting
+
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
                     const jobData = doc.data() as Job;
@@ -132,13 +136,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     
     const departmentOptions = useMemo(() => {
         return departments
-            .filter(d => d && d.name) // Ensure department and its name exist
+            .filter(d => d && d.name)
             .map(d => ({ value: d.name, label: d.name }));
     }, [departments]);
 
     const jobOptions = useMemo(() => {
         return jobs
-            .filter(j => j && j.name) // Ensure job and its name exist
+            .filter(j => j && j.name)
             .map(j => ({ value: j.name, label: j.name }));
     }, [jobs]);
 
@@ -322,4 +326,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-    
