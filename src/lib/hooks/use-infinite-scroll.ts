@@ -18,8 +18,8 @@ const PAGE_SIZE = 15;
 
 export function useInfiniteScroll<T extends { id?: string }>(
   collectionPath: string | null,
-  // IMPROVED: Added optional orderByField parameter to make the hook more flexible.
-  orderByField: string = 'createdAt'
+  orderByField: string = 'createdAt',
+  orderByDirection: 'asc' | 'desc' = 'desc'
 ) {
   const { firestore } = useFirebase();
   const [items, setItems] = useState<T[]>([]);
@@ -36,15 +36,14 @@ export function useInfiniteScroll<T extends { id?: string }>(
       setLoadingMore(true);
     } else {
       setLoading(true);
-      setItems([]); // Reset for new fetches
+      setItems([]);
       setLastVisible(null);
       setHasMore(true);
     }
 
     try {
       const queryConstraints: QueryConstraint[] = [
-        // FIXED: Using the flexible orderByField instead of hardcoded 'createdAt'.
-        orderBy(orderByField, 'desc'),
+        orderBy(orderByField, orderByDirection),
         limit(PAGE_SIZE),
       ];
 
@@ -71,18 +70,14 @@ export function useInfiniteScroll<T extends { id?: string }>(
       setLoading(false);
       setLoadingMore(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, collectionPath, hasMore, lastVisible, orderByField]);
+  }, [firestore, collectionPath, hasMore, lastVisible, orderByField, orderByDirection]);
 
-  // Initial Fetch Effect
   useEffect(() => {
     if (collectionPath) {
         fetchItems(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionPath, orderByField]);
+  }, [collectionPath, orderByField, orderByDirection, fetchItems]);
 
-  // Intersection Observer Effect
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {

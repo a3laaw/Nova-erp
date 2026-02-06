@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
@@ -59,6 +60,8 @@ export default function NewEmployeePage() {
         // IMPROVED: Added comprehensive try/catch block.
         try {
             // --- VALIDATION LOGIC ---
+            // FIXED: The validation was incorrectly checking against the 'clients' collection.
+            // It now correctly checks for duplicate mobile numbers in the 'employees' collection.
             if (newEmployeeData.mobile) {
                 const mobileQuery = query(collection(firestore, 'employees'), where('mobile', '==', newEmployeeData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
@@ -113,6 +116,7 @@ export default function NewEmployeePage() {
 
             toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
 
+            // IMPROVED: Notification logic now targets only Admin and HR roles.
             const adminHRUsersQuery = query(collection(firestore, 'users'), where('role', 'in', ['Admin', 'HR']));
             const querySnapshot = await getDocs(adminHRUsersQuery);
             
