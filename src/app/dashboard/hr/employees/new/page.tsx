@@ -49,20 +49,19 @@ export default function NewEmployeePage() {
             }
 
             await runTransaction(firestore, async (transaction) => {
+                const currentYear = new Date().getFullYear();
                 const employeeCounterRef = doc(firestore, 'counters', 'employees');
                 const employeeCounterDoc = await transaction.get(employeeCounterRef);
                 
-                let nextNumber = 1;
+                let nextNumber = 101;
                 if (employeeCounterDoc.exists()) {
                     const counts = employeeCounterDoc.data()?.counts || {};
-                    const currentYear = new Date().getFullYear();
-                    nextNumber = (counts[currentYear] || 0) + 1;
-                    transaction.set(employeeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-                } else {
-                     transaction.set(employeeCounterRef, { counts: { [new Date().getFullYear()]: nextNumber } });
+                    nextNumber = (counts[currentYear] || 100) + 1;
                 }
                 
-                const newEmployeeNumber = `${new Date().getFullYear().toString().slice(-2)}-${String(nextNumber).padStart(4, '0')}`;
+                transaction.set(employeeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+                
+                const newEmployeeNumber = `${String(currentYear).slice(-2)}-${String(nextNumber).padStart(4, '0')}`;
 
                 const finalEmployeeData = {
                   ...newEmployeeData,
