@@ -96,7 +96,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                   getDocs(jobsQuery),
                 ]);
 
-                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => d.name));
                 const uniqueJobs = new Map<string, Job>();
                 jobsSnapshot.forEach(doc => {
                     const jobData = doc.data() as Job;
@@ -128,8 +128,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
-    const jobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
+    const departmentOptions = useMemo(() => departments.filter(d => d.name).map(d => ({ value: d.name, label: d.name })), [departments]);
+    const jobOptions = useMemo(() => jobs.filter(j => j.name).map(j => ({ value: j.name, label: j.name })), [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -311,5 +311,4 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
     
