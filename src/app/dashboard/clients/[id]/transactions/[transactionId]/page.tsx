@@ -405,6 +405,7 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRef, { stages: currentStages });
 
+        const safeApptDate = toFirestoreDate(appointment.appointmentDate);
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -415,15 +416,15 @@ export default function TransactionDetailPage() {
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
         };
-    
+
         const timelineRef = collection(transactionRef, 'timelineEvents');
         batch.set(doc(timelineRef), logData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
-        batch.set(doc(historyRef), { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
+        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
         await batch.commit();
-    
+
         toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
@@ -550,7 +551,7 @@ export default function TransactionDetailPage() {
         batch.set(doc(timelineRef), commentData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
-        batch.set(doc(historyRef), { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
+        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
         batch.update(transactionRef, { stages: currentStages });
         await batch.commit();
@@ -1000,3 +1001,4 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
