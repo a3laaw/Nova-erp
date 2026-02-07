@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AuthProvider } from '@/context/auth-context';
@@ -8,7 +7,6 @@ import { SyncStatusProvider } from '@/context/sync-context';
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Loader } from 'lucide-react';
-import { SidebarProvider } from '@/components/ui/sidebar';
 
 const DynamicFirebaseProvider = dynamic(
   () => import('@/firebase/provider').then(mod => mod.FirebaseProvider),
@@ -43,11 +41,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 <LanguageProvider>
                     <SyncStatusProvider>
                         <AuthProvider>
-                            <SidebarProvider>
-                                <LanguageManager>
-                                    {children}
-                                </LanguageManager>
-                            </SidebarProvider>
+                            <LanguageManager>
+                                {children}
+                            </LanguageManager>
                         </AuthProvider>
                     </SyncStatusProvider>
                 </LanguageProvider>
