@@ -210,6 +210,8 @@ export default function TransactionDetailPage() {
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [workStageTemplates, setWorkStageTemplates] = useState<WorkStage[]>([]);
+
   // --- Data Fetching ---
   const transactionRef = useMemo(() => {
     if (!firestore || !clientId || !transactionId) return null;
@@ -245,6 +247,16 @@ export default function TransactionDetailPage() {
     };
     fetchEmployees();
   }, [firestore]);
+  
+  useEffect(() => {
+    if (!firestore || !transaction?.departmentId) return;
+    const fetchTemplates = async () => {
+        const stagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`));
+        const snapshot = await getDocs(stagesQuery);
+        setWorkStageTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage)));
+    };
+    fetchTemplates();
+  }, [firestore, transaction?.departmentId]);
 
 
   const handleConfirmCancelContract = async () => {
@@ -738,17 +750,38 @@ export default function TransactionDetailPage() {
     }
   };
   
-  const trackableInProgressStages = useMemo(() => 
-    (transaction?.stages || []).filter(s => s.status === 'in-progress' && s.enableModificationTracking),
-  [transaction?.stages]);
-
-  // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
   const sortedStages = useMemo(() => {
     if (!transaction?.stages) return [];
-    return [...transaction.stages].sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
+    return [...transaction.stages].sort((a,b) => (a.order ?? 999) - (b.order ?? 999));
   }, [transaction?.stages]);
+
+  const enrichedStages = useMemo(() => {
+    if (workStageTemplates.length === 0 && sortedStages.length > 0) return sortedStages as (Partial<TransactionStage> & Partial<WorkStage>)[];
+    return sortedStages.map(progressStage => {
+        const template = workStageTemplates.find(t => t.id === progressStage.stageId);
+        return {
+            ...template,
+            ...progressStage,
+        };
+    });
+  }, [sortedStages, workStageTemplates]);
+
+  const trackableInProgressStages = useMemo(() => 
+    enrichedStages.filter(s => s.status === 'in-progress' && s.enableModificationTracking === true),
+  [enrichedStages]);
+
+
+  const clientAddress = client?.address ? [
+      client.address.governorate, 
+      client.address.area, 
+      `قطعة ${client.address.block}`, 
+      `شارع ${client.address.street}`, 
+      `منزل ${client.address.houseNumber}`
+    ].filter(Boolean).join('، ') : 'غير محدد';
+  
+  const assignedEngineerName = transaction?.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : null;
 
 
   if (isLoading) {
@@ -845,7 +878,7 @@ export default function TransactionDetailPage() {
             </CardHeader>
             <CardContent>
                 <div className='grid md:grid-cols-2 gap-6'>
-                    <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? (employeesMap.get(transaction.assignedEngineerId) || '...') : <span className='text-muted-foreground'>لم يحدد</span>} />
+                    <InfoRow icon={<User />} label="المهندس المسؤول" value={assignedEngineerName || <span className='text-muted-foreground'>لم يحدد</span>} />
                     <InfoRow icon={<Calendar />} label="تاريخ الإنشاء" value={formatDate(transaction.createdAt)} />
                 </div>
                 {transaction.description && (
@@ -874,14 +907,14 @@ export default function TransactionDetailPage() {
                     <CardContent>
                         {trackableInProgressStages.length > 0 && (
                             <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-900/30">
-                              <CardHeader className="pb-4">
+                                <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
                                     تسجيل تعديلات على المراحل الحالية
                                 </CardTitle>
-                              </CardHeader>
-                              <CardContent className="space-y-3">
+                                </CardHeader>
+                                <CardContent className="space-y-3">
                                 {trackableInProgressStages.map(stage => (
-                                  <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
+                                    <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
                                     <p className="font-semibold">{stage.name}</p>
                                     <Button
                                         size="sm"
@@ -893,16 +926,16 @@ export default function TransactionDetailPage() {
                                         <Plus className="ml-1 h-4 w-4" />
                                         تسجيل تعديل جديد
                                     </Button>
-                                  </div>
+                                    </div>
                                 ))}
-                              </CardContent>
+                                </CardContent>
                             </Card>
                         )}
-                        {isLoading ? <Skeleton className="h-48 w-full" /> : !transaction.stages || transaction.stages.length === 0 ? (
+                        {isLoading ? <Skeleton className="h-48 w-full" /> : !enrichedStages || enrichedStages.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
-                                {sortedStages.map((stage) => {
+                                {enrichedStages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
                                     const canBeStarted = canStartStage(stage, transaction.stages as TransactionStage[]);
 
@@ -913,7 +946,7 @@ export default function TransactionDetailPage() {
                                                     {stageStatusTranslations[stage.status]}
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
-                                                {stage.trackingType === 'duration' && <StageCountdown stage={stage} />}
+                                                {stage.trackingType === 'duration' && <StageCountdown stage={stage as TransactionStage} />}
                                                 {stage.trackingType === 'occurrence' && stage.maxOccurrences && (
                                                     <Badge variant="secondary">الإنجاز: {stage.completedCount || 0} / {stage.maxOccurrences}</Badge>
                                                 )}
@@ -923,18 +956,18 @@ export default function TransactionDetailPage() {
                                             </div>
                                             <div className="flex gap-2 items-center">
                                                 {stage.status === 'pending' && (
-                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || !canBeStarted.allowed} title={!canBeStarted.allowed ? canBeStarted.reason : ''}>
+                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId!, 'in-progress')} disabled={!canInteract || !canBeStarted.allowed} title={!canBeStarted.allowed ? canBeStarted.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
                                                     </Button>
                                                 )}
                                                 {stage.status === 'in-progress' && (
                                                     <div className="flex gap-2 items-center">
-                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
+                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId!, 'completed')} disabled={!canInteract}>
                                                             <Check className="ml-2 h-4 w-4" />
                                                             {stage.trackingType === 'occurrence' ? 'تسجيل إنجاز' : 'إكمال'}
                                                         </Button>
                                                          {stage.trackingType === 'occurrence' && stage.allowManualCompletion && (
-                                                            <Button size="sm" variant="destructive" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract} title="إنهاء المرحلة حتى لو لم تصل للحد الأقصى">
+                                                            <Button size="sm" variant="destructive" onClick={() => handleStageStatusChange(stage.stageId!, 'completed')} disabled={!canInteract} title="إنهاء المرحلة حتى لو لم تصل للحد الأقصى">
                                                                 <CheckSquare className="ml-2 h-4 w-4" /> إنهاء وإكمال
                                                             </Button>
                                                          )}
@@ -948,7 +981,7 @@ export default function TransactionDetailPage() {
                                                             </div>
                                                         )}
                                                         {currentUser?.role === 'Admin' && (
-                                                             <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleRevertStage(stage.stageId)} disabled={isProcessing}>
+                                                             <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleRevertStage(stage.stageId!)} disabled={isProcessing}>
                                                                 <Undo2 className="ml-1 h-4 w-4" /> تراجع
                                                             </Button>
                                                         )}
@@ -1025,3 +1058,4 @@ export default function TransactionDetailPage() {
   );
 }
 
+    
