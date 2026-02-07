@@ -1,5 +1,5 @@
 
-'use client';
+      'use client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
@@ -17,6 +17,14 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus } from 'lucide-react';
@@ -325,9 +333,127 @@ export default function TransactionDetailPage() {
   };
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
-    // This function's logic remains complex and is omitted for brevity.
-    // It handles status changes, logging, and notifications.
+        if (!firestore || !currentUser || !transaction) return;
+        setIsProcessing(true);
+        try {
+            const batch = writeBatch(firestore);
+            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+
+            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+            
+            if (stageIndex === -1) throw new Error("Stage not found");
+            
+            const stage = currentStages[stageIndex];
+            const stageTemplate = workStageTemplates.find(t => t.id === stageId);
+
+            stage.status = newStatus;
+            
+            if (newStatus === 'in-progress') stage.startDate = serverTimestamp();
+            if (newStatus === 'completed') stage.endDate = serverTimestamp();
+            
+            if (newStatus === 'completed' && stageTemplate?.nextStageIds) {
+                for (const nextStageId of stageTemplate.nextStageIds) {
+                    const nextStageIndex = currentStages.findIndex(s => s.stageId === nextStageId);
+                    if (nextStageIndex !== -1 && currentStages[nextStageIndex].status === 'pending') {
+                         currentStages[nextStageIndex].status = 'in-progress';
+                         currentStages[nextStageIndex].startDate = serverTimestamp();
+                    }
+                }
+            }
+            batch.update(transactionRef, { stages: currentStages });
+            await batch.commit();
+            toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة إلى ${stageStatusTranslations[newStatus]}.` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة المرحلة.' });
+        } finally {
+            setIsProcessing(false);
+        }
   };
+
+   const handleRevertStage = async (stageIdToRevert: string) => {
+    if (!firestore || !currentUser || !transaction) return;
+
+    setIsProcessing(true);
+    const batch = writeBatch(firestore);
+    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+
+    try {
+        const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+        const stageIndex = currentStages.findIndex(s => s.stageId === stageIdToRevert);
+
+        if (stageIndex === -1 || currentStages[stageIndex].status !== 'completed') {
+            throw new Error('لا يمكن التراجع عن مرحلة غير مكتملة.');
+        }
+
+        const stageToRevert = currentStages[stageIndex];
+        const revertedStageName = stageToRevert.name;
+
+        stageToRevert.status = 'in-progress';
+        stageToRevert.endDate = null;
+
+        const stageTemplate = workStageTemplates.find(t => t.id === stageIdToRevert);
+
+        if (stageTemplate?.nextStageIds) {
+            for (const nextStageId of stageTemplate.nextStageIds) {
+                const nextStageIndex = currentStages.findIndex(s => s.stageId === nextStageId);
+                if (nextStageIndex !== -1) {
+                    const nextStage = currentStages[nextStageIndex];
+                    if (nextStage.status === 'in-progress') {
+                        const template = workStageTemplates.find(t => t.id === nextStageId);
+                        if (template?.stageType === 'sequential') {
+                             nextStage.status = 'pending';
+                             nextStage.startDate = null;
+                        }
+                    }
+                }
+            }
+        }
+        
+        const contract = transaction.contract;
+        if (contract?.clauses) {
+            const completedStageNames = new Set(currentStages.filter(s => s.status === 'completed').map(s => s.name));
+            const updatedClauses = contract.clauses.map(clause => {
+                if (clause.condition === revertedStageName && clause.status === 'مستحقة') {
+                    return { ...clause, status: 'غير مستحقة' as const };
+                }
+                if (clause.condition && !completedStageNames.has(clause.condition) && clause.status === 'مستحقة') {
+                    return { ...clause, status: 'غير مستحقة' as const };
+                }
+                return clause;
+            });
+            batch.update(transactionRef, { 'contract.clauses': updatedClauses });
+        }
+
+
+        batch.update(transactionRef, { stages: currentStages });
+
+        const logContent = `قام ${currentUser.fullName} بالتراجع عن إكمال المرحلة: "${revertedStageName}".`;
+        const logData = {
+            type: 'log' as const,
+            content: logContent,
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            userAvatar: currentUser.avatarUrl,
+            createdAt: serverTimestamp()
+        };
+        const timelineRef = doc(collection(transactionRef, 'timelineEvents'));
+        batch.set(timelineRef, logData);
+        
+        const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
+        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
+        
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: `تم التراجع عن إكمال مرحلة "${revertedStageName}".` });
+
+    } catch (error) {
+        console.error("Error reverting stage:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: (error as Error).message || 'فشل التراجع عن المرحلة.' });
+    } finally {
+        setIsProcessing(false);
+    }
+};
 
   const enrichedStages = useMemo(() => {
     if (!transaction || !workStageTemplates) return [];
@@ -406,27 +532,6 @@ export default function TransactionDetailPage() {
             </CardContent>
         </Card>
         
-        {trackableInProgressStages.length > 0 && (
-            <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/30">
-                <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
-                        تسجيل تعديلات على المراحل الحالية
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {trackableInProgressStages.map(stage => (
-                        <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
-                            <p className="font-semibold">{stage.name}</p>
-                            <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
-                                <Plus className="ml-1 h-4 w-4" />
-                                تسجيل تعديل جديد
-                            </Button>
-                        </div>
-                    ))}
-                </CardContent>
-            </Card>
-        )}
-
         <Tabs defaultValue="stages" dir="rtl">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stages">مراحل المعاملة</TabsTrigger>
@@ -434,6 +539,26 @@ export default function TransactionDetailPage() {
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
+                 {trackableInProgressStages.length > 0 && (
+                    <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/30 mb-6">
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
+                                تسجيل تعديلات على المراحل الحالية
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {trackableInProgressStages.map(stage => (
+                                <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
+                                    <p className="font-semibold">{stage.name}</p>
+                                    <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
+                                        <Plus className="ml-1 h-4 w-4" />
+                                        تسجيل تعديل جديد
+                                    </Button>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
                 <Card>
                     <CardHeader>
                         <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> سير العمل</CardTitle>
@@ -475,7 +600,7 @@ export default function TransactionDetailPage() {
                                                     </Button>
                                                 )}
                                                 {stage.status === 'completed' && currentUser?.role === 'Admin' && (
-                                                     <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => {}} disabled={isProcessing}>
+                                                     <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleRevertStage(stage.stageId!)} disabled={isProcessing}>
                                                         <Undo2 className="ml-1 h-4 w-4" /> تراجع
                                                     </Button>
                                                 )}
@@ -499,5 +624,6 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+    
 
     
