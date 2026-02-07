@@ -661,125 +661,96 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
 
     const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsSaving(true);
-  
-      try {
-        const appointmentDateTime =
-          isEditing && newDate && newTime
-            ? new Date(`${newDate}T${newTime}`)
-            : dialogData.appointmentDate;
-  
-        if (isPast(appointmentDateTime) && !isEditing) {
-          throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
-        }
-  
-        if (isNewClient) {
-          if (!newClientName || !newClientMobile) {
-            throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-          }
-          const clientsRef = collection(firestore, 'clients');
-          const q = query(clientsRef, where('mobile', '==', newClientMobile));
-          const querySnapshot = await getDocs(q);
-          if (!querySnapshot.empty) {
-            throw new Error(
-              `رقم الجوال هذا مسجل بالفعل للعميل: ${
-                querySnapshot.docs[0].data().nameAr
-              }.`
-            );
-          }
-        } else {
-          if (!selectedClientId || !selectedTransactionId) {
-            throw new Error('الرجاء اختيار العميل والمعاملة.');
-          }
-        }
-  
-        // --- Reads are now outside the transaction ---
-        const allClientApptsQuery = isNewClient ? null : query(
-          collection(firestore, 'appointments'),
-          where('clientId', '==', selectedClientId),
-          where('type', '==', 'architectural')
-        );
-        const allClientApptsSnap = allClientApptsQuery ? await getDocs(allClientApptsQuery) : null;
-        const existingAppointments = allClientApptsSnap?.docs.map(
-          (d) => ({ id: d.id, ...d.data() } as Appointment)
-        ) || [];
-  
-        const clientRef = isNewClient ? null : doc(firestore, 'clients', selectedClientId);
-        const clientSnap = clientRef ? await getDoc(clientRef) : null;
-        const contractSigned = clientSnap?.exists()
-          ? clientSnap.data()!.status === 'contracted' ||
-            clientSnap.data()!.status === 'reContracted'
-          : false;
-  
-        // --- Start Transaction for writes only ---
-        await runTransaction(firestore, async (transaction) => {
-          let appointmentsToProcess = [...existingAppointments];
-  
-          if (isEditing) {
-            appointmentsToProcess = appointmentsToProcess.filter(
-              (a) => a.id !== dialogData.id
-            );
-          }
-          
-          const client = clients.find((c: Client) => c.id === selectedClientId);
-          const appointmentBaseData = {
-            title: title || (isNewClient ? newClientName : client?.nameAr),
-            engineerId: dialogData.engineerId,
-            appointmentDate: Timestamp.fromDate(appointmentDateTime),
-            type: 'architectural' as const,
-            clientId: isNewClient ? null : selectedClientId,
-            clientName: isNewClient ? newClientName : null,
-            clientMobile: isNewClient ? newClientMobile : null,
-            transactionId: isNewClient ? null : selectedTransactionId,
-            notes: notes,
-          };
-          
-          const newOrUpdatedAppointment: any = {
-            id: isEditing ? dialogData.id : `new-${Date.now()}`,
-            ...dialogData,
-            ...appointmentBaseData
-          };
+        e.preventDefault();
+        setIsSaving(true);
+    
+        try {
+            const appointmentDateTime = isEditing && newDate && newTime
+                ? new Date(`${newDate}T${newTime}`)
+                : dialogData.appointmentDate;
+    
+            if (isPast(appointmentDateTime) && !isEditing) {
+                throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
+            }
+    
+            if (isNewClient) {
+                if (!newClientName || !newClientMobile) {
+                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
+                }
+            } else {
+                if (!selectedClientId || !selectedTransactionId) {
+                    throw new Error('الرجاء اختيار العميل والمعاملة.');
+                }
+            }
 
-          appointmentsToProcess.push(newOrUpdatedAppointment);
-          
-          appointmentsToProcess.sort(
-            (a, b) =>
-              (a.appointmentDate?.toMillis() || 0) -
-              (b.appointmentDate?.toMillis() || 0)
-          );
+            // --- Simplified Update/Create Logic ---
+            if (isEditing) {
+                const appointmentRef = doc(firestore, 'appointments', dialogData.id);
+                await updateDoc(appointmentRef, {
+                    appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                    title,
+                    notes,
+                    transactionId: selectedTransactionId,
+                    // Note: Client and Engineer are not editable for existing appointments
+                });
+            } else {
+                 const newAppointmentData: any = {
+                    engineerId: dialogData.engineerId,
+                    title: title || (isNewClient ? newClientName : clients.find((c: Client) => c.id === selectedClientId)?.nameAr),
+                    notes,
+                    appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                    createdAt: serverTimestamp(),
+                    type: 'architectural' as const,
+                    clientId: isNewClient ? null : selectedClientId,
+                    clientName: isNewClient ? newClientName : null,
+                    clientMobile: isNewClient ? newClientMobile : null,
+                    transactionId: isNewClient ? null : selectedTransactionId,
+                };
+                await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+            }
 
-          // Delete existing architectural appointments for this client to re-create them
-          existingAppointments.forEach(appt => {
-              if(appt.id && appt.type === 'architectural') transaction.delete(doc(firestore, 'appointments', appt.id));
-          });
-          
-          // Re-create all appointments with correct order and color
-          appointmentsToProcess.forEach((appt, index) => {
-            const visitCount = index + 1;
-            const newColor = getVisitColor({ visitCount, contractSigned });
-            const { id, ...saveData } = appt;
-            const finalData = { ...saveData, visitCount, color: newColor, createdAt: appt.createdAt || serverTimestamp() };
-            
-            const newApptRef = doc(collection(firestore, 'appointments'));
-            transaction.set(newApptRef, finalData);
-          });
-        });
-  
-        toast({ title: 'نجاح', description: 'تم تحديث الموعد بنجاح.' });
-        onClose();
-        onSaveSuccess();
-  
-      } catch (error) {
-        console.error('Error during save:', error);
-        const message =
-          error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
-        toast({ variant: 'destructive', title: 'خطأ', description: message });
-      } finally {
-        setIsSaving(false);
-      }
+            // --- Recalculate and Batch Update Counts/Colors ---
+            const finalClientId = isNewClient ? null : selectedClientId;
+            if (finalClientId) {
+                const allClientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural'));
+                const allClientApptsSnap = await getDocs(allClientApptsQuery);
+                let appointmentsForClient = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
+
+                const clientRef = doc(firestore, 'clients', finalClientId);
+                const clientSnap = await getDoc(clientRef);
+                const contractSigned = clientSnap.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
+
+                appointmentsForClient.sort((a, b) => (a.appointmentDate?.toMillis() || 0) - (b.appointmentDate?.toMillis() || 0));
+
+                const updateBatch = writeBatch(firestore);
+                appointmentsForClient.forEach((appt, index) => {
+                    const visitCount = index + 1;
+                    const newColor = getVisitColor({ visitCount, contractSigned });
+
+                    const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
+                    
+                    if (needsUpdate) {
+                        const apptRef = doc(firestore, 'appointments', appt.id!);
+                        updateBatch.update(apptRef, { visitCount, color: newColor });
+                    }
+                });
+                await updateBatch.commit();
+            }
+    
+            toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
+            onClose();
+            onSaveSuccess();
+    
+        } catch (error) {
+            console.error("Error during save:", error);
+            const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
+            toast({ variant: 'destructive', title: 'خطأ', description: message });
+        } finally {
+            setIsSaving(false);
+        }
     };
-
+    
+    
     const clientOptions = useMemo(() => filteredClients.map((c: Client) => ({
       value: c.id,
       label: c.nameAr,
