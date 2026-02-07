@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -32,7 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import type { Client, ClientTransaction, Employee, Quotation, TransactionStage, WorkStage, UserRole, Department, TransactionAssignment } from '@/lib/types';
+import type { Client, ClientTransaction, Employee, Quotation, TransactionStage, WorkStage, UserRole, Department, TransactionAssignment, TransactionType } from '@/lib/types';
 import { format, differenceInDays, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
@@ -248,14 +248,55 @@ export default function TransactionDetailPage() {
   }, [firestore]);
   
   useEffect(() => {
-    if (!firestore || !transaction?.departmentId) return;
+    if (!firestore || !transaction) return;
+
     const fetchTemplates = async () => {
-        const stagesQuery = query(collection(firestore, `departments/${transaction.departmentId}/workStages`));
-        const snapshot = await getDocs(stagesQuery);
-        setWorkStageTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage)));
+        try {
+            const allDepartmentIds = new Set<string>();
+            if (transaction.departmentId) {
+                allDepartmentIds.add(transaction.departmentId);
+            }
+
+            if (transaction.transactionTypeId) {
+                const transTypeRef = doc(firestore, 'transactionTypes', transaction.transactionTypeId);
+                const transTypeSnap = await getDoc(transTypeRef);
+                if (transTypeSnap.exists()) {
+                    const transTypeData = transTypeSnap.data() as TransactionType;
+                    if (transTypeData.departmentIds) {
+                        transTypeData.departmentIds.forEach(id => allDepartmentIds.add(id));
+                    }
+                }
+            }
+
+            if (allDepartmentIds.size === 0) {
+                setWorkStageTemplates([]);
+                return;
+            }
+
+            const stagePromises = Array.from(allDepartmentIds).map(deptId => 
+                getDocs(query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order')))
+            );
+            
+            const stageSnapshots = await Promise.all(stagePromises);
+            
+            const allStages = new Map<string, WorkStage>();
+            stageSnapshots.forEach(snapshot => {
+                snapshot.docs.forEach(doc => {
+                    if (!allStages.has(doc.id)) {
+                        allStages.set(doc.id, { id: doc.id, ...doc.data() } as WorkStage);
+                    }
+                });
+            });
+
+            setWorkStageTemplates(Array.from(allStages.values()));
+        } catch (error) {
+            console.error("Error fetching work stage templates:", error);
+            toast({ variant: "destructive", title: "خطأ", description: "فشل في تحميل قوالب مراحل العمل." });
+        }
     };
+
     fetchTemplates();
-  }, [firestore, transaction?.departmentId]);
+  }, [firestore, transaction, toast]);
 
 
   const handleConfirmCancelContract = async () => {
@@ -1056,6 +1097,8 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
 
     
 
