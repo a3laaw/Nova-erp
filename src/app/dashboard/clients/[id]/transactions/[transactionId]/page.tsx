@@ -1,7 +1,6 @@
 
-'use client';
-
-import { useEffect, useState, useMemo, useCallback } from 'react';
+      'use client';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
@@ -752,21 +751,21 @@ export default function TransactionDetailPage() {
   
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
-  const sortedStages = useMemo(() => {
-    if (!transaction?.stages) return [];
-    return [...transaction.stages].sort((a,b) => (a.order ?? 999) - (b.order ?? 999));
-  }, [transaction?.stages]);
-
   const enrichedStages = useMemo(() => {
-    if (workStageTemplates.length === 0 && sortedStages.length > 0) return sortedStages as (Partial<TransactionStage> & Partial<WorkStage>)[];
-    return sortedStages.map(progressStage => {
-        const template = workStageTemplates.find(t => t.id === progressStage.stageId);
+    const progressStages = transaction?.stages || [];
+    const templateStages = workStageTemplates || [];
+
+    const combined = templateStages.map(template => {
+        const progress = progressStages.find(p => p.stageId === template.id);
         return {
             ...template,
-            ...progressStage,
-        };
+            ...progress,
+        }
     });
-  }, [sortedStages, workStageTemplates]);
+
+    return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
+
+  }, [transaction?.stages, workStageTemplates]);
 
   const trackableInProgressStages = useMemo(() => 
     enrichedStages.filter(s => s.status === 'in-progress' && s.enableModificationTracking === true),
@@ -942,8 +941,8 @@ export default function TransactionDetailPage() {
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>
-                                                    {stageStatusTranslations[stage.status]}
+                                                <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status!])}>
+                                                    {stageStatusTranslations[stage.status!]}
                                                 </Badge>
                                                 <div className="font-semibold">{stage.name}</div>
                                                 {stage.trackingType === 'duration' && <StageCountdown stage={stage as TransactionStage} />}
@@ -1057,5 +1056,7 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
 
     
