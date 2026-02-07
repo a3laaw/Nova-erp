@@ -91,10 +91,11 @@
     }
 
     @media print {
-        body {
+        html, body {
             background: white !important;
-            -webkit-print-color-adjust: exact; /* Chrome, Safari */
-            color-adjust: exact; /* Firefox */
+            color: black !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
         }
         .no-print {
             display: none !important;
@@ -102,38 +103,29 @@
         .printable-wrapper {
             box-shadow: none !important;
             border: none !important;
+            background: transparent !important;
         }
-        .printable-content {
-          padding: 0 !important;
-        }
-
         .printable-container {
             display: table;
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
         }
-
         .print-header {
             display: table-header-group;
         }
-
+        .print-content {
+            display: table-row-group;
+        }
         .print-footer {
             display: table-footer-group;
         }
-
-        .print-content {
-            display: table-row-group;
-            position: relative; /* For watermark positioning */
-        }
-        
         .print-watermark {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-45deg);
             opacity: 0.08;
-            z-index: 10;
+            z-index: -1;
             pointer-events: none;
         }
     }
@@ -157,5 +149,3 @@
     size: A4;
     margin: 0;
 }
-
-    

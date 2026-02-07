@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useBranding } from '@/context/branding-context';
@@ -18,32 +17,48 @@ export function PrintableDocument({ children }: PrintableDocumentProps) {
     return (
         <div id="printable-area" className="printable-container bg-white dark:bg-card">
             {branding?.letterhead_image_url && (
-                <div className="print-header">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={branding.letterhead_image_url} alt="Company Letterhead" className="w-full" />
-                </div>
+                <thead className="print-header">
+                  <tr><td>
+                    <div style={{
+                      backgroundImage: `url(${branding.letterhead_image_url})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center top',
+                      height: '150px' /* Adjust height as needed */
+                    }}></div>
+                  </td></tr>
+                </thead>
             )}
 
-            <main className="print-content">
-                {branding?.watermark_image_url && (
-                    <div className="print-watermark">
-                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={branding.watermark_image_url} alt="Watermark" />
+            <tbody className="print-content">
+              <tr><td>
+                <div className="relative">
+                    {branding?.watermark_image_url && (
+                        <div className="print-watermark">
+                             {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={branding.watermark_image_url} alt="Watermark" />
+                        </div>
+                    )}
+                    <div className="p-8 md:p-12 document-body">
+                        {children}
                     </div>
-                )}
-                <div className="p-8 md:p-12 document-body">
-                    {children}
                 </div>
-            </main>
+              </td></tr>
+            </tbody>
 
             {branding?.footer_image_url && (
-                <div className="print-footer">
-                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={branding.footer_image_url} alt="Company Footer" className="w-full" />
-                </div>
+                <tfoot className="print-footer">
+                  <tr><td>
+                    <div style={{
+                      backgroundImage: `url(${branding.footer_image_url})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center bottom',
+                      height: '100px' /* Adjust height as needed */
+                    }}></div>
+                  </td></tr>
+                </tfoot>
             )}
         </div>
     );
 }
-
-    
