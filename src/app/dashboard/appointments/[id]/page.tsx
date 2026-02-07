@@ -584,11 +584,14 @@ export default function AppointmentDetailsPage() {
         
         const combined = workStages.map(template => {
             const progress = progressStages.find(p => p.stageId === template.id);
+            const enableModificationTracking = template.enableModificationTracking || false;
+
             return {
                 ...template,
                 ...progress,
+                enableModificationTracking, // Ensure template value is respected
                 status: progress?.status || 'pending', 
-            };
+            } as TransactionStage & WorkStage;
         });
 
         return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
@@ -836,3 +839,5 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
+
+    
