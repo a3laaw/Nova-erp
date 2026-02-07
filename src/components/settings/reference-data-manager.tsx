@@ -586,7 +586,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                             </div>
                           </>
                         )}
-                        <div className="flex items-center space-x-2">
+                         <div className="flex items-center space-x-2">
                            <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} />
                            <Label htmlFor="enableModificationTracking">تفعيل عداد التعديلات لهذه المرحلة</Label>
                         </div>
