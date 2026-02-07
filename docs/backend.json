@@ -39,17 +39,7 @@
         "letterhead_image_url": {
             "type": "string",
             "format": "uri",
-            "description": "URL to the company's full letterhead image (for document headers)."
-        },
-        "footer_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the company's full footer image (for document footers)."
-        },
-        "watermark_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the company's watermark image for documents."
+            "description": "URL to the company's full letterhead image."
         },
         "system_background_url": {
             "type": "string",
@@ -392,7 +382,6 @@
           "enum": ["duration", "occurrence", "none"],
           "description": "The tracking type of the stage, copied from the template."
         },
-        "enableModificationTracking": { "type": "boolean", "description": "If true, enables a counter for modifications on this stage." },
         "expectedDurationDays": {
             "type": ["number", "null"],
             "description": "The expected duration in days for this stage (if trackingType is 'duration')."
@@ -525,7 +514,7 @@
         "description": "Records changes made to employee data for historical tracking.",
         "type": "object",
         "properties": {
-            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate", "StatusChange", "ResidencyUpdate"] },
+            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate"] },
             "field": { "type": "string", "description": "The name of the field that was changed." },
             "oldValue": { "description": "The value of the field before the change." },
             "newValue": { "description": "The value of the field after the change." },
@@ -1089,7 +1078,9 @@
         "journalEntryId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "clientId": { "type": "string", "description": "Client ID if this payment is for a project"},
-        "transactionId": { "type": "string", "description": "Transaction ID if this payment is for a project"}
+        "transactionId": { "type": "string", "description": "Transaction ID if this payment is for a project"},
+        "employeeId": { "type": "string", "description": "Employee ID if this payment is for an employee-specific expense like residency renewal" },
+        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "The new residency expiry date if this is for a renewal." }
       },
       "required": ["voucherNumber", "payeeName", "amount", "paymentDate", "paymentMethod", "debitAccountId", "creditAccountId", "status"]
     },
@@ -1203,6 +1194,22 @@
         }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
+    },
+    "ResidencyRenewal": {
+      "title": "Residency Renewal",
+      "description": "Tracks the financial and administrative process of an employee's residency renewal.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "renewalDate": { "type": "string", "format": "date-time" },
+        "newExpiryDate": { "type": "string", "format": "date-time" },
+        "cost": { "type": "number" },
+        "paymentVoucherId": { "type": "string" },
+        "monthlyAmortizationAmount": { "type": "number" },
+        "amortizationStatus": { "type": "string", "enum": ["in-progress", "completed"] },
+        "lastAmortizationDate": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId", "monthlyAmortizationAmount", "amortizationStatus"]
     }
   },
   "auth": {
@@ -1372,8 +1379,10 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
+    },
+    "/residencyRenewals/{renewalId}": {
+        "schema": { "$ref": "#/entities/ResidencyRenewal" },
+        "description": "Stores records of employee residency renewals."
     }
   }
 }
-
-    
