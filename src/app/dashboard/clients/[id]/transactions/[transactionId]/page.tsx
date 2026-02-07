@@ -405,6 +405,7 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRef, { stages: currentStages });
     
+        const safeApptDate = toFirestoreDate(transaction.createdAt); // Fallback to tx creation date
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -415,7 +416,7 @@ export default function TransactionDetailPage() {
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
         };
-
+    
         const timelineRef = collection(transactionRef, 'timelineEvents');
         batch.set(doc(timelineRef), logData);
         
@@ -423,7 +424,7 @@ export default function TransactionDetailPage() {
         batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
         await batch.commit();
-
+    
         toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
@@ -774,7 +775,7 @@ export default function TransactionDetailPage() {
       </div>
     );
   }
-
+  
   return (
     <>
     {transaction && client && (
@@ -863,36 +864,6 @@ export default function TransactionDetailPage() {
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
-                {trackableInProgressStages.length > 0 && (
-                    <Card className="mb-6 bg-amber-50 border-amber-200">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-amber-800">
-                            تسجيل تعديلات على المراحل الحالية
-                        </CardTitle>
-                        <CardDescription className="text-amber-700">
-                           اضغط على الزر لتوثيق طلب تعديل جديد من العميل على إحدى المراحل قيد التنفيذ.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {trackableInProgressStages.map(stage => (
-                          <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
-                            <p className="font-semibold">{stage.name}</p>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
-                                onClick={() => handleModificationIncrement(stage.stageId!)}
-                                disabled={isProcessing}
-                            >
-                                <Plus className="ml-1 h-4 w-4" />
-                                إضافة تعديل
-                            </Button>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                )}
-
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
@@ -901,6 +872,32 @@ export default function TransactionDetailPage() {
                         <CardDescription>تتبع التقدم في كل مرحلة من مراحل المعاملة.</CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {trackableInProgressStages.length > 0 && (
+                            <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-900/30">
+                              <CardHeader className="pb-4">
+                                <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
+                                    تسجيل تعديلات على المراحل الحالية
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                {trackableInProgressStages.map(stage => (
+                                  <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
+                                    <p className="font-semibold">{stage.name}</p>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+                                        onClick={() => handleModificationIncrement(stage.stageId!)}
+                                        disabled={isProcessing}
+                                    >
+                                        <Plus className="ml-1 h-4 w-4" />
+                                        تسجيل تعديل جديد
+                                    </Button>
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+                        )}
                         {isLoading ? <Skeleton className="h-48 w-full" /> : !transaction.stages || transaction.stages.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
