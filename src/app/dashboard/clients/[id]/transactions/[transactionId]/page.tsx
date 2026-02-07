@@ -292,7 +292,6 @@ export default function TransactionDetailPage() {
         
         currentStages[stageToRevertIndex].status = 'pending';
         (currentStages[stageToRevertIndex] as any).endDate = null;
-        // FIX: Also reset the start date and expected end date to fully revert the stage state.
         (currentStages[stageToRevertIndex] as any).startDate = null;
         (currentStages[stageToRevertIndex] as any).expectedEndDate = null;
 
@@ -303,7 +302,6 @@ export default function TransactionDetailPage() {
                 const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
                 
                 if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
-                    // OPTIMIZATION: Instead of fetching all templates, use the data within the transaction itself.
                     const predecessorsOfNextStage = currentStages.filter(s => s.nextStageIds?.includes(nextStageId));
                     const otherCompletedPredecessors = predecessorsOfNextStage.some(p => p.stageId !== stageIdToRevert && p.status === 'completed');
                     
@@ -756,12 +754,6 @@ export default function TransactionDetailPage() {
                                                 ))}
                                             </div>
                                             <div className="flex gap-2 items-center">
-                                                {stage.status === 'in-progress' && stage.enableModificationTracking && (
-                                                    <Button size="sm" variant="outline" className="h-7 px-2 text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
-                                                        <Plus className="ml-1 h-3 w-3" />
-                                                        إضافة تعديل
-                                                    </Button>
-                                                )}
                                                 {stage.status === 'pending' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || !canStart.allowed} title={!canStart.allowed ? canStart.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
@@ -769,6 +761,12 @@ export default function TransactionDetailPage() {
                                                 )}
                                                 {stage.status === 'in-progress' && (
                                                     <>
+                                                        {stage.enableModificationTracking && (
+                                                            <Button size="sm" variant="outline" className="h-7 px-2 text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
+                                                                <Plus className="ml-1 h-3 w-3" />
+                                                                إضافة تعديل
+                                                            </Button>
+                                                        )}
                                                          <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
                                                             <Check className="ml-2 h-4 w-4" />
                                                             {stage.trackingType === 'occurrence' ? 'تسجيل إنجاز' : 'إكمال'}
