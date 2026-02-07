@@ -56,15 +56,22 @@ function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean })
   return "#9ca3af"; // gray-400
 }
 
-async function reconcileClientAppointments(firestore: any, clientId: string) {
-    if (!clientId) return;
+async function reconcileClientAppointments(firestore: any, identifier: { clientId?: string | null; clientMobile?: string | null }) {
+    if (!identifier.clientId && !identifier.clientMobile) return;
 
     try {
-        const clientApptsQuery = query(
-            collection(firestore, 'appointments'),
-            where('clientId', '==', clientId),
-            where('type', '==', 'architectural')
-        );
+        const apptsQueryConstraints = [
+            where('type', '==', 'architectural'),
+        ];
+        if (identifier.clientId) {
+            apptsQueryConstraints.push(where('clientId', '==', identifier.clientId));
+        } else if (identifier.clientMobile) {
+            apptsQueryConstraints.push(where('clientMobile', '==', identifier.clientMobile));
+        } else {
+            return;
+        }
+
+        const clientApptsQuery = query(collection(firestore, 'appointments'), ...apptsQueryConstraints);
         const clientApptsSnap = await getDocs(clientApptsQuery);
 
         const appointments = clientApptsSnap.docs
@@ -73,17 +80,25 @@ async function reconcileClientAppointments(firestore: any, clientId: string) {
 
         if (appointments.length === 0) return;
 
-        const clientRef = doc(firestore, 'clients', clientId);
-        const clientSnap = await getDoc(clientRef);
-        const contractSigned = clientSnap.exists() && ['contracted', 'reContracted'].includes(clientSnap.data().status);
-
+        let contractSigned = false;
+        if (identifier.clientId) {
+            const clientRef = doc(firestore, 'clients', identifier.clientId);
+            const clientSnap = await getDoc(clientRef);
+            contractSigned = clientSnap.exists() && ['contracted', 'reContracted'].includes(clientSnap.data().status);
+        }
+        
         const batch = writeBatch(firestore);
 
         appointments.forEach((appt, index) => {
             const visitCount = index + 1;
             const newColor = getVisitColor({ visitCount, contractSigned });
-            const apptRef = doc(firestore, 'appointments', appt.id!);
-            batch.update(apptRef, { visitCount, color: newColor });
+            
+            const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
+
+            if (needsUpdate) {
+                const apptRef = doc(firestore, 'appointments', appt.id!);
+                batch.update(apptRef, { visitCount, color: newColor });
+            }
         });
 
         await batch.commit();
@@ -112,7 +127,6 @@ export function ArchitecturalAppointmentsView() {
     const [isDeleting, setIsDeleting] = useState(false);
     
     useEffect(() => {
-        // Set date on client-side to avoid hydration mismatch
         if (!date) {
             setDate(new Date());
         }
@@ -179,7 +193,6 @@ export function ArchitecturalAppointmentsView() {
 
     const appointments = useMemo(() => {
       if (!rawAppointments) return [];
-      // If clients haven't loaded yet, return raw data to avoid losing appointments from view
       if (clients.length === 0) return rawAppointments.map(appt => ({ ...appt, clientName: appt.clientName || '...' }));
 
       return rawAppointments.map(appt => ({
@@ -211,7 +224,6 @@ export function ArchitecturalAppointmentsView() {
         if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
 
-        // Check if the appointment is in the past
         if (isPast(appointmentDate)) {
             toast({
                 title: 'لا يمكن الحجز في الماضي',
@@ -226,7 +238,7 @@ export function ArchitecturalAppointmentsView() {
             engineerId: engineer.id,
             engineerName: engineer.fullName,
             appointmentDate,
-            appointments, // Pass current appointments to dialog
+            appointments,
         });
         setIsDialogOpen(true);
     };
@@ -252,28 +264,30 @@ export function ArchitecturalAppointmentsView() {
         if (!appointmentToDelete || !firestore || !currentUser) return;
     
         setIsDeleting(true);
-        const { id: apptId, clientId } = appointmentToDelete;
+        const { id: apptId, clientId, clientMobile } = appointmentToDelete;
         
         try {
             await deleteDoc(doc(firestore, 'appointments', apptId!));
 
-            if (clientId) {
-                await reconcileClientAppointments(firestore, clientId); 
+            if (clientId || clientMobile) {
+                await reconcileClientAppointments(firestore, { clientId, clientMobile }); 
+            }
 
-                const logBatch = writeBatch(firestore);
+            if (clientId) {
                 const logContent = `قام ${currentUser.fullName} بحذف موعد الزيارة رقم ${appointmentToDelete.visitCount || ''} ("${appointmentToDelete.title}").`;
                 const logData = {
                     type: 'log' as const, content: logContent, userId: currentUser.id,
                     userName: currentUser.fullName, userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
                 };
+                const batch = writeBatch(firestore);
                 const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
-                logBatch.set(historyRef, { ...logData, content: `[موعد] ${logContent}` });
+                batch.set(historyRef, { ...logData, content: `[موعد] ${logContent}` });
                 if (appointmentToDelete.transactionId) {
                     const timelineRef = doc(collection(firestore, `clients/${clientId}/transactions/${appointmentToDelete.transactionId}/timelineEvents`));
-                    logBatch.set(timelineRef, logData);
+                    batch.set(timelineRef, logData);
                 }
-                await logBatch.commit();
+                await batch.commit();
             }
     
             toast({ title: 'نجاح', description: 'تم إلغاء الموعد بنجاح.' });
@@ -290,7 +304,7 @@ export function ArchitecturalAppointmentsView() {
 
 
     const handleSave = async () => {
-        if (date) { // Re-fetch data for the current date
+        if (date) { 
             await fetchAppointments(date);
         }
     };
@@ -300,7 +314,7 @@ export function ArchitecturalAppointmentsView() {
         if (!element || !date) return;
         
         const opt = {
-          margin:       [0.5, 0.2, 0.5, 0.2],
+          margin:       [0.5, 0.2, 0.5, 0.2], // [top, left, bottom, right]
           filename:     `architectural_appointments_${format(date, "yyyy-MM-dd")}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
           html2canvas:  { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
@@ -613,15 +627,24 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         e.preventDefault();
         setIsSaving(true);
         
-        const finalClientId = isNewClient ? null : selectedClientId;
-        const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-        
+        const isNewProspective = isNewClient && !isEditing;
+        const isExistingProspective = isNewClient && isEditing;
+
         try {
-            if (isNewClient && (!newClientName || !newClientMobile)) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-            if (!isNewClient && !finalClientId) throw new Error('الرجاء اختيار عميل.');
+            let appointmentDateTime: Date;
+            if (isEditing) {
+                if (!newDate || !newTime) throw new Error('الرجاء تحديد التاريخ والوقت الجديدين.');
+                appointmentDateTime = new Date(`${newDate}T${newTime}`);
+            } else {
+                appointmentDateTime = dialogData.appointmentDate;
+            }
+
+            if (isPast(appointmentDateTime) && !isEditing) {
+                throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
+            }
 
             const dataToSave: any = {
-                title: title.trim() || (isNewClient ? newClientName : clients.find((c:any) => c.id === finalClientId)?.nameAr),
+                title: title.trim() || (isNewClient ? newClientName : clients.find((c:any) => c.id === selectedClientId)?.nameAr),
                 notes: notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 engineerId: dialogData.engineerId,
@@ -629,13 +652,19 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 transactionId: selectedTransactionId || null,
             };
 
+            let reconcileIdentifier: { clientId?: string | null; clientMobile?: string | null } = {};
+
             if (isNewClient) {
+                if (!newClientName || !newClientMobile) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
                 dataToSave.clientName = newClientName;
                 dataToSave.clientMobile = newClientMobile;
+                reconcileIdentifier = { clientMobile: newClientMobile };
             } else {
-                dataToSave.clientId = finalClientId;
+                if (!selectedClientId) throw new Error('الرجاء اختيار عميل.');
+                dataToSave.clientId = selectedClientId;
+                reconcileIdentifier = { clientId: selectedClientId };
             }
-
+            
             if (isEditing) {
                 const appointmentRef = doc(firestore, 'appointments', dialogData.id);
                 await updateDoc(appointmentRef, dataToSave);
@@ -643,10 +672,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 dataToSave.createdAt = serverTimestamp();
                 await addDoc(collection(firestore, 'appointments'), dataToSave);
             }
-
-            if (finalClientId) {
-                await reconcileClientAppointments(firestore, finalClientId);
-            }
+            
+            await reconcileClientAppointments(firestore, reconcileIdentifier);
 
             toast({ title: 'نجاح!', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
             onClose();
@@ -762,6 +789,5 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-
 
     
