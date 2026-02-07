@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -35,7 +35,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Appointment, Client, Employee } from '@/lib/types';
+import type { Appointment, Client, Employee, WorkStage, TransactionStage } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
@@ -253,10 +253,10 @@ export function ArchitecturalAppointmentsView() {
     
         setIsDeleting(true);
         const { id: apptId, clientId } = appointmentToDelete;
-
+        
         try {
             await deleteDoc(doc(firestore, 'appointments', apptId!));
-            
+
             if (clientId) {
                 await reconcileClientAppointments(firestore, clientId); 
 
@@ -616,61 +616,42 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         const finalClientId = isNewClient ? null : selectedClientId;
         const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
         
-        if (isPast(appointmentDateTime) && !isEditing) {
-            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.'});
-            setIsSaving(false); return;
-        }
-
         try {
-            if (isNewClient) {
-                if (!newClientName || !newClientMobile) {
-                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-                }
-                 // Check for existing mobile number before proceeding
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('mobile', '==', newClientMobile));
-                const querySnapshot = await getDocs(q);
+            if (isNewClient && (!newClientName || !newClientMobile)) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
+            if (!isNewClient && !finalClientId) throw new Error('الرجاء اختيار عميل.');
 
-                if (!querySnapshot.empty) {
-                     throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`);
-                }
-            } else if (!finalClientId) {
-                 throw new Error('الرجاء اختيار عميل.');
-            }
-            
-            const appointmentRef = isEditing ? doc(firestore, 'appointments', dialogData.id) : doc(collection(firestore, 'appointments'));
-            const dataToSave = {
-                title: title.trim() || 'موعد',
+            const dataToSave: any = {
+                title: title.trim() || (isNewClient ? newClientName : clients.find((c:any) => c.id === finalClientId)?.nameAr),
                 notes: notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                engineerId: dialogData.engineerId,
+                type: 'architectural',
                 transactionId: selectedTransactionId || null,
             };
 
+            if (isNewClient) {
+                dataToSave.clientName = newClientName;
+                dataToSave.clientMobile = newClientMobile;
+            } else {
+                dataToSave.clientId = finalClientId;
+            }
+
             if (isEditing) {
+                const appointmentRef = doc(firestore, 'appointments', dialogData.id);
                 await updateDoc(appointmentRef, dataToSave);
             } else {
-                const client = clients.find((c:any) => c.id === finalClientId);
-                const newAppointmentData = {
-                    ...dataToSave,
-                    engineerId: dialogData.engineerId,
-                    type: 'architectural' as const,
-                    createdAt: serverTimestamp(),
-                    ...(isNewClient 
-                        ? { clientName: newClientName, clientMobile: newClientMobile }
-                        : { clientId: finalClientId }
-                    ),
-                };
-                await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+                dataToSave.createdAt = serverTimestamp();
+                await addDoc(collection(firestore, 'appointments'), dataToSave);
             }
-    
+
             if (finalClientId) {
                 await reconcileClientAppointments(firestore, finalClientId);
             }
-    
+
             toast({ title: 'نجاح!', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
             onClose();
             onSaveSuccess();
-    
+
         } catch (error) {
              console.error("Error during save:", error);
              const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
@@ -771,7 +752,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : !selectedClientId) }>
+                        <Button type="submit" disabled={isSaving || (!isNewClient && !selectedClientId) }>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
@@ -781,5 +762,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
 
     
