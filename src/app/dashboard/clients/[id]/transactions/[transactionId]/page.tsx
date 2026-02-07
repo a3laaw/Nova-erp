@@ -400,6 +400,11 @@ export default function TransactionDetailPage() {
         stageToRevert.status = 'in-progress';
         stageToRevert.endDate = null;
 
+        // Reset modification count
+        if (stageToRevert.modificationCount && stageToRevert.modificationCount > 0) {
+            stageToRevert.modificationCount = 0;
+        }
+
         const stageTemplate = workStageTemplates.find(t => t.id === stageIdToRevert);
 
         if (stageTemplate?.nextStageIds) {
@@ -484,9 +489,10 @@ export default function TransactionDetailPage() {
         return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
     }, [transaction, workStageTemplates]);
 
-    const currentInProgressStage = useMemo(() => 
-        enrichedStages.find(s => s.status === 'in-progress' && s.enableModificationTracking),
-    [enrichedStages]);
+    const currentInProgressStage = useMemo(() => {
+      if (!enrichedStages) return undefined;
+      return enrichedStages.find(s => s.status === 'in-progress' && s.enableModificationTracking);
+    }, [enrichedStages]);
 
   const assignedEngineerName = transaction?.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : null;
   
@@ -561,33 +567,11 @@ export default function TransactionDetailPage() {
                             <div className="text-center p-8 text-muted-foreground">لا توجد مراحل محددة لهذه المعاملة.</div>
                         ) : (
                             <div className="space-y-4">
-                                {currentInProgressStage && (
-                                    <div className="p-4 border border-orange-200 bg-orange-50 dark:bg-orange-900/20 rounded-lg space-y-2">
-                                        <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-300">
-                                            تسجيل تعديل للمرحلة الحالية
-                                        </h3>
-                                        <p className="text-sm text-muted-foreground">
-                                            المرحلة الحالية قيد التنفيذ هي: <strong className="text-foreground">{currentInProgressStage.name}</strong>.
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            إذا كانت هذه الزيارة لمناقشة تعديلات على هذه المرحلة، اضغط على الزر أدناه لتوثيق ذلك.
-                                        </p>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
-                                            onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
-                                            disabled={isProcessing}
-                                        >
-                                            <Plus className="ml-1 h-4 w-4" />
-                                            تسجيل تعديل جديد
-                                        </Button>
-                                    </div>
-                                )}
                                 {enrichedStages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
                                     const canBeStarted = canStartStage(stage, transaction.stages as TransactionStage[]);
-
+                                    const showModificationButton = stage.status === 'in-progress' && stage.enableModificationTracking;
+                                    
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -602,7 +586,19 @@ export default function TransactionDetailPage() {
                                                     <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                                                 ))}
                                             </div>
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-2 items-center flex-shrink-0">
+                                                {showModificationButton && (
+                                                     <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+                                                        onClick={() => handleModificationIncrement(stage.stageId!)}
+                                                        disabled={isProcessing}
+                                                    >
+                                                        <Plus className="ml-1 h-4 w-4" />
+                                                        تسجيل تعديل
+                                                    </Button>
+                                                )}
                                                 {stage.status === 'pending' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId!, 'in-progress')} disabled={!canInteract || !canBeStarted.allowed} title={!canBeStarted.allowed ? canBeStarted.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
@@ -640,4 +636,3 @@ export default function TransactionDetailPage() {
   );
 }
 
-    
