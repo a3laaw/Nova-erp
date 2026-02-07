@@ -304,7 +304,6 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRefDoc, { stages: currentStages });
     
-        const safeApptDate = toFirestoreDate(transaction.createdAt); // Fallback to transaction creation date
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -351,8 +350,8 @@ export default function TransactionDetailPage() {
             stage.status = newStatus;
             
             const now = new Date();
-            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now as any;
-            if (newStatus === 'completed') stage.endDate = now as any;
+            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
+            if (newStatus === 'completed') stage.endDate = now;
             
             // Auto-start next sequential stage
             if (newStatus === 'completed' && stageTemplate?.nextStageIds) {
@@ -363,7 +362,7 @@ export default function TransactionDetailPage() {
                          const canStart = canStartStage(nextStage, currentStages as TransactionStage[]);
                          if (canStart.allowed) {
                             nextStage.status = 'in-progress';
-                            nextStage.startDate = now as any;
+                            nextStage.startDate = now;
                          }
                     }
                 }
@@ -399,11 +398,7 @@ export default function TransactionDetailPage() {
 
         stageToRevert.status = 'in-progress';
         stageToRevert.endDate = null;
-
-        // Reset modification count
-        if (stageToRevert.modificationCount && stageToRevert.modificationCount > 0) {
-            stageToRevert.modificationCount = 0;
-        }
+        stageToRevert.modificationCount = 0; // Unconditionally reset the count
 
         const stageTemplate = workStageTemplates.find(t => t.id === stageIdToRevert);
 
@@ -475,7 +470,6 @@ export default function TransactionDetailPage() {
         
         const combined = workStageTemplates.map(template => {
             const progress = progressStages.find(p => p.stageId === template.id);
-            // Explicitly carry over the tracking flag from the template
             const enableModificationTracking = template.enableModificationTracking || false;
 
             return {
@@ -491,8 +485,13 @@ export default function TransactionDetailPage() {
 
     const currentInProgressStage = useMemo(() => {
       if (!enrichedStages) return undefined;
-      return enrichedStages.find(s => s.status === 'in-progress' && s.enableModificationTracking);
-    }, [enrichedStages]);
+      const stage = enrichedStages.find(s => s.status === 'in-progress');
+      if (stage && workStageTemplates.find(t => t.id === stage.stageId)?.enableModificationTracking) {
+        return stage;
+      }
+      return undefined;
+    }, [enrichedStages, workStageTemplates]);
+
 
   const assignedEngineerName = transaction?.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : null;
   
@@ -635,4 +634,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
