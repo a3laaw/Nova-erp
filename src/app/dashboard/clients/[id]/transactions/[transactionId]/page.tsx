@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -18,7 +19,7 @@ import {
 } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -283,7 +284,7 @@ export default function TransactionDetailPage() {
     setIsProcessing(true);
     try {
         const batch = writeBatch(firestore);
-        const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+        const transactionRefDoc = doc(firestore, 'clients', clientId, 'transactions', transactionId);
     
         const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
         const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
@@ -293,9 +294,8 @@ export default function TransactionDetailPage() {
         const stage = currentStages[stageIndex];
         stage.modificationCount = (stage.modificationCount || 0) + 1;
         
-        batch.update(transactionRef, { stages: currentStages });
+        batch.update(transactionRefDoc, { stages: currentStages });
     
-        const safeApptDate = toFirestoreDate(new Date()); // Assuming modification is tracked now
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -307,8 +307,8 @@ export default function TransactionDetailPage() {
             createdAt: serverTimestamp(),
         };
     
-        const timelineRef = collection(transactionRef, 'timelineEvents');
-        batch.set(doc(timelineRef), logData);
+        const timelineRef = doc(collection(transactionRefDoc, 'timelineEvents'));
+        batch.set(timelineRef, logData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
         batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
@@ -373,6 +373,7 @@ export default function TransactionDetailPage() {
   }
 
   return (
+    <>
     <div className='space-y-6' dir='rtl'>
         <Card>
             <CardHeader>
@@ -417,7 +418,8 @@ export default function TransactionDetailPage() {
                         <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
                             <p className="font-semibold">{stage.name}</p>
                             <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
-                                <Plus className="ml-1 h-4 w-4" /> تسجيل تعديل جديد
+                                <Plus className="ml-1 h-4 w-4" />
+                                تسجيل تعديل جديد
                             </Button>
                         </div>
                     ))}
@@ -497,4 +499,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
     
