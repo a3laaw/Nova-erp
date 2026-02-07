@@ -1,5 +1,5 @@
 
-      'use client';
+'use client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
@@ -347,12 +347,14 @@ export default function TransactionDetailPage() {
             
             const stage = currentStages[stageIndex];
             const stageTemplate = workStageTemplates.find(t => t.id === stageId);
-
+            const originalStatus = stage.status;
             stage.status = newStatus;
             
-            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = new Date() as any;
-            if (newStatus === 'completed') stage.endDate = new Date() as any;
+            const now = new Date();
+            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
+            if (newStatus === 'completed') stage.endDate = now;
             
+            // Auto-start next sequential stage
             if (newStatus === 'completed' && stageTemplate?.nextStageIds) {
                 for (const nextStageId of stageTemplate.nextStageIds) {
                     const nextStageIndex = currentStages.findIndex(s => s.stageId === nextStageId);
@@ -361,7 +363,7 @@ export default function TransactionDetailPage() {
                          const canStart = canStartStage(nextStage, currentStages);
                          if (canStart.allowed) {
                             nextStage.status = 'in-progress';
-                            nextStage.startDate = new Date() as any;
+                            nextStage.startDate = now;
                          }
                     }
                 }
@@ -505,6 +507,7 @@ export default function TransactionDetailPage() {
   }
 
   return (
+    <>
     <div className='space-y-6' dir='rtl'>
         <Card>
             <CardHeader>
@@ -544,7 +547,7 @@ export default function TransactionDetailPage() {
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
-                 {trackableInProgressStages.length > 0 && (
+                {trackableInProgressStages.length > 0 && (
                     <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/30 mb-6">
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
@@ -629,5 +632,3 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-
-```
