@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -73,9 +74,9 @@ export default function DashboardLayout({
           >
             <MainNav currentUser={user} onLogout={handleLogout} />
           </Sidebar>
-          <SidebarInset className={cn(hasBackground && "bg-background/80 backdrop-blur-sm")}>
+          <SidebarInset className={cn("flex flex-col h-screen", hasBackground && "bg-background/80 backdrop-blur-sm")}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
-            <main className="flex-1 p-4 md:p-6 lg:p-8">
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
               {children}
             </main>
             <OfflineIndicator />
