@@ -1,6 +1,5 @@
-
-      'use client';
-import { useEffect, useState, useMemo } from 'react';
+'use client';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc, collectionGroup } from 'firebase/firestore';
@@ -19,7 +18,7 @@ import {
 } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, BadgeInfo, Files, PlusCircle, History, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -187,6 +186,8 @@ export default function TransactionDetailPage() {
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [workStageTemplates, setWorkStageTemplates] = useState<WorkStage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [transactionToCancel, setTransactionToCancel] = useState<ClientTransaction | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
 
   const transactionRef = useMemo(() => {
     if (!firestore || !clientId || !transactionId) return null;
@@ -217,8 +218,11 @@ export default function TransactionDetailPage() {
   }, [firestore]);
   
   useEffect(() => {
-    if (!firestore || !transaction?.transactionTypeId) return;
-
+    if (!firestore || !transaction?.transactionTypeId) {
+        setWorkStageTemplates([]);
+        return;
+    }
+    
     const fetchTemplates = async () => {
         try {
             const transTypeRef = doc(firestore, 'transactionTypes', transaction.transactionTypeId!);
@@ -291,6 +295,7 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRef, { stages: currentStages });
     
+        const safeApptDate = toFirestoreDate(new Date()); // Assuming modification is tracked now
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -325,20 +330,21 @@ export default function TransactionDetailPage() {
   };
 
   const enrichedStages = useMemo(() => {
-    const progressStages = transaction?.stages || [];
-    const templateStages = workStageTemplates || [];
-
-    const combined = templateStages.map(template => {
+    if (!transaction || !workStageTemplates) return [];
+    
+    const progressStages = transaction.stages || [];
+    
+    const combined = workStageTemplates.map(template => {
         const progress = progressStages.find(p => p.stageId === template.id);
         return {
             ...template,
             ...progress,
-            status: progress?.status || 'pending', // Ensure status exists
-        } as TransactionStage & WorkStage; // Type assertion
+            status: progress?.status || 'pending', 
+        } as TransactionStage & WorkStage;
     });
 
     return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
-  }, [transaction?.stages, workStageTemplates]);
+  }, [transaction, workStageTemplates]);
 
   const trackableInProgressStages = useMemo(() => 
     enrichedStages.filter(s => s.status === 'in-progress' && s.enableModificationTracking === true),
@@ -347,17 +353,17 @@ export default function TransactionDetailPage() {
   const assignedEngineerName = transaction?.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : null;
   
   const formatDate = (dateValue: any): string => {
-    if (!dateValue) return '-';
-    const date = toFirestoreDate(dateValue);
-    if (!date) return '-';
-    try {
-      return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
-    } catch (e) {
-      return '-';
-    }
+      if (!dateValue) return '-';
+      const date = toFirestoreDate(dateValue);
+      if (!date) return '-';
+      try {
+        return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+      } catch (e) {
+        return '-';
+      }
   }
 
-  const isLoading = transactionLoading || clientLoading;
+  const isLoading = transactionLoading || clientLoading || employeesMap.size === 0;
 
   if (isLoading) {
     return <div className="space-y-6" dir="rtl"><Card><CardHeader><Skeleton className="h-8 w-64" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card></div>;
@@ -399,32 +405,33 @@ export default function TransactionDetailPage() {
             </CardContent>
         </Card>
         
-         <Tabs defaultValue="stages" dir="rtl">
+        {trackableInProgressStages.length > 0 && (
+            <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/30">
+                <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
+                        تسجيل تعديلات على المراحل الحالية
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {trackableInProgressStages.map(stage => (
+                        <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
+                            <p className="font-semibold">{stage.name}</p>
+                            <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
+                                <Plus className="ml-1 h-4 w-4" /> تسجيل تعديل جديد
+                            </Button>
+                        </div>
+                    ))}
+                </CardContent>
+            </Card>
+        )}
+
+        <Tabs defaultValue="stages" dir="rtl">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stages">مراحل المعاملة</TabsTrigger>
                 <TabsTrigger value="comments">التعليقات والمتابعة</TabsTrigger>
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
-                 {trackableInProgressStages.length > 0 && (
-                    <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-900/30">
-                        <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
-                                تسجيل تعديلات على المراحل الحالية
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {trackableInProgressStages.map(stage => (
-                                <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
-                                    <p className="font-semibold">{stage.name}</p>
-                                    <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
-                                        <Plus className="ml-1 h-4 w-4" /> تسجيل تعديل جديد
-                                    </Button>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                 )}
                 <Card>
                     <CardHeader>
                         <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> سير العمل</CardTitle>
@@ -449,6 +456,9 @@ export default function TransactionDetailPage() {
                                                 {stage.trackingType === 'duration' && <StageCountdown stage={stage as TransactionStage} />}
                                                 {stage.trackingType === 'occurrence' && stage.maxOccurrences && <Badge variant="secondary">الإنجاز: {stage.completedCount || 0} / {stage.maxOccurrences}</Badge>}
                                                 {stage.modificationCount && stage.modificationCount > 0 && <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">التعديلات: {stage.modificationCount}</Badge>}
+                                                {stage.allowedRoles && stage.allowedRoles.map(role => (
+                                                    <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
+                                                ))}
                                             </div>
                                             <div className="flex gap-2 items-center">
                                                 {stage.status === 'pending' && (
@@ -459,7 +469,7 @@ export default function TransactionDetailPage() {
                                                 {stage.status === 'in-progress' && (
                                                     <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId!, 'completed')} disabled={!canInteract}>
                                                         <Check className="ml-2 h-4 w-4" />
-                                                        {stage.trackingType === 'occurrence' ? 'تسجيل إنجاز' : 'إكمال'}
+                                                        {'إكمال'}
                                                     </Button>
                                                 )}
                                                 {stage.status === 'completed' && currentUser?.role === 'Admin' && (
@@ -487,3 +497,4 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+    
