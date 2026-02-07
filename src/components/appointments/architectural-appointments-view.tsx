@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy, runTransaction } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -577,7 +578,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     const [newClientName, setNewClientName] = useState('');
     const [newClientMobile, setNewClientMobile] = useState('');
 
-    const isEditing = !!dialogData?.isEditing;
+    const isEditing = !!dialogData?.id;
     
     const filteredClients = useMemo(() => {
         if (!dialogData?.engineerId) return [];
@@ -587,7 +588,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     useEffect(() => {
         if (isOpen && dialogData) {
              if(isEditing) {
-                const apptDate = toFirestoreDate(dialogData.appointmentDate); // This is already a Date object
+                const apptDate = toFirestoreDate(dialogData.appointmentDate);
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title || '');
                 setSelectedTransactionId(dialogData.transactionId || '');
@@ -633,7 +634,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const transSnap = await getDocs(transQuery);
                 const transactions = transSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setClientTransactions(transactions);
-                 // If editing, make sure the original transaction ID is still valid
                 if (isEditing && dialogData.transactionId && !transactions.some(t => t.id === dialogData.transactionId)) {
                     setSelectedTransactionId(''); 
                 }
@@ -656,111 +656,97 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSaving(true);
-        
-        const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-        
-        if (isPast(appointmentDateTime) && !isEditing) {
-            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.'});
-            setIsSaving(false); return;
-        }
+      e.preventDefault();
+      setIsSaving(true);
+  
+      const appointmentDateTime = isEditing && newDate && newTime 
+          ? new Date(`${newDate}T${newTime}`) 
+          : dialogData.appointmentDate;
+  
+      if (isPast(appointmentDateTime) && !isEditing) {
+          toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.' });
+          setIsSaving(false); return;
+      }
+  
+      try {
+          if (isNewClient) {
+              if (!newClientName || !newClientMobile) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
+              const clientsRef = collection(firestore, 'clients');
+              const q = query(clientsRef, where('mobile', '==', newClientMobile));
+              const querySnapshot = await getDocs(q);
+              if (!querySnapshot.empty) throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}.`);
+          } else {
+              if (!selectedClientId || !selectedTransactionId) throw new Error('الرجاء اختيار العميل والمعاملة.');
+          }
 
-        try {
-            if (isNewClient) {
-                if (!newClientName || !newClientMobile) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال اسم وجوال العميل الجديد.' });
-                    setIsSaving(false); return;
-                }
-                 // Check for existing mobile number before proceeding
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('mobile', '==', newClientMobile));
-                const querySnapshot = await getDocs(q);
+          await runTransaction(firestore, async (transaction) => {
+              const client = clients.find((c: Client) => c.id === selectedClientId);
+              const contractSigned = client ? (client.status === 'contracted' || client.status === 'reContracted') : false;
 
-                if (!querySnapshot.empty) {
-                    const existingClient = querySnapshot.docs[0].data();
-                    toast({
-                        variant: 'destructive',
-                        title: 'عميل موجود بالفعل',
-                        description: `رقم الجوال هذا مسجل بالفعل للعميل: ${existingClient.nameAr}. الرجاء اختيار العميل من القائمة.`,
-                    });
-                    setIsSaving(false);
-                    return;
-                }
+              // 1. Get ALL appointments for the client
+              const allClientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'));
+              const allClientApptsSnap = await transaction.get(allClientApptsQuery);
+              let appointmentsToProcess = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
 
-                const newAppointmentData = {
-                    title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile,
-                    engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                    type: 'architectural' as const, visitCount: 1, color: '#facc15', createdAt: serverTimestamp(),
-                };
-                await addDoc(collection(firestore, 'appointments'), newAppointmentData);
-                toast({ title: 'نجاح', description: 'تم حفظ الموعد للعميل الجديد بنجاح.' });
-            } else {
-                const client = clients.find((c: Client) => c.id === selectedClientId);
-                if (!client || !selectedTransactionId) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل والمعاملة.' });
-                    setIsSaving(false); return;
-                }
-                const batch = writeBatch(firestore);
-                if (isEditing) {
-                    const oldApptRef = doc(firestore, 'appointments', dialogData.id);
-                    batch.delete(oldApptRef);
-                }
-                const allClientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'));
-                const allClientApptsSnap = await getDocs(allClientApptsQuery);
-                const existingAppointments = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment)).filter(a => isEditing ? a.id !== dialogData.id : true);
-                const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
-                const newAppointmentObject = {
-                    id: 'new-temp-id', appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                    clientId: client.id, title: title || client.nameAr, engineerId: dialogData.engineerId,
-                    contractSigned, type: 'architectural' as const, transactionId: selectedTransactionId,
-                };
-                let processingList: (Appointment | typeof newAppointmentObject)[] = [...existingAppointments, newAppointmentObject];
-                processingList.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
-                processingList.forEach((appt, index) => {
-                    const visitCount = index + 1;
-                    const newColor = getVisitColor({ visitCount, contractSigned });
-                    if (appt.id === 'new-temp-id') {
-                        const newApptRef = doc(collection(firestore, 'appointments'));
-                        const { id, ...dataToSave } = appt;
-                        batch.set(newApptRef, { ...dataToSave, color: newColor, visitCount, createdAt: serverTimestamp() });
-                        
-                        const logContent = `حجز ${currentUser.fullName} موعداً بعنوان "${title || client.nameAr}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}. (الزيارة رقم ${visitCount})`;
-                        const logData = {
-                            type: 'log' as const,
-                            content: logContent,
-                            userId: currentUser.id,
-                            userName: currentUser.fullName,
-                            userAvatar: currentUser.avatarUrl,
-                            createdAt: serverTimestamp(),
-                        };
-                        const clientHistoryRef = doc(collection(firestore, `clients/${client.id}/history`));
-                        batch.set(clientHistoryRef, logData);
-                        if (selectedTransactionId) {
-                            const txTimelineRef = doc(collection(firestore, `clients/${client.id}/transactions/${selectedTransactionId}/timelineEvents`));
-                            batch.set(txTimelineRef, logData);
-                        }
-                    } else {
-                        const existingData = existingAppointments.find(e => e.id === appt.id);
-                        if (existingData && (existingData.visitCount !== visitCount || existingData.color !== newColor)) {
-                            const apptRef = doc(firestore, 'appointments', appt.id!);
-                            batch.update(apptRef, { visitCount, color: newColor });
-                        }
-                    }
-                });
-                await batch.commit();
-                toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد وتحديث الجدول بنجاح.` });
-            }
-            onClose();
-            onSaveSuccess();
-        } catch (error) {
-             console.error("Error during save:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'حدث خطأ أثناء التحقق من المواعيد أو حفظها.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-    
+              // 2. Prepare the new/updated appointment data
+              const appointmentData: any = {
+                  title: title || (isNewClient ? newClientName : client?.nameAr),
+                  engineerId: dialogData.engineerId,
+                  appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                  type: 'architectural',
+                  clientId: isNewClient ? null : selectedClientId,
+                  clientName: isNewClient ? newClientName : null,
+                  clientMobile: isNewClient ? newClientMobile : null,
+                  transactionId: isNewClient ? null : selectedTransactionId,
+              };
+
+              // 3. Add or update the appointment in our in-memory list
+              if (isEditing) {
+                  const existingIndex = appointmentsToProcess.findIndex(a => a.id === dialogData.id);
+                  if (existingIndex > -1) {
+                      appointmentsToProcess[existingIndex] = { ...appointmentsToProcess[existingIndex], ...appointmentData };
+                  } else {
+                       // This case shouldn't happen if data is consistent, but as a fallback:
+                       appointmentsToProcess.push({ id: dialogData.id, ...appointmentData });
+                  }
+              } else {
+                  appointmentsToProcess.push({ id: `new-${Date.now()}`, ...appointmentData, createdAt: new Date() });
+              }
+
+              // 4. Sort the list to establish the correct chronological order
+              appointmentsToProcess.sort((a, b) => a.appointmentDate!.toMillis() - b.appointmentDate!.toMillis());
+              
+              // 5. Iterate through the sorted list and update/create documents in the transaction
+              appointmentsToProcess.forEach((appt, index) => {
+                  const visitCount = index + 1;
+                  const newColor = getVisitColor({ visitCount, contractSigned });
+                  const finalData = { ...appt, visitCount, color: newColor };
+                  
+                  if(appt.id?.startsWith('new-')) { // It's a new one
+                      const newApptRef = doc(collection(firestore, 'appointments'));
+                      const { id, ...saveData } = finalData;
+                      transaction.set(newApptRef, {...saveData, createdAt: serverTimestamp() });
+                  } else { // It's an existing one needing an update
+                      const apptRef = doc(firestore, 'appointments', appt.id!);
+                      const { id, createdAt, ...updateData } = finalData;
+                      transaction.update(apptRef, updateData);
+                  }
+              });
+          });
+
+          toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
+          onClose();
+          onSaveSuccess();
+
+      } catch (error) {
+          console.error("Error during save:", error);
+          const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
+          toast({ variant: 'destructive', title: 'خطأ', description: message });
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
     const clientOptions = useMemo(() => filteredClients.map((c: Client) => ({
       value: c.id,
       label: c.nameAr,
@@ -858,3 +844,4 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
