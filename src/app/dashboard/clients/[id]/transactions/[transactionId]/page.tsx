@@ -762,7 +762,7 @@ export default function TransactionDetailPage() {
                                                 {stage.status === 'in-progress' && (
                                                     <>
                                                         {stage.enableModificationTracking && (
-                                                            <Button size="sm" variant="outline" className="h-7 px-2 text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
+                                                            <Button size="sm" variant="outline" className="h-8 px-2 text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
                                                                 <Plus className="ml-1 h-3 w-3" />
                                                                 إضافة تعديل
                                                             </Button>
@@ -842,3 +842,4 @@ export default function TransactionDetailPage() {
 
 
     
+
