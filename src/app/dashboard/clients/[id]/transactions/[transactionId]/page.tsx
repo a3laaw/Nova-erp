@@ -304,6 +304,7 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRefDoc, { stages: currentStages });
     
+        const safeApptDate = toFirestoreDate(transaction.createdAt); // Fallback to transaction creation date
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -315,8 +316,8 @@ export default function TransactionDetailPage() {
             createdAt: serverTimestamp(),
         };
     
-        const timelineRef = doc(collection(transactionRefDoc, 'timelineEvents'));
-        batch.set(timelineRef, logData);
+        const timelineRef = collection(transactionRefDoc, 'timelineEvents');
+        batch.set(doc(timelineRef), logData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
         batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
@@ -349,15 +350,19 @@ export default function TransactionDetailPage() {
 
             stage.status = newStatus;
             
-            if (newStatus === 'in-progress') stage.startDate = serverTimestamp();
-            if (newStatus === 'completed') stage.endDate = serverTimestamp();
+            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = new Date() as any;
+            if (newStatus === 'completed') stage.endDate = new Date() as any;
             
             if (newStatus === 'completed' && stageTemplate?.nextStageIds) {
                 for (const nextStageId of stageTemplate.nextStageIds) {
                     const nextStageIndex = currentStages.findIndex(s => s.stageId === nextStageId);
                     if (nextStageIndex !== -1 && currentStages[nextStageIndex].status === 'pending') {
-                         currentStages[nextStageIndex].status = 'in-progress';
-                         currentStages[nextStageIndex].startDate = serverTimestamp();
+                         const nextStage = currentStages[nextStageIndex];
+                         const canStart = canStartStage(nextStage, currentStages);
+                         if (canStart.allowed) {
+                            nextStage.status = 'in-progress';
+                            nextStage.startDate = new Date() as any;
+                         }
                     }
                 }
             }
@@ -365,6 +370,7 @@ export default function TransactionDetailPage() {
             await batch.commit();
             toast({ title: 'نجاح', description: `تم تحديث حالة المرحلة إلى ${stageStatusTranslations[newStatus]}.` });
         } catch (error) {
+            console.error("Error updating stage status:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة المرحلة.' });
         } finally {
             setIsProcessing(false);
@@ -499,7 +505,6 @@ export default function TransactionDetailPage() {
   }
 
   return (
-    <>
     <div className='space-y-6' dir='rtl'>
         <Card>
             <CardHeader>
@@ -624,6 +629,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
-    
 
-    
+```
