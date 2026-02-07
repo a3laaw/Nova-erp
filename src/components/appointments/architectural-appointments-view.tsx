@@ -127,6 +127,7 @@ export function ArchitecturalAppointmentsView() {
     const [isDeleting, setIsDeleting] = useState(false);
     
     useEffect(() => {
+        // Set date on client-side to avoid hydration mismatch
         if (!date) {
             setDate(new Date());
         }
@@ -238,7 +239,7 @@ export function ArchitecturalAppointmentsView() {
             engineerId: engineer.id,
             engineerName: engineer.fullName,
             appointmentDate,
-            appointments,
+            appointments, // Pass current appointments to dialog
         });
         setIsDialogOpen(true);
     };
@@ -304,7 +305,7 @@ export function ArchitecturalAppointmentsView() {
 
 
     const handleSave = async () => {
-        if (date) { 
+        if (date) { // Re-fetch data for the current date
             await fetchAppointments(date);
         }
     };
@@ -627,18 +628,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         e.preventDefault();
         setIsSaving(true);
         
-        const isNewProspective = isNewClient && !isEditing;
-        const isExistingProspective = isNewClient && isEditing;
-
         try {
-            let appointmentDateTime: Date;
-            if (isEditing) {
-                if (!newDate || !newTime) throw new Error('الرجاء تحديد التاريخ والوقت الجديدين.');
-                appointmentDateTime = new Date(`${newDate}T${newTime}`);
-            } else {
-                appointmentDateTime = dialogData.appointmentDate;
-            }
-
+            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
             if (isPast(appointmentDateTime) && !isEditing) {
                 throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
             }
@@ -664,7 +655,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 dataToSave.clientId = selectedClientId;
                 reconcileIdentifier = { clientId: selectedClientId };
             }
-            
+
             if (isEditing) {
                 const appointmentRef = doc(firestore, 'appointments', dialogData.id);
                 await updateDoc(appointmentRef, dataToSave);
@@ -779,7 +770,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (!isNewClient && !selectedClientId) }>
+                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : (!selectedClientId)) }>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
@@ -789,5 +780,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
 
     
