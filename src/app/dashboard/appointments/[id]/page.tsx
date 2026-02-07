@@ -522,8 +522,14 @@ export default function AppointmentDetailsPage() {
         if (!firestore || !currentUser || !transaction || !stageId || !appointment || !client) return;
     
         const stageToUpdate = transaction.stages?.find(s => s.stageId === stageId);
-        if (!stageToUpdate || stageToUpdate.status !== 'in-progress' || !stageToUpdate.enableModificationTracking) {
+        if (!stageToUpdate || stageToUpdate.status !== 'in-progress') {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن تسجيل تعديل لهذه المرحلة حاليًا.' });
+            return;
+        }
+        
+        const stageTemplate = workStages.find(t => t.id === stageId);
+        if (!stageTemplate || !stageTemplate.enableModificationTracking) {
+            toast({ variant: 'destructive', title: 'غير مسموح', description: 'خاصية تتبع التعديلات غير مفعلة لهذه المرحلة.' });
             return;
         }
     
@@ -571,9 +577,27 @@ export default function AppointmentDetailsPage() {
         }
     };
     
-    const currentInProgressStage = useMemo(() => 
-        transaction?.stages?.find(s => s.status === 'in-progress' && s.enableModificationTracking),
-    [transaction?.stages]);
+    const enrichedStages = useMemo(() => {
+        if (!transaction || !workStages) return [];
+        
+        const progressStages = transaction.stages || [];
+        
+        const combined = workStages.map(template => {
+            const progress = progressStages.find(p => p.stageId === template.id);
+            return {
+                ...template,
+                ...progress,
+                status: progress?.status || 'pending', 
+            };
+        });
+
+        return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
+    }, [transaction, workStages]);
+    
+    const currentInProgressStage = useMemo(() => {
+        if (!enrichedStages) return undefined;
+        return enrichedStages.find(s => s.status === 'in-progress' && s.enableModificationTracking);
+    }, [enrichedStages]);
 
     if (loading) {
         return (
@@ -689,6 +713,28 @@ export default function AppointmentDetailsPage() {
                                 لا يمكن تحديث مرحلة العمل لأن هذه الزيارة غير مرتبطة بأي معاملة. الرجاء ربطها بمعاملة أولاً.
                             </AlertDescription>
                         </Alert>
+                    ) : currentInProgressStage ? (
+                        <div className="p-4 border border-orange-200 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                            <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                                تسجيل تعديل على المرحلة الحالية
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                المرحلة الحالية قيد التنفيذ هي: <strong className="text-foreground">{currentInProgressStage.name}</strong>.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                إذا كانت هذه الزيارة لمناقشة تعديلات على هذه المرحلة، اضغط على الزر أدناه لتوثيق ذلك.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+                                onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
+                                disabled={isSaving}
+                            >
+                                <Plus className="ml-1 h-4 w-4" />
+                                تسجيل تعديل جديد
+                            </Button>
+                        </div>
                     ) : !appointment.workStageUpdated || (isEditingStage && currentUser?.role === 'Admin') ? (
                         <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                              <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -734,30 +780,6 @@ export default function AppointmentDetailsPage() {
                                 </div>
                             </AlertDescription>
                         </Alert>
-                    )}
-
-                    {currentInProgressStage && (
-                        <div className="mt-4 p-4 border border-orange-200 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                            <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-300">
-                                تسجيل تعديل على المرحلة الحالية
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                المرحلة الحالية قيد التنفيذ هي: <strong className="text-foreground">{currentInProgressStage.name}</strong>.
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                إذا كانت هذه الزيارة لمناقشة تعديلات على هذه المرحلة، اضغط على الزر أدناه لتوثيق ذلك.
-                            </p>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
-                                onClick={() => handleModificationIncrement(currentInProgressStage.stageId)}
-                                disabled={isSaving}
-                            >
-                                <Plus className="ml-1 h-4 w-4" />
-                                تسجيل تعديل جديد
-                            </Button>
-                        </div>
                     )}
                  </CardContent>
             </Card>
