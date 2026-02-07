@@ -351,8 +351,8 @@ export default function TransactionDetailPage() {
             stage.status = newStatus;
             
             const now = new Date();
-            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
-            if (newStatus === 'completed') stage.endDate = now;
+            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now as any;
+            if (newStatus === 'completed') stage.endDate = now as any;
             
             // Auto-start next sequential stage
             if (newStatus === 'completed' && stageTemplate?.nextStageIds) {
@@ -360,10 +360,10 @@ export default function TransactionDetailPage() {
                     const nextStageIndex = currentStages.findIndex(s => s.stageId === nextStageId);
                     if (nextStageIndex !== -1 && currentStages[nextStageIndex].status === 'pending') {
                          const nextStage = currentStages[nextStageIndex];
-                         const canStart = canStartStage(nextStage, currentStages);
+                         const canStart = canStartStage(nextStage, currentStages as TransactionStage[]);
                          if (canStart.allowed) {
                             nextStage.status = 'in-progress';
-                            nextStage.startDate = now;
+                            nextStage.startDate = now as any;
                          }
                     }
                 }
@@ -480,10 +480,6 @@ export default function TransactionDetailPage() {
     return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
   }, [transaction, workStageTemplates]);
 
-  const trackableInProgressStages = useMemo(() => 
-    enrichedStages.filter(s => s.status === 'in-progress' && s.enableModificationTracking === true),
-  [enrichedStages]);
-
   const assignedEngineerName = transaction?.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : null;
   
   const formatDate = (dateValue: any): string => {
@@ -547,26 +543,6 @@ export default function TransactionDetailPage() {
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
-                {trackableInProgressStages.length > 0 && (
-                    <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/30 mb-6">
-                        <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-base">
-                                تسجيل تعديلات على المراحل الحالية
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {trackableInProgressStages.map(stage => (
-                                <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
-                                    <p className="font-semibold">{stage.name}</p>
-                                    <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
-                                        <Plus className="ml-1 h-4 w-4" />
-                                        تسجيل تعديل جديد
-                                    </Button>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                )}
                 <Card>
                     <CardHeader>
                         <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> سير العمل</CardTitle>
@@ -596,6 +572,12 @@ export default function TransactionDetailPage() {
                                                 ))}
                                             </div>
                                             <div className="flex gap-2 items-center">
+                                                {stage.status === 'in-progress' && stage.enableModificationTracking && (
+                                                    <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId!)} disabled={isProcessing}>
+                                                        <Plus className="ml-1 h-4 w-4" />
+                                                        تسجيل تعديل
+                                                    </Button>
+                                                )}
                                                 {stage.status === 'pending' && (
                                                     <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId!, 'in-progress')} disabled={!canInteract || !canBeStarted.allowed} title={!canBeStarted.allowed ? canBeStarted.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
@@ -632,3 +614,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    
