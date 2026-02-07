@@ -1,7 +1,7 @@
 
       'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where } from 'firebase/firestore';
@@ -292,6 +292,9 @@ export default function TransactionDetailPage() {
         
         currentStages[stageToRevertIndex].status = 'pending';
         (currentStages[stageToRevertIndex] as any).endDate = null;
+        // FIX: Also reset the start date and expected end date to fully revert the stage state.
+        (currentStages[stageToRevertIndex] as any).startDate = null;
+        (currentStages[stageToRevertIndex] as any).expectedEndDate = null;
 
         // 2. Revert the next sequential stage if it was auto-started
         const revertedStageTemplate = (transaction.stages || []).find(s => s.stageId === stageIdToRevert);
@@ -300,15 +303,9 @@ export default function TransactionDetailPage() {
                 const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
                 
                 if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
-                    const allStagesInTemplate: WorkStage[] = [];
-                    const depts = await getDocs(collection(firestore, 'departments'));
-                    for(const deptDoc of depts.docs) {
-                        const stagesSnap = await getDocs(collection(deptDoc.ref, 'workStages'));
-                        stagesSnap.forEach(sDoc => allStagesInTemplate.push({id: sDoc.id, ...sDoc.data()} as WorkStage));
-                    }
-                    
-                    const predecessorsOfNextStage = allStagesInTemplate.filter(s => s.nextStageIds?.includes(nextStageId));
-                    const otherCompletedPredecessors = predecessorsOfNextStage.some(p => p.id !== stageIdToRevert && currentStages.find(cs => cs.stageId === p.id)?.status === 'completed');
+                    // OPTIMIZATION: Instead of fetching all templates, use the data within the transaction itself.
+                    const predecessorsOfNextStage = currentStages.filter(s => s.nextStageIds?.includes(nextStageId));
+                    const otherCompletedPredecessors = predecessorsOfNextStage.some(p => p.stageId !== stageIdToRevert && p.status === 'completed');
                     
                     if (!otherCompletedPredecessors) {
                         currentStages[nextStageIndexInProg].status = 'pending';
@@ -318,8 +315,6 @@ export default function TransactionDetailPage() {
                 }
             }
         }
-        
-        batch.update(transactionRef, { stages: currentStages });
         
         const progressQuery = query(
             collection(firestore, 'work_stages_progress'),
@@ -367,6 +362,7 @@ export default function TransactionDetailPage() {
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
         batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
+        batch.update(transactionRef, { stages: currentStages });
         await batch.commit();
         
         toast({ title: 'نجاح', description: `تم التراجع عن مرحلة "${stageTemplate.name}" والإجراءات المرتبطة بها.`});
@@ -550,7 +546,7 @@ export default function TransactionDetailPage() {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' });
     }
   };
-
+  
   const canStartStage = (stage: TransactionStage, allStages: TransactionStage[]) => {
     if (stage.status !== 'pending') return { allowed: false, reason: `المرحلة حالياً "${stageStatusTranslations[stage.status]}".`};
     if (stage.stageType === 'parallel') {
@@ -845,3 +841,6 @@ export default function TransactionDetailPage() {
 
 
 
+
+
+    
