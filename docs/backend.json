@@ -1078,9 +1078,7 @@
         "journalEntryId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "clientId": { "type": "string", "description": "Client ID if this payment is for a project"},
-        "transactionId": { "type": "string", "description": "Transaction ID if this payment is for a project"},
-        "employeeId": { "type": "string", "description": "Employee ID if this payment is for an employee-specific expense like residency renewal" },
-        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "The new residency expiry date if this is for a renewal." }
+        "transactionId": { "type": "string", "description": "Transaction ID if this payment is for a project"}
       },
       "required": ["voucherNumber", "payeeName", "amount", "paymentDate", "paymentMethod", "debitAccountId", "creditAccountId", "status"]
     },
@@ -1194,22 +1192,6 @@
         }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
-    },
-    "ResidencyRenewal": {
-      "title": "Residency Renewal",
-      "description": "Tracks the financial and administrative process of an employee's residency renewal.",
-      "type": "object",
-      "properties": {
-        "employeeId": { "type": "string" },
-        "renewalDate": { "type": "string", "format": "date-time" },
-        "newExpiryDate": { "type": "string", "format": "date-time" },
-        "cost": { "type": "number" },
-        "paymentVoucherId": { "type": "string" },
-        "monthlyAmortizationAmount": { "type": "number" },
-        "amortizationStatus": { "type": "string", "enum": ["in-progress", "completed"] },
-        "lastAmortizationDate": { "type": ["string", "null"], "format": "date-time" }
-      },
-      "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId", "monthlyAmortizationAmount", "amortizationStatus"]
     }
   },
   "auth": {
@@ -1379,10 +1361,6 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
-    },
-    "/residencyRenewals/{renewalId}": {
-        "schema": { "$ref": "#/entities/ResidencyRenewal" },
-        "description": "Stores records of employee residency renewals."
     }
   }
 }
