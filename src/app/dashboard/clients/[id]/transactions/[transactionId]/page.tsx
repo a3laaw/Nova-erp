@@ -67,7 +67,6 @@ import {
     getDocs as getDocsFromFirestore,
     collection as collectionFromFirestore
 } from 'firebase/firestore';
-import { Input } from '@/components/ui/input';
 
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
@@ -154,6 +153,41 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 }
 
 const EMPTY_ARRAY_FOR_SUBSCRIPTION: DocumentData[] = [];
+
+// Helper function to check if a stage can be started
+const canStartStage = (stage: Partial<TransactionStage>, allStages: TransactionStage[]): { allowed: boolean, reason: string } => {
+    // Parallel stages can always be started (manually) if they are within the allowed main stages
+    if (stage.stageType === 'parallel') {
+        if (!stage.allowedDuringStages || stage.allowedDuringStages.length === 0) {
+            return { allowed: true, reason: '' };
+        }
+        const isDuringAllowedStage = allStages.some(s => 
+            stage.allowedDuringStages!.includes(s.stageId) && s.status === 'in-progress'
+        );
+        if (isDuringAllowedStage) {
+            return { allowed: true, reason: '' };
+        }
+        return { allowed: false, reason: 'لا يمكن بدء هذه المرحلة الخدمية الآن.' };
+    }
+
+    // For sequential stages, check predecessors
+    const predecessors = allStages.filter(s => s.nextStageIds?.includes(stage.stageId!));
+
+    // If no predecessors, it's a starting stage
+    if (predecessors.length === 0) {
+        return { allowed: true, reason: '' };
+    }
+
+    // If there are predecessors, at least one must be completed
+    const arePredecessorsCompleted = predecessors.every(p => p.status === 'completed');
+    
+    if (arePredecessorsCompleted) {
+        return { allowed: true, reason: '' };
+    }
+    
+    return { allowed: false, reason: 'يجب إكمال المراحل السابقة أولاً.' };
+};
+
 
 export default function TransactionDetailPage() {
   const params = useParams();
@@ -381,7 +415,7 @@ export default function TransactionDetailPage() {
             userAvatar: currentUser.avatarUrl,
             createdAt: serverTimestamp(),
         };
-
+    
         const timelineRef = collection(transactionRef, 'timelineEvents');
         batch.set(doc(timelineRef), logData);
         
@@ -389,7 +423,7 @@ export default function TransactionDetailPage() {
         batch.set(doc(historyRef), { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
         await batch.commit();
-
+    
         toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
@@ -443,15 +477,16 @@ export default function TransactionDetailPage() {
         (currentStages[stageToRevertIndex] as any).expectedEndDate = null;
 
         // 2. Revert the next sequential stage if it was auto-started
-        const revertedStageTemplate = (transaction.stages || []).find(s => s.stageId === stageIdToRevert);
+        const allStagesInTemplate: WorkStage[] = [];
+        const depts = await getDocs(collection(firestore, 'departments'));
+        for(const deptDoc of depts.docs) {
+            const stagesSnap = await getDocs(collection(deptDoc.ref, 'workStages'));
+            stagesSnap.forEach(sDoc => allStagesInTemplate.push({id: sDoc.id, ...sDoc.data()} as WorkStage));
+        }
+
+        const revertedStageTemplate = allStagesInTemplate.find(s => s.id === stageIdToRevert);
+
         if (revertedStageTemplate?.nextStageIds) {
-            const allStagesInTemplate: WorkStage[] = [];
-            const depts = await getDocs(collection(firestore, 'departments'));
-            for(const deptDoc of depts.docs) {
-                const stagesSnap = await getDocs(collection(deptDoc.ref, 'workStages'));
-                stagesSnap.forEach(sDoc => allStagesInTemplate.push({id: sDoc.id, ...sDoc.data()} as WorkStage));
-            }
-        
             for (const nextStageId of revertedStageTemplate.nextStageIds) {
                 const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageId);
                 
@@ -515,7 +550,7 @@ export default function TransactionDetailPage() {
         batch.set(doc(timelineRef), commentData);
         
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
-        batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
+        batch.set(doc(historyRef), { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
         batch.update(transactionRef, { stages: currentStages });
         await batch.commit();
@@ -838,8 +873,9 @@ export default function TransactionDetailPage() {
                             <div className="space-y-4">
                                 {sortedStages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
-                                    const canStart = canStartStage(stage, transaction.stages as TransactionStage[]);
+                                    const canBeStarted = canStartStage(stage, transaction.stages as TransactionStage[]);
                                     const isInProgressWithTracking = stage.status === 'in-progress' && stage.enableModificationTracking;
+
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -857,13 +893,19 @@ export default function TransactionDetailPage() {
                                             </div>
                                             <div className="flex gap-2 items-center">
                                                 {stage.status === 'pending' && (
-                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || !canStart.allowed} title={!canStart.allowed ? canStart.reason : ''}>
+                                                    <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={!canInteract || !canBeStarted.allowed} title={!canBeStarted.allowed ? canBeStarted.reason : ''}>
                                                         <Play className="ml-2 h-4 w-4" /> بدء
                                                     </Button>
                                                 )}
                                                 {stage.status === 'in-progress' && (
-                                                    <>
-                                                         <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
+                                                    <div className="flex gap-2 items-center">
+                                                        {isInProgressWithTracking && (
+                                                            <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
+                                                                <Plus className="ml-1 h-4 w-4" />
+                                                                إضافة تعديل
+                                                            </Button>
+                                                        )}
+                                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
                                                             <Check className="ml-2 h-4 w-4" />
                                                             {stage.trackingType === 'occurrence' ? 'تسجيل إنجاز' : 'إكمال'}
                                                         </Button>
@@ -872,13 +914,7 @@ export default function TransactionDetailPage() {
                                                                 <CheckSquare className="ml-2 h-4 w-4" /> إنهاء وإكمال
                                                             </Button>
                                                          )}
-                                                    </>
-                                                )}
-                                                {isInProgressWithTracking && (
-                                                    <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
-                                                        <Plus className="ml-1 h-4 w-4" />
-                                                        إضافة تعديل
-                                                    </Button>
+                                                    </div>
                                                 )}
                                                 {stage.status === 'completed' && (
                                                     <div className="flex items-center gap-2">
@@ -929,8 +965,38 @@ export default function TransactionDetailPage() {
             </TabsContent>
         </Tabs>
     </div>
+     <AlertDialog open={!!transactionToCancel} onOpenChange={(open) => !open && setTransactionToCancel(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد إلغاء العقد</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في إلغاء عقد المعاملة "{transactionToCancel?.transactionType}"؟ سيتم حذف بيانات العقد نهائياً والتراجع عن مرحلة توقيع العقد. لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmCancelContract} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90">
+                    {isProcessing ? 'جاري الإلغاء...' : 'نعم، قم بالإلغاء'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+     <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد حذف المعاملة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في حذف المعاملة "{transactionToDelete?.transactionType}"؟ سيتم حذف هذه المعاملة وجميع بياناتها المرتبطة بها (مثل التعليقات والسجلات والعقد) بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteTransaction} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90">
+                    {isProcessing ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
-
-```
