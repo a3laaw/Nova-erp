@@ -39,6 +39,7 @@ import type { Appointment, Client, Employee, WorkStage, TransactionStage } from 
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
+import { Textarea } from '../ui/textarea';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 
@@ -92,11 +93,11 @@ export function ArchitecturalAppointmentsView() {
                 ]);
 
                 const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.nameAr));
+                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'ar'));
                 setEngineers(archEngineers);
                 
                 const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+                setClients(allClients.sort((a,b) => (a.nameAr || '').localeCompare(b.nameAr || '', 'ar')));
             } catch (error) {
                  console.error("Error fetching static appointment data:", error);
                  toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين والعملاء.' });
@@ -204,6 +205,7 @@ export function ArchitecturalAppointmentsView() {
             clientMobile: appointment.clientMobile,
             appointmentDate: toFirestoreDate(appointment.appointmentDate),
             title: appointment.title,
+            notes: appointment.notes,
             transactionId: appointment.transactionId,
         });
         setIsDialogOpen(true);
@@ -567,6 +569,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     
     const [selectedClientId, setSelectedClientId] = useState('');
     const [title, setTitle] = useState('');
+    const [notes, setNotes] = useState('');
     const [clientTransactions, setClientTransactions] = useState<any[]>([]);
     const [loadingTransactions, setLoadingTransactions] = useState(false);
     const [selectedTransactionId, setSelectedTransactionId] = useState('');
@@ -591,6 +594,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const apptDate = toFirestoreDate(dialogData.appointmentDate); // This is already a Date object
                 setSelectedClientId(dialogData.clientId || '');
                 setTitle(dialogData.title || '');
+                setNotes(dialogData.notes || '');
                 setSelectedTransactionId(dialogData.transactionId || '');
                 if (apptDate) {
                   setNewDate(format(apptDate, 'yyyy-MM-dd'));
@@ -604,6 +608,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             } else {
                 setSelectedClientId('');
                 setTitle('');
+                setNotes('');
                 setSelectedTransactionId('');
                 setNewDate('');
                 setNewTime('');
@@ -653,6 +658,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         label: tx.transactionType,
         searchKey: tx.createdAt?.toDate ? format(tx.createdAt.toDate(), 'dd/MM/yyyy') : ''
     })), [clientTransactions]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -726,10 +732,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             clientName: isNewClient ? newClientName : null,
             clientMobile: isNewClient ? newClientMobile : null,
             transactionId: isNewClient ? null : selectedTransactionId,
-            notes: formData.notes,
+            notes: notes,
           };
           
-          const newOrUpdatedAppointment = {
+          const newOrUpdatedAppointment: any = {
             id: isEditing ? dialogData.id : `new-${Date.now()}`,
             ...dialogData,
             ...appointmentBaseData
@@ -743,9 +749,9 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
               (b.appointmentDate?.toMillis() || 0)
           );
 
-          // Clear existing appointments for this client (except non-architectural ones)
+          // Delete existing architectural appointments for this client to re-create them
           existingAppointments.forEach(appt => {
-              if(appt.id) transaction.delete(doc(firestore, 'appointments', appt.id));
+              if(appt.id && appt.type === 'architectural') transaction.delete(doc(firestore, 'appointments', appt.id));
           });
           
           // Re-create all appointments with correct order and color
@@ -819,6 +825,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                             <Label htmlFor="title">الغرض من الزيارة (اختياري)</Label>
                             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder='سيتم استخدام اسم العميل اذا ترك فارغاً' />
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="notes">ملاحظات (اختياري)</Label>
+                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+                        </div>
                         <div className="flex items-center space-x-2 rtl:space-x-reverse">
                             <Checkbox id="isNewClient" checked={isNewClient} onCheckedChange={(checked) => setIsNewClient(checked as boolean)} disabled={isEditing} />
                             <Label htmlFor="isNewClient">إضافة عميل جديد غير مسجل</Label>
@@ -871,5 +881,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-
-    
