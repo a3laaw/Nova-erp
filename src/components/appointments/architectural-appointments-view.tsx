@@ -216,84 +216,83 @@ export function ArchitecturalAppointmentsView() {
     
         setIsDeleting(true);
         try {
-            const batch = writeBatch(firestore);
             const { id: apptId, workStageProgressId, transactionId, clientId, visitCount, title } = appointmentToDelete;
     
-            let stageRevertedMessage = '';
+            await runTransaction(firestore, async (transaction) => {
+                 let stageRevertedMessage = '';
     
-            if (workStageProgressId && transactionId && clientId) {
-                const progressRef = doc(firestore, 'work_stages_progress', workStageProgressId);
-                const progressSnap = await getDoc(progressRef);
-                
-                if (progressSnap.exists()) {
-                    const { stageId, stageName } = progressSnap.data();
-                    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-                    const transactionSnap = await getDoc(transactionRef);
+                if (workStageProgressId && transactionId && clientId) {
+                    const progressRef = doc(firestore, 'work_stages_progress', workStageProgressId);
+                    const progressSnap = await transaction.get(progressRef);
                     
-                    if (transactionSnap.exists()) {
-                        const transactionData = transactionSnap.data();
-                        const currentStages = transactionData.stages ? JSON.parse(JSON.stringify(transactionData.stages)) : [];
-                        const stageToRevertIndex = currentStages.findIndex((s: TransactionStage) => s.stageId === stageId && s.status === 'completed');
+                    if (progressSnap.exists()) {
+                        const { stageId, stageName } = progressSnap.data();
+                        const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+                        const transactionSnap = await transaction.get(transactionRef);
                         
-                        if (stageToRevertIndex !== -1) {
-                            currentStages[stageToRevertIndex].status = 'pending';
-                            currentStages[stageToRevertIndex].endDate = null;
+                        if (transactionSnap.exists()) {
+                            const transactionData = transactionSnap.data();
+                            const currentStages = transactionData.stages ? JSON.parse(JSON.stringify(transactionData.stages)) : [];
+                            const stageToRevertIndex = currentStages.findIndex((s: TransactionStage) => s.stageId === stageId && s.status === 'completed');
                             
-                            const deptId = transactionData.departmentId;
-                            if (deptId) {
-                                const stagesTemplateQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
-                                const stagesTemplateSnap = await getDocs(stagesTemplateQuery);
-                                const stagesTemplate = stagesTemplateSnap.docs.map(d => ({id: d.id, ...d.data()} as WorkStage));
-                                const revertedStageTemplate = stagesTemplate.find(s => s.id === stageId);
-    
-                                if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
-                                    const nextStageTemplate = stagesTemplate.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
-                                    if (nextStageTemplate) {
-                                        const nextStageIndexInProg = currentStages.findIndex((s: TransactionStage) => s.stageId === nextStageTemplate.id);
-                                        if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
-                                            currentStages[nextStageIndexInProg].status = 'pending';
-                                            currentStages[nextStageIndexInProg].startDate = null;
+                            if (stageToRevertIndex !== -1) {
+                                currentStages[stageToRevertIndex].status = 'pending';
+                                currentStages[stageToRevertIndex].endDate = null;
+                                
+                                const deptId = transactionData.departmentId;
+                                // This requires an external read which is not ideal but necessary without restructuring
+                                if (deptId) {
+                                    const stagesTemplateQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
+                                    const stagesTemplateSnap = await getDocs(stagesTemplateQuery);
+                                    const stagesTemplate = stagesTemplateSnap.docs.map(d => ({id: d.id, ...d.data()} as WorkStage));
+                                    const revertedStageTemplate = stagesTemplate.find(s => s.id === stageId);
+        
+                                    if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
+                                        const nextStageTemplate = stagesTemplate.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
+                                        if (nextStageTemplate) {
+                                            const nextStageIndexInProg = currentStages.findIndex((s: TransactionStage) => s.stageId === nextStageTemplate.id);
+                                            if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
+                                                currentStages[nextStageIndexInProg].status = 'pending';
+                                                currentStages[nextStageIndexInProg].startDate = null;
+                                            }
                                         }
                                     }
                                 }
+        
+                                transaction.update(transactionRef, { stages: currentStages });
+                                stageRevertedMessage = ` مما أدى إلى التراجع التلقائي عن مرحلة "${stageName}".`;
                             }
-    
-                            batch.update(transactionRef, { stages: currentStages });
-                            stageRevertedMessage = ` مما أدى إلى التراجع التلقائي عن مرحلة "${stageName}".`;
                         }
+                        transaction.delete(progressRef);
                     }
-                    batch.delete(progressRef);
                 }
-            }
-    
-            // Always log the deletion
-            if (clientId) {
-                const logContent = `قام ${currentUser.fullName} بحذف موعد الزيارة رقم ${visitCount || ''} ("${title}").${stageRevertedMessage}`;
-                const logData = {
-                    type: 'log' as const,
-                    content: logContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                };
-    
-                // Log in client history with context
-                const historyRef = collection(firestore, `clients/${clientId}/history`);
-                batch.set(doc(historyRef), { ...logData, content: `[موعد] ${logContent}` });
-    
-                // Log in transaction timeline if it exists
-                if (transactionId) {
-                    const timelineRef = collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`);
-                    batch.set(doc(timelineRef), logData);
+        
+                if (clientId) {
+                    const logContent = `قام ${currentUser.fullName} بحذف موعد الزيارة رقم ${visitCount || ''} ("${title}").${stageRevertedMessage}`;
+                    const logData = {
+                        type: 'log' as const,
+                        content: logContent,
+                        userId: currentUser.id,
+                        userName: currentUser.fullName,
+                        userAvatar: currentUser.avatarUrl,
+                        createdAt: serverTimestamp(),
+                    };
+        
+                    const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
+                    transaction.set(historyRef, { ...logData, content: `[موعد] ${logContent}` });
+        
+                    if (transactionId) {
+                        const timelineRef = doc(collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`));
+                        transaction.set(timelineRef, logData);
+                    }
                 }
-            }
-    
-            // Delete the appointment document
-            const apptToDeleteRef = doc(firestore, 'appointments', apptId!);
-            batch.delete(apptToDeleteRef);
-    
-            // Recalculate visit counts and colors for remaining appointments
+        
+                const apptToDeleteRef = doc(firestore, 'appointments', apptId!);
+                transaction.delete(apptToDeleteRef);
+
+            });
+
+             // Recalculate visit counts and colors for remaining appointments *after* the transaction
             if (clientId) {
                 const clientApptsQuery = query(
                     collection(firestore, 'appointments'),
@@ -301,10 +300,7 @@ export function ArchitecturalAppointmentsView() {
                     where('type', '==', 'architectural')
                 );
                 const clientApptsSnap = await getDocs(clientApptsQuery);
-                
-                let remainingAppointments = clientApptsSnap.docs
-                    .map(d => ({ id: d.id, ...d.data() } as Appointment))
-                    .filter(a => a.id !== apptId);
+                let remainingAppointments = clientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
                 
                 const clientRef = doc(firestore, 'clients', clientId);
                 const clientSnap = await getDoc(clientRef);
@@ -312,6 +308,7 @@ export function ArchitecturalAppointmentsView() {
     
                 remainingAppointments.sort((a, b) => a.appointmentDate.toMillis() - b.appointmentDate.toMillis());
     
+                const updateBatch = writeBatch(firestore);
                 remainingAppointments.forEach((appt, index) => {
                     const visitCount = index + 1;
                     const newColor = getVisitColor({ visitCount, contractSigned });
@@ -320,12 +317,11 @@ export function ArchitecturalAppointmentsView() {
     
                     if (needsUpdate) {
                         const apptRef = doc(firestore, 'appointments', appt.id!);
-                        batch.update(apptRef, { visitCount, color: newColor });
+                        updateBatch.update(apptRef, { visitCount, color: newColor });
                     }
                 });
+                await updateBatch.commit();
             }
-    
-            await batch.commit();
     
             toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث البيانات المرتبطة به.' });
             if(date) await fetchAppointments(date);
@@ -662,87 +658,79 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!firestore || !currentUser) return;
         setIsSaving(true);
     
         try {
-            const appointmentDateTime = isEditing && newDate && newTime
-                ? new Date(`${newDate}T${newTime}`)
+            const finalClientId = isNewClient ? null : selectedClientId;
+            const appointmentDateTime = isEditing && newDate && newTime 
+                ? new Date(`${newDate}T${newTime}`) 
                 : dialogData.appointmentDate;
+            
+            // --- Validation ---
+            if (isPast(appointmentDateTime) && !isEditing) throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
+            if (isNewClient && (!newClientName || !newClientMobile)) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
+            if (!isNewClient && !finalClientId) throw new Error('الرجاء اختيار عميل مسجل.');
     
-            if (isPast(appointmentDateTime) && !isEditing) {
-                throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
-            }
+            // --- Data Fetching (outside transaction) ---
+            const allClientApptsQuery = finalClientId ? query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural')) : null;
+            const allClientApptsSnap = allClientApptsQuery ? await getDocs(allClientApptsQuery) : null;
+            const existingAppointments = allClientApptsSnap ? allClientApptsSnap.docs.map(d => ({id: d.id, ...d.data() as Appointment})) : [];
     
-            if (isNewClient) {
-                if (!newClientName || !newClientMobile) {
-                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-                }
-            } else {
-                if (!selectedClientId || !selectedTransactionId) {
-                    throw new Error('الرجاء اختيار العميل والمعاملة.');
-                }
-            }
+            const clientRef = finalClientId ? doc(firestore, 'clients', finalClientId) : null;
+            const clientSnap = clientRef ? await getDoc(clientRef) : null;
+            const contractSigned = clientSnap?.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
 
-            // --- Simplified Update/Create Logic ---
-            if (isEditing) {
-                const appointmentRef = doc(firestore, 'appointments', dialogData.id);
-                await updateDoc(appointmentRef, {
+            await runTransaction(firestore, async (transaction) => {
+                // Prepare the list of appointments to process
+                let appointmentsToProcess = existingAppointments.filter(appt => isEditing ? appt.id !== dialogData.id : true);
+    
+                const currentAppointmentData = {
                     appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                    title,
-                    notes,
-                    transactionId: selectedTransactionId,
-                    // Note: Client and Engineer are not editable for existing appointments
-                });
-            } else {
-                 const newAppointmentData: any = {
-                    engineerId: dialogData.engineerId,
-                    title: title || (isNewClient ? newClientName : clients.find((c: Client) => c.id === selectedClientId)?.nameAr),
-                    notes,
-                    appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                    createdAt: serverTimestamp(),
-                    type: 'architectural' as const,
-                    clientId: isNewClient ? null : selectedClientId,
+                    clientId: finalClientId,
                     clientName: isNewClient ? newClientName : null,
                     clientMobile: isNewClient ? newClientMobile : null,
-                    transactionId: isNewClient ? null : selectedTransactionId,
+                    engineerId: dialogData.engineerId,
+                    title: title || (isNewClient ? newClientName : clientSnap?.data()?.nameAr || ''),
+                    notes: notes,
+                    transactionId: selectedTransactionId || null,
+                    type: 'architectural' as const,
+                    createdAt: dialogData.createdAt || serverTimestamp() // Preserve original creation if editing
                 };
-                await addDoc(collection(firestore, 'appointments'), newAppointmentData);
-            }
-
-            // --- Recalculate and Batch Update Counts/Colors ---
-            const finalClientId = isNewClient ? null : selectedClientId;
-            if (finalClientId) {
-                const allClientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural'));
-                const allClientApptsSnap = await getDocs(allClientApptsQuery);
-                let appointmentsForClient = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
-
-                const clientRef = doc(firestore, 'clients', finalClientId);
-                const clientSnap = await getDoc(clientRef);
-                const contractSigned = clientSnap.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
-
-                appointmentsForClient.sort((a, b) => (a.appointmentDate?.toMillis() || 0) - (b.appointmentDate?.toMillis() || 0));
-
-                const updateBatch = writeBatch(firestore);
-                appointmentsForClient.forEach((appt, index) => {
+                appointmentsToProcess.push(currentAppointmentData as Appointment);
+    
+                // Sort chronologically to re-calculate visitCount and color
+                appointmentsToProcess.sort((a,b) => (a.appointmentDate?.toMillis() || 0) - (b.appointmentDate?.toMillis() || 0));
+                
+                // Delete all old architectural appointments for this client
+                if(finalClientId) {
+                    const deleteQuery = query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural'));
+                    const deleteSnap = await getDocs(deleteQuery); // Re-fetch inside transaction for safety
+                    deleteSnap.docs.forEach(docSnap => transaction.delete(docSnap.ref));
+                }
+    
+                // Re-create all appointments with correct data
+                appointmentsToProcess.forEach((appt, index) => {
                     const visitCount = index + 1;
                     const newColor = getVisitColor({ visitCount, contractSigned });
-
-                    const needsUpdate = appt.visitCount !== visitCount || appt.color !== newColor;
                     
-                    if (needsUpdate) {
-                        const apptRef = doc(firestore, 'appointments', appt.id!);
-                        updateBatch.update(apptRef, { visitCount, color: newColor });
-                    }
+                    const newApptRef = doc(collection(firestore, 'appointments'));
+                    const { id, ...dataToSave } = appt; 
+
+                    transaction.set(newApptRef, {
+                        ...dataToSave,
+                        visitCount,
+                        color: newColor,
+                    });
                 });
-                await updateBatch.commit();
-            }
+            });
     
             toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
             onClose();
             onSaveSuccess();
     
         } catch (error) {
-            console.error("Error during save:", error);
+            console.error("Error saving appointment:", error);
             const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
             toast({ variant: 'destructive', title: 'خطأ', description: message });
         } finally {
@@ -828,12 +816,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                                     />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="transaction-search">المعاملة <span className="text-destructive">*</span></Label>
+                                    <Label htmlFor="transaction-search">المعاملة</Label>
                                     <InlineSearchList
                                         value={selectedTransactionId}
                                         onSelect={setSelectedTransactionId}
                                         options={transactionOptions}
-                                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : loadingTransactions ? 'جاري جلب المعاملات...' : 'اختر المعاملة...'}
+                                        placeholder={!selectedClientId ? 'اختر عميلاً أولاً' : loadingTransactions ? 'جاري جلب المعاملات...' : 'اختر المعاملة (اختياري)...'}
                                         disabled={!selectedClientId || loadingTransactions}
                                     />
                                 </div>
@@ -842,7 +830,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : (!selectedClientId || !selectedTransactionId))}>
+                        <Button type="submit" disabled={isSaving || (!isNewClient && !selectedClientId) }>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
@@ -852,3 +840,5 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
+    
