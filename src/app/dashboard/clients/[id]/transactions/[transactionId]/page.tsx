@@ -398,7 +398,7 @@ export default function TransactionDetailPage() {
 
         stageToRevert.status = 'in-progress';
         stageToRevert.endDate = null;
-        stageToRevert.modificationCount = 0; // Unconditionally reset the count
+        delete stageToRevert.modificationCount;
 
         const stageTemplate = workStageTemplates.find(t => t.id === stageIdToRevert);
 
@@ -634,3 +634,4 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
