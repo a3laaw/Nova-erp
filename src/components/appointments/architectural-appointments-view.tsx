@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -616,7 +615,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     }, [isOpen, dialogData, isEditing]);
 
     useEffect(() => {
-        if (selectedClientId && !filteredClients.some(c => c.id === selectedClientId)) {
+        if (selectedClientId && !filteredClients.some((c:any) => c.id === selectedClientId)) {
             setSelectedClientId('');
         }
     }, [filteredClients, selectedClientId]);
@@ -663,72 +662,59 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     
         try {
             const finalClientId = isNewClient ? null : selectedClientId;
-            const appointmentDateTime = isEditing && newDate && newTime 
-                ? new Date(`${newDate}T${newTime}`) 
-                : dialogData.appointmentDate;
-            
-            // --- Validation ---
+            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
             if (isPast(appointmentDateTime) && !isEditing) throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
             if (isNewClient && (!newClientName || !newClientMobile)) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-            if (!isNewClient && !finalClientId) throw new Error('الرجاء اختيار عميل مسجل.');
+            if (!isNewClient && !finalClientId) throw new Error('الرجاء اختيار عميل.');
     
-            // --- Data Fetching (outside transaction) ---
-            const allClientApptsQuery = finalClientId ? query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural')) : null;
-            const allClientApptsSnap = allClientApptsQuery ? await getDocs(allClientApptsQuery) : null;
-            const existingAppointments = allClientApptsSnap ? allClientApptsSnap.docs.map(d => ({id: d.id, ...d.data() as Appointment})) : [];
-    
-            const clientRef = finalClientId ? doc(firestore, 'clients', finalClientId) : null;
-            const clientSnap = clientRef ? await getDoc(clientRef) : null;
-            const contractSigned = clientSnap?.exists() && (clientSnap.data().status === 'contracted' || clientSnap.data().status === 'reContracted');
-
             await runTransaction(firestore, async (transaction) => {
-                // Prepare the list of appointments to process
-                let appointmentsToProcess = existingAppointments.filter(appt => isEditing ? appt.id !== dialogData.id : true);
+                const clientRef = finalClientId ? doc(firestore, 'clients', finalClientId) : null;
+                const clientSnap = clientRef ? await transaction.get(clientRef) : null;
+                const contractSigned = clientSnap?.exists() && ['contracted', 'reContracted'].includes(clientSnap.data().status);
+    
+                let allAppointmentsForClient: Appointment[] = [];
+                if (finalClientId) {
+                    const clientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural'));
+                    const clientApptsSnap = await transaction.get(clientApptsQuery);
+                    allAppointmentsForClient = clientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
+                }
+    
+                let appointmentsToProcess: (Partial<Appointment> & { id?: string })[] = isEditing
+                    ? allAppointmentsForClient.filter(appt => appt.id !== dialogData.id)
+                    : allAppointmentsForClient;
     
                 const currentAppointmentData = {
+                    title: title.trim() || (isNewClient ? newClientName : clientSnap?.data()?.nameAr || ''),
+                    notes: notes,
+                    engineerId: dialogData.engineerId,
                     appointmentDate: Timestamp.fromDate(appointmentDateTime),
+                    transactionId: selectedTransactionId || null,
+                    type: 'architectural' as const,
                     clientId: finalClientId,
                     clientName: isNewClient ? newClientName : null,
                     clientMobile: isNewClient ? newClientMobile : null,
-                    engineerId: dialogData.engineerId,
-                    title: title || (isNewClient ? newClientName : clientSnap?.data()?.nameAr || ''),
-                    notes: notes,
-                    transactionId: selectedTransactionId || null,
-                    type: 'architectural' as const,
-                    createdAt: dialogData.createdAt || serverTimestamp() // Preserve original creation if editing
+                    createdAt: isEditing ? dialogData.createdAt : serverTimestamp(),
                 };
-                appointmentsToProcess.push(currentAppointmentData as Appointment);
+                appointmentsToProcess.push(currentAppointmentData);
     
-                // Sort chronologically to re-calculate visitCount and color
-                appointmentsToProcess.sort((a,b) => (a.appointmentDate?.toMillis() || 0) - (b.appointmentDate?.toMillis() || 0));
+                appointmentsToProcess.sort((a, b) => (a.appointmentDate?.toMillis() || 0) - (b.appointmentDate?.toMillis() || 0));
                 
-                // Delete all old architectural appointments for this client
-                if(finalClientId) {
-                    const deleteQuery = query(collection(firestore, 'appointments'), where('clientId', '==', finalClientId), where('type', '==', 'architectural'));
-                    const deleteSnap = await getDocs(deleteQuery); // Re-fetch inside transaction for safety
-                    deleteSnap.docs.forEach(docSnap => transaction.delete(docSnap.ref));
-                }
+                allAppointmentsForClient.forEach(appt => {
+                    transaction.delete(doc(firestore, 'appointments', appt.id!));
+                });
     
-                // Re-create all appointments with correct data
                 appointmentsToProcess.forEach((appt, index) => {
                     const visitCount = index + 1;
                     const newColor = getVisitColor({ visitCount, contractSigned });
-                    
                     const newApptRef = doc(collection(firestore, 'appointments'));
-                    const { id, ...dataToSave } = appt; 
-
-                    transaction.set(newApptRef, {
-                        ...dataToSave,
-                        visitCount,
-                        color: newColor,
-                    });
+                    const { id, ...dataToSave } = appt;
+                    transaction.set(newApptRef, { ...dataToSave, visitCount, color });
                 });
             });
     
-            toast({ title: 'نجاح', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
+            toast({ title: 'نجاح!', description: `تم ${isEditing ? 'تعديل' : 'حفظ'} الموعد بنجاح.` });
             onClose();
             onSaveSuccess();
-    
         } catch (error) {
             console.error("Error saving appointment:", error);
             const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
@@ -830,7 +816,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (!isNewClient && !selectedClientId) }>
+                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : !selectedClientId) }>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
