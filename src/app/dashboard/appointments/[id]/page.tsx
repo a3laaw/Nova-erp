@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil, UserPlus, Link2 } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Edit, Pencil, UserPlus, Link2, Plus } from 'lucide-react';
 import { format, isPast, addDays, differenceInDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -518,6 +518,63 @@ export default function AppointmentDetailsPage() {
         }
     };
     
+    const handleModificationIncrement = async (stageId: string) => {
+        if (!firestore || !currentUser || !transaction || !stageId || !appointment || !client) return;
+    
+        const stageToUpdate = transaction.stages?.find(s => s.stageId === stageId);
+        if (!stageToUpdate || stageToUpdate.status !== 'in-progress' || !stageToUpdate.enableModificationTracking) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن تسجيل تعديل لهذه المرحلة حاليًا.' });
+            return;
+        }
+    
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(firestore);
+            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+    
+            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+    
+            if (stageIndex === -1) throw new Error("Stage not found");
+    
+            const stage = currentStages[stageIndex];
+            stage.modificationCount = (stage.modificationCount || 0) + 1;
+            
+            batch.update(transactionRef, { stages: currentStages });
+    
+            const safeApptDate = toFirestoreDate(appointment.appointmentDate);
+            const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}) خلال زيارة بتاريخ ${safeApptDate ? format(safeApptDate, "PP", { locale: ar }) : 'غير محدد'}.`;
+            
+            const logData = {
+                type: 'log' as const,
+                content: logContent,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+            };
+    
+            const timelineRef = collection(transactionRef, 'timelineEvents');
+            batch.set(doc(timelineRef), logData);
+            
+            const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
+            batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
+            
+            await batch.commit();
+    
+            toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
+            toast({ variant: 'destructive', title: 'خطأ', description: message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const currentInProgressStage = useMemo(() => 
+        transaction?.stages?.find(s => s.status === 'in-progress' && s.enableModificationTracking),
+    [transaction?.stages]);
+
     if (loading) {
         return (
             <Card className="max-w-2xl mx-auto" dir="rtl">
@@ -615,7 +672,7 @@ export default function AppointmentDetailsPage() {
                 <CardHeader>
                     <CardTitle>إجراءات الزيارة</CardTitle>
                 </CardHeader>
-                 <CardContent>
+                 <CardContent className="space-y-4">
                     {!appointment.clientId ? (
                         <Alert variant="default">
                             <AlertCircle className="h-4 w-4" />
@@ -677,6 +734,30 @@ export default function AppointmentDetailsPage() {
                                 </div>
                             </AlertDescription>
                         </Alert>
+                    )}
+
+                    {currentInProgressStage && (
+                        <div className="mt-4 p-4 border border-orange-200 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                            <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                                تسجيل تعديل على المرحلة الحالية
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                المرحلة الحالية قيد التنفيذ هي: <strong className="text-foreground">{currentInProgressStage.name}</strong>.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                إذا كانت هذه الزيارة لمناقشة تعديلات على هذه المرحلة، اضغط على الزر أدناه لتوثيق ذلك.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+                                onClick={() => handleModificationIncrement(currentInProgressStage.stageId)}
+                                disabled={isSaving}
+                            >
+                                <Plus className="ml-1 h-4 w-4" />
+                                تسجيل تعديل جديد
+                            </Button>
+                        </div>
                     )}
                  </CardContent>
             </Card>
