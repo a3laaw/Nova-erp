@@ -382,7 +382,7 @@ export default function TransactionDetailPage() {
   };
   
   const handleModificationIncrement = async (stageId: string) => {
-    if (!firestore || !currentUser || !transaction) return;
+    if (!firestore || !currentUser || !transaction || !stageId || !client) return;
 
     const stageToUpdate = transaction.stages?.find(s => s.stageId === stageId);
     if (!stageToUpdate || stageToUpdate.status !== 'in-progress' || !stageToUpdate.enableModificationTracking) {
@@ -394,18 +394,17 @@ export default function TransactionDetailPage() {
     try {
         const batch = writeBatch(firestore);
         const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-
+    
         const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
         const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
-
+    
         if (stageIndex === -1) throw new Error("Stage not found");
-
+    
         const stage = currentStages[stageIndex];
         stage.modificationCount = (stage.modificationCount || 0) + 1;
         
         batch.update(transactionRef, { stages: currentStages });
-
-        const safeApptDate = toFirestoreDate(appointment.appointmentDate);
+    
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -738,6 +737,10 @@ export default function TransactionDetailPage() {
     }
   };
   
+  const trackableInProgressStages = useMemo(() => 
+    (transaction?.stages || []).filter(s => s.status === 'in-progress' && s.enableModificationTracking),
+  [transaction?.stages]);
+
   // --- Render Logic ---
   const isLoading = transactionLoading || clientLoading || assignmentsLoading;
   
@@ -860,6 +863,36 @@ export default function TransactionDetailPage() {
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="stages" className="mt-6">
+                {trackableInProgressStages.length > 0 && (
+                    <Card className="mb-6 bg-amber-50 border-amber-200">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-amber-800">
+                            تسجيل تعديلات على المراحل الحالية
+                        </CardTitle>
+                        <CardDescription className="text-amber-700">
+                           اضغط على الزر لتوثيق طلب تعديل جديد من العميل على إحدى المراحل قيد التنفيذ.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {trackableInProgressStages.map(stage => (
+                          <div key={stage.stageId} className="flex justify-between items-center p-2 bg-background rounded-md border">
+                            <p className="font-semibold">{stage.name}</p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+                                onClick={() => handleModificationIncrement(stage.stageId!)}
+                                disabled={isProcessing}
+                            >
+                                <Plus className="ml-1 h-4 w-4" />
+                                إضافة تعديل
+                            </Button>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                )}
+
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
@@ -875,7 +908,6 @@ export default function TransactionDetailPage() {
                                 {sortedStages.map((stage) => {
                                     const canInteract = currentUser?.role === 'Admin' || (stage.allowedRoles && stage.allowedRoles.includes(currentUser?.jobTitle || ''));
                                     const canBeStarted = canStartStage(stage, transaction.stages as TransactionStage[]);
-                                    const isInProgressWithTracking = stage.status === 'in-progress' && stage.enableModificationTracking;
 
                                     return (
                                         <div key={stage.stageId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
@@ -889,7 +921,7 @@ export default function TransactionDetailPage() {
                                                     <Badge variant="secondary">الإنجاز: {stage.completedCount || 0} / {stage.maxOccurrences}</Badge>
                                                 )}
                                                 {stage.modificationCount && stage.modificationCount > 0 && (
-                                                    <Badge variant="outline" className="bg-orange-100 text-orange-800">التعديلات: {stage.modificationCount}</Badge>
+                                                    <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">التعديلات: {stage.modificationCount}</Badge>
                                                 )}
                                             </div>
                                             <div className="flex gap-2 items-center">
@@ -900,12 +932,6 @@ export default function TransactionDetailPage() {
                                                 )}
                                                 {stage.status === 'in-progress' && (
                                                     <div className="flex gap-2 items-center">
-                                                        {isInProgressWithTracking && (
-                                                            <Button size="sm" variant="outline" className="h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100" onClick={() => handleModificationIncrement(stage.stageId)} disabled={isProcessing}>
-                                                                <Plus className="ml-1 h-4 w-4" />
-                                                                إضافة تعديل
-                                                            </Button>
-                                                        )}
                                                         <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={!canInteract}>
                                                             <Check className="ml-2 h-4 w-4" />
                                                             {stage.trackingType === 'occurrence' ? 'تسجيل إنجاز' : 'إكمال'}
