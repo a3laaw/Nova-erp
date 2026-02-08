@@ -519,8 +519,11 @@ export default function AppointmentDetailsPage() {
     };
     
     const handleModificationIncrement = async (stageId: string) => {
-        if (!firestore || !currentUser || !transaction || !stageId || !appointment || !client) return;
-    
+        if (!firestore || !currentUser || !transaction || !stageId || !client || !appointment?.clientId || !appointment.transactionId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'بيانات الموعد أو المعاملة ناقصة.' });
+            return;
+        }
+
         const stageToUpdate = transaction.stages?.find(s => s.stageId === stageId);
         if (!stageToUpdate || stageToUpdate.status !== 'in-progress') {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن تسجيل تعديل لهذه المرحلة حاليًا.' });
@@ -533,10 +536,10 @@ export default function AppointmentDetailsPage() {
             return;
         }
     
-        setIsSaving(true);
+        setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
+            const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
     
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
@@ -563,7 +566,7 @@ export default function AppointmentDetailsPage() {
             const timelineRef = collection(transactionRef, 'timelineEvents');
             batch.set(doc(timelineRef), logData);
             
-            const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
+            const historyRef = doc(collection(firestore, `clients/${appointment.clientId}/history`));
             batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
             
             await batch.commit();
@@ -573,7 +576,7 @@ export default function AppointmentDetailsPage() {
             const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
             toast({ variant: 'destructive', title: 'خطأ', description: message });
         } finally {
-            setIsSaving(false);
+            setIsProcessing(false);
         }
     };
     
@@ -588,6 +591,7 @@ export default function AppointmentDetailsPage() {
             return {
                 ...template,
                 ...progress,
+                enableModificationTracking: template.enableModificationTracking || false,
                 status: progress?.status || 'pending', 
             } as TransactionStage & WorkStage;
         });
@@ -596,12 +600,12 @@ export default function AppointmentDetailsPage() {
     }, [transaction, workStages]);
     
     const currentInProgressStage = useMemo(() => {
-        if (!enrichedStages) return undefined;
-        const stage = enrichedStages.find(s => s.status === 'in-progress');
-        if (stage && workStages.find(t => t.id === stage.stageId)?.enableModificationTracking) {
-          return stage;
-        }
-        return undefined;
+      if (!enrichedStages) return undefined;
+      const stage = enrichedStages.find(s => s.status === 'in-progress');
+      if (stage && workStages.find(t => t.id === stage.stageId)?.enableModificationTracking) {
+        return stage;
+      }
+      return undefined;
     }, [enrichedStages, workStages]);
 
     if (loading) {
@@ -736,7 +740,7 @@ export default function AppointmentDetailsPage() {
                                         variant="outline"
                                         className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
                                         onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
-                                        disabled={isSaving}
+                                        disabled={isProcessing}
                                     >
                                         <Plus className="ml-1 h-4 w-4" />
                                         تسجيل تعديل جديد
