@@ -856,3 +856,5 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
+
+    
