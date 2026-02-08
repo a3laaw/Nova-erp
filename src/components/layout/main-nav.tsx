@@ -33,6 +33,7 @@ import {
   ChevronDown,
   ShoppingCart,
   LogOut,
+  LineChart,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,15 @@ const navItems = {
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
+    {
+      label: 'التقارير',
+      icon: LineChart,
+      roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
+      hrefPrefix: '/dashboard/reports',
+      children: [
+          { href: '/dashboard/reports/workflow', label: 'تقارير سير العمل' }
+      ]
+    },
     { 
       label: 'المحاسبة', 
       icon: Wallet, 
@@ -122,6 +132,7 @@ const navItems = {
         { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
       ]
     },
+    { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
   ],
   en: [
