@@ -2,7 +2,7 @@
 
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, collectionGroup } from 'firebase/firestore';
-import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account } from '@/lib/types';
+import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account, Appointment } from '@/lib/types';
 import { useToast } from './use-toast';
 import { useSmartCache } from './use-smart-cache';
 
@@ -14,6 +14,7 @@ interface AnalyticalData {
     employees: Employee[];
     departments: Department[];
     accounts: Account[];
+    appointments: Appointment[];
 }
 
 export function useAnalyticalData() {
@@ -32,7 +33,8 @@ export function useAnalyticalData() {
           transactionsSnap,
           employeesSnap,
           departmentsSnap,
-          accountsSnap
+          accountsSnap,
+          appointmentsSnap
         ] = await Promise.all([
           getDocs(query(collection(firestore, 'journalEntries'))),
           getDocs(query(collection(firestore, 'clients'))),
@@ -40,6 +42,7 @@ export function useAnalyticalData() {
           getDocs(query(collection(firestore, 'employees'))),
           getDocs(query(collection(firestore, 'departments'))),
           getDocs(query(collection(firestore, 'chartOfAccounts'))),
+          getDocs(query(collection(firestore, 'appointments'))),
         ]);
         
         const transactions = transactionsSnap.docs.map(doc => {
@@ -55,6 +58,7 @@ export function useAnalyticalData() {
           employees: employeesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)),
           departments: departmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)),
           accounts: accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)),
+          appointments: appointmentsSnap.docs.map(doc => ({id: doc.id, ...doc.data()} as Appointment)),
         };
     } catch (error) {
         console.error("Error fetching analytical data:", error);
@@ -78,6 +82,7 @@ export function useAnalyticalData() {
     employees: data?.employees || [],
     departments: data?.departments || [],
     accounts: data?.accounts || [],
+    appointments: data?.appointments || [],
     loading, 
     error 
   };

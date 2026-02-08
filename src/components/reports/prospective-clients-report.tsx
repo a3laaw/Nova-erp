@@ -30,6 +30,7 @@ export function ProspectiveClientsReport({ appointments, employees, loading }: P
         const prospectiveAppointments = appointments.filter(a => !a.clientId && a.clientMobile);
 
         const clientsMap = new Map<string, ProspectiveClient>();
+        const engineersMap = new Map(employees.map(e => [e.id, e.fullName]));
 
         prospectiveAppointments.forEach(appt => {
             if (!appt.clientMobile || !appt.clientName) return;
@@ -37,7 +38,7 @@ export function ProspectiveClientsReport({ appointments, employees, loading }: P
             const existing = clientsMap.get(appt.clientMobile);
             const appointmentDate = appt.appointmentDate?.toDate ? appt.appointmentDate.toDate() : new Date();
 
-            const engineerName = employees.find(e => e.id === appt.engineerId)?.fullName || 'غير معروف';
+            const engineerName = engineersMap.get(appt.engineerId) || 'غير معروف';
 
             if (existing) {
                 existing.visitCount += 1;
