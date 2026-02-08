@@ -509,34 +509,33 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
-            className="max-w-3xl"
+            className="max-w-4xl"
         >
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} عنصر جديد</DialogTitle>
-            <DialogDescription>
-              {`أدخل بيانات ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle} الجديد.`}
-            </DialogDescription>
+            <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="grid md:grid-cols-2 gap-x-8 gap-y-6 py-4 px-6">
-                <div className="md:col-span-2 grid gap-2">
-                    <Label htmlFor="item-name">الاسم</Label>
+           <ScrollArea className="max-h-[70vh]">
+            <div className="py-4 px-2 space-y-6">
+                <div className="px-4 grid gap-2">
+                    <Label htmlFor="item-name">{`اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}`}</Label>
                     <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
                 </div>
 
                 {isWorkStageView && !isPrimaryDialogOpen && (
-                    <>
+                    <div className="grid md:grid-cols-2 gap-6 px-4">
                         {/* --- Left Column --- */}
-                        <div className="space-y-6">
-                            <div className="grid gap-2">
-                              <Label>نوع المرحلة</Label>
-                              <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="sequential">تسلسلية (خطوة أساسية في سير العمل)</SelectItem>
-                                      <SelectItem value="parallel">موازية (خدمية مثل التعديلات)</SelectItem>
-                                  </SelectContent>
-                              </Select>
+                        <div className="space-y-6 rounded-lg border p-4">
+                             <h3 className="font-semibold text-base mb-2">منطق المرحلة</h3>
+
+                             <div className="grid gap-2">
+                                <Label>نوع المرحلة</Label>
+                                <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="sequential">تسلسلية (خطوة أساسية في سير العمل)</SelectItem>
+                                        <SelectItem value="parallel">موازية (خدمية مثل التعديلات)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             
                              <div className="grid gap-2">
@@ -563,7 +562,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                                 </div>
                             )}
                             {itemTrackingType === 'occurrence' && (
-                              <div className="p-3 border rounded-md space-y-4">
+                              <div className="p-3 border rounded-md space-y-4 bg-background">
                                 <div className="grid gap-2">
                                     <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
                                     <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
@@ -577,9 +576,23 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                         </div>
 
                         {/* --- Right Column --- */}
-                        <div className="space-y-6">
-                             {itemStageType === 'parallel' && (
-                                <div className="grid gap-2">
+                        <div className="space-y-6 rounded-lg border p-4">
+                             <h3 className="font-semibold text-base mb-2">العلاقات والصلاحيات</h3>
+                             
+                             <div className="grid gap-2">
+                                <Label>الأدوار المسؤولة (المسميات الوظيفية)</Label>
+                                <MultiSelect
+                                    options={allJobs}
+                                    selected={itemRoles}
+                                    onChange={setItemRoles}
+                                    placeholder="اتركه فارغًا ليكون متاحًا للجميع"
+                                    disabled={refDataLoading}
+                                    menuPortalTarget={portalTarget}
+                                />
+                            </div>
+
+                            {itemStageType === 'parallel' && (
+                                 <div className="grid gap-2">
                                     <Label>يظهر فقط أثناء المراحل التالية (اختياري)</Label>
                                     <MultiSelect
                                         options={allSequentialStages.filter(s => s.value !== editingItem?.id)}
@@ -591,17 +604,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                                     />
                                 </div>
                             )}
-                            <div className="grid gap-2">
-                                <Label>الأدوار المسؤولة (المسميات الوظيفية)</Label>
-                                <MultiSelect
-                                    options={allJobs}
-                                    selected={itemRoles}
-                                    onChange={setItemRoles}
-                                    placeholder="اختر دورًا أو أكثر..."
-                                    disabled={refDataLoading}
-                                    menuPortalTarget={portalTarget}
-                                />
-                            </div>
+                            
                             <div className="grid gap-2">
                                 <Label>المراحل التالية المحتملة (للربط)</Label>
                                 <MultiSelect
@@ -613,12 +616,13 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                                     menuPortalTarget={portalTarget}
                                 />
                             </div>
+
                              <div className="flex items-center space-x-2 pt-4">
                                <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} />
                                <Label htmlFor="enableModificationTracking">تفعيل عداد التعديلات لهذه المرحلة</Label>
                             </div>
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
           </ScrollArea>
