@@ -740,7 +740,7 @@ export default function AppointmentDetailsPage() {
                                         size="sm"
                                         variant="outline"
                                         className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
-                                        onClick={()={() => handleModificationIncrement(currentInProgressStage.stageId!)}}
+                                        onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
                                         disabled={isProcessing}
                                     >
                                         <Plus className="ml-1 h-4 w-4" />
@@ -816,7 +816,7 @@ export default function AppointmentDetailsPage() {
                                     placeholder="اكتب هنا ملخصًا للزيارة، النقاط التي تم الاتفاق عليها، والمهام المطلوبة للمتابعة..."
                                     rows={5}
                                     value={minutesContent}
-                                    onChange={(e)={() => setMinutesContent(e.target.value)}}
+                                    onChange={(e) => setMinutesContent(e.target.value)}
                                     disabled={isSavingMinutes}
                                 />
                                 <div className="flex justify-end">
@@ -834,7 +834,7 @@ export default function AppointmentDetailsPage() {
             <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
                 <Button 
                     disabled={!appointment.workStageUpdated && !!appointment.clientId}
-                    onClick={()={() => router.push('/dashboard/appointments')}}
+                    onClick={() => router.push('/dashboard/appointments')}
                 >
                     <ArrowRight className="ml-2 h-4 w-4" />
                     إغلاق الزيارة والعودة للتقويم
@@ -852,5 +852,3 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
-
-    
