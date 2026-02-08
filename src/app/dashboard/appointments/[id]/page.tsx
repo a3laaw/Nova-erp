@@ -106,6 +106,7 @@ export default function AppointmentDetailsPage() {
     const [selectedTransactionToLink, setSelectedTransactionToLink] = useState('');
     const [isLinking, setIsLinking] = useState(false);
     const [isAutoLinking, setIsAutoLinking] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const loading = appointmentLoading || clientLoading || engineerLoading || transactionLoading || clientTransactionsLoading;
 
@@ -739,7 +740,7 @@ export default function AppointmentDetailsPage() {
                                         size="sm"
                                         variant="outline"
                                         className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
-                                        onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
+                                        onClick={()={() => handleModificationIncrement(currentInProgressStage.stageId!)}}
                                         disabled={isProcessing}
                                     >
                                         <Plus className="ml-1 h-4 w-4" />
@@ -767,13 +768,13 @@ export default function AppointmentDetailsPage() {
                                             onSelect={setSelectedStageId}
                                             options={workStageOptions}
                                             placeholder={workStageOptions.length === 0 ? "لا توجد مراحل متاحة لك" : "اختر مرحلة..."}
-                                            disabled={workStageOptions.length === 0}
+                                            disabled={workStageOptions.length === 0 || isProcessing}
                                         />
                                         {workStageOptions.length === 0 && !loading && currentUser?.role !== 'Admin' && (
                                             <p className='text-xs text-muted-foreground'>لا توجد مراحل عمل متاحة لدورك الوظيفي حالياً أو تم إكمال جميع المراحل.</p>
                                         )}
                                     </div>
-                                    <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId}>
+                                    <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId || isProcessing}>
                                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Check className="ml-2 h-4 w-4"/>}
                                         {isEditingStage ? 'حفظ التعديل' : 'تأكيد إكمال المرحلة'}
                                     </Button>
@@ -786,7 +787,7 @@ export default function AppointmentDetailsPage() {
                                         <div className="flex justify-between items-center w-full">
                                             <span>تم تسجيل مرحلة العمل لهذه الزيارة بنجاح.</span>
                                             {currentUser?.role === 'Admin' && (
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-green-800 hover:text-green-900 dark:text-green-300 dark:hover:text-green-200 -mr-2" onClick={() => setIsEditingStage(true)}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-green-800 hover:text-green-900 dark:text-green-300 dark:hover:text-green-200 -mr-2" onClick={() => setIsEditingStage(true)} disabled={isProcessing}>
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
                                             )}
@@ -815,7 +816,7 @@ export default function AppointmentDetailsPage() {
                                     placeholder="اكتب هنا ملخصًا للزيارة، النقاط التي تم الاتفاق عليها، والمهام المطلوبة للمتابعة..."
                                     rows={5}
                                     value={minutesContent}
-                                    onChange={(e) => setMinutesContent(e.target.value)}
+                                    onChange={(e)={() => setMinutesContent(e.target.value)}}
                                     disabled={isSavingMinutes}
                                 />
                                 <div className="flex justify-end">
@@ -833,7 +834,7 @@ export default function AppointmentDetailsPage() {
             <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
                 <Button 
                     disabled={!appointment.workStageUpdated && !!appointment.clientId}
-                    onClick={() => router.push('/dashboard/appointments')}
+                    onClick={()={() => router.push('/dashboard/appointments')}}
                 >
                     <ArrowRight className="ml-2 h-4 w-4" />
                     إغلاق الزيارة والعودة للتقويم
@@ -851,3 +852,5 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
+
+    
