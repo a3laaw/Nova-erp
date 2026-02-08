@@ -62,15 +62,7 @@ const navItems = {
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
-    {
-      label: 'التقارير',
-      icon: LineChart,
-      roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
-      hrefPrefix: '/dashboard/reports',
-      children: [
-          { href: '/dashboard/reports/workflow', label: 'تقارير سير العمل' }
-      ]
-    },
+    { href: '/dashboard/reports', label: 'التقارير', icon: LineChart, roles: ['Admin', 'Engineer', 'Accountant', 'HR'] },
     { 
       label: 'المحاسبة', 
       icon: Wallet, 
