@@ -584,12 +584,10 @@ export default function AppointmentDetailsPage() {
         
         const combined = workStages.map(template => {
             const progress = progressStages.find(p => p.stageId === template.id);
-            const enableModificationTracking = template.enableModificationTracking || false;
 
             return {
                 ...template,
                 ...progress,
-                enableModificationTracking, // Ensure template value is respected
                 status: progress?.status || 'pending', 
             } as TransactionStage & WorkStage;
         });
@@ -599,8 +597,12 @@ export default function AppointmentDetailsPage() {
     
     const currentInProgressStage = useMemo(() => {
         if (!enrichedStages) return undefined;
-        return enrichedStages.find(s => s.status === 'in-progress' && s.enableModificationTracking);
-    }, [enrichedStages]);
+        const stage = enrichedStages.find(s => s.status === 'in-progress');
+        if (stage && workStages.find(t => t.id === stage.stageId)?.enableModificationTracking) {
+          return stage;
+        }
+        return undefined;
+    }, [enrichedStages, workStages]);
 
     if (loading) {
         return (
@@ -716,73 +718,79 @@ export default function AppointmentDetailsPage() {
                                 لا يمكن تحديث مرحلة العمل لأن هذه الزيارة غير مرتبطة بأي معاملة. الرجاء ربطها بمعاملة أولاً.
                             </AlertDescription>
                         </Alert>
-                    ) : currentInProgressStage ? (
-                        <div className="p-4 border border-orange-200 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                            <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-300">
-                                تسجيل تعديل على المرحلة الحالية
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                المرحلة الحالية قيد التنفيذ هي: <strong className="text-foreground">{currentInProgressStage.name}</strong>.
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                إذا كانت هذه الزيارة لمناقشة تعديلات على هذه المرحلة، اضغط على الزر أدناه لتوثيق ذلك.
-                            </p>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
-                                onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
-                                disabled={isSaving}
-                            >
-                                <Plus className="ml-1 h-4 w-4" />
-                                تسجيل تعديل جديد
-                            </Button>
-                        </div>
-                    ) : !appointment.workStageUpdated || (isEditingStage && currentUser?.role === 'Admin') ? (
-                        <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                             <h3 className="font-semibold text-lg flex items-center gap-2">
-                                <Workflow className="text-blue-500" /> 
-                                {isEditingStage ? 'تعديل مرحلة العمل' : 'تحديث مرحلة العمل'}
-                             </h3>
-                             <p className="text-sm text-muted-foreground">
-                                {isEditingStage 
-                                    ? 'اختر المرحلة الصحيحة. سيتم التراجع عن الإجراءات التلقائية السابقة.' 
-                                    : 'الرجاء تحديد مرحلة العمل التي وصل إليها العميل في هذه الزيارة.'
-                                }
-                             </p>
-                            <div className="grid gap-2">
-                                <Label htmlFor="work-stage">مرحلة العمل</Label>
-                                <InlineSearchList 
-                                    value={selectedStageId}
-                                    onSelect={setSelectedStageId}
-                                    options={workStageOptions}
-                                    placeholder={workStageOptions.length === 0 ? "لا توجد مراحل متاحة لك" : "اختر مرحلة..."}
-                                    disabled={workStageOptions.length === 0}
-                                />
-                                {workStageOptions.length === 0 && !loading && currentUser?.role !== 'Admin' && (
-                                    <p className='text-xs text-muted-foreground'>لا توجد مراحل عمل متاحة لدورك الوظيفي حالياً أو تم إكمال جميع المراحل.</p>
-                                )}
-                            </div>
-                            <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId}>
-                                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Check className="ml-2 h-4 w-4"/>}
-                                {isEditingStage ? 'حفظ التعديل' : 'تأكيد تحديث المرحلة'}
-                            </Button>
-                        </div>
                     ) : (
-                         <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800/50">
-                            <Check className="h-4 w-4 !text-green-600 dark:!text-green-300" />
-                            <AlertTitle>تم تحديث مرحلة العمل</AlertTitle>
-                            <AlertDescription asChild>
-                                <div className="flex justify-between items-center w-full">
-                                    <span>تم تسجيل مرحلة العمل لهذه الزيارة بنجاح.</span>
-                                    {currentUser?.role === 'Admin' && (
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-800 hover:text-green-900 dark:text-green-300 dark:hover:text-green-200 -mr-2" onClick={() => setIsEditingStage(true)}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                    )}
+                        <>
+                            {currentInProgressStage && (
+                                <div className="p-4 border border-orange-200 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                                    <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                                        تسجيل تعديل على المرحلة الحالية
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        المرحلة الحالية قيد التنفيذ هي: <strong className="text-foreground">{currentInProgressStage.name}</strong>.
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        إذا كانت هذه الزيارة لمناقشة تعديلات على هذه المرحلة، اضغط على الزر أدناه لتوثيق ذلك.
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+                                        onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
+                                        disabled={isSaving}
+                                    >
+                                        <Plus className="ml-1 h-4 w-4" />
+                                        تسجيل تعديل جديد
+                                    </Button>
                                 </div>
-                            </AlertDescription>
-                        </Alert>
+                            )}
+
+                            {!appointment.workStageUpdated || (isEditingStage && currentUser?.role === 'Admin') ? (
+                                <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                                        <Workflow className="text-blue-500" /> 
+                                        {isEditingStage ? 'تعديل مرحلة العمل' : 'تحديث وإنهاء مرحلة العمل'}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        {isEditingStage 
+                                            ? 'اختر المرحلة الصحيحة. سيتم التراجع عن الإجراءات التلقائية السابقة.' 
+                                            : 'حدد المرحلة التي تم إنجازها في هذه الزيارة للانتقال للخطوة التالية.'
+                                        }
+                                    </p>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="work-stage">مرحلة العمل</Label>
+                                        <InlineSearchList 
+                                            value={selectedStageId}
+                                            onSelect={setSelectedStageId}
+                                            options={workStageOptions}
+                                            placeholder={workStageOptions.length === 0 ? "لا توجد مراحل متاحة لك" : "اختر مرحلة..."}
+                                            disabled={workStageOptions.length === 0}
+                                        />
+                                        {workStageOptions.length === 0 && !loading && currentUser?.role !== 'Admin' && (
+                                            <p className='text-xs text-muted-foreground'>لا توجد مراحل عمل متاحة لدورك الوظيفي حالياً أو تم إكمال جميع المراحل.</p>
+                                        )}
+                                    </div>
+                                    <Button onClick={handleUpdateStage} disabled={isSaving || !selectedStageId}>
+                                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Check className="ml-2 h-4 w-4"/>}
+                                        {isEditingStage ? 'حفظ التعديل' : 'تأكيد إكمال المرحلة'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800/50">
+                                    <Check className="h-4 w-4 !text-green-600 dark:!text-green-300" />
+                                    <AlertTitle>تم تحديث مرحلة العمل</AlertTitle>
+                                    <AlertDescription asChild>
+                                        <div className="flex justify-between items-center w-full">
+                                            <span>تم تسجيل مرحلة العمل لهذه الزيارة بنجاح.</span>
+                                            {currentUser?.role === 'Admin' && (
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-green-800 hover:text-green-900 dark:text-green-300 dark:hover:text-green-200 -mr-2" onClick={() => setIsEditingStage(true)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </>
                     )}
                  </CardContent>
             </Card>
@@ -839,5 +847,3 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
-
-    

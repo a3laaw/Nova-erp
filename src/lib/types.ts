@@ -366,7 +366,7 @@ export interface TransactionStage {
   expectedEndDate?: any | null;
   completedCount?: number;
   modificationCount?: number;
-  enableModificationTracking?: boolean;
+  
   stageType?: 'sequential' | 'parallel';
   allowedRoles?: string[];
   nextStageIds?: string[];
@@ -672,6 +672,4 @@ export interface ResidencyRenewal {
     amortizationStatus: 'in-progress' | 'completed';
     lastAmortizationDate?: any;
 }
-    
-
     
