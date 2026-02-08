@@ -542,7 +542,7 @@ export default function AppointmentDetailsPage() {
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            const transactionRef = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
+            const transactionRefDoc = doc(firestore, 'clients', appointment.clientId, 'transactions', appointment.transactionId);
     
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
@@ -552,7 +552,7 @@ export default function AppointmentDetailsPage() {
             const stage = currentStages[stageIndex];
             stage.modificationCount = (stage.modificationCount || 0) + 1;
             
-            batch.update(transactionRef, { stages: currentStages });
+            batch.update(transactionRefDoc, { stages: currentStages });
     
             const safeApptDate = toFirestoreDate(appointment.appointmentDate);
             const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}) خلال زيارة بتاريخ ${safeApptDate ? format(safeApptDate, "PP", { locale: ar }) : 'غير محدد'}.`;
@@ -566,16 +566,20 @@ export default function AppointmentDetailsPage() {
                 createdAt: serverTimestamp(),
             };
     
-            const timelineRef = collection(transactionRef, 'timelineEvents');
+            const timelineRef = collection(transactionRefDoc, 'timelineEvents');
             batch.set(doc(timelineRef), logData);
             
             const historyRef = doc(collection(firestore, `clients/${appointment.clientId}/history`));
             batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
             
+            // Mark the appointment as "updated" since an action was taken
+            const apptRef = doc(firestore, 'appointments', appointment.id);
+            batch.update(apptRef, { workStageUpdated: true });
+
             await batch.commit();
     
             toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
-            setModificationRecorded(true); // <--- FIX: Set state to true after success
+            setModificationRecorded(true);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
             toast({ variant: 'destructive', title: 'خطأ', description: message });
@@ -856,5 +860,7 @@ export default function AppointmentDetailsPage() {
         </div>
     )
 }
+
+    
 
     

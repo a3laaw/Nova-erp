@@ -1064,6 +1064,8 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
+        "employeeId": { "type": "string", "description": "Link to employee for specific payments like residency renewal." },
+        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "Stores the new expiry date when renewing residency."},
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
@@ -1361,6 +1363,12 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
+    },
+    "/residencyRenewals/{renewalId}": {
+      "schema": {
+        "$ref": "#/entities/ResidencyRenewal"
+      },
+      "description": "Stores records of employee residency renewals and their costs."
     }
   }
 }

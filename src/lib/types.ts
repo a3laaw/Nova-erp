@@ -1,5 +1,6 @@
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -672,4 +673,6 @@ export interface ResidencyRenewal {
     amortizationStatus: 'in-progress' | 'completed';
     lastAmortizationDate?: any;
 }
+    
+
     
