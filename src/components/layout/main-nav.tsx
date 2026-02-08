@@ -65,8 +65,10 @@ const navItems = {
       roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
       hrefPrefix: '/dashboard/reports',
       children: [
-        { href: '/dashboard/reports', label: 'تقارير سير العمل' },
-        { href: '/dashboard/accounting/reports', label: 'التقارير المحاسبية' },
+        { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة' },
+        { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة' },
+        { href: '/dashboard/reports/prospective-clients', label: 'العملاء المحتملون' },
+        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية' },
       ]
     },
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
@@ -96,6 +98,7 @@ const navItems = {
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
+            { href: '/dashboard/accounting/reports', label: 'التقارير المحاسبية' },
           ]
         },
         {

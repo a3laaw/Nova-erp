@@ -1,26 +1,21 @@
 'use client';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { WorkflowReportsDashboard } from '@/components/reports/workflow-reports-dashboard';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader } from 'lucide-react';
 
-export default function ReportsPage() {
-    return (
-        <Card dir="rtl">
-            <CardHeader>
-                <CardTitle>تقارير سير العمل التحليلية</CardTitle>
-                <CardDescription>
-                لوحة معلومات ذكية تعرض لك أهم مؤشرات الأداء والمخاطر والفرص في سير عمل المشاريع.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <WorkflowReportsDashboard />
-            </CardContent>
-        </Card>
-    )
+export default function ReportsRedirectPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect to the first report page in the new structure.
+    router.replace('/dashboard/reports/delayed-stages');
+  }, [router]);
+
+  return (
+    <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
+    </div>
+  );
 }
