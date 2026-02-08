@@ -510,6 +510,16 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
             className="max-w-4xl"
+            onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (
+                target.closest('[cmdk-root]') ||
+                target.closest('[role="listbox"]') ||
+                target.closest('[data-radix-popper-content-wrapper]')
+              ) {
+                e.preventDefault();
+              }
+            }}
         >
           <DialogHeader>
             <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
@@ -895,7 +905,19 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
       </CardContent>
       
        <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-        <DialogContent dir="rtl">
+        <DialogContent 
+            dir="rtl"
+             onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (
+                target.closest('[cmdk-root]') ||
+                target.closest('[role="listbox"]') ||
+                target.closest('[data-radix-popper-content-wrapper]')
+              ) {
+                e.preventDefault();
+              }
+            }}
+        >
             <DialogHeader>
                 <DialogTitle>{editingItem ? 'تعديل نوع معاملة' : 'إضافة نوع معاملة جديد'}</DialogTitle>
             </DialogHeader>

@@ -51,6 +51,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchRefData = async () => {
@@ -73,7 +80,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
               uniqueStages.set(stageName, { value: stageName, label: stageName });
           }
         });
-        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label)));
+        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
 
       } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
@@ -208,6 +215,16 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
         <DialogContent
           dir="rtl"
           className="max-w-4xl h-[90vh]"
+           onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (
+                target.closest('[cmdk-root]') ||
+                target.closest('[role="listbox"]') ||
+                target.closest('[data-radix-popper-content-wrapper]')
+              ) {
+                e.preventDefault();
+              }
+            }}
         >
             <DialogHeader>
                 <DialogTitle>{template ? 'تعديل نموذج عقد' : 'إنشاء نموذج عقد جديد'}</DialogTitle>
@@ -227,7 +244,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                         </div>
                         <div className="grid gap-2">
                             <Label>ربط بأنواع المعاملات</Label>
-                            <MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع المعاملات..." disabled={loadingRefData} />
+                            <MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع المعاملات..." disabled={loadingRefData} menuPortalTarget={portalTarget}/>
                         </div>
                     </section>
 
@@ -337,17 +354,19 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                             <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
                             <Button size="sm" variant="outline" type="button" onClick={addOpenClause}><PlusCircle className="ml-2"/> إضافة بند</Button>
                         </div>
-                         {openClauses.map((clause, index) => (
-                            <div key={clause.id} className="flex items-center gap-2">
-                               <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
-                               <Textarea value={clause.text} onChange={(e) => updateOpenClause(clause.id, e.target.value)} rows={2} className="flex-grow" placeholder={`نص البند الإضافي ${index + 1}`}/>
-                               <div className="flex flex-col">
-                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderOpenClause(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
-                                <Button variant="ghost" size="icon" type="button" onClick={() => reorderOpenClause(index, 'down')} disabled={index === openClauses.length - 1}><ArrowDown className="h-4 w-4"/></Button>
-                               </div>
-                               <Button variant="ghost" size="icon" type="button" onClick={() => removeOpenClause(clause.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
-                            </div>
-                         ))}
+                        <div className='space-y-2'>
+                            {openClauses.map((clause, index) => (
+                                <div key={clause.id} className="flex items-center gap-2">
+                                   <span className="pt-2 font-semibold">{arabicOrdinals[index] || `${index + 1}-`}</span>
+                                   <Textarea value={clause.text} onChange={(e) => updateOpenClause(clause.id, e.target.value)} rows={2} className="flex-grow" placeholder={`نص البند الإضافي ${index + 1}`}/>
+                                   <div className="flex flex-col">
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderOpenClause(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4"/></Button>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderOpenClause(index, 'down')} disabled={index === openClauses.length - 1}><ArrowDown className="h-4 w-4"/></Button>
+                                   </div>
+                                   <Button variant="ghost" size="icon" type="button" onClick={() => removeOpenClause(clause.id)}><Trash2 className="text-destructive h-4 w-4"/></Button>
+                                </div>
+                            ))}
+                        </div>
                     </section>
 
                 </div>
@@ -363,3 +382,5 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     </Dialog>
   )
 }
+
+    
