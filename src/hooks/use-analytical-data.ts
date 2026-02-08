@@ -5,6 +5,7 @@ import { collection, getDocs, query, collectionGroup } from 'firebase/firestore'
 import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account, Appointment } from '@/lib/types';
 import { useToast } from './use-toast';
 import { useSmartCache } from './use-smart-cache';
+import { useCallback } from 'react';
 
 // The shape of the data that the hook will return
 interface AnalyticalData {
@@ -21,7 +22,7 @@ export function useAnalyticalData() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  const fetchAnalyticalData = async (): Promise<AnalyticalData> => {
+  const fetchAnalyticalData = useCallback(async (): Promise<AnalyticalData> => {
     if (!firestore) {
       throw new Error("Firestore is not available.");
     }
@@ -66,7 +67,7 @@ export function useAnalyticalData() {
         // Re-throw to be caught by useSmartCache
         throw error;
     }
-  };
+  }, [firestore, toast]);
   
   // Use the smart cache hook to manage fetching and caching
   const { data, loading, error } = useSmartCache<AnalyticalData>(
