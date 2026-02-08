@@ -59,10 +59,19 @@ const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { href: '/dashboard/notifications', label: 'تنبيهات النظام', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { 
+      label: 'التقارير', 
+      icon: LineChart, 
+      roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
+      hrefPrefix: '/dashboard/reports',
+      children: [
+        { href: '/dashboard/reports', label: 'تقارير سير العمل' },
+        { href: '/dashboard/accounting/reports', label: 'التقارير المحاسبية' },
+      ]
+    },
     { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
-    { href: '/dashboard/reports', label: 'التقارير', icon: LineChart, roles: ['Admin', 'Engineer', 'Accountant', 'HR'] },
     { 
       label: 'المحاسبة', 
       icon: Wallet, 
@@ -87,7 +96,6 @@ const navItems = {
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
-            { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية' },
           ]
         },
         {
@@ -120,8 +128,6 @@ const navItems = {
       children: [
         { href: '/dashboard/warehouse', label: 'عرض المخزون' },
         { href: '/dashboard/purchasing', label: 'المشتريات' },
-        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
-        { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
       ]
     },
     { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
