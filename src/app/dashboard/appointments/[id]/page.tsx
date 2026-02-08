@@ -107,6 +107,8 @@ export default function AppointmentDetailsPage() {
     const [isLinking, setIsLinking] = useState(false);
     const [isAutoLinking, setIsAutoLinking] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [modificationRecorded, setModificationRecorded] = useState(false);
+
 
     const loading = appointmentLoading || clientLoading || engineerLoading || transactionLoading || clientTransactionsLoading;
 
@@ -573,6 +575,7 @@ export default function AppointmentDetailsPage() {
             await batch.commit();
     
             toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
+            setModificationRecorded(true); // <--- FIX: Set state to true after success
         } catch (error) {
             const message = error instanceof Error ? error.message : 'فشل تسجيل التعديل.';
             toast({ variant: 'destructive', title: 'خطأ', description: message });
@@ -741,15 +744,16 @@ export default function AppointmentDetailsPage() {
                                         variant="outline"
                                         className="mt-3 h-8 px-3 text-orange-600 border-orange-300 hover:bg-orange-100"
                                         onClick={() => handleModificationIncrement(currentInProgressStage.stageId!)}
-                                        disabled={isProcessing}
+                                        disabled={isProcessing || modificationRecorded}
+                                        title={modificationRecorded ? 'تم تسجيل تعديل لهذه الزيارة بالفعل' : ''}
                                     >
-                                        <Plus className="ml-1 h-4 w-4" />
-                                        تسجيل تعديل جديد
+                                        {modificationRecorded ? <Check className="ml-1 h-4 w-4"/> : isProcessing ? <Loader2 className="ml-1 h-4 w-4 animate-spin"/> : <Plus className="ml-1 h-4 w-4" />}
+                                        {isProcessing ? 'جاري التسجيل...' : modificationRecorded ? 'تم تسجيل التعديل' : 'تسجيل تعديل جديد'}
                                     </Button>
                                 </div>
                             )}
 
-                            {!appointment.workStageUpdated || (isEditingStage && currentUser?.role === 'Admin') ? (
+                            {(!appointment.workStageUpdated && !modificationRecorded) || (isEditingStage && currentUser?.role === 'Admin') ? (
                                 <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                     <h3 className="font-semibold text-lg flex items-center gap-2">
                                         <Workflow className="text-blue-500" /> 
@@ -779,7 +783,7 @@ export default function AppointmentDetailsPage() {
                                         {isEditingStage ? 'حفظ التعديل' : 'تأكيد إكمال المرحلة'}
                                     </Button>
                                 </div>
-                            ) : (
+                            ) : !isEditingStage && (
                                 <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800/50">
                                     <Check className="h-4 w-4 !text-green-600 dark:!text-green-300" />
                                     <AlertTitle>تم تحديث مرحلة العمل</AlertTitle>
@@ -800,7 +804,7 @@ export default function AppointmentDetailsPage() {
                  </CardContent>
             </Card>
 
-            {appointment.workStageUpdated && (
+            {(appointment.workStageUpdated || modificationRecorded) && (
                 <Card>
                     <CardHeader>
                         <CardTitle>ملخص الزيارة / محضر الاجتماع</CardTitle>
@@ -833,18 +837,18 @@ export default function AppointmentDetailsPage() {
 
             <CardFooter className="flex flex-col items-start gap-2 border-t pt-6">
                 <Button 
-                    disabled={!appointment.workStageUpdated && !!appointment.clientId}
+                    disabled={!appointment.workStageUpdated && !modificationRecorded && !!appointment.clientId}
                     onClick={() => router.push('/dashboard/appointments')}
                 >
                     <ArrowRight className="ml-2 h-4 w-4" />
                     إغلاق الزيارة والعودة للتقويم
                 </Button>
-                {!appointment.workStageUpdated && !!appointment.clientId && (
+                {!appointment.workStageUpdated && !modificationRecorded && !!appointment.clientId && (
                         <Alert variant="destructive" className="w-full">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>إجراء مطلوب</AlertTitle>
                         <AlertDescription>
-                            يجب تحديث مرحلة العمل أولاً قبل إغلاق الزيارة.
+                            يجب تحديث مرحلة العمل أو تسجيل تعديل قبل إغلاق الزيارة.
                         </AlertDescription>
                     </Alert>
                 )}
