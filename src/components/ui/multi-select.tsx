@@ -16,9 +16,10 @@ interface MultiSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  menuPortalTarget?: HTMLElement | null;
 }
 
-export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
+export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false, menuPortalTarget }: MultiSelectProps) {
   
   const handleChange = (newSelected: MultiValue<MultiSelectOption>) => {
     const values = newSelected ? newSelected.map(opt => opt.value) : [];
@@ -50,6 +51,10 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       ...base,
       backgroundColor: 'hsl(var(--card))',
       zIndex: 20,
+    }),
+    menuPortal: (base) => ({
+        ...base,
+        zIndex: 9999,
     }),
     option: (base, state) => ({
       ...base,
@@ -96,6 +101,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       isSearchable={true}
       noOptionsMessage={() => "لا توجد نتائج"}
       styles={customStyles}
+      menuPortalTarget={menuPortalTarget}
       theme={(theme) => ({
         ...theme,
         borderRadius: 6,
