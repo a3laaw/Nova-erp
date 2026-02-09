@@ -40,6 +40,7 @@ import { Label } from '@/components/ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
 import { searchEmployees } from '@/lib/cache/fuse-search';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
@@ -75,10 +76,20 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const [isTerminating, setIsTerminating] = useState(false);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
 
-    const filteredEmployees = useMemo(() => {
+    const augmentedEmployees = useMemo(() => {
         if (!employees) return [];
-        return searchEmployees(employees, searchQuery);
-    }, [employees, searchQuery]);
+        const today = new Date();
+        return employees.map(emp => ({
+            ...emp,
+            annualLeaveBalance: calculateAnnualLeaveBalance(emp, today)
+        }));
+    }, [employees]);
+
+
+    const filteredEmployees = useMemo(() => {
+        if (!augmentedEmployees) return [];
+        return searchEmployees(augmentedEmployees, searchQuery);
+    }, [augmentedEmployees, searchQuery]);
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
