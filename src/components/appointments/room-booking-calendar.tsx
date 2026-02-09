@@ -115,21 +115,16 @@ export function RoomBookingCalendar() {
     const [isDeleting, setIsDeleting] = useState(false);
 
      const workHours = useMemo(() => {
-        return branding?.work_hours?.general || {
-            morning_start_time: '08:00',
-            morning_end_time: '12:00',
-            evening_start_time: '13:00',
-            evening_end_time: '17:00',
-            appointment_slot_duration: 30,
-            appointment_buffer_time: 0,
-        };
+        return branding?.work_hours?.general;
     }, [branding]);
 
     const { morningSlots, eveningSlots } = useMemo(() => {
+        if (!workHours || !date) {
+            return { morningSlots: [], eveningSlots: [] };
+        }
+        
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
-        
-        if (!date) return { morningSlots: [], eveningSlots: [] };
     
         const todayDayIndex = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
         const todayDayName = weekDays[todayDayIndex].id;

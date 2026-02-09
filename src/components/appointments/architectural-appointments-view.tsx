@@ -165,21 +165,16 @@ export function ArchitecturalAppointmentsView() {
     const [isDeleting, setIsDeleting] = useState(false);
     
     const workHours = useMemo(() => {
-        return branding?.work_hours?.architectural || {
-            morning_start_time: '08:00',
-            morning_end_time: '12:00',
-            evening_start_time: '13:00',
-            evening_end_time: '17:00',
-            appointment_slot_duration: 30,
-            appointment_buffer_time: 0,
-        };
+        return branding?.work_hours?.architectural;
     }, [branding]);
 
     const { morningSlots, eveningSlots } = useMemo(() => {
+        if (!workHours || !date) {
+            return { morningSlots: [], eveningSlots: [] };
+        }
+        
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
-        
-        if (!date) return { morningSlots: [], eveningSlots: [] };
     
         const todayDayIndex = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
         const todayDayName = weekDays[todayDayIndex].id;
@@ -726,7 +721,13 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '!=', 'cancelled'), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 if (!prospectiveSnapshot.empty && (!isEditing || prospectiveSnapshot.docs[0].id !== dialogData.id)) {
-                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
+                    toast({
+                        variant: 'destructive',
+                        title: 'عميل محتمل موجود',
+                        description: `هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`,
+                    });
+                    setIsSaving(false);
+                    return;
                 }
 
                 const newAppointmentData = {
