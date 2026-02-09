@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -172,6 +171,11 @@ export function DataIntegrityManager() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [confirmText, setConfirmText] = useState('');
 
+    // State for Appointments Deletion
+    const [isAppointmentsDeleteDialogOpen, setIsAppointmentsDeleteDialogOpen] = useState(false);
+    const [isAppointmentsDeleting, setIsAppointmentsDeleting] = useState(false);
+    const [confirmAppointmentsText, setConfirmAppointmentsText] = useState('');
+
 
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
@@ -304,6 +308,35 @@ export function DataIntegrityManager() {
         }
     };
 
+    const handleDeleteAllAppointments = async () => {
+        if (!firestore) return;
+        setIsAppointmentsDeleting(true);
+        try {
+            const appointmentsRef = collection(firestore, 'appointments');
+            const snapshot = await getDocs(appointmentsRef);
+            if (snapshot.empty) {
+                toast({ title: 'لا يوجد بيانات', description: 'مجموعة المواعيد فارغة بالفعل.' });
+                setIsAppointmentsDeleting(false);
+                setIsAppointmentsDeleteDialogOpen(false);
+                setConfirmAppointmentsText('');
+                return;
+            }
+            const batch = writeBatch(firestore);
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم مسح جميع بيانات المواعيد بنجاح.' });
+        } catch (error) {
+            console.error("Error deleting all appointments:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في مسح بيانات المواعيد.' });
+        } finally {
+            setIsAppointmentsDeleting(false);
+            setIsAppointmentsDeleteDialogOpen(false);
+            setConfirmAppointmentsText('');
+        }
+    };
+
 
     // Fetch options for dropdowns
     useEffect(() => {
@@ -359,6 +392,21 @@ export function DataIntegrityManager() {
                     onApplyCorrections={handleApplyDepartmentCorrections}
                     itemCountLabel="موظفين"
                 />
+                
+                <Separator />
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold text-destructive">مسح جميع المواعيد (إجراء خطير)</h3>
+                            <p className="text-sm text-muted-foreground">استخدم هذا الخيار لمسح جميع المواعيد المحجوزة والسابقة من النظام.</p>
+                        </div>
+                        <Button onClick={() => setIsAppointmentsDeleteDialogOpen(true)} variant="destructive">
+                            <Trash2 className="ml-2 h-4 w-4" />
+                            مسح بيانات المواعيد
+                        </Button>
+                    </div>
+                </div>
 
                 <Separator />
 
@@ -402,6 +450,36 @@ export function DataIntegrityManager() {
                         >
                             {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
                             {isDeleting ? 'جاري المسح...' : 'نعم، قم بالمسح'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
+            <AlertDialog open={isAppointmentsDeleteDialogOpen} onOpenChange={setIsAppointmentsDeleteDialogOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد تمامًا من مسح المواعيد؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <span className="block font-bold">هذا الإجراء سيقوم بحذف جميع المواعيد من قاعدة البيانات بشكل نهائي. لا يمكن التراجع عن هذا الإجراء إطلاقًا.</span>
+                            <span className="block mt-4">للتأكيد، الرجاء كتابة العبارة التالية في المربع أدناه: <code className="font-mono text-destructive bg-destructive/10 px-1 py-0.5 rounded">مسح المواعيد</code></span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Input
+                        value={confirmAppointmentsText}
+                        onChange={(e) => setConfirmAppointmentsText(e.target.value)}
+                        placeholder="اكتب 'مسح المواعيد' هنا"
+                        className="mt-2"
+                        dir="ltr"
+                    />
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isAppointmentsDeleting}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteAllAppointments}
+                            disabled={isAppointmentsDeleting || confirmAppointmentsText !== 'مسح المواعيد'}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            {isAppointmentsDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
+                            {isAppointmentsDeleting ? 'جاري المسح...' : 'نعم، قم بالمسح'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
