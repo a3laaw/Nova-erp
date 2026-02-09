@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { Loader2, Upload, FileCheck, AlertTriangle } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { parse } from 'date-fns';
 
 // Expected columns in the Excel file
 const EXPECTED_COLUMNS = ['employeeNumber', 'date', 'checkIn', 'checkOut'];
@@ -58,31 +59,57 @@ export function AttendanceUploader() {
             throw new Error(`الملف يجب أن يحتوي على الأعمدة التالية: ${EXPECTED_COLUMNS.join(', ')}`);
         }
 
-        const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp.id]));
+        const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         const attendanceByEmployee = new Map<string, { records: any[], summary: any }>();
         
         json.forEach(row => {
-            const employeeId = employeeMap.get(String(row.employeeNumber));
-            if (employeeId) {
-                if (!attendanceByEmployee.has(employeeId)) {
-                    attendanceByEmployee.set(employeeId, {
+            const employee = employeeMap.get(String(row.employeeNumber));
+            if (employee && employee.id) {
+                if (!attendanceByEmployee.has(employee.id)) {
+                    attendanceByEmployee.set(employee.id, {
                         records: [],
                         summary: { presentDays: 0, absentDays: 0, lateDays: 0, leaveDays: 0, totalDays: 0 }
                     });
                 }
-                const attendanceData = attendanceByEmployee.get(employeeId)!;
-                // Simple status logic for demonstration
-                const status = (row.checkIn || row.checkOut) ? 'present' : 'absent';
+                const attendanceData = attendanceByEmployee.get(employee.id)!;
                 
+                let status: 'present' | 'absent' | 'late' | 'leave' = 'absent';
+                const checkInValue = row.checkIn;
+                
+                if (checkInValue) {
+                    status = 'present';
+                    // Check for lateness
+                    if (employee.workStartTime) {
+                        try {
+                            const workStartTime = parse(employee.workStartTime, 'HH:mm', new Date());
+                            // Excel times can be tricky. Assuming it's a number from 0-1 representing the fraction of the day.
+                            if (typeof checkInValue === 'number') {
+                                const checkInDate = XLSX.SSF.parse_date_code(checkInValue);
+                                const checkInTime = new Date(0, 0, 0, checkInDate.h, checkInDate.m, checkInDate.s);
+
+                                if (checkInTime > workStartTime) {
+                                    status = 'late';
+                                }
+                            }
+                        } catch (timeError) {
+                            console.warn("Could not parse time for lateness check", { checkInValue, workStartTime: employee.workStartTime });
+                        }
+                    }
+                }
+
                 attendanceData.records.push({
                     date: new Date((row.date - (25567 + 1)) * 86400 * 1000), // Convert Excel date
-                    checkIn: row.checkIn || null,
+                    checkIn: checkInValue || null,
                     checkOut: row.checkOut || null,
                     status: status
                 });
 
                 if (status === 'present') attendanceData.summary.presentDays++;
-                else attendanceData.summary.absentDays++;
+                else if (status === 'late') {
+                    attendanceData.summary.presentDays++; // It's a present day, but late
+                    attendanceData.summary.lateDays++;
+                }
+                else if (status === 'absent') attendanceData.summary.absentDays++;
                 attendanceData.summary.totalDays++;
             }
         });
@@ -162,3 +189,5 @@ export function AttendanceUploader() {
     </div>
   );
 }
+
+    

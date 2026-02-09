@@ -61,8 +61,11 @@ export function PayrollGenerator() {
           const dailyRate = basicSalary / 30;
 
           let absenceDeduction = 0;
+          let lateDeduction = 0;
           if (attendance) {
               absenceDeduction = (attendance.summary.absentDays || 0) * dailyRate;
+              // Simple rule: every 3 late days = 1 day deduction
+              lateDeduction = Math.floor((attendance.summary.lateDays || 0) / 3) * dailyRate;
           }
 
           const earnings = {
@@ -74,6 +77,7 @@ export function PayrollGenerator() {
 
           const deductions = {
               absenceDeduction: absenceDeduction,
+              lateDeduction: lateDeduction,
               otherDeductions: 0,
           };
           const totalDeductions = Object.values(deductions).reduce((sum, val) => sum + val, 0);
@@ -132,8 +136,8 @@ export function PayrollGenerator() {
         if (accruedSalarySnap.empty || cashSnap.empty) {
             throw new Error("لم يتم العثور على حسابات الرواتب المستحقة أو الصندوق. يرجى مراجعة شجرة الحسابات.");
         }
-        const accruedSalaryAccount = { id: accruedSalarySnap.docs[0].id, ...accruedSalarySnap.docs[0].data() } as Account;
-        const cashAccount = { id: cashSnap.docs[0].id, ...cashSnap.docs[0].data() } as Account;
+        const accruedSalaryAccount = { id: accruedSalarySnap.docs[0].id, ...accruedSalarySnap.docs[0].data() as Account };
+        const cashAccount = { id: cashSnap.docs[0].id, ...cashSnap.docs[0].data() as Account };
 
 
         const commissionEntriesQuery = query(
@@ -282,3 +286,5 @@ export function PayrollGenerator() {
     </div>
   );
 }
+
+    

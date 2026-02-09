@@ -652,6 +652,7 @@
         "deductions": {
           "type": "object",
           "properties": {
+            "lateDeduction": { "type": "number" },
             "absenceDeduction": { "type": "number" },
             "otherDeductions": { "type": "number" }
           }

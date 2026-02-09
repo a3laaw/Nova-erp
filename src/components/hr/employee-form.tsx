@@ -55,12 +55,15 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         dob: undefined as Date | undefined,
         nationality: '',
         residencyExpiry: undefined as Date | undefined,
+        workStartTime: '08:00',
+        workEndTime: '17:00',
     });
     
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
     const [isAreaLoading, setIsAreaLoading] = useState(false);
+
     
     useEffect(() => {
         if (initialData) {
@@ -85,6 +88,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 dob: toFirestoreDate(initialData.dob) || undefined,
                 nationality: initialData.nationality || '',
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
+                workStartTime: initialData.workStartTime || '08:00',
+                workEndTime: initialData.workEndTime || '17:00',
             });
         }
     }, [initialData]);
@@ -196,13 +201,15 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             gender: formData.gender,
             dob: formData.dob,
             nationality: formData.nationality,
+            workStartTime: formData.workStartTime,
+            workEndTime: formData.workEndTime,
         };
 
         if (formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry) {
             dataToSave.residencyExpiry = formData.residencyExpiry;
         }
         
-        if (formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary' || formData.contractType === 'part-time') {
+        if (['percentage', 'permanent', 'temporary', 'part-time'].includes(formData.contractType)) {
             dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
         }
         
@@ -293,7 +300,24 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
                             <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
                         </div>
-                         <div className="grid gap-1.5">
+                        <div className="grid grid-cols-2 gap-4 col-span-3">
+                           <div className="grid gap-1.5">
+                               <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
+                               <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} />
+                           </div>
+                           <div className="grid gap-1.5">
+                               <Label htmlFor="workEndTime">وقت انتهاء الدوام</Label>
+                               <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} />
+                           </div>
+                        </div>
+                     </div>
+                </section>
+
+                {/* Section 3: Financial Information */}
+                <section className="space-y-4">
+                    <h3 className="font-semibold text-lg border-b pb-2">المعلومات المالية</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-1.5">
                             <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
                             <Select value={formData.contractType || ''} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])} dir="rtl">
                                 <SelectTrigger><SelectValue/></SelectTrigger>
@@ -306,7 +330,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </SelectContent>
                             </Select>
                         </div>
-                         {(formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary' || formData.contractType === 'part-time') && (
+                         {['percentage', 'permanent', 'temporary', 'part-time'].includes(formData.contractType) && (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="contractPercentage">
                                     نسبة العقد (%) {formData.contractType === 'percentage' && <span className="text-destructive">*</span>}
@@ -323,12 +347,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             </div>
                         )}
                      </div>
-                </section>
 
-                {/* Section 3: Financial Information */}
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-lg border-b pb-2">المعلومات المالية</h3>
-                    
                     {formData.contractType !== 'percentage' && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-1.5">
@@ -387,3 +406,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    

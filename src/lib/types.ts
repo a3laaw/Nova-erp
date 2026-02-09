@@ -2,6 +2,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -350,6 +351,7 @@ export type Payslip = {
         commission?: number;
     };
     deductions: {
+        lateDeduction?: number;
         absenceDeduction: number;
         otherDeductions: number;
     };
@@ -677,5 +679,7 @@ export interface ResidencyRenewal {
     amortizationStatus: 'in-progress' | 'completed';
     lastAmortizationDate?: any;
 }
+
+    
 
     
