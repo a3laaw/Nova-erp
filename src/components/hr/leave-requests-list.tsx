@@ -81,7 +81,7 @@ export function LeaveRequestsList() {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(firestore, 'leaveRequests', requestToDelete.id));
+        await deleteDoc(doc(firestore, 'leaveRequests', requestToDelete.id!));
         toast({ title: 'نجاح', description: 'تم حذف طلب الإجازة بنجاح.' });
     } catch (e) {
         console.error("Error deleting leave request:", e);
@@ -109,18 +109,18 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToApprove.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const workingDays = requestToApprove.workingDays || 0;
+            const daysToDeduct = requestToApprove.days || 0; // Use total calendar days for balance deduction
             let employeeUpdate: Partial<Employee> = {};
             
             switch (requestToApprove.leaveType) {
                 case 'Annual':
-                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) + workingDays;
+                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) + daysToDeduct;
                     break;
                 case 'Sick':
-                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) + workingDays;
+                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) + daysToDeduct;
                     break;
                 case 'Emergency':
-                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) + workingDays;
+                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) + daysToDeduct;
                     break;
             }
             batch.update(employeeRef, employeeUpdate);
@@ -192,18 +192,18 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const workingDays = requestToUndoApproval.workingDays || 0;
+            const daysToRevert = requestToUndoApproval.days || 0; // Use total calendar days
             let employeeUpdate: Partial<Employee> = {};
             
             switch (requestToUndoApproval.leaveType) {
                 case 'Annual':
-                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) - workingDays;
+                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) - daysToRevert;
                     break;
                 case 'Sick':
-                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) - workingDays;
+                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) - daysToRevert;
                     break;
                 case 'Emergency':
-                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) - workingDays;
+                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) - daysToRevert;
                     break;
             }
             // Ensure balances don't go negative
@@ -274,7 +274,7 @@ export function LeaveRequestsList() {
                 <TableCell className="font-medium">{req.employeeName}</TableCell>
                 <TableCell>{req.leaveType}</TableCell>
                 <TableCell>{formatDate(req.startDate)} - {formatDate(req.endDate)}</TableCell>
-                <TableCell>{req.workingDays} أيام عمل</TableCell>
+                <TableCell>{req.days} أيام</TableCell>
                 <TableCell><Badge variant="outline" className={statusColors[req.status]}>{statusTranslations[req.status]}</Badge></TableCell>
                 <TableCell>
                     <DropdownMenu>
