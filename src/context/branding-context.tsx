@@ -17,6 +17,7 @@ export interface BrandingSettings {
   footer_image_url?: string;
   watermark_image_url?: string;
   system_background_url?: string;
+  financial_statement_notes?: string;
   work_hours?: {
     general: {
       morning_start_time: string;
@@ -34,6 +35,15 @@ export interface BrandingSettings {
       appointment_slot_duration: number;
       appointment_buffer_time?: number;
     };
+    ramadan?: {
+        is_enabled?: boolean;
+        start_date?: any;
+        end_date?: any;
+        start_time?: string;
+        end_time?: string;
+        appointment_slot_duration?: number;
+        appointment_buffer_time?: number;
+    },
     holidays?: string[];
     half_day?: {
       day: string;
@@ -104,3 +114,5 @@ export const useBranding = () => {
   }
   return context;
 };
+
+    

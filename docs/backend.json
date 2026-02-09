@@ -40,6 +40,16 @@
             "format": "uri",
             "description": "URL to the company's full letterhead image."
         },
+        "footer_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the company's footer image."
+        },
+        "watermark_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to a watermark image for printable documents."
+        },
         "system_background_url": {
             "type": "string",
             "format": "uri",
@@ -75,6 +85,19 @@
                         "evening_end_time": { "type": "string" },
                         "appointment_slot_duration": { "type": "number" },
                         "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
+                    }
+                },
+                "ramadan": {
+                    "type": "object",
+                    "description": "Defines special working hours for the month of Ramadan.",
+                    "properties": {
+                        "is_enabled": { "type": "boolean", "description": "Enable/disable special Ramadan timings." },
+                        "start_date": { "type": "string", "format": "date", "description": "Start date of Ramadan for the current year." },
+                        "end_date": { "type": "string", "format": "date", "description": "End date of Ramadan for the current year." },
+                        "start_time": { "type": "string", "description": "e.g., '09:30'" },
+                        "end_time": { "type": "string", "description": "e.g., '15:30'" },
+                        "appointment_slot_duration": { "type": "number" },
+                        "appointment_buffer_time": { "type": "number" }
                     }
                 },
                 "holidays": {
@@ -1177,6 +1200,10 @@
         "subject": { "type": "string" },
         "departmentId": { "type": "string", "description": "The ID of the department this quotation is for." },
         "transactionTypeId": { "type": "string", "description": "The ID of the transaction type this quotation is for." },
+        "templateDescription": { "type": "string" },
+        "scopeOfWork": { "type": "array", "items": { "$ref": "#/entities/ContractScopeItem" } },
+        "termsAndConditions": { "type": "array", "items": { "$ref": "#/entities/ContractTerm" } },
+        "openClauses": { "type": "array", "items": { "$ref": "#/entities/ContractTerm" } },
         "items": {
           "type": "array",
           "items": {
@@ -1441,3 +1468,4 @@
     }
   }
 }
+    
