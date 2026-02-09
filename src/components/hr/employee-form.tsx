@@ -45,6 +45,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date(), department: '', jobTitle: '',
         contractType: 'permanent' as Employee['contractType'], basicSalary: '',
+        housingAllowance: '', transportAllowance: '',
         salaryPaymentType: 'cash' as Employee['salaryPaymentType'],
         bankName: '',
         accountNumber: '',
@@ -59,7 +60,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
-
+    const [isAreaLoading, setIsAreaLoading] = useState(false);
+    
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -72,6 +74,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 jobTitle: initialData.jobTitle || '',
                 contractType: initialData.contractType || 'permanent',
                 basicSalary: String(initialData.basicSalary || ''),
+                housingAllowance: String(initialData.housingAllowance || ''),
+                transportAllowance: String(initialData.transportAllowance || ''),
                 salaryPaymentType: initialData.salaryPaymentType || 'cash',
                 bankName: initialData.bankName || '',
                 accountNumber: initialData.accountNumber || '',
@@ -84,6 +88,17 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             });
         }
     }, [initialData]);
+
+    useEffect(() => {
+        if (formData.contractType === 'percentage') {
+            setFormData(prev => ({
+                ...prev,
+                basicSalary: '0',
+                housingAllowance: '0',
+                transportAllowance: '0',
+            }));
+        }
+    }, [formData.contractType]);
 
 
     useEffect(() => {
@@ -119,7 +134,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
         fetchReferenceData();
     }, [firestore, toast]);
-    
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
@@ -153,8 +168,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!formData.fullName || !formData.civilId || !formData.mobile || !formData.hireDate || !formData.department || !formData.jobTitle || !formData.basicSalary) {
+        if (!formData.fullName || !formData.civilId || !formData.mobile || !formData.hireDate || !formData.department || !formData.jobTitle) {
             toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).' });
+            return;
+        }
+        if (formData.contractType !== 'percentage' && !formData.basicSalary) {
+             toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء إدخال الراتب الأساسي.' });
             return;
         }
         
@@ -168,6 +187,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             jobTitle: formData.jobTitle,
             contractType: formData.contractType,
             basicSalary: parseFloat(formData.basicSalary) || 0,
+            housingAllowance: parseFloat(formData.housingAllowance) || 0,
+            transportAllowance: parseFloat(formData.transportAllowance) || 0,
             salaryPaymentType: formData.salaryPaymentType,
             bankName: formData.salaryPaymentType === 'transfer' ? formData.bankName : '',
             accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
@@ -181,7 +202,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dataToSave.residencyExpiry = formData.residencyExpiry;
         }
         
-        if (formData.contractType === 'percentage') {
+        if (formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary') {
             dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
         }
         
@@ -285,10 +306,20 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </SelectContent>
                             </Select>
                         </div>
-                         {formData.contractType === 'percentage' && (
+                         {(formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary') && (
                             <div className="grid gap-1.5">
-                                <Label htmlFor="contractPercentage">نسبة العقد (%) <span className="text-destructive">*</span></Label>
-                                <Input id="contractPercentage" type="number" step="0.01" value={formData.contractPercentage} onChange={handleInputChange} dir="ltr" required />
+                                <Label htmlFor="contractPercentage">
+                                    نسبة العقد (%) {formData.contractType === 'percentage' && <span className="text-destructive">*</span>}
+                                </Label>
+                                <Input 
+                                    id="contractPercentage" 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={formData.contractPercentage} 
+                                    onChange={handleInputChange} 
+                                    dir="ltr" 
+                                    required={formData.contractType === 'percentage'} 
+                                />
                             </div>
                         )}
                      </div>
@@ -300,7 +331,15 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                            <Input id="basicSalary" type="number" step="0.01" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required />
+                            <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required disabled={formData.contractType === 'percentage'}/>
+                        </div>
+                         <div className="grid gap-1.5">
+                            <Label htmlFor="housingAllowance">بدل السكن</Label>
+                            <Input id="housingAllowance" type="number" step="any" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr" disabled={formData.contractType === 'percentage'}/>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="transportAllowance">بدل المواصلات</Label>
+                            <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr" disabled={formData.contractType === 'percentage'}/>
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
@@ -342,5 +381,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
-    
