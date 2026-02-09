@@ -331,7 +331,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
                             <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
                         </div>
-                        {formData.contractType !== 'permanent' && (
+                        {!['permanent', 'percentage'].includes(formData.contractType) && (
                             <div className="grid grid-cols-2 gap-4 col-span-3">
                                <div className="grid gap-1.5">
                                    <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
