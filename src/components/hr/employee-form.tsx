@@ -60,6 +60,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         workStartTime: '08:00',
         workEndTime: '17:00',
     });
+
+    const [showHousingAllowance, setShowHousingAllowance] = useState(false);
+    const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
@@ -97,6 +100,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 workStartTime: initialData.workStartTime || defaultStartTime,
                 workEndTime: initialData.workEndTime || defaultEndTime,
             });
+            setShowHousingAllowance(!!initialData.housingAllowance && initialData.housingAllowance > 0);
+            setShowTransportAllowance(!!initialData.transportAllowance && initialData.transportAllowance > 0);
         } else {
              setFormData(prev => ({
                 ...prev,
@@ -105,6 +110,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 workStartTime: defaultStartTime,
                 workEndTime: defaultEndTime,
              }));
+            setShowHousingAllowance(false);
+            setShowTransportAllowance(false);
         }
     }, [initialData, branding]);
 
@@ -116,6 +123,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 housingAllowance: '0',
                 transportAllowance: '0',
             }));
+            setShowHousingAllowance(false);
+            setShowTransportAllowance(false);
         } else if (formData.contractType === 'permanent' && branding?.work_hours?.general) {
              setFormData(prev => ({
                 ...prev,
@@ -163,7 +172,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
-        if (id === 'fullName') sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
+        if (id === 'fullName') sanitizedValue = value.replace(/[^ \\u0600-\\u06FF]/g, '');
         else if (id === 'nameEn') sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
@@ -229,8 +238,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dataToSave.residencyExpiry = formData.residencyExpiry;
         }
         
-        if (['percentage', 'permanent', 'temporary', 'part-time', 'special'].includes(formData.contractType)) {
+        if (['percentage', 'special'].includes(formData.contractType)) {
             dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
+        } else {
+             dataToSave.contractPercentage = 0;
         }
         
         await onSave(dataToSave);
@@ -350,7 +361,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </SelectContent>
                             </Select>
                         </div>
-                         {['percentage', 'permanent', 'temporary', 'part-time', 'special'].includes(formData.contractType) && (
+                         {['percentage', 'special'].includes(formData.contractType) && (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="contractPercentage">
                                     نسبة العقد (%) {formData.contractType === 'percentage' && <span className="text-destructive">*</span>}
@@ -369,18 +380,46 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                      </div>
 
                     {formData.contractType !== 'percentage' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
                                 <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="housingAllowance">بدل السكن</Label>
-                                <Input id="housingAllowance" type="number" step="any" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr"/>
+                            <div className="grid gap-2">
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
+                                    <Checkbox
+                                        id="showHousing"
+                                        checked={showHousingAllowance}
+                                        onCheckedChange={(checked) => {
+                                            setShowHousingAllowance(!!checked);
+                                            if (!checked) { handleSelectChange('housingAllowance', ''); }
+                                        }}
+                                    />
+                                    <Label htmlFor="showHousing">إضافة بدل سكن</Label>
+                                </div>
+                                {showHousingAllowance && (
+                                    <div className="grid gap-1.5 mt-2">
+                                        <Input id="housingAllowance" type="number" step="any" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr" placeholder="0.00"/>
+                                    </div>
+                                )}
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="transportAllowance">بدل المواصلات</Label>
-                                <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr"/>
+                            <div className="grid gap-2">
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
+                                    <Checkbox
+                                        id="showTransport"
+                                        checked={showTransportAllowance}
+                                        onCheckedChange={(checked) => {
+                                            setShowTransportAllowance(!!checked);
+                                            if (!checked) { handleSelectChange('transportAllowance', ''); }
+                                        }}
+                                    />
+                                    <Label htmlFor="showTransport">إضافة بدل مواصلات</Label>
+                                </div>
+                                {showTransportAllowance && (
+                                    <div className="grid gap-1.5 mt-2">
+                                        <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr" placeholder="0.00"/>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -426,5 +465,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
-    
