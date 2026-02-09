@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -19,6 +20,8 @@ import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Checkbox } from '../ui/checkbox';
 import { useBranding } from '@/context/branding-context';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Textarea } from '../ui/textarea';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -59,6 +62,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         residencyExpiry: undefined as Date | undefined,
         workStartTime: '08:00',
         workEndTime: '17:00',
+        pieceRateMode: 'salary_with_target' as 'salary_with_target' | 'per_piece',
+        targetDescription: '',
     });
 
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
@@ -99,6 +104,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
                 workStartTime: initialData.workStartTime || defaultStartTime,
                 workEndTime: initialData.workEndTime || defaultEndTime,
+                pieceRateMode: initialData.pieceRateMode || 'salary_with_target',
+                targetDescription: initialData.targetDescription || '',
             });
             setShowHousingAllowance(!!initialData.housingAllowance && initialData.housingAllowance > 0);
             setShowTransportAllowance(!!initialData.transportAllowance && initialData.transportAllowance > 0);
@@ -116,7 +123,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [initialData, branding]);
 
     useEffect(() => {
-        const noSalaryContractTypes = ['percentage', 'piece-rate'];
+        const noSalaryContractTypes = ['percentage'];
         const fixedTimeContractTypes = ['permanent'];
 
         if (noSalaryContractTypes.includes(formData.contractType)) {
@@ -130,7 +137,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setShowTransportAllowance(false);
         }
         
-        if (fixedTimeContractTypes.includes(formData.contractType) && branding?.work_hours?.general) {
+        const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate'].includes(formData.contractType);
+        if (workTimeShouldBeHidden && branding?.work_hours?.general) {
              setFormData(prev => ({
                 ...prev,
                 workStartTime: branding.work_hours.general.morning_start_time || '08:00',
@@ -174,7 +182,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         fetchReferenceData();
     }, [firestore, toast]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
         if (id === 'fullName') sanitizedValue = value.replace(/[^ \\u0600-\\u06FF]/g, '');
@@ -211,8 +219,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).' });
             return;
         }
-        const noSalaryContractTypes = ['percentage', 'piece-rate'];
-        if (!noSalaryContractTypes.includes(formData.contractType) && !formData.basicSalary) {
+
+        const isSalaryRequired = formData.contractType !== 'percentage' && (formData.contractType !== 'piece-rate' || formData.pieceRateMode === 'salary_with_target');
+
+        if (isSalaryRequired && !formData.basicSalary) {
              toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء إدخال الراتب الأساسي.' });
             return;
         }
@@ -226,9 +236,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             department: formData.department,
             jobTitle: formData.jobTitle,
             contractType: formData.contractType,
-            basicSalary: parseFloat(formData.basicSalary) || 0,
-            housingAllowance: parseFloat(formData.housingAllowance) || 0,
-            transportAllowance: parseFloat(formData.transportAllowance) || 0,
             salaryPaymentType: formData.salaryPaymentType,
             bankName: formData.salaryPaymentType === 'transfer' ? formData.bankName : '',
             accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
@@ -239,6 +246,27 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             workStartTime: formData.workStartTime,
             workEndTime: formData.workEndTime,
         };
+
+        if (formData.contractType === 'piece-rate') {
+            dataToSave.pieceRateMode = formData.pieceRateMode;
+            if (formData.pieceRateMode === 'salary_with_target') {
+                dataToSave.basicSalary = parseFloat(formData.basicSalary) || 0;
+                dataToSave.targetDescription = formData.targetDescription;
+                dataToSave.housingAllowance = 0;
+                dataToSave.transportAllowance = 0;
+            } else { // per_piece
+                dataToSave.basicSalary = 0;
+                dataToSave.housingAllowance = 0;
+                dataToSave.transportAllowance = 0;
+                dataToSave.targetDescription = '';
+            }
+        } else {
+             dataToSave.basicSalary = parseFloat(formData.basicSalary) || 0;
+             dataToSave.housingAllowance = showHousingAllowance ? (parseFloat(formData.housingAllowance) || 0) : 0;
+             dataToSave.transportAllowance = showTransportAllowance ? (parseFloat(formData.transportAllowance) || 0) : 0;
+             dataToSave.pieceRateMode = undefined;
+             dataToSave.targetDescription = undefined;
+        }
 
         if (formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry) {
             dataToSave.residencyExpiry = formData.residencyExpiry;
@@ -253,8 +281,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         await onSave(dataToSave);
     };
 
-    const salaryIsDisabled = ['percentage', 'piece-rate'].includes(formData.contractType);
     const workTimeIsHidden = ['permanent', 'percentage', 'piece-rate'].includes(formData.contractType);
+    const showStandardSalary = !['percentage', 'piece-rate'].includes(formData.contractType);
 
     return (
         <form onSubmit={handleSubmit}>
@@ -391,7 +419,33 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         )}
                      </div>
 
-                    {!salaryIsDisabled && (
+                    {formData.contractType === 'piece-rate' && (
+                        <div className="p-4 border rounded-md bg-muted/50 space-y-4">
+                            <Label>طريقة حساب الإنجاز</Label>
+                            <RadioGroup
+                                value={formData.pieceRateMode}
+                                onValueChange={(value) => handleSelectChange('pieceRateMode', value as 'salary_with_target' | 'per_piece')}
+                                className="flex gap-4"
+                            >
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                                    <RadioGroupItem value="salary_with_target" id="pr-salary" />
+                                    <Label htmlFor="pr-salary">راتب أساسي مع تارجت</Label>
+                                </div>
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                                    <RadioGroupItem value="per_piece" id="pr-piece" />
+                                    <Label htmlFor="pr-piece">حسب سعر القطعة فقط</Label>
+                                </div>
+                            </RadioGroup>
+
+                            {formData.pieceRateMode === 'per_piece' && (
+                                <div className="text-sm text-muted-foreground p-3 bg-background rounded-md">
+                                    سيتم حساب المستحقات بناءً على المهام المسندة والتي يتم إنجازها.
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {showStandardSalary && (
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
@@ -436,6 +490,19 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </div>
                     )}
                     
+                    {formData.contractType === 'piece-rate' && formData.pieceRateMode === 'salary_with_target' && (
+                        <div className="space-y-4 pt-2">
+                             <div className="grid gap-1.5 max-w-sm">
+                                <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
+                                <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="targetDescription">وصف التارجت المطلوب</Label>
+                                <Textarea id="targetDescription" value={formData.targetDescription} onChange={(e) => handleSelectChange('targetDescription', e.target.value)} placeholder="مثال: إنجاز 10 مخططات شهريًا"/>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
@@ -478,4 +545,4 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     );
 }
 
-  
+    

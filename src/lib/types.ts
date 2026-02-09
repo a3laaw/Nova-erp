@@ -252,6 +252,8 @@ export type Employee = {
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'percentage' | 'part-time' | 'special' | 'piece-rate';
     contractPercentage?: number;
+    pieceRateMode?: 'salary_with_target' | 'per_piece';
+    targetDescription?: string;
     department: string;
     basicSalary: number; 
     housingAllowance?: number;
@@ -680,4 +682,5 @@ export interface ResidencyRenewal {
 }
 
     
-  
+
+    

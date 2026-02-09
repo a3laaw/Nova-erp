@@ -514,6 +514,15 @@
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
         "contractType": { "type": "string", "enum": ["permanent", "temporary", "percentage", "part-time", "special", "piece-rate"] },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
+        "pieceRateMode": {
+          "type": "string",
+          "enum": ["salary_with_target", "per_piece"],
+          "description": "For piece-rate contracts, defines if it's a fixed salary with a target, or purely per piece."
+        },
+        "targetDescription": {
+            "type": "string",
+            "description": "For salary-with-target contracts, this describes the monthly/weekly target."
+        },
         "department": { "type": "string" },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
@@ -1468,5 +1477,4 @@
     }
   }
 }
-
-  
+    
