@@ -116,7 +116,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [initialData, branding]);
 
     useEffect(() => {
-        if (formData.contractType === 'percentage' || formData.contractType === 'subcontractor') {
+        const noSalaryContractTypes = ['percentage', 'piece-rate'];
+        const fixedTimeContractTypes = ['permanent'];
+
+        if (noSalaryContractTypes.includes(formData.contractType)) {
             setFormData(prev => ({
                 ...prev,
                 basicSalary: '0',
@@ -125,7 +128,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             }));
             setShowHousingAllowance(false);
             setShowTransportAllowance(false);
-        } else if (formData.contractType === 'permanent' && branding?.work_hours?.general) {
+        }
+        
+        if (fixedTimeContractTypes.includes(formData.contractType) && branding?.work_hours?.general) {
              setFormData(prev => ({
                 ...prev,
                 workStartTime: branding.work_hours.general.morning_start_time || '08:00',
@@ -206,7 +211,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).' });
             return;
         }
-        if (formData.contractType !== 'percentage' && formData.contractType !== 'subcontractor' && !formData.basicSalary) {
+        const noSalaryContractTypes = ['percentage', 'piece-rate'];
+        if (!noSalaryContractTypes.includes(formData.contractType) && !formData.basicSalary) {
              toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء إدخال الراتب الأساسي.' });
             return;
         }
@@ -246,6 +252,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         
         await onSave(dataToSave);
     };
+
+    const salaryIsDisabled = ['percentage', 'piece-rate'].includes(formData.contractType);
+    const workTimeIsHidden = ['permanent', 'percentage', 'piece-rate'].includes(formData.contractType);
 
     return (
         <form onSubmit={handleSubmit}>
@@ -331,7 +340,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
                             <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
                         </div>
-                        {!['permanent', 'percentage', 'subcontractor'].includes(formData.contractType) && (
+                        {!workTimeIsHidden && (
                             <div className="grid grid-cols-2 gap-4 col-span-3">
                                <div className="grid gap-1.5">
                                    <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
@@ -357,7 +366,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <SelectContent>
                                     <SelectItem value="permanent">دائم</SelectItem>
                                     <SelectItem value="temporary">مؤقت</SelectItem>
-                                    <SelectItem value="subcontractor">مقاول باطن (بالقطعة)</SelectItem>
+                                    <SelectItem value="piece-rate">بالقطعة / بالإنجاز</SelectItem>
                                     <SelectItem value="percentage">نسبة من العقود</SelectItem>
                                     <SelectItem value="part-time">دوام جزئي</SelectItem>
                                     <SelectItem value="special">دوام خاص</SelectItem>
@@ -382,7 +391,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         )}
                      </div>
 
-                    {formData.contractType !== 'percentage' && formData.contractType !== 'subcontractor' && (
+                    {!salaryIsDisabled && (
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
@@ -468,3 +477,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+  
