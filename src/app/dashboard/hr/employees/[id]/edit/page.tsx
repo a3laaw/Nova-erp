@@ -14,9 +14,11 @@ import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp, wri
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
-import type { Employee } from '@/lib/types';
+import type { Employee, AuditLog } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, formatCurrency } from '@/lib/utils';
+import { toFirestoreDate } from '@/services/date-converter';
+import { format } from 'date-fns';
 
 export default function EditEmployeePage() {
     const router = useRouter();
@@ -42,46 +44,72 @@ export default function EditEmployeePage() {
         const batch = writeBatch(firestore);
         const employeeRefDoc = doc(firestore, 'employees', id);
 
-        const changes: string[] = [];
-        const fieldMappings: { key: keyof Employee; label: string }[] = [
-             { key: 'fullName', label: 'الاسم الكامل' },
-             { key: 'nameEn', label: 'الاسم بالإنجليزية' },
-             { key: 'civilId', label: 'الرقم المدني' },
-             { key: 'mobile', label: 'رقم الجوال' },
-             { key: 'department', label: 'القسم' },
-             { key: 'jobTitle', label: 'المسمى الوظيفي' },
-             { key: 'basicSalary', label: 'الراتب الأساسي' },
-             { key: 'contractType', label: 'نوع العقد' },
+        const changesToLog: Omit<AuditLog, 'id' | 'changedBy' | 'effectiveDate'>[] = [];
+
+        const fieldMappings: { key: keyof Employee; changeType: AuditLog['changeType'], label: string, isCurrency?: boolean }[] = [
+            { key: 'fullName', changeType: 'DataUpdate', label: 'الاسم الكامل' },
+            { key: 'nameEn', changeType: 'DataUpdate', label: 'الاسم بالإنجليزية' },
+            { key: 'civilId', changeType: 'DataUpdate', label: 'الرقم المدني' },
+            { key: 'mobile', changeType: 'DataUpdate', label: 'رقم الجوال' },
+            { key: 'department', changeType: 'JobChange', label: 'القسم' },
+            { key: 'jobTitle', changeType: 'JobChange', label: 'المسمى الوظيفي' },
+            { key: 'basicSalary', changeType: 'SalaryChange', label: 'الراتب الأساسي', isCurrency: true },
+            { key: 'housingAllowance', changeType: 'SalaryChange', label: 'بدل السكن', isCurrency: true },
+            { key: 'transportAllowance', changeType: 'SalaryChange', label: 'بدل المواصلات', isCurrency: true },
+            { key: 'contractType', changeType: 'JobChange', label: 'نوع العقد' },
+            { key: 'contractPercentage', changeType: 'JobChange', label: 'نسبة العقد' },
+            { key: 'residencyExpiry', changeType: 'ResidencyUpdate', label: 'تاريخ انتهاء الإقامة' },
         ];
 
-        fieldMappings.forEach(({ key, label }) => {
-            const oldValue = String(employee[key] || '');
-            const newValue = String(updatedData[key] || '');
-            if (newValue !== oldValue) {
-                changes.push(`تحديث ${label}: من "${oldValue || '-'}" إلى "${newValue || '-'}"`);
+        fieldMappings.forEach(({ key, changeType, label, isCurrency }) => {
+            const oldValue = employee[key];
+            const newValue = updatedData[key];
+
+            const formatValue = (val: any) => {
+                if (val === null || val === undefined || val === '') return '-';
+                if (key.toLowerCase().includes('date') || key.toLowerCase().includes('expiry')) {
+                    const date = toFirestoreDate(val);
+                    return date ? format(date, 'dd/MM/yyyy') : '-';
+                }
+                if(isCurrency) {
+                    return formatCurrency(Number(val));
+                }
+                return String(val);
+            };
+
+            const oldStr = formatValue(oldValue);
+            const newStr = formatValue(newValue);
+            
+            if (oldStr !== newStr) {
+                changesToLog.push({
+                    changeType,
+                    field: label,
+                    oldValue: oldStr,
+                    newValue: newStr,
+                    notes: `تحديث ${label}: من "${oldStr}" إلى "${newStr}".`
+                });
             }
         });
 
         try {
             batch.update(employeeRefDoc, cleanFirestoreData(updatedData));
 
-            if (changes.length > 0) {
-                 const logRef = doc(collection(firestore, `employees/${id}/auditLogs`));
-                 batch.set(logRef, {
-                    changeType: 'DataUpdate',
-                    field: 'Multiple',
-                    newValue: changes.join('\n'),
-                    oldValue: 'Previous State',
-                    effectiveDate: serverTimestamp(),
-                    changedBy: currentUser.id,
-                    notes: 'تحديث بيانات الموظف من نموذج التعديل.'
+            if (changesToLog.length > 0) {
+                 const logCollectionRef = collection(firestore, `employees/${id}/auditLogs`);
+                 changesToLog.forEach(logEntry => {
+                     const logRef = doc(logCollectionRef);
+                     batch.set(logRef, {
+                        ...logEntry,
+                        effectiveDate: serverTimestamp(),
+                        changedBy: currentUser.fullName,
+                     });
                  });
             }
 
             await batch.commit();
 
             toast({ title: 'نجاح', description: 'تم تحديث بيانات الموظف بنجاح.' });
-            router.push(`/dashboard/hr/employees`);
+            router.push(`/dashboard/hr/employees/${id}`);
         } catch (error) {
             console.error("Error updating employee:", error);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ التعديلات.' });

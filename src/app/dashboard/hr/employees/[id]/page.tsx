@@ -14,6 +14,10 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInDays } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { ResidencyRenewalDialog } from '@/components/hr/residency-renewal-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EmployeeAuditLog } from '@/components/hr/employee-audit-log';
+import { EmployeeFinancials } from '@/components/hr/employee-financials';
+
 
 function InfoRow({ label, value, icon, children }: { label: string, value: React.ReactNode, icon: React.ReactNode, children?: React.ReactNode }) {
     return (
@@ -80,65 +84,80 @@ export default function EmployeeProfilePage() {
     }
 
     return (
-        <>
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle className="text-2xl">{employee.fullName}</CardTitle>
-                            <CardDescription>{employee.jobTitle} - {employee.department}</CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                             <Button variant="outline" onClick={() => router.back()}><ArrowRight className="ml-2 h-4"/> عودة</Button>
-                             <Button asChild>
-                                <Link href={`/dashboard/hr/employees/${id}/edit`}>
-                                    <Edit className="ml-2 h-4"/> تعديل
-                                </Link>
-                             </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                    <section>
-                        <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الشخصية</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                            <InfoRow label="الرقم المدني" value={employee.civilId} icon={<User className="h-4 w-4"/>} />
-                            <InfoRow label="رقم الجوال" value={<span dir="ltr">{employee.mobile}</span>} icon={<Phone className="h-4 w-4"/>} />
-                            <InfoRow label="تاريخ الميلاد" value={formatDate(employee.dob)} icon={<CalendarIcon className="h-4 w-4"/>} />
-                            <InfoRow label="الجنسية" value={employee.nationality} icon={<User className="h-4 w-4"/>} />
-                            {employee.nationality !== 'كويتي' && (
-                                <InfoRow label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} icon={<CalendarIcon className="h-4 w-4"/>}>
-                                    <Button
-                                        variant={canRenewResidency ? "destructive" : "outline"}
-                                        size="sm"
-                                        className="h-7"
-                                        onClick={() => setIsRenewalDialogOpen(true)}
-                                        disabled={!canRenewResidency}
-                                    >
-                                        <RefreshCw className="ml-2 h-3 w-3"/>
-                                        تجديد الإقامة
-                                    </Button>
-                                </InfoRow>
-                            )}
-                        </div>
-                    </section>
-                    <section>
-                        <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الوظيفية</h3>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                            <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} icon={<Briefcase className="h-4 w-4"/>} />
-                            <InfoRow label="تاريخ التعيين" value={formatDate(employee.hireDate)} icon={<CalendarIcon className="h-4 w-4"/>} />
-                            <InfoRow label="نوع العقد" value={employee.contractType} icon={<FileSignature className="h-4 w-4"/>} />
-                            <InfoRow label="الراتب الأساسي" value={`${formatCurrency(employee.basicSalary)}`} icon={<Banknote className="h-4 w-4"/>} />
-                         </div>
-                    </section>
-                </CardContent>
-            </Card>
+        <div className="space-y-6">
+            <Tabs defaultValue="profile" dir="rtl">
+                <TabsList className="grid w-full grid-cols-3 mb-6">
+                    <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
+                    <TabsTrigger value="financials">السندات المالية</TabsTrigger>
+                    <TabsTrigger value="audit">سجل التدقيق</TabsTrigger>
+                </TabsList>
+                <TabsContent value="profile">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle className="text-2xl">{employee.fullName}</CardTitle>
+                                    <CardDescription>{employee.jobTitle} - {employee.department}</CardDescription>
+                                </div>
+                                <div className="flex gap-2">
+                                     <Button variant="outline" onClick={() => router.push('/dashboard/hr/employees')}><ArrowRight className="ml-2 h-4"/> عودة</Button>
+                                     <Button asChild>
+                                        <Link href={`/dashboard/hr/employees/${id}/edit`}>
+                                            <Edit className="ml-2 h-4"/> تعديل
+                                        </Link>
+                                     </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-8">
+                            <section>
+                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الشخصية</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                    <InfoRow label="الرقم المدني" value={employee.civilId} icon={<User className="h-4 w-4"/>} />
+                                    <InfoRow label="رقم الجوال" value={<span dir="ltr">{employee.mobile}</span>} icon={<Phone className="h-4 w-4"/>} />
+                                    <InfoRow label="تاريخ الميلاد" value={formatDate(employee.dob)} icon={<CalendarIcon className="h-4 w-4"/>} />
+                                    <InfoRow label="الجنسية" value={employee.nationality} icon={<User className="h-4 w-4"/>} />
+                                    {employee.nationality !== 'كويتي' && (
+                                        <InfoRow label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} icon={<CalendarIcon className="h-4 w-4"/>}>
+                                            <Button
+                                                variant={canRenewResidency ? "destructive" : "outline"}
+                                                size="sm"
+                                                className="h-7"
+                                                onClick={() => setIsRenewalDialogOpen(true)}
+                                                disabled={!canRenewResidency}
+                                            >
+                                                <RefreshCw className="ml-2 h-3 w-3"/>
+                                                تجديد الإقامة
+                                            </Button>
+                                        </InfoRow>
+                                    )}
+                                </div>
+                            </section>
+                            <section>
+                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الوظيفية</h3>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                    <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} icon={<Briefcase className="h-4 w-4"/>} />
+                                    <InfoRow label="تاريخ التعيين" value={formatDate(employee.hireDate)} icon={<CalendarIcon className="h-4 w-4"/>} />
+                                    <InfoRow label="نوع العقد" value={employee.contractType} icon={<FileSignature className="h-4 w-4"/>} />
+                                    <InfoRow label="الراتب الأساسي" value={`${formatCurrency(employee.basicSalary)}`} icon={<Banknote className="h-4 w-4"/>} />
+                                 </div>
+                            </section>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="financials">
+                    <EmployeeFinancials employeeId={id} />
+                </TabsContent>
+                <TabsContent value="audit">
+                    <EmployeeAuditLog employeeId={id} />
+                </TabsContent>
+            </Tabs>
 
             <ResidencyRenewalDialog 
                 isOpen={isRenewalDialogOpen}
                 onClose={() => setIsRenewalDialogOpen(false)}
                 employee={employee}
             />
-        </>
+        </div>
     );
 }

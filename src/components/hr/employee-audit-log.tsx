@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -11,6 +10,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { AuditLog } from '@/lib/types';
+
+interface AuditLogEvent extends AuditLog {
+  id: string;
+}
 
 interface EmployeeAuditLogProps {
   employeeId: string;
@@ -30,7 +33,7 @@ export function EmployeeAuditLog({ employeeId }: EmployeeAuditLogProps) {
     loadingMore,
     hasMore,
     loaderRef
-  } = useInfiniteScroll<AuditLog>(`employees/${employeeId}/auditLogs`);
+  } = useInfiniteScroll<AuditLogEvent>(`employees/${employeeId}/auditLogs`);
   
   return (
     <Card>
@@ -70,7 +73,7 @@ export function EmployeeAuditLog({ employeeId }: EmployeeAuditLogProps) {
                                 <p className="text-xs text-muted-foreground">{formatDate(event.effectiveDate)}</p>
                             </div>
                             <div className="mt-1">
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{event.newValue}</p>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{event.notes}</p>
                             </div>
                         </div>
                     </div>
