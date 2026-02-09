@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import type { LeaveRequest, Employee } from '@/lib/types';
@@ -54,12 +54,15 @@ export function LeaveRequestsList() {
 
   const [requestToApprove, setRequestToApprove] = useState<LeaveRequest | null>(null);
   const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
+  const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
+  const [requestToUndoRejection, setRequestToUndoRejection] = useState<LeaveRequest | null>(null);
+
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: leaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+  const { data: leaveRequests, setData: setLeaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
   const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
 
   const loading = loadingLeaves || loadingEmployees;
@@ -143,7 +146,7 @@ export function LeaveRequestsList() {
         setRequestToApprove(null);
     }
   };
-
+  
   const handleConfirmRejection = async () => {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
@@ -173,6 +176,68 @@ export function LeaveRequestsList() {
         setIsProcessingAction(false);
         setRequestToReject(null);
         setRejectionReason('');
+    }
+  };
+
+  const handleUndoApproval = async () => {
+    if (!requestToUndoApproval || !firestore || !currentUser) return;
+
+    setIsProcessingAction(true);
+    const batch = writeBatch(firestore);
+
+    try {
+        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoApproval.id);
+        batch.update(leaveRef, { status: 'pending' });
+
+        const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
+        if (employee) {
+            const employeeRef = doc(firestore, 'employees', employee.id!);
+            const workingDays = requestToUndoApproval.workingDays || 0;
+            let employeeUpdate: Partial<Employee> = {};
+            
+            switch (requestToUndoApproval.leaveType) {
+                case 'Annual':
+                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) - workingDays;
+                    break;
+                case 'Sick':
+                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) - workingDays;
+                    break;
+                case 'Emergency':
+                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) - workingDays;
+                    break;
+            }
+            // Ensure balances don't go negative
+            if(employeeUpdate.annualLeaveUsed !== undefined) employeeUpdate.annualLeaveUsed = Math.max(0, employeeUpdate.annualLeaveUsed);
+            if(employeeUpdate.sickLeaveUsed !== undefined) employeeUpdate.sickLeaveUsed = Math.max(0, employeeUpdate.sickLeaveUsed);
+            if(employeeUpdate.emergencyLeaveUsed !== undefined) employeeUpdate.emergencyLeaveUsed = Math.max(0, employeeUpdate.emergencyLeaveUsed);
+
+            batch.update(employeeRef, employeeUpdate);
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم التراجع عن الموافقة بنجاح.' });
+    } catch (e) {
+        console.error("Error undoing approval:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التراجع عن الموافقة.' });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToUndoApproval(null);
+    }
+  };
+  
+   const handleUndoRejection = async () => {
+    if (!requestToUndoRejection || !firestore) return;
+    setIsProcessingAction(true);
+    try {
+        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoRejection.id);
+        await updateDoc(leaveRef, { status: 'pending', rejectionReason: null });
+        toast({ title: 'نجاح', description: 'تم التراجع عن الرفض.' });
+    } catch (e) {
+        console.error("Error undoing rejection:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الرفض.' });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToUndoRejection(null);
     }
   };
 
@@ -218,26 +283,38 @@ export function LeaveRequestsList() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent dir="rtl">
                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                            {req.status === 'pending' && (currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
+                            
+                            {currentUser?.role === 'Admin' || currentUser?.role === 'HR' ? (
                                 <>
-                                 <DropdownMenuItem onClick={() => setRequestToApprove(req)}>
-                                    <Check className="ml-2 h-4 w-4 text-green-600" />
-                                    موافقة
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setRequestToReject(req)}>
-                                    <X className="ml-2 h-4 w-4 text-red-600" />
-                                    رفض
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEditClick(req)}>
-                                    <Pencil className="ml-2 h-4 w-4" />
-                                    تعديل
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
+                                    {req.status === 'pending' && (
+                                        <>
+                                            <DropdownMenuItem onClick={() => setRequestToApprove(req)} className="text-green-600 focus:text-green-700 focus:bg-green-50">
+                                                <Check className="ml-2 h-4 w-4" /> موافقة
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setRequestToReject(req)} className="text-red-600 focus:text-red-700 focus:bg-red-50">
+                                                <X className="ml-2 h-4 w-4" /> رفض
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                    {req.status === 'approved' && (
+                                        <DropdownMenuItem onClick={() => setRequestToUndoApproval(req)} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
+                                            <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الموافقة
+                                        </DropdownMenuItem>
+                                    )}
+                                     {req.status === 'rejected' && (
+                                        <DropdownMenuItem onClick={() => setRequestToUndoRejection(req)}>
+                                            <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الرفض
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem onClick={() => handleEditClick(req)}>
+                                        <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
                                 </>
-                            )}
+                            ) : null}
+                            
                             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
-                                <Trash2 className="ml-2 h-4 w-4" />
-                                حذف
+                                <Trash2 className="ml-2 h-4 w-4" /> حذف
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -265,8 +342,42 @@ export function LeaveRequestsList() {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmApproval} disabled={isProcessingAction}>
+                <AlertDialogAction onClick={handleConfirmApproval} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، موافقة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+       <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد التراجع عن الموافقة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في التراجع عن الموافقة؟ سيتم إعادة الطلب إلى حالة "معلق" وإعادة أيام الإجازة لرصيد الموظف.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700">
+                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، تراجع'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+       <AlertDialog open={!!requestToUndoRejection} onOpenChange={() => setRequestToUndoRejection(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد التراجع عن الرفض</AlertDialogTitle>
+                <AlertDialogDescription>
+                    سيتم إعادة الطلب إلى حالة "معلق" ليتم مراجعته مرة أخرى.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoRejection} disabled={isProcessingAction}>
+                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، تراجع'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
