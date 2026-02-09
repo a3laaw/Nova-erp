@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -13,17 +13,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import type { LeaveRequest } from '@/lib/types';
+import type { LeaveRequest, Employee } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { LeaveRequestForm } from './leave-request-form';
 import { toFirestoreDate } from '@/services/date-converter';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/auth-context';
+import { Textarea } from '../ui/textarea';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -40,19 +43,37 @@ const statusTranslations: Record<LeaveRequest['status'], string> = {
 
 export function LeaveRequestsList() {
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [requestToEdit, setRequestToEdit] = useState<LeaveRequest | null>(null);
+
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [requestToApprove, setRequestToApprove] = useState<LeaveRequest | null>(null);
+  const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
   
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: leaveRequests, loading, error } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+  const { data: leaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+  const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
+
+  const loading = loadingLeaves || loadingEmployees;
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
+  const handleEditClick = (req: LeaveRequest) => {
+    setRequestToEdit(req);
+    setIsFormOpen(true);
+  }
+
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -67,11 +88,98 @@ export function LeaveRequestsList() {
         setRequestToDelete(null);
     }
   };
+  
+  const handleConfirmApproval = async () => {
+    if (!requestToApprove || !firestore || !currentUser) return;
+
+    setIsProcessingAction(true);
+    const batch = writeBatch(firestore);
+
+    try {
+        const leaveRef = doc(firestore, 'leaveRequests', requestToApprove.id);
+        batch.update(leaveRef, {
+            status: 'approved',
+            approvedBy: currentUser.id,
+            approvedAt: serverTimestamp()
+        });
+
+        const employee = employees.find(e => e.id === requestToApprove.employeeId);
+        if (employee) {
+            const employeeRef = doc(firestore, 'employees', employee.id!);
+            const workingDays = requestToApprove.workingDays || 0;
+            let employeeUpdate: Partial<Employee> = {};
+            
+            switch (requestToApprove.leaveType) {
+                case 'Annual':
+                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) + workingDays;
+                    break;
+                case 'Sick':
+                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) + workingDays;
+                    break;
+                case 'Emergency':
+                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) + workingDays;
+                    break;
+            }
+            batch.update(employeeRef, employeeUpdate);
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تمت الموافقة على طلب الإجازة.' });
+
+        const targetUserId = await findUserIdByEmployeeId(firestore, requestToApprove.employeeId);
+        if (targetUserId && targetUserId !== currentUser.id) {
+            await createNotification(firestore, {
+                userId: targetUserId,
+                title: 'تحديث على طلب الإجازة',
+                body: `تمت الموافقة على طلب الإجازة الذي قدمته من ${formatDate(requestToApprove.startDate)} إلى ${formatDate(requestToApprove.endDate)}.`,
+                link: '/dashboard/hr/leaves'
+            });
+        }
+    } catch (e) {
+        console.error("Error approving leave:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في الموافقة على طلب الإجازة.' });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToApprove(null);
+    }
+  };
+
+  const handleConfirmRejection = async () => {
+    if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
+    setIsProcessingAction(true);
+    try {
+        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id);
+        await updateDoc(leaveRef, {
+            status: 'rejected',
+            rejectionReason: rejectionReason,
+            approvedBy: currentUser.id,
+            approvedAt: serverTimestamp()
+        });
+        toast({ title: 'تم الرفض', description: 'تم رفض طلب الإجازة بنجاح.' });
+        
+        const targetUserId = await findUserIdByEmployeeId(firestore, requestToReject.employeeId);
+        if (targetUserId && targetUserId !== currentUser.id) {
+            await createNotification(firestore, {
+                userId: targetUserId,
+                title: 'تحديث على طلب الإجازة',
+                body: `تم رفض طلب الإجازة الذي قدمته. السبب: ${rejectionReason}`,
+                link: '/dashboard/hr/leaves'
+            });
+        }
+    } catch (e) {
+        console.error("Error rejecting leave:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في رفض طلب الإجازة.' });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToReject(null);
+        setRejectionReason('');
+    }
+  };
 
   return (
     <>
       <div className="flex justify-end mb-4">
-        <Button onClick={() => setIsFormOpen(true)}>
+        <Button onClick={() => { setRequestToEdit(null); setIsFormOpen(true); }}>
           <PlusCircle className="ml-2 h-4 w-4" />
           طلب إجازة جديد
         </Button>
@@ -110,6 +218,23 @@ export function LeaveRequestsList() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent dir="rtl">
                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                            {req.status === 'pending' && (currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
+                                <>
+                                 <DropdownMenuItem onClick={() => setRequestToApprove(req)}>
+                                    <Check className="ml-2 h-4 w-4 text-green-600" />
+                                    موافقة
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setRequestToReject(req)}>
+                                    <X className="ml-2 h-4 w-4 text-red-600" />
+                                    رفض
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditClick(req)}>
+                                    <Pencil className="ml-2 h-4 w-4" />
+                                    تعديل
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                </>
+                            )}
                             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
                                 <Trash2 className="ml-2 h-4 w-4" />
                                 حذف
@@ -126,9 +251,51 @@ export function LeaveRequestsList() {
       <LeaveRequestForm 
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)} 
-        onSaveSuccess={() => { /* Real-time will handle update */ }} 
+        onSaveSuccess={() => {}}
+        leaveRequestToEdit={requestToEdit}
       />
+      
+      <AlertDialog open={!!requestToApprove} onOpenChange={() => setRequestToApprove(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد الموافقة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من موافقتك على طلب الإجازة للموظف "{requestToApprove?.employeeName}"؟ سيتم تحديث رصيد إجازاته.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmApproval} disabled={isProcessingAction}>
+                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، موافقة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
+      <AlertDialog open={!!requestToReject} onOpenChange={() => setRequestToReject(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد الرفض</AlertDialogTitle>
+                <AlertDialogDescription>
+                    الرجاء ذكر سبب رفض طلب الإجازة للموظف "{requestToReject?.employeeName}".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+                <Textarea
+                    placeholder="اكتب سبب الرفض هنا..."
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                />
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmRejection} disabled={!rejectionReason.trim() || isProcessingAction}>
+                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'تأكيد الرفض'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
        <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
         <AlertDialogContent dir="rtl">
             <AlertDialogHeader>

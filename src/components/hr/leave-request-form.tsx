@@ -12,7 +12,7 @@ import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
 import { Loader2, Save, Upload } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, addDoc, serverTimestamp, query, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -22,9 +22,10 @@ interface LeaveRequestFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSaveSuccess: () => void;
+  leaveRequestToEdit?: LeaveRequest | null;
 }
 
-export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess }: LeaveRequestFormProps) {
+export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestToEdit }: LeaveRequestFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { branding, loading: brandingLoading } = useBranding();
@@ -41,13 +42,31 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess }: LeaveReques
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  const isEditing = !!leaveRequestToEdit;
 
   useEffect(() => {
-    if (!currentUser?.employeeId) return;
-    if (currentUser.role !== 'Admin' && currentUser.role !== 'HR') {
-      setSelectedEmployeeId(currentUser.employeeId);
+    if (isOpen) {
+        if (isEditing && leaveRequestToEdit) {
+            setSelectedEmployeeId(leaveRequestToEdit.employeeId);
+            setLeaveType(leaveRequestToEdit.leaveType);
+            setStartDate(toFirestoreDate(leaveRequestToEdit.startDate));
+            setEndDate(toFirestoreDate(leaveRequestToEdit.endDate));
+            setNotes(leaveRequestToEdit.notes || '');
+        } else {
+             if (currentUser?.role !== 'Admin' && currentUser?.role !== 'HR') {
+              setSelectedEmployeeId(currentUser?.employeeId || '');
+            } else {
+              setSelectedEmployeeId('');
+            }
+            setLeaveType('Annual');
+            setStartDate(undefined);
+            setEndDate(undefined);
+            setNotes('');
+        }
     }
-  }, [currentUser]);
+  }, [isOpen, isEditing, leaveRequestToEdit, currentUser]);
+
 
   useEffect(() => {
     if (!isOpen || !firestore) return;
@@ -88,7 +107,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess }: LeaveReques
       const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
       if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار.');
 
-      const newRequest: Omit<LeaveRequest, 'id'> = {
+      const dataToSave = {
         employeeId: selectedEmployeeId,
         employeeName: selectedEmployee.fullName,
         leaveType: leaveType,
@@ -97,18 +116,27 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess }: LeaveReques
         days: leaveDuration.totalDays,
         workingDays: leaveDuration.workingDays,
         notes: notes,
-        status: 'pending',
-        createdAt: serverTimestamp(),
       };
       
-      await addDoc(collection(firestore, 'leaveRequests'), newRequest);
+      if (isEditing && leaveRequestToEdit?.id) {
+        const leaveRef = doc(firestore, 'leaveRequests', leaveRequestToEdit.id);
+        await updateDoc(leaveRef, dataToSave);
+        toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
+      } else {
+        const newRequest = {
+            ...dataToSave,
+            status: 'pending' as const,
+            createdAt: serverTimestamp(),
+        };
+        await addDoc(collection(firestore, 'leaveRequests'), newRequest);
+        toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
+      }
       
-      toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
       onSaveSuccess();
       onClose();
 
     } catch (error) {
-      const message = error instanceof Error ? error.message : "فشل إرسال الطلب.";
+      const message = error instanceof Error ? error.message : "فشل حفظ الطلب.";
       toast({ variant: 'destructive', title: 'خطأ', description: message });
     } finally {
       setIsSaving(false);
@@ -120,8 +148,10 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess }: LeaveReques
       <DialogContent dir="rtl">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>طلب إجازة جديد</DialogTitle>
-            <DialogDescription>سيتم إرسال الطلب للموافقة من قبل مدير النظام أو قسم الموارد البشرية.</DialogDescription>
+            <DialogTitle>{isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? 'قم بتعديل تفاصيل طلب الإجازة.' : 'سيتم إرسال الطلب للموافقة من قبل مدير النظام أو قسم الموارد البشرية.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
@@ -185,7 +215,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess }: LeaveReques
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-              إرسال الطلب
+              {isEditing ? 'حفظ التعديلات' : 'إرسال الطلب'}
             </Button>
           </DialogFooter>
         </form>
