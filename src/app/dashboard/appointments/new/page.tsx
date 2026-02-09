@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -222,28 +221,19 @@ export default function NewArchitecturalAppointmentPage() {
             appointmentDateTime.setHours(hours, minutes, 0, 0);
 
             if (isNewClient) {
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('mobile', '==', newClientMobile));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'رقم الجوال مسجل',
-                        description: `رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}.`,
-                    });
-                    setIsSaving(false);
-                    return;
+                if (!newClientName || !newClientMobile) {
+                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
                 }
-                
-                const appointmentsRef = collection(firestore, 'appointments');
-                const prospectiveQuery = query(appointmentsRef, where('clientMobile', '==', newClientMobile), limit(1));
+                 // Check if prospective client already exists
+                const prospectiveApptsRef = collection(firestore, 'appointments');
+                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '==', 'scheduled'), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 
                 if (!prospectiveSnapshot.empty) {
                     toast({
                         variant: 'destructive',
                         title: 'عميل محتمل موجود',
-                        description: 'هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".',
+                        description: `هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`,
                     });
                     setIsSaving(false);
                     return;
