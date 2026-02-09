@@ -1,4 +1,7 @@
-// This page is ready for the new HR module implementation.
+'use client';
+
+import { GratuityCalculatorView } from "@/components/hr/gratuity-calculator-view";
+
 export default function GratuityCalculatorPage() {
-    return null;
+    return <GratuityCalculatorView />;
 }
