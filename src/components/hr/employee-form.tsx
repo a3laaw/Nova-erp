@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -328,19 +327,23 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 {/* Section 3: Financial Information */}
                 <section className="space-y-4">
                     <h3 className="font-semibold text-lg border-b pb-2">المعلومات المالية</h3>
+                     {formData.contractType !== 'percentage' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
+                                <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="housingAllowance">بدل السكن</Label>
+                                <Input id="housingAllowance" type="number" step="any" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr"/>
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="transportAllowance">بدل المواصلات</Label>
+                                <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr"/>
+                            </div>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                            <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required disabled={formData.contractType === 'percentage'}/>
-                        </div>
-                         <div className="grid gap-1.5">
-                            <Label htmlFor="housingAllowance">بدل السكن</Label>
-                            <Input id="housingAllowance" type="number" step="any" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr" disabled={formData.contractType === 'percentage'}/>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="transportAllowance">بدل المواصلات</Label>
-                            <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr" disabled={formData.contractType === 'percentage'}/>
-                        </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
                             <Select value={formData.salaryPaymentType || 'cash'} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl">
