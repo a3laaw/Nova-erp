@@ -39,52 +39,78 @@ export function calculateWorkingDays(
 }
 
 export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDate: Date): number => {
-    // This is a simplified logic. A real-world scenario would be more complex.
-    if (!employee.hireDate) return 0;
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
-    
+
+    // Calculate total months of service
     const totalMonthsOfService = differenceInMonths(asOfDate, hireDate);
-    // Assuming 2.5 days per month (30 days per year)
+    
+    // Accrual is 30 days per year, which is 2.5 days per month.
     const totalAccrued = (totalMonthsOfService / 12) * 30;
     
-    return Math.floor(totalAccrued - (employee.annualLeaveUsed || 0) + (employee.carriedLeaveDays || 0));
+    const usedLeave = employee.annualLeaveUsed || 0;
+    const carriedOver = employee.carriedLeaveDays || 0;
+
+    const balance = totalAccrued + carriedOver - usedLeave;
+
+    return Math.floor(balance > 0 ? balance : 0);
 };
 
 
 export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
     const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: '' };
+    if (!hireDate) return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'تاريخ التعيين غير صالح.' };
 
     const yearsOfService = differenceInYears(asOfDate, hireDate);
-    const dailyWage = (employee.basicSalary || 0) / 30; // Simplified daily wage
+    const lastSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
 
-    let gratuityDays = 0;
-    if (yearsOfService <= 5) {
-        gratuityDays = yearsOfService * 15;
-    } else {
-        gratuityDays = (5 * 15) + ((yearsOfService - 5) * 30);
+    if (lastSalary === 0) {
+        return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.' };
     }
-    
-    let rawGratuity = gratuityDays * dailyWage;
+
+    let rawGratuity = 0;
+    const dailyWage = lastSalary / 26; // As per common practice for Kuwait law
+
+    // Kuwaiti Private Sector Labor Law No. 6 of 2010, Article 51
+    if (yearsOfService <= 5) {
+        // 15 days' remuneration for each of the first five years
+        rawGratuity = yearsOfService * 15 * dailyWage;
+    } else {
+        // 15 days for first 5 years + one month's remuneration for each year thereafter.
+        const firstFiveYearsGratuity = 5 * 15 * dailyWage;
+        const subsequentYears = yearsOfService - 5;
+        const subsequentYearsGratuity = subsequentYears * lastSalary;
+        rawGratuity = firstFiveYearsGratuity + subsequentYearsGratuity;
+    }
 
     // Cap at 1.5 years salary
-    const maxGratuity = (employee.basicSalary || 0) * 1.5;
+    const maxGratuity = 1.5 * 12 * lastSalary;
     rawGratuity = Math.min(rawGratuity, maxGratuity);
 
+    let finalGratuity = rawGratuity;
+    let notice = `بناءً على ${yearsOfService.toFixed(1)} سنوات من الخدمة.`;
+
     if (employee.terminationReason === 'resignation') {
-        if (yearsOfService < 3) rawGratuity = 0;
-        else if (yearsOfService < 5) rawGratuity *= 0.5;
-        else if (yearsOfService < 10) rawGratuity *= (2/3);
+        if (yearsOfService < 3) {
+            finalGratuity = 0;
+            notice += " (لا يستحق مكافأة لخدمة أقل من 3 سنوات عند الاستقالة)";
+        } else if (yearsOfService < 5) {
+            finalGratuity = rawGratuity * 0.5;
+             notice += " (يستحق نصف المكافأة لخدمة بين 3-5 سنوات عند الاستقالة)";
+        } else if (yearsOfService < 10) {
+            finalGratuity = rawGratuity * (2 / 3);
+            notice += " (يستحق ثلثي المكافأة لخدمة بين 5-10 سنوات عند الاستقالة)";
+        }
+        // If > 10 years, they get the full amount, so no change needed.
     }
 
     const leaveBalance = calculateAnnualLeaveBalance(employee, asOfDate);
     const leaveBalancePay = leaveBalance * dailyWage;
 
     return { 
-        gratuity: rawGratuity, 
-        leaveBalancePay: leaveBalancePay, 
-        total: rawGratuity + leaveBalancePay, 
-        notice: `بناءً على ${yearsOfService.toFixed(1)} سنوات من الخدمة.` 
+        gratuity: finalGratuity, 
+        leaveBalancePay, 
+        total: finalGratuity + leaveBalancePay, 
+        notice,
     };
 };
