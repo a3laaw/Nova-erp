@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -12,6 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -151,11 +153,13 @@ export function PayslipsList() {
                             </TableRow>
                         ))}
                     </TableBody>
-                     <TableRow className="font-bold bg-muted">
-                        <TableCell>الإجمالي</TableCell>
-                        <TableCell className="text-left font-mono">{formatCurrency(totals.netSalary)}</TableCell>
-                        <TableCell colSpan={2}></TableCell>
-                    </TableRow>
+                    <TableFooter>
+                         <TableRow className="font-bold bg-muted">
+                            <TableCell>الإجمالي</TableCell>
+                            <TableCell className="text-left font-mono">{formatCurrency(totals.netSalary)}</TableCell>
+                            <TableCell colSpan={2}></TableCell>
+                        </TableRow>
+                    </TableFooter>
                 </Table>
             </div>
         </div>
