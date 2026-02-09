@@ -44,6 +44,33 @@ import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/context/branding-context';
 
 
+// --- Constants & Helpers ---
+const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
+    if (!start || !end || !slotDuration || slotDuration <= 0) return [];
+    
+    const slots: string[] = [];
+    let currentTime = parse(start, 'HH:mm', new Date());
+    const endTime = parse(end, 'HH:mm', new Date());
+
+    // Apply an initial buffer before the first slot
+    if (buffer > 0) {
+      currentTime = new Date(currentTime.getTime() + buffer * 60000);
+    }
+    
+    const totalIncrement = slotDuration + buffer;
+
+    while (currentTime < endTime) {
+        // Ensure the slot itself doesn't push past the end time
+        const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
+        if (slotEndTime > endTime) {
+            break; // This slot would end too late, so we don't add it
+        }
+        slots.push(format(currentTime, 'HH:mm'));
+        currentTime = new Date(currentTime.getTime() + totalIncrement * 60000);
+    }
+    return slots;
+};
+
 function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean }) {
   if (visit.visitCount === 1) return "#facc15"; // yellow-400
   if (visit.visitCount! > 1 && !visit.contractSigned) return "#22c55e"; // green-500
@@ -106,25 +133,14 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
 }
 
 
-// --- NEW Helper for generating time slots ---
-const generateTimeSlots = (start: string, end: string, duration: number): string[] => {
-    if (!start || !end || !duration || duration <= 0) return [];
-    
-    const slots: string[] = [];
-    let currentTime = parse(start, 'HH:mm', new Date());
-    const endTime = parse(end, 'HH:mm', new Date());
-
-    while (currentTime < endTime) {
-        slots.push(format(currentTime, 'HH:mm'));
-        currentTime = new Date(currentTime.getTime() + duration * 60000);
-    }
-    return slots;
-};
-
 const weekDays: { id: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday', label: string }[] = [
-    { id: 'Sunday', label: 'الأحد' }, { id: 'Monday', label: 'الاثنين' }, { id: 'Tuesday', label: 'الثلاثاء' },
-    { id: 'Wednesday', label: 'الأربعاء' }, { id: 'Thursday', label: 'الخميس' }, { id: 'Friday', label: 'الجمعة' },
     { id: 'Saturday', label: 'السبت' },
+    { id: 'Sunday', label: 'الأحد' },
+    { id: 'Monday', label: 'الاثنين' },
+    { id: 'Tuesday', label: 'الثلاثاء' },
+    { id: 'Wednesday', label: 'الأربعاء' },
+    { id: 'Thursday', label: 'الخميس' },
+    { id: 'Friday', label: 'الجمعة' },
 ];
 
 
@@ -161,8 +177,7 @@ export function ArchitecturalAppointmentsView() {
     const { morningSlots, eveningSlots } = useMemo(() => {
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
-        const totalDuration = slotDuration + buffer;
-
+        
         if (!date) return { morningSlots: [], eveningSlots: [] };
     
         const todayDayIndex = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
@@ -196,8 +211,8 @@ export function ArchitecturalAppointmentsView() {
         }
     
         return {
-            morningSlots: generateTimeSlots(morning_start_time, morning_end_time, totalDuration),
-            eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, totalDuration)
+            morningSlots: generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer),
+            eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer)
         };
     }, [workHours, date, branding]);
     
@@ -269,6 +284,7 @@ export function ArchitecturalAppointmentsView() {
 
     const appointments = useMemo(() => {
       if (!rawAppointments) return [];
+      // If clients haven't loaded yet, return raw data to avoid losing appointments from view
       if (clients.length === 0 && !brandingLoading) return rawAppointments.map(appt => ({ ...appt, clientName: appt.clientName || '...' }));
 
       return rawAppointments
@@ -706,7 +722,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 }
                  
                 const prospectiveApptsRef = collection(firestore, 'appointments');
-                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), limit(1));
+                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '!=', 'cancelled'), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 if (!prospectiveSnapshot.empty) {
                     toast({

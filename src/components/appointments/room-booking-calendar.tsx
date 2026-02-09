@@ -56,24 +56,41 @@ const parseTime = (timeStr: string): { hours: number, minutes: number } => {
   return { hours, minutes };
 };
 
-const generateTimeSlots = (start: string, end: string, duration: number): string[] => {
-    if (!start || !end || !duration || duration <= 0) return [];
+const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
+    if (!start || !end || !slotDuration || slotDuration <= 0) return [];
     
     const slots: string[] = [];
     let currentTime = parse(start, 'HH:mm', new Date());
     const endTime = parse(end, 'HH:mm', new Date());
 
+    // Apply an initial buffer before the first slot
+    if (buffer > 0) {
+      currentTime = new Date(currentTime.getTime() + buffer * 60000);
+    }
+    
+    const totalIncrement = slotDuration + buffer;
+
     while (currentTime < endTime) {
+        // Ensure the slot itself doesn't push past the end time
+        const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
+        if (slotEndTime > endTime) {
+            break; // This slot would end too late, so we don't add it
+        }
         slots.push(format(currentTime, 'HH:mm'));
-        currentTime = new Date(currentTime.getTime() + duration * 60000);
+        currentTime = new Date(currentTime.getTime() + totalIncrement * 60000);
     }
     return slots;
 };
 
+
 const weekDays: { id: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday', label: string }[] = [
-    { id: 'Sunday', label: 'الأحد' }, { id: 'Monday', label: 'الاثنين' }, { id: 'Tuesday', label: 'الثلاثاء' },
-    { id: 'Wednesday', label: 'الأربعاء' }, { id: 'Thursday', label: 'الخميس' }, { id: 'Friday', label: 'الجمعة' },
     { id: 'Saturday', label: 'السبت' },
+    { id: 'Sunday', label: 'الأحد' },
+    { id: 'Monday', label: 'الاثنين' },
+    { id: 'Tuesday', label: 'الثلاثاء' },
+    { id: 'Wednesday', label: 'الأربعاء' },
+    { id: 'Thursday', label: 'الخميس' },
+    { id: 'Friday', label: 'الجمعة' },
 ];
 
 
@@ -110,8 +127,7 @@ export function RoomBookingCalendar() {
     const { morningSlots, eveningSlots } = useMemo(() => {
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
-        const totalDuration = slotDuration + buffer;
-
+        
         if (!date) return { morningSlots: [], eveningSlots: [] };
     
         const todayDayIndex = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
@@ -145,8 +161,8 @@ export function RoomBookingCalendar() {
         }
     
         return {
-            morningSlots: generateTimeSlots(morning_start_time, morning_end_time, totalDuration),
-            eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, totalDuration)
+            morningSlots: generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer),
+            eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer)
         };
     }, [workHours, date, branding]);
 

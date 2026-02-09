@@ -76,9 +76,9 @@ export default function DashboardLayout({
           </Sidebar>
           <SidebarInset className={cn("flex flex-col h-screen", hasBackground && "bg-background/80 backdrop-blur-sm")}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
               {children}
-            </div>
+            </main>
             <OfflineIndicator />
           </SidebarInset>
         </div>
