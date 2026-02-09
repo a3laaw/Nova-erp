@@ -116,8 +116,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 housingAllowance: '0',
                 transportAllowance: '0',
             }));
+        } else if (formData.contractType === 'permanent' && branding?.work_hours?.general) {
+             setFormData(prev => ({
+                ...prev,
+                workStartTime: branding.work_hours.general.morning_start_time || '08:00',
+                workEndTime: branding.work_hours.general.evening_end_time || '17:00',
+            }));
         }
-    }, [formData.contractType]);
+    }, [formData.contractType, branding]);
 
 
     useEffect(() => {
@@ -317,11 +323,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         <div className="grid grid-cols-2 gap-4 col-span-3">
                            <div className="grid gap-1.5">
                                <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
-                               <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} />
+                               <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} disabled={formData.contractType === 'permanent'} />
                            </div>
                            <div className="grid gap-1.5">
                                <Label htmlFor="workEndTime">وقت انتهاء الدوام</Label>
-                               <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} />
+                               <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} disabled={formData.contractType === 'permanent'}/>
                            </div>
                         </div>
                      </div>
@@ -338,7 +344,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <SelectContent>
                                     <SelectItem value="permanent">دائم</SelectItem>
                                     <SelectItem value="temporary">مؤقت</SelectItem>
-                                    <SelectItem value="subcontractor">مقاول باطن</SelectItem>
                                     <SelectItem value="percentage">نسبة من العقود</SelectItem>
                                     <SelectItem value="part-time">دوام جزئي</SelectItem>
                                 </SelectContent>

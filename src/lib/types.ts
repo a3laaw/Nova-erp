@@ -250,7 +250,7 @@ export type Employee = {
     noticeStartDate: any | null; 
     terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
-    contractType: 'permanent' | 'temporary' | 'subcontractor' | 'percentage' | 'part-time';
+    contractType: 'permanent' | 'temporary' | 'percentage' | 'part-time';
     contractPercentage?: number;
     department: string;
     basicSalary: number; 
@@ -351,7 +351,6 @@ export type Payslip = {
         commission?: number;
     };
     deductions: {
-        lateDeduction?: number;
         absenceDeduction: number;
         otherDeductions: number;
     };
@@ -679,7 +678,5 @@ export interface ResidencyRenewal {
     amortizationStatus: 'in-progress' | 'completed';
     lastAmortizationDate?: any;
 }
-
-    
 
     
