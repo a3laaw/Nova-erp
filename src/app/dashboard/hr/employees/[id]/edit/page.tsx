@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -62,12 +61,23 @@ export default function EditEmployeePage() {
             { key: 'residencyExpiry', changeType: 'ResidencyUpdate', label: 'تاريخ انتهاء الإقامة' },
         ];
 
-        fieldMappings.forEach(({ key, changeType, label, isCurrency }) => {
+        const contractTypeTranslations: Record<string, string> = {
+            permanent: 'دائم',
+            temporary: 'مؤقت',
+            subcontractor: 'مقاول باطن',
+            percentage: 'نسبة من العقود',
+            'part-time': 'دوام جزئي',
+        };
+
+        fieldMappings.forEach(({ key, label, isCurrency }) => {
             const oldValue = employee[key];
             const newValue = updatedData[key];
 
             const formatValue = (val: any) => {
                 if (val === null || val === undefined || val === '') return '-';
+                if (key === 'contractType') {
+                    return contractTypeTranslations[val as string] || val;
+                }
                 if (key.toLowerCase().includes('date') || key.toLowerCase().includes('expiry')) {
                     const date = toFirestoreDate(val);
                     return date ? format(date, 'dd/MM/yyyy') : '-';
@@ -91,7 +101,7 @@ export default function EditEmployeePage() {
                 });
             }
         });
-
+        
         try {
             batch.update(employeeRefDoc, cleanFirestoreData(updatedData));
 
