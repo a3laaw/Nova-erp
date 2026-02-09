@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 const defaultSchedule = {
     morning_start_time: '08:00',
@@ -27,6 +28,7 @@ const defaultSchedule = {
 
 const defaultHalfDay = {
     day: '',
+    type: 'morning_only' as 'morning_only' | 'custom_end_time',
     end_time: '13:00',
 };
 
@@ -187,7 +189,7 @@ export function WorkHoursManager() {
                         <Label>أيام العطلة الأسبوعية</Label>
                          <div className="flex flex-wrap gap-x-6 gap-y-3">
                             {weekDays.map(day => (
-                                <div key={day.id} className="flex items-center space-x-2">
+                                <div key={day.id} className="flex items-center space-x-2 rtl:space-x-reverse">
                                     <Checkbox
                                         id={`holiday-${day.id}`}
                                         checked={holidays.includes(day.id)}
@@ -205,7 +207,7 @@ export function WorkHoursManager() {
 
                      <div className="p-4 border rounded-lg space-y-4">
                         <Label className="font-semibold">يوم نصف الدوام (اختياري)</Label>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Select value={halfDay.day || 'none'} onValueChange={(d) => setHalfDay(p => ({...p, day: d === 'none' ? '' : d}))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="اختر اليوم..." />
@@ -217,17 +219,34 @@ export function WorkHoursManager() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <div className="grid gap-2">
+                            
+                            <RadioGroup
+                                value={halfDay.type}
+                                onValueChange={(value: "morning_only" | "custom_end_time") => setHalfDay(p => ({...p, type: value}))}
+                                disabled={!halfDay.day}
+                                className="flex items-center space-x-4 rtl:space-x-reverse pt-2"
+                            >
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                                    <RadioGroupItem value="morning_only" id="r1" />
+                                    <Label htmlFor="r1">دوام صباحي فقط</Label>
+                                </div>
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                                    <RadioGroupItem value="custom_end_time" id="r2" />
+                                    <Label htmlFor="r2">وقت انتهاء مخصص</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                        {halfDay.day && halfDay.type === 'custom_end_time' && (
+                            <div className="grid gap-2 max-w-xs">
                                 <Label htmlFor="half-day-end-time" className="text-xs text-muted-foreground">وقت انتهاء الدوام</Label>
                                 <Input 
                                     id="half-day-end-time"
                                     type="time"
                                     value={halfDay.end_time}
                                     onChange={(e) => setHalfDay(p => ({...p, end_time: e.target.value}))}
-                                    disabled={!halfDay.day}
                                 />
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 

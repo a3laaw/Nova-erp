@@ -106,9 +106,9 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
 }
 
 
-// --- New Helper for generating time slots ---
+// --- NEW Helper for generating time slots ---
 const generateTimeSlots = (start: string, end: string, duration: number): string[] => {
-    if (!start || !end || !duration) return [];
+    if (!start || !end || !duration || duration <= 0) return [];
     
     const slots: string[] = [];
     let currentTime = parse(start, 'HH:mm', new Date());
@@ -120,6 +120,12 @@ const generateTimeSlots = (start: string, end: string, duration: number): string
     }
     return slots;
 };
+
+const weekDays: { id: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday', label: string }[] = [
+    { id: 'Sunday', label: 'الأحد' }, { id: 'Monday', label: 'الاثنين' }, { id: 'Tuesday', label: 'الثلاثاء' },
+    { id: 'Wednesday', label: 'الأربعاء' }, { id: 'Thursday', label: 'الخميس' }, { id: 'Friday', label: 'الجمعة' },
+    { id: 'Saturday', label: 'السبت' },
+];
 
 
 export function ArchitecturalAppointmentsView() {
@@ -140,26 +146,63 @@ export function ArchitecturalAppointmentsView() {
 
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-
+    
     const workHours = useMemo(() => {
-        return branding?.work_hours || {
+        return branding?.work_hours?.architectural || {
             morning_start_time: '08:00',
             morning_end_time: '12:00',
             evening_start_time: '13:00',
             evening_end_time: '17:00',
-            appointment_slot_duration: 30
+            appointment_slot_duration: 30,
+            appointment_buffer_time: 0,
         };
     }, [branding]);
 
     const { morningSlots, eveningSlots } = useMemo(() => {
-        const duration = workHours.appointment_slot_duration;
+        const slotDuration = workHours.appointment_slot_duration || 30;
+        const buffer = workHours.appointment_buffer_time || 0;
+        const totalDuration = slotDuration + buffer;
+
+        if (!date) return { morningSlots: [], eveningSlots: [] };
+    
+        const todayDayIndex = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
+        const todayDayName = weekDays[todayDayIndex].id;
+    
+        const isHoliday = branding?.work_hours?.holidays?.includes(todayDayName);
+    
+        if (isHoliday) {
+            return { morningSlots: [], eveningSlots: [] };
+        }
+    
+        const halfDaySettings = branding?.work_hours?.half_day;
+        const isHalfDay = halfDaySettings?.day === todayDayName;
+    
+        let { morning_start_time, morning_end_time, evening_start_time, evening_end_time } = workHours;
+    
+        if (isHalfDay) {
+            if (halfDaySettings.type === 'morning_only') {
+                evening_start_time = morning_end_time;
+                evening_end_time = morning_end_time;
+            } else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
+                const customEnd = halfDaySettings.end_time;
+                if (customEnd <= morning_end_time) {
+                    morning_end_time = customEnd;
+                    evening_start_time = customEnd;
+                    evening_end_time = customEnd;
+                } else if (customEnd > evening_start_time) {
+                    evening_end_time = customEnd < evening_end_time ? customEnd : evening_end_time;
+                }
+            }
+        }
+    
         return {
-            morningSlots: generateTimeSlots(workHours.morning_start_time, workHours.morning_end_time, duration),
-            eveningSlots: generateTimeSlots(workHours.evening_start_time, workHours.evening_end_time, duration)
+            morningSlots: generateTimeSlots(morning_start_time, morning_end_time, totalDuration),
+            eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, totalDuration)
         };
-    }, [workHours]);
+    }, [workHours, date, branding]);
     
     useEffect(() => {
+        // Set date on client-side to avoid hydration mismatch
         if (!date) {
             setDate(new Date());
         }
@@ -259,6 +302,7 @@ export function ArchitecturalAppointmentsView() {
         if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
 
+        // Check if the appointment is in the past
         if (isPast(appointmentDate)) {
             toast({
                 title: 'لا يمكن الحجز في الماضي',
@@ -273,7 +317,7 @@ export function ArchitecturalAppointmentsView() {
             engineerId: engineer.id,
             engineerName: engineer.fullName,
             appointmentDate,
-            appointments,
+            appointments, // Pass current appointments to dialog
         });
         setIsDialogOpen(true);
     };
@@ -323,7 +367,7 @@ export function ArchitecturalAppointmentsView() {
 
 
     const handleSave = async () => {
-        if (date) {
+        if (date) { // Re-fetch data for the current date
             await fetchAppointments(date);
         }
     };
@@ -665,7 +709,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 if (!prospectiveSnapshot.empty) {
-                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
+                    toast({
+                        variant: 'destructive',
+                        title: 'عميل محتمل موجود',
+                        description: 'هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".',
+                    });
+                    setIsSaving(false); return;
                 }
 
                 const newAppointmentData = {

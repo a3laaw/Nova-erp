@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
@@ -19,12 +18,28 @@ export interface BrandingSettings {
   watermark_image_url?: string;
   system_background_url?: string;
   work_hours?: {
-    morning_start_time: string;
-    morning_end_time: string;
-    evening_start_time: string;
-    evening_end_time: string;
-    appointment_slot_duration: number;
-    appointment_buffer_time?: number;
+    general: {
+      morning_start_time: string;
+      morning_end_time: string;
+      evening_start_time: string;
+      evening_end_time: string;
+      appointment_slot_duration: number;
+      appointment_buffer_time?: number;
+    };
+    architectural: {
+      morning_start_time: string;
+      morning_end_time: string;
+      evening_start_time: string;
+      evening_end_time: string;
+      appointment_slot_duration: number;
+      appointment_buffer_time?: number;
+    };
+    holidays?: string[];
+    half_day?: {
+      day: string;
+      type: 'morning_only' | 'custom_end_time';
+      end_time: string;
+    }
   }
 }
 
@@ -89,5 +104,3 @@ export const useBranding = () => {
   }
   return context;
 };
-
-    
