@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,6 +14,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Separator } from '../ui/separator';
 
 const defaultSchedule = {
     morning_start_time: '08:00',
@@ -39,6 +39,48 @@ const weekDays: { id: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday'
     { id: 'Thursday', label: 'الخميس' },
     { id: 'Friday', label: 'الجمعة' },
 ];
+
+const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSchedule, setSchedule: any }) => (
+    <div className="space-y-6">
+        <div>
+            <h4 className="font-medium text-muted-foreground mb-4">الفترة الصباحية</h4>
+            <div className="grid grid-cols-2 gap-4">
+                 <div className="grid gap-2">
+                    <Label>من الساعة</Label>
+                    <Input type="time" value={schedule.morning_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_start_time: e.target.value }))} />
+                </div>
+                <div className="grid gap-2">
+                    <Label>إلى الساعة</Label>
+                    <Input type="time" value={schedule.morning_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_end_time: e.target.value }))} />
+                </div>
+            </div>
+        </div>
+        <div>
+            <h4 className="font-medium text-muted-foreground mb-4">الفترة المسائية</h4>
+            <div className="grid grid-cols-2 gap-4">
+                 <div className="grid gap-2">
+                    <Label>من الساعة</Label>
+                    <Input type="time" value={schedule.evening_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_start_time: e.target.value }))} />
+                </div>
+                <div className="grid gap-2">
+                    <Label>إلى الساعة</Label>
+                    <Input type="time" value={schedule.evening_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_end_time: e.target.value }))} />
+                </div>
+            </div>
+        </div>
+        <Separator/>
+        <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+                <Label>مدة كل موعد (بالدقائق)</Label>
+                <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} />
+            </div>
+             <div className="grid gap-2">
+                <Label>فترة راحة بين المواعيد (بالدقائق)</Label>
+                <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} />
+            </div>
+        </div>
+    </div>
+);
 
 export function WorkHoursManager() {
     const { firestore } = useFirebase();
@@ -67,7 +109,7 @@ export function WorkHoursManager() {
         try {
             const dataToSave = {
                 work_hours: {
-                    general: { ...generalSchedule, appointment_slot_duration: Number(generalSchedule.appointment_slot_duration) },
+                    general: { ...generalSchedule, appointment_slot_duration: Number(generalSchedule.appointment_slot_duration), appointment_buffer_time: Number(generalSchedule.appointment_buffer_time) },
                     architectural: { ...architecturalSchedule, appointment_slot_duration: Number(architecturalSchedule.appointment_slot_duration), appointment_buffer_time: Number(architecturalSchedule.appointment_buffer_time) },
                     holidays,
                     half_day: halfDay,
@@ -82,41 +124,6 @@ export function WorkHoursManager() {
             setIsSaving(false);
         }
     };
-    
-    const ScheduleForm = ({ schedule, setSchedule, showBuffer = false }: { schedule: typeof defaultSchedule, setSchedule: any, showBuffer?: boolean }) => (
-        <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="grid gap-2">
-                    <Label>بداية الفترة الصباحية</Label>
-                    <Input type="time" value={schedule.morning_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_start_time: e.target.value }))} />
-                </div>
-                <div className="grid gap-2">
-                    <Label>نهاية الفترة الصباحية</Label>
-                    <Input type="time" value={schedule.morning_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_end_time: e.target.value }))} />
-                </div>
-                <div className="grid gap-2">
-                    <Label>بداية الفترة المسائية</Label>
-                    <Input type="time" value={schedule.evening_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_start_time: e.target.value }))} />
-                </div>
-                <div className="grid gap-2">
-                    <Label>نهاية الفترة المسائية</Label>
-                    <Input type="time" value={schedule.evening_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_end_time: e.target.value }))} />
-                </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2 max-w-xs">
-                    <Label>مدة الموعد (بالدقائق)</Label>
-                    <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} />
-                </div>
-                {showBuffer && (
-                     <div className="grid gap-2 max-w-xs">
-                        <Label>فترة راحة بين المواعيد (بالدقائق)</Label>
-                        <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
 
     if (loading) {
         return (
@@ -151,10 +158,26 @@ export function WorkHoursManager() {
                         <TabsTrigger value="architectural">دوام القسم المعماري</TabsTrigger>
                     </TabsList>
                     <TabsContent value="general" className="mt-6">
-                        <ScheduleForm schedule={generalSchedule} setSchedule={setGeneralSchedule} />
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>أوقات الدوام العامة</CardTitle>
+                                <CardDescription>تطبق على حجز قاعات الاجتماعات والأقسام العامة.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScheduleForm schedule={generalSchedule} setSchedule={setGeneralSchedule} />
+                            </CardContent>
+                        </Card>
                     </TabsContent>
                     <TabsContent value="architectural" className="mt-6">
-                        <ScheduleForm schedule={architecturalSchedule} setSchedule={setArchitecturalSchedule} showBuffer={true} />
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>أوقات دوام القسم المعماري</CardTitle>
+                                <CardDescription>أوقات مخصصة لزيارات العملاء مع المهندسين المعماريين.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScheduleForm schedule={architecturalSchedule} setSchedule={setArchitecturalSchedule} />
+                            </CardContent>
+                        </Card>
                     </TabsContent>
                 </Tabs>
 
@@ -181,7 +204,7 @@ export function WorkHoursManager() {
                     </div>
 
                      <div className="p-4 border rounded-lg space-y-4">
-                        <Label>يوم نصف الدوام (اختياري)</Label>
+                        <Label className="font-semibold">يوم نصف الدوام (اختياري)</Label>
                         <div className="grid grid-cols-2 gap-4">
                             <Select value={halfDay.day || 'none'} onValueChange={(d) => setHalfDay(p => ({...p, day: d === 'none' ? '' : d}))}>
                                 <SelectTrigger>
@@ -194,12 +217,16 @@ export function WorkHoursManager() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <Input 
-                                type="time"
-                                value={halfDay.end_time}
-                                onChange={(e) => setHalfDay(p => ({...p, end_time: e.target.value}))}
-                                disabled={!halfDay.day}
-                            />
+                            <div className="grid gap-2">
+                                <Label htmlFor="half-day-end-time" className="text-xs text-muted-foreground">وقت انتهاء الدوام</Label>
+                                <Input 
+                                    id="half-day-end-time"
+                                    type="time"
+                                    value={halfDay.end_time}
+                                    onChange={(e) => setHalfDay(p => ({...p, end_time: e.target.value}))}
+                                    disabled={!halfDay.day}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -214,7 +241,3 @@ export function WorkHoursManager() {
         </Card>
     );
 }
-
-    
-
-    

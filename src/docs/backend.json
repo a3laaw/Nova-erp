@@ -49,6 +49,49 @@
         "financial_statement_notes": {
             "type": "string",
             "description": "The full text content for the notes to the financial statements."
+        },
+        "work_hours": {
+            "type": "object",
+            "description": "Defines the company's working hours, holidays, and appointment settings.",
+            "properties": {
+                "general": {
+                    "type": "object",
+                    "description": "General working hours for meeting rooms and other departments.",
+                    "properties": {
+                        "morning_start_time": { "type": "string", "description": "e.g., '08:00'" },
+                        "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
+                        "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
+                        "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
+                        "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" },
+                        "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
+                    }
+                },
+                "architectural": {
+                    "type": "object",
+                    "description": "Specific working hours for the architectural department.",
+                    "properties": {
+                        "morning_start_time": { "type": "string" },
+                        "morning_end_time": { "type": "string" },
+                        "evening_start_time": { "type": "string" },
+                        "evening_end_time": { "type": "string" },
+                        "appointment_slot_duration": { "type": "number" },
+                        "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
+                    }
+                },
+                "holidays": {
+                    "type": "array",
+                    "description": "Weekly holidays.",
+                    "items": { "type": "string", "enum": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] }
+                },
+                "half_day": {
+                    "type": "object",
+                    "description": "Defines a weekly half-day.",
+                    "properties": {
+                        "day": { "type": "string", "enum": ["", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+                        "end_time": { "type": "string", "description": "e.g., '13:00'" }
+                    }
+                }
+            }
         }
       },
       "required": ["company_name"]
@@ -756,11 +799,6 @@
           "description": "Distinguishes between architectural appointments and room bookings.",
           "enum": ["architectural", "room"]
         },
-        "status": {
-            "type": "string",
-            "description": "The current status of the appointment, especially for cancellation tracking.",
-            "enum": ["scheduled", "cancelled"]
-        },
         "appointmentDate": {
           "type": "string",
           "format": "date-time",
@@ -1367,4 +1405,3 @@
     }
   }
 }
-    
