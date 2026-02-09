@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { searchJournalEntries } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DateInput } from '../ui/date-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -56,6 +57,7 @@ export function JournalEntriesList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [entryTypeFilter, setEntryTypeFilter] = useState('all');
 
 
   const entriesQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
@@ -74,8 +76,24 @@ export function JournalEntriesList() {
         return matchesDateFrom && matchesDateTo;
     });
 
-    return searchJournalEntries(dateFiltered, searchQuery);
-  }, [entries, searchQuery, dateFrom, dateTo]);
+    const searchFiltered = searchJournalEntries(dateFiltered, searchQuery);
+    
+    if (entryTypeFilter === 'all') {
+        return searchFiltered;
+    }
+
+    return searchFiltered.filter(entry => {
+        const isCommissionEntry = entry.narration?.includes('عمولة');
+        if (entryTypeFilter === 'commission') {
+            return isCommissionEntry;
+        }
+        if (entryTypeFilter === 'manual') {
+            return !isCommissionEntry;
+        }
+        return true;
+    });
+
+  }, [entries, searchQuery, dateFrom, dateTo, entryTypeFilter]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
@@ -161,17 +179,17 @@ export function JournalEntriesList() {
   return (
     <>
          <div className="bg-muted/50 p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="grid gap-2 md:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div className="grid gap-2 lg:col-span-1">
                     <Label htmlFor="search">بحث ذكي</Label>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             id="search"
                             placeholder="ابحث بالرقم أو البيان..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10"
+                            className="pl-10 rtl:pr-10"
                         />
                     </div>
                 </div>
@@ -179,15 +197,28 @@ export function JournalEntriesList() {
                     <Label htmlFor="dateFrom">من تاريخ</Label>
                     <DateInput 
                         value={dateFrom}
-                        onChange={setDateFrom}
+                        onChange={(date) => setDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
                     />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="dateTo">إلى تاريخ</Label>
                     <DateInput 
                         value={dateTo}
-                        onChange={setDateTo}
+                        onChange={(date) => setDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
                     />
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="entryType">نوع القيد</Label>
+                    <Select value={entryTypeFilter} onValueChange={setEntryTypeFilter}>
+                        <SelectTrigger id="entryType">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">الكل</SelectItem>
+                            <SelectItem value="manual">القيود اليدوية</SelectItem>
+                            <SelectItem value="commission">قيود العمولات الآلية</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
         </div>
@@ -225,7 +256,7 @@ export function JournalEntriesList() {
                     </TableRow>
                 ) : (
                     filteredEntries.map((entry) => (
-                        <TableRow key={entry.id} className={cn(entry.entryNumber?.startsWith('CRV-JE-') && 'bg-blue-50 dark:bg-blue-900/20')}>
+                        <TableRow key={entry.id} className={cn(entry.narration?.includes('عمولة') && 'bg-blue-50 dark:bg-blue-900/20')}>
                         <TableCell className="font-mono">
                             <Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline text-primary">
                                 {entry.entryNumber}
@@ -294,7 +325,7 @@ export function JournalEntriesList() {
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ?  'جاري الحذف...' : 'نعم، قم بالحذف'}
+                        {isDeleting ?  <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بالحذف'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
