@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Calendar, UserX, Repeat, MoreHorizontal } from 'lucide-react';
+import { UserPlus, Calendar, UserX, Repeat, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,9 +96,11 @@ export function ProspectiveClientsList() {
         let status: ProspectiveClient['status'] = 'active-visit';
         const lastAppointmentDate = toFirestoreDate(lastAppointment.appointmentDate);
 
+        if (!lastAppointmentDate) return;
+
         if (lastAppointment.status === 'cancelled') {
             status = 'cancelled-visit';
-        } else if (lastAppointmentDate && isPast(lastAppointmentDate) && !lastAppointment.workStageUpdated) {
+        } else if (isPast(lastAppointmentDate) && !lastAppointment.workStageUpdated) {
             status = 'no-show';
         }
 
