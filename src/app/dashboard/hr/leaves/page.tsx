@@ -1,4 +1,4 @@
-// This file is marked for deletion and will be replaced.
-export default function DeprecatedLeaveRequestsPage() {
+// This page is ready for the new HR module implementation.
+export default function LeaveRequestsPage() {
     return null;
 }
