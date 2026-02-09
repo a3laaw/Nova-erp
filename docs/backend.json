@@ -41,6 +41,16 @@
             "format": "uri",
             "description": "URL to the company's full letterhead image."
         },
+        "footer_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to an image to be displayed at the bottom of printable documents."
+        },
+        "watermark_image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to an image to be used as a watermark on printable documents."
+        },
         "system_background_url": {
             "type": "string",
             "format": "uri",
@@ -52,14 +62,44 @@
         },
         "work_hours": {
             "type": "object",
-            "description": "Defines the company's working hours and appointment slot settings.",
+            "description": "Defines the company's working hours, holidays, and appointment settings.",
             "properties": {
-                "morning_start_time": { "type": "string", "description": "e.g., '08:00'" },
-                "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
-                "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
-                "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
-                "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" },
-                "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments, e.g., 15" }
+                "general": {
+                    "type": "object",
+                    "description": "General working hours for meeting rooms and other departments.",
+                    "properties": {
+                        "morning_start_time": { "type": "string", "description": "e.g., '08:00'" },
+                        "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
+                        "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
+                        "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
+                        "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" }
+                    }
+                },
+                "architectural": {
+                    "type": "object",
+                    "description": "Specific working hours for the architectural department.",
+                    "properties": {
+                        "morning_start_time": { "type": "string" },
+                        "morning_end_time": { "type": "string" },
+                        "evening_start_time": { "type": "string" },
+                        "evening_end_time": { "type": "string" },
+                        "appointment_slot_duration": { "type": "number" },
+                        "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
+                    }
+                },
+                "holidays": {
+                    "type": "array",
+                    "description": "Weekly holidays.",
+                    "items": { "type": "string", "enum": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] }
+                },
+                "half_day": {
+                    "type": "object",
+                    "description": "Defines a weekly half-day.",
+                    "properties": {
+                        "day": { "type": "string", "enum": ["", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+                        "end_time": { "type": "string", "description": "e.g., '13:00'" }
+                    }
+                }
             }
         }
       },
@@ -406,6 +446,14 @@
             "type": "boolean",
             "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count."
         },
+        "enableModificationTracking": {
+            "type": "boolean",
+            "description": "If true, allows a modification counter to be incremented for this stage."
+        },
+        "modificationCount": {
+            "type": ["number", "null"],
+            "description": "How many times a modification has been recorded for this stage."
+        },
         "startDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage started." },
         "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
         "expectedEndDate": { "type": ["string", "null"], "format": "date-time", "description": "The expected completion date for countdowns." },
@@ -525,7 +573,7 @@
         "description": "Records changes made to employee data for historical tracking.",
         "type": "object",
         "properties": {
-            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate"] },
+            "changeType": { "type": "string", "enum": ["Creation", "SalaryChange", "JobChange", "DataUpdate", "StatusChange", "ResidencyUpdate"] },
             "field": { "type": "string", "description": "The name of the field that was changed." },
             "oldValue": { "description": "The value of the field before the change." },
             "newValue": { "description": "The value of the field after the change." },
@@ -721,7 +769,8 @@
         "trackingType": { "type": "string", "enum": ["duration", "occurrence", "none"], "description": "How to track progress: by time, occurrences, or as a single event." },
         "expectedDurationDays": { "type": ["number", "null"], "description": "The expected duration in days for this stage (if trackingType is 'duration')." },
         "maxOccurrences": { "type": ["number", "null"], "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')." },
-        "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." }
+        "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." },
+        "enableModificationTracking": { "type": "boolean", "description": "If true, allows a modification counter to be incremented for this stage." }
       },
       "required": ["name", "order", "stageType", "trackingType"]
     },
@@ -1079,6 +1128,8 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
+        "employeeId": { "type": "string", "description": "Link to employee if payeeType is employee, for residency renewal etc." },
+        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "New expiry date if this is for residency renewal." },
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
@@ -1158,7 +1209,8 @@
         "notes": { "type": "string" },
         "status": { "type": "string", "enum": ["draft", "sent", "accepted", "rejected", "expired"] },
         "createdAt": { "type": "string", "format": "date-time" },
-        "createdBy": { "type": "string" }
+        "createdBy": { "type": "string" },
+        "transactionId": { "type": "string", "description": "The ID of the transaction this quotation was converted to."}
       },
       "required": ["quotationNumber", "clientId", "date", "subject", "items", "totalAmount", "status", "createdAt"]
     },
@@ -1204,9 +1256,26 @@
         "status": {
           "type": "string",
           "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
-        }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
+    },
+    "ResidencyRenewal": {
+      "title": "Residency Renewal",
+      "description": "Tracks the financial transaction for an employee's residency renewal.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "renewalDate": { "type": "string", "format": "date-time" },
+        "newExpiryDate": { "type": "string", "format": "date" },
+        "cost": { "type": "number" },
+        "paymentVoucherId": { "type": "string" },
+        "monthlyAmortizationAmount": { "type": "number" },
+        "amortizationStatus": { "type": "string", "enum": ["in-progress", "completed"]},
+        "lastAmortizationDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId"]
     }
   },
   "auth": {
@@ -1376,8 +1445,15 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
+    },
+    "/residencyRenewals/{renewalId}": {
+        "schema": {
+            "$ref": "#/entities/ResidencyRenewal"
+        },
+        "description": "Stores financial records for employee residency renewals."
     }
   }
 }
+    
 
     
