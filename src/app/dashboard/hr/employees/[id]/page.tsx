@@ -16,7 +16,6 @@ import { formatCurrency } from '@/lib/utils';
 import { ResidencyRenewalDialog } from '@/components/hr/residency-renewal-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmployeeAuditLog } from '@/components/hr/employee-audit-log';
-import { EmployeeFinancials } from '@/components/hr/employee-financials';
 
 
 function InfoRow({ label, value, icon, children }: { label: string, value: React.ReactNode, icon: React.ReactNode, children?: React.ReactNode }) {
@@ -86,9 +85,8 @@ export default function EmployeeProfilePage() {
     return (
         <div className="space-y-6">
             <Tabs defaultValue="profile" dir="rtl">
-                <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
                     <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
-                    <TabsTrigger value="financials">السندات المالية</TabsTrigger>
                     <TabsTrigger value="audit">سجل التدقيق</TabsTrigger>
                 </TabsList>
                 <TabsContent value="profile">
@@ -144,9 +142,6 @@ export default function EmployeeProfilePage() {
                             </section>
                         </CardContent>
                     </Card>
-                </TabsContent>
-                <TabsContent value="financials">
-                    <EmployeeFinancials employeeId={id} />
                 </TabsContent>
                 <TabsContent value="audit">
                     <EmployeeAuditLog employeeId={id} />
