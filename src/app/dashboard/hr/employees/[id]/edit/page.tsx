@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -69,7 +70,7 @@ export default function EditEmployeePage() {
             'part-time': 'دوام جزئي',
         };
 
-        fieldMappings.forEach(({ key, label, isCurrency }) => {
+        fieldMappings.forEach(({ key, label, isCurrency, changeType }) => {
             const oldValue = employee[key];
             const newValue = updatedData[key];
 
@@ -103,7 +104,8 @@ export default function EditEmployeePage() {
         });
         
         try {
-            batch.update(employeeRefDoc, cleanFirestoreData(updatedData));
+            const updatePayload = { ...updatedData };
+            batch.update(employeeRefDoc, cleanFirestoreData(updatePayload));
 
             if (changesToLog.length > 0) {
                  const logCollectionRef = collection(firestore, `employees/${id}/auditLogs`);
