@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { Payslip } from '@/lib/types';
+import type { Payslip, Employee } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -62,12 +62,26 @@ export function PayslipsList() {
         ];
     }, [firestore, year, month]);
 
-    const { data: payslips, loading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
+    const { data: payslips, loading: loadingPayslips } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
+    const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
+
+    const loading = loadingPayslips || loadingEmployees;
 
     const sortedPayslips = useMemo(() => {
-        if (!payslips) return [];
-        return [...payslips].sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'ar'));
-    }, [payslips]);
+        if (!payslips || !employees) return [];
+        const employeeIdSet = new Set(employees.map(e => e.id));
+        
+        return payslips
+            .filter(p => p.employeeId && employeeIdSet.has(p.employeeId))
+            .map(p => {
+                const employee = employees.find(e => e.id === p.employeeId);
+                return {
+                    ...p,
+                    employeeName: employee ? employee.fullName : p.employeeName,
+                };
+            })
+            .sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'ar'));
+    }, [payslips, employees]);
 
     const handleConfirmAndPay = async () => {
         // TODO: Implement payment confirmation and journal entry creation
