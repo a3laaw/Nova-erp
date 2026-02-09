@@ -120,7 +120,10 @@ const navItems = {
       roles: ['Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'الموظفين' },
+        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين' },
+        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات' },
+        { href: '/dashboard/hr/payroll', label: 'مسير الرواتب' },
+        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة' },
       ]
     },
     { 
