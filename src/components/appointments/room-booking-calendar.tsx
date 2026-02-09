@@ -41,6 +41,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import Link from 'next/link';
+import { useAuth } from '@/context/auth-context';
 
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -201,10 +202,10 @@ export function RoomBookingCalendar() {
                 ]);
                 
                 const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+                setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
                 
-                const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName)));
+                const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
+                setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName, 'ar')));
             } catch (error) {
                 console.error("Error fetching static booking data:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
@@ -596,7 +597,114 @@ export function RoomBookingCalendar() {
         </div>
     );
 }
-// Dialog component remains the same
-// ... BookingDialog component code ...
 
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore }: any) {
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    const [selectedClientId, setSelectedClientId] = useState('');
+    const [selectedEngineerId, setSelectedEngineerId] = useState('');
+    const [title, setTitle] = useState('');
+    const [department, setDepartment] = useState('');
+    const [notes, setNotes] = useState('');
+
+    const isEditing = !!dialogData?.id;
+
+    useEffect(() => {
+        if (isOpen && dialogData) {
+            setSelectedClientId(dialogData.clientId || '');
+            setSelectedEngineerId(dialogData.engineerId || '');
+            setTitle(dialogData.title || '');
+            setDepartment(dialogData.department || '');
+            setNotes(dialogData.notes || '');
+        }
+    }, [isOpen, dialogData]);
     
+    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
+    const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id, label: e.fullName, searchKey: e.employeeNumber })), [engineers]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        if (!selectedClientId || !selectedEngineerId || !title || !department) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول.' });
+            setIsSaving(false);
+            return;
+        }
+
+        try {
+            const dataToSave = {
+                clientId: selectedClientId,
+                engineerId: selectedEngineerId,
+                title,
+                department,
+                notes,
+                meetingRoom: dialogData.room,
+                appointmentDate: Timestamp.fromDate(dialogData.appointmentDate),
+                type: 'room' as const,
+            };
+
+            if (isEditing) {
+                await updateDoc(doc(firestore, 'appointments', dialogData.id), dataToSave);
+            } else {
+                await addDoc(collection(firestore, 'appointments'), { ...dataToSave, createdAt: serverTimestamp() });
+            }
+            toast({ title: 'نجاح', description: 'تم حفظ الحجز بنجاح.' });
+            onSaveSuccess();
+            onClose();
+        } catch (error) {
+            console.error("Error saving room booking:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الحجز.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent dir="rtl">
+                 <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>{isEditing ? 'تعديل الحجز' : 'حجز جديد'}</DialogTitle>
+                        <DialogDescription>
+                            حجز {dialogData.room} يوم {format(dialogData.appointmentDate, 'PP', { locale: ar })} الساعة {format(dialogData.appointmentDate, 'p', { locale: ar })}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 grid gap-4">
+                         <div className="grid gap-2">
+                            <Label>عنوان الاجتماع</Label>
+                            <Input value={title} onChange={e => setTitle(e.target.value)} required />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>العميل</Label>
+                            <InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clientOptions} placeholder="اختر العميل..." />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                           <div className="grid gap-2">
+                                <Label>القسم</Label>
+                                <select value={department} onChange={e => setDepartment(e.target.value)} required className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    <option value="" disabled>اختر القسم...</option>
+                                    {departmentOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>المهندس المسؤول</Label>
+                                <InlineSearchList value={selectedEngineerId} onSelect={setSelectedEngineerId} options={engineerOptions} placeholder="اختر المهندس..." />
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>ملاحظات إضافية</Label>
+                            <Textarea value={notes} onChange={e => setNotes(e.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin"/>}
+                            {isSaving ? 'جاري الحفظ...' : 'حفظ'}
+                        </Button>
+                    </DialogFooter>
+                 </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
