@@ -140,7 +140,87 @@ const navItems = {
     { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
   ],
   en: [
-    // ... english translations ...
+    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { 
+      label: 'Reports', 
+      icon: LineChart, 
+      roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
+      hrefPrefix: '/dashboard/reports',
+      children: [
+        { href: '/dashboard/reports/delayed-stages', label: 'Delayed Tasks' },
+        { href: '/dashboard/reports/stalled-stages', label: 'Stalled Stages' },
+        { href: '/dashboard/reports/prospective-clients', label: 'Prospective Clients' },
+        { href: '/dashboard/reports/upsell-opportunities', label: 'Upsell Opportunities' },
+      ]
+    },
+    { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
+    { 
+      label: 'Accounting', 
+      icon: Wallet, 
+      roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
+      hrefPrefix: '/dashboard/accounting',
+      children: [
+        { href: '/dashboard/accounting/quotations', label: 'Quotations' },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
+        { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
+        {
+          label: 'Journals & Vouchers',
+          children: [
+            { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
+            { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
+            { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
+            { href: '/dashboard/accounting/invoices', label: 'Invoices' },
+          ]
+        },
+        {
+          label: 'Financial Reports',
+          children: [
+            { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
+            { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
+            { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
+            { href: '/dashboard/accounting/reports', label: 'Accounting Reports' },
+          ]
+        },
+        {
+          label: 'Financial Statements',
+          children: [
+            { href: '/dashboard/accounting/income-statement', label: 'Income Statement' },
+            { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet' },
+            { href: '/dashboard/accounting/cash-flow', label: 'Cash Flow Statement' },
+            { href: '/dashboard/accounting/equity-statement', label: 'Statement of Changes in Equity' },
+            { href: '/dashboard/accounting/financial-statement-notes', label: 'Notes to Financial Statements' },
+            { href: '/dashboard/accounting/financial-forecast', label: 'Financial Forecast' },
+          ]
+        }
+      ]
+    },
+    { 
+      label: 'Human Resources', 
+      icon: HeartHandshake, 
+      roles: ['Admin', 'HR'],
+      hrefPrefix: '/dashboard/hr',
+      children: [
+        { href: '/dashboard/hr/employees', label: 'Employee Files' },
+        { href: '/dashboard/hr/leaves', label: 'Leave Requests' },
+        { href: '/dashboard/hr/payroll', label: 'Payroll' },
+        { href: '/dashboard/hr/gratuity-calculator', label: 'Gratuity Calculator' },
+      ]
+    },
+    { 
+      label: 'Warehouse',
+      icon: Warehouse,
+      roles: ['Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse', label: 'Inventory View' },
+        { href: '/dashboard/purchasing', label: 'Purchasing' },
+      ]
+    },
+    { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
+    { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
   ]
 };
 
