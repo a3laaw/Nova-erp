@@ -46,3 +46,5 @@
 ### 6. التنبؤ المالي (Financial Forecast)
 - **المصدر:** `src/app/dashboard/accounting/financial-forecast/page.tsx`
 - **الوصف:** أداة تعتمد على بيانات العقود والمصاريف الثابتة لتقديم توقعات مستقبلية للإيرادات والمصروفات.
+
+    
