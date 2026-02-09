@@ -58,7 +58,8 @@
                 "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
                 "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
                 "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
-                "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" }
+                "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" },
+                "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments, e.g., 15" }
             }
         }
       },
@@ -1378,3 +1379,5 @@
     }
   }
 }
+
+    

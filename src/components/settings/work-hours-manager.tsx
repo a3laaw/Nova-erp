@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -18,6 +19,7 @@ const defaultWorkHours = {
     evening_start_time: '13:00',
     evening_end_time: '17:00',
     appointment_slot_duration: 30,
+    appointment_buffer_time: 0,
 };
 
 export function WorkHoursManager() {
@@ -51,6 +53,7 @@ export function WorkHoursManager() {
                 work_hours: {
                     ...formData,
                     appointment_slot_duration: Number(formData.appointment_slot_duration) || 30,
+                    appointment_buffer_time: Number(formData.appointment_buffer_time) || 0,
                 }
             };
 
@@ -117,10 +120,16 @@ export function WorkHoursManager() {
                         <Input id="evening_end_time" type="time" value={formData.evening_end_time} onChange={(e) => handleFieldChange('evening_end_time', e.target.value)} />
                     </div>
                  </div>
-                 <div className="grid gap-2 max-w-xs">
-                    <Label htmlFor="appointment_slot_duration">مدة الموعد (بالدقائق)</Label>
-                    <Input id="appointment_slot_duration" type="number" min="15" step="5" value={formData.appointment_slot_duration} onChange={(e) => handleFieldChange('appointment_slot_duration', e.target.value)} />
-                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid gap-2 max-w-xs">
+                        <Label htmlFor="appointment_slot_duration">مدة الموعد (بالدقائق)</Label>
+                        <Input id="appointment_slot_duration" type="number" min="15" step="5" value={formData.appointment_slot_duration} onChange={(e) => handleFieldChange('appointment_slot_duration', e.target.value)} />
+                    </div>
+                    <div className="grid gap-2 max-w-xs">
+                        <Label htmlFor="appointment_buffer_time">فترة الراحة بين المواعيد (بالدقائق)</Label>
+                        <Input id="appointment_buffer_time" type="number" min="0" step="5" value={formData.appointment_buffer_time} onChange={(e) => handleFieldChange('appointment_buffer_time', e.target.value)} />
+                    </div>
+                 </div>
             </CardContent>
             <CardFooter className="flex justify-end">
                 <Button onClick={handleSave} disabled={isSaving}>

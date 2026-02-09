@@ -24,6 +24,7 @@ export interface BrandingSettings {
     evening_start_time: string;
     evening_end_time: string;
     appointment_slot_duration: number;
+    appointment_buffer_time?: number;
   }
 }
 
@@ -88,3 +89,5 @@ export const useBranding = () => {
   }
   return context;
 };
+
+    
