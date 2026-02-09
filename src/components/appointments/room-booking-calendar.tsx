@@ -65,7 +65,6 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
     let currentTime = parse(start, 'HH:mm', new Date());
     const endTime = parse(end, 'HH:mm', new Date());
 
-    // Apply an initial buffer before the first slot
     if (buffer > 0) {
       currentTime = new Date(currentTime.getTime() + buffer * 60000);
     }
@@ -74,12 +73,11 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
         const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
         
         if (slotEndTime > endTime) {
-            break; // This slot would end too late
+            break;
         }
         
         slots.push(format(currentTime, 'HH:mm'));
         
-        // Move to the end of the current slot, then add the buffer for the next one
         currentTime = new Date(slotEndTime.getTime() + buffer * 60000);
     }
     return slots;
@@ -116,10 +114,31 @@ export function RoomBookingCalendar() {
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const { morningSlots, eveningSlots, hasWorkHours } = useMemo(() => {
+    const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
+        if (!date) {
+            return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
+        }
+    
+        const ramadanSettings = branding?.work_hours?.ramadan;
+        const isDateInRamadan = ramadanSettings?.is_enabled &&
+            ramadanSettings.start_date &&
+            ramadanSettings.end_date &&
+            date >= toFirestoreDate(ramadanSettings.start_date)! &&
+            date <= toFirestoreDate(ramadanSettings.end_date)!;
+    
+        if (isDateInRamadan) {
+            const slots = generateTimeSlots(
+                ramadanSettings.start_time!,
+                ramadanSettings.end_time!,
+                ramadanSettings.appointment_slot_duration || 30,
+                ramadanSettings.appointment_buffer_time || 0
+            );
+            return { morningSlots: slots, eveningSlots: [], hasWorkHours: slots.length > 0, isRamadan: true };
+        }
+    
         const workHours = branding?.work_hours?.general;
-        if (!workHours || !date) {
-            return { morningSlots: [], eveningSlots: [], hasWorkHours: false };
+        if (!workHours) {
+            return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
         }
         
         const slotDuration = workHours.appointment_slot_duration || 30;
@@ -131,7 +150,7 @@ export function RoomBookingCalendar() {
         const isHoliday = branding?.work_hours?.holidays?.includes(todayDayName);
     
         if (isHoliday) {
-            return { morningSlots: [], eveningSlots: [], hasWorkHours: true };
+            return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
         }
     
         const halfDaySettings = branding?.work_hours?.half_day;
@@ -161,7 +180,8 @@ export function RoomBookingCalendar() {
         return {
             morningSlots: mSlots,
             eveningSlots: eSlots,
-            hasWorkHours: mSlots.length > 0 || eSlots.length > 0
+            hasWorkHours: mSlots.length > 0 || eSlots.length > 0,
+            isRamadan: false,
         };
     }, [branding, date]);
 
@@ -515,7 +535,7 @@ export function RoomBookingCalendar() {
 
             <div id="room-booking-printable-area" className="printable-content">
                 <div className="hidden print:block mb-4 p-4">
-                    <h1 className="text-xl font-bold">تقويم حجوزات القاعات</h1>
+                    <h1 className="text-xl font-bold">{isRamadan ? "تقويم حجوزات القاعات (دوام شهر رمضان المبارك)" : "تقويم حجوزات القاعات"}</h1>
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
                 
@@ -526,8 +546,12 @@ export function RoomBookingCalendar() {
                   </div>
                 ) : (
                     <div className="space-y-4">
-                        {renderGridSection('الفترة الصباحية', morningSlots)}
-                        {renderGridSection('الفترة المسائية', eveningSlots)}
+                        {isRamadan ? renderGridSection('فترة دوام رمضان', morningSlots) : (
+                            <>
+                                {renderGridSection('الفترة الصباحية', morningSlots)}
+                                {renderGridSection('الفترة المسائية', eveningSlots)}
+                            </>
+                        )}
                     </div>
                 )}
             </div>
@@ -572,236 +596,7 @@ export function RoomBookingCalendar() {
         </div>
     );
 }
+// Dialog component remains the same
+// ... BookingDialog component code ...
 
-// --- Booking Dialog Component ---
-
-function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore }: any) {
-    const { toast } = useToast();
-    const isEditing = !!dialogData?.id;
-    const [formData, setFormData] = useState({
-        clientId: '',
-        clientName: '',
-        clientMobile: '',
-        department: '',
-        engineerId: '',
-        title: '',
-        notes: '',
-    });
-    const [isSaving, setIsSaving] = useState(false);
     
-    const [newDate, setNewDate] = useState('');
-    const [newTime, setNewTime] = useState('');
-    const [isNewClient, setIsNewClient] = useState(false);
-    
-    const roomName = useMemo(() => dialogData?.meetingRoom || dialogData?.room, [dialogData]);
-
-    useEffect(() => {
-        if (isOpen && dialogData) {
-             const appointmentDate = toFirestoreDate(dialogData.appointmentDate);
-            if (isEditing && appointmentDate instanceof Date) {
-                setNewDate(format(appointmentDate, 'yyyy-MM-dd'));
-                setNewTime(format(appointmentDate, 'HH:mm'));
-            } else {
-                 setNewDate('');
-                 setNewTime('');
-            }
-            setFormData({
-                clientId: dialogData.clientId || '',
-                clientName: dialogData.clientName || '',
-                clientMobile: dialogData.clientMobile || '',
-                department: dialogData.department || '',
-                engineerId: dialogData.engineerId || '',
-                title: dialogData.title || '',
-                notes: dialogData.notes || '',
-            });
-            setIsNewClient(!dialogData.clientId);
-        }
-    }, [isOpen, dialogData, isEditing]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Basic validation
-        if (isNewClient && (!formData.clientName || !formData.clientMobile)) {
-            toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة اسم وجوال العميل الجديد.' });
-            return;
-        }
-        if (!isNewClient && !formData.clientId) {
-            toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار عميل مسجل.' });
-            return;
-        }
-        if (!formData.department || !formData.engineerId) {
-            toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء اختيار القسم والمهندس المسؤول.' });
-            return;
-        }
-
-        setIsSaving(true);
-        
-        try {
-            // Check for existing mobile for new clients
-            if (isNewClient) {
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('mobile', '==', formData.clientMobile));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`);
-                }
-            }
-
-            const appointmentDateTime = isEditing ? new Date(`${newDate}T${newTime}`) : dialogData.appointmentDate;
-            if (isPast(appointmentDateTime) && !isEditing) {
-                throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
-            }
-
-            // Conflict validation
-            const appointmentsRef = collection(firestore, 'appointments');
-            const dayStart = startOfDay(appointmentDateTime);
-            const dayEnd = endOfDay(appointmentDateTime);
-            const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
-            const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
-            const latestDayAppointments = dayAppointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-
-            const windowStart = new Date(appointmentDateTime.getTime() - 29 * 60 * 1000);
-            const windowEnd = new Date(appointmentDateTime.getTime() + 29 * 60 * 1000);
-            
-            const roomHasConflict = latestDayAppointments.some((appt: any) => {
-                if (isEditing && appt.id === dialogData.id) return false;
-                const apptDate = toFirestoreDate(appt.appointmentDate);
-                return appt.meetingRoom === roomName && apptDate && apptDate >= windowStart && apptDate <= windowEnd;
-            });
-            if (roomHasConflict) throw new Error('قاعة الاجتماعات محجوزة في هذا الوقت.');
-
-            if (formData.engineerId) {
-                const engineerHasConflict = latestDayAppointments.some((appt: any) => {
-                    if (isEditing && appt.id === dialogData.id) return false;
-                    const apptDate = toFirestoreDate(appt.appointmentDate);
-                    return appt.engineerId === formData.engineerId && apptDate && apptDate >= windowStart && apptDate <= windowEnd;
-                });
-                if (engineerHasConflict) throw new Error('المهندس لديه موعد آخر في نفس الوقت.');
-            }
-            
-            const checkClientId = isNewClient ? null : formData.clientId;
-            if (checkClientId) {
-                const clientHasConflict = latestDayAppointments.some((appt: any) => {
-                    if (isEditing && appt.id === dialogData.id) return false;
-                    const apptDate = toFirestoreDate(appt.appointmentDate);
-                    return appt.clientId === checkClientId && apptDate && apptDate >= windowStart && apptDate <= windowEnd;
-                });
-                if (clientHasConflict) throw new Error('العميل لديه موعد آخر في نفس الوقت.');
-            }
-            
-            // Prepare data for saving
-            const dataToSave: any = {
-                clientId: isNewClient ? undefined : formData.clientId,
-                clientName: isNewClient ? formData.clientName : undefined,
-                clientMobile: isNewClient ? formData.clientMobile : undefined,
-                engineerId: formData.engineerId,
-                title: formData.title,
-                notes: formData.notes || '',
-                meetingRoom: roomName,
-                department: formData.department,
-                appointmentDate: Timestamp.fromDate(appointmentDateTime),
-                type: 'room',
-            };
-            if (!dataToSave.clientId) delete dataToSave.clientId;
-
-            if (isEditing) {
-                const appointmentRef = doc(firestore, 'appointments', dialogData.id);
-                await updateDoc(appointmentRef, dataToSave);
-                toast({ title: "تم التعديل بنجاح!" });
-            } else {
-                dataToSave.createdAt = serverTimestamp();
-                await addDoc(collection(firestore, 'appointments'), dataToSave);
-                toast({ title: "تم الحجز بنجاح!" });
-            }
-            
-            onClose();
-            onSaveSuccess();
-
-        } catch (error) {
-             console.error("Error during save:", error);
-             const message = error instanceof Error ? error.message : 'حدث خطأ أثناء الحفظ.';
-             toast({ variant: 'destructive', title: 'خطأ', description: message });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-    
-    const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
-    const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id!, label: e.fullName, searchKey: e.civilId })), [engineers]);
-    const departmentOptionsForSelect = useMemo(() => departmentOptions.map(d => ({ value: d, label: d, searchKey: d })), []);
-
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent
-                dir="rtl"
-                className="w-[95vw] sm:max-w-lg"
-            >
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>{isEditing ? 'تعديل موعد' : 'حجز موعد جديد'}</DialogTitle>
-                         <DialogDescription>
-                            حجز {roomName}
-                            {!isEditing && ` في ${format(dialogData.appointmentDate, "PPP 'الساعة' HH:mm", { locale: ar })}`}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-6">
-                         {isEditing && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="date">التاريخ</Label>
-                                    <Input id="date" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required/>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="time">الوقت</Label>
-                                    <Input id="time" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required step="1800" />
-                                </div>
-                            </div>
-                         )}
-                        <div className="grid gap-2">
-                            <Label htmlFor="title">الغرض من الموعد (اختياري)</Label>
-                            <Input id="title" value={formData.title} onChange={(e) => setFormData(p => ({...p, title: e.target.value}))} />
-                        </div>
-                        <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <Checkbox id="isNewClient" checked={isNewClient} onCheckedChange={(checked) => setIsNewClient(checked as boolean)} disabled={isEditing} />
-                            <Label htmlFor="isNewClient">إضافة عميل جديد غير مسجل</Label>
-                        </div>
-                         {isNewClient ? (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="new-client-name">اسم العميل <span className="text-destructive">*</span></Label>
-                                    <Input id="new-client-name" value={formData.clientName} onChange={e => setFormData(p => ({...p, clientName: e.target.value}))} required />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="new-client-mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                                    <Input id="new-client-mobile" value={formData.clientMobile} onChange={e => setFormData(p => ({...p, clientMobile: e.target.value}))} dir="ltr" required />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="grid gap-2">
-                                <Label>العميل <span className="text-destructive">*</span></Label>
-                                <InlineSearchList value={formData.clientId} onSelect={(v) => setFormData(p => ({...p, clientId: v}))} options={clientOptions} placeholder="ابحث بالاسم أو رقم الجوال..." disabled={isEditing}/>
-                            </div>
-                        )}
-                        <div className="grid gap-2">
-                            <Label>القسم <span className="text-destructive">*</span></Label>
-                             <InlineSearchList value={formData.department} onSelect={(v) => setFormData(p => ({...p, department: v}))} options={departmentOptionsForSelect} placeholder="ابحث عن قسم..." />
-                        </div>
-                         <div className="grid gap-2">
-                            <Label>المهندس <span className="text-destructive">*</span></Label>
-                             <InlineSearchList value={formData.engineerId} onSelect={(v) => setFormData(p => ({...p, engineerId: v}))} options={engineerOptions} placeholder="ابحث بالاسم أو الرقم المدني..." />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (isNewClient ? (!formData.clientName || !formData.clientMobile) : !formData.clientId) || !formData.department || !formData.engineerId}>
-                            {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                            {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}

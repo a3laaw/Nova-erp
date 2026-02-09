@@ -15,6 +15,9 @@ import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Switch } from '../ui/switch';
+import { DateInput } from '../ui/date-input';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const defaultSchedule = {
     morning_start_time: '08:00',
@@ -29,6 +32,16 @@ const defaultHalfDay = {
     day: '',
     type: 'morning_only' as 'morning_only' | 'custom_end_time',
     end_time: '13:00',
+};
+
+const defaultRamadanSchedule = {
+    is_enabled: false,
+    start_date: undefined as Date | undefined,
+    end_date: undefined as Date | undefined,
+    start_time: '09:30',
+    end_time: '15:30',
+    appointment_slot_duration: 30,
+    appointment_buffer_time: 15,
 };
 
 const weekDays: { id: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday', label: string }[] = [
@@ -92,15 +105,25 @@ export function WorkHoursManager() {
     const [architecturalSchedule, setArchitecturalSchedule] = useState(defaultSchedule);
     const [holidays, setHolidays] = useState<string[]>([]);
     const [halfDay, setHalfDay] = useState(defaultHalfDay);
+    const [ramadanSchedule, setRamadanSchedule] = useState(defaultRamadanSchedule);
 
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (branding?.work_hours) {
-            setGeneralSchedule({ ...defaultSchedule, ...branding.work_hours.general });
-            setArchitecturalSchedule({ ...defaultSchedule, ...branding.work_hours.architectural });
-            setHolidays(branding.work_hours.holidays || []);
-            setHalfDay({ ...defaultHalfDay, ...branding.work_hours.half_day });
+            const wh = branding.work_hours;
+            setGeneralSchedule({ ...defaultSchedule, ...wh.general });
+            setArchitecturalSchedule({ ...defaultSchedule, ...wh.architectural });
+            setHolidays(wh.holidays || []);
+            setHalfDay({ ...defaultHalfDay, ...wh.half_day });
+             if (wh.ramadan) {
+                setRamadanSchedule({
+                    ...defaultRamadanSchedule,
+                    ...wh.ramadan,
+                    start_date: toFirestoreDate(wh.ramadan.start_date) || undefined,
+                    end_date: toFirestoreDate(wh.ramadan.end_date) || undefined,
+                });
+            }
         }
     }, [branding]);
     
@@ -114,6 +137,11 @@ export function WorkHoursManager() {
                     architectural: { ...architecturalSchedule, appointment_slot_duration: Number(architecturalSchedule.appointment_slot_duration), appointment_buffer_time: Number(architecturalSchedule.appointment_buffer_time) },
                     holidays,
                     half_day: halfDay,
+                    ramadan: {
+                        ...ramadanSchedule,
+                        appointment_slot_duration: Number(ramadanSchedule.appointment_slot_duration),
+                        appointment_buffer_time: Number(ramadanSchedule.appointment_buffer_time),
+                    }
                 }
             };
             await setDoc(doc(firestore, 'company_settings', 'main'), dataToSave, { merge: true });
@@ -173,6 +201,60 @@ export function WorkHoursManager() {
                         </CardContent>
                     </Card>
                  </div>
+                 
+                 <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <CardTitle>أوقات دوام شهر رمضان</CardTitle>
+                                <CardDescription>تفعيل وتخصيص أوقات العمل والمواعيد خلال شهر رمضان.</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="ramadan-enabled">تعطيل/تفعيل</Label>
+                                <Switch
+                                    id="ramadan-enabled"
+                                    checked={ramadanSchedule.is_enabled}
+                                    onCheckedChange={(checked) => setRamadanSchedule(p => ({ ...p, is_enabled: checked }))}
+                                />
+                            </div>
+                        </div>
+                    </CardHeader>
+                    {ramadanSchedule.is_enabled && (
+                        <CardContent className="space-y-6 pt-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label>تاريخ بداية رمضان</Label>
+                                    <DateInput value={ramadanSchedule.start_date} onChange={(date) => setRamadanSchedule(p => ({ ...p, start_date: date }))} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>تاريخ نهاية رمضان</Label>
+                                    <DateInput value={ramadanSchedule.end_date} onChange={(date) => setRamadanSchedule(p => ({ ...p, end_date: date }))} />
+                                </div>
+                            </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label>من الساعة</Label>
+                                    <Input type="time" value={ramadanSchedule.start_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, start_time: e.target.value }))} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>إلى الساعة</Label>
+                                    <Input type="time" value={ramadanSchedule.end_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, end_time: e.target.value }))} />
+                                </div>
+                            </div>
+                            <Separator />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label>مدة كل موعد (بالدقائق)</Label>
+                                    <Input type="number" min="15" step="5" value={ramadanSchedule.appointment_slot_duration} onChange={(e) => setRamadanSchedule(p => ({ ...p, appointment_slot_duration: Number(e.target.value) }))} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>فترة الراحة بين المواعيد (بالدقائق)</Label>
+                                    <Input type="number" min="0" step="5" value={ramadanSchedule.appointment_buffer_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, appointment_buffer_time: Number(e.target.value) }))} />
+                                </div>
+                            </div>
+                        </CardContent>
+                    )}
+                </Card>
 
                 <div className="space-y-4 pt-6 border-t">
                     <h3 className="font-semibold text-lg">إعدادات أيام الأسبوع</h3>
@@ -199,12 +281,12 @@ export function WorkHoursManager() {
                      <div className="p-4 border rounded-lg space-y-4">
                         <Label className="font-semibold">يوم نصف الدوام (اختياري)</Label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Select value={halfDay.day || 'none'} onValueChange={(d) => setHalfDay(p => ({...p, day: d === 'none' ? '' : d}))}>
+                            <Select value={halfDay.day || ''} onValueChange={(d) => setHalfDay(p => ({...p, day: d}))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="اختر اليوم..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">لا يوجد</SelectItem>
+                                    <SelectItem value="">لا يوجد</SelectItem>
                                     {weekDays.filter(d => !holidays.includes(d.id)).map(day => (
                                         <SelectItem key={day.id} value={day.id}>{day.label}</SelectItem>
                                     ))}
@@ -251,3 +333,4 @@ export function WorkHoursManager() {
         </Card>
     );
 }
+    
