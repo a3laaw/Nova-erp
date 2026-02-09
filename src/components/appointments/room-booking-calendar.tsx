@@ -39,6 +39,8 @@ import { InlineSearchList } from '../ui/inline-search-list';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
+import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
+import Link from 'next/link';
 
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -161,6 +163,8 @@ export function RoomBookingCalendar() {
             eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer)
         };
     }, [workHours, date, branding]);
+
+    const hasWorkHours = useMemo(() => morningSlots.length > 0 || eveningSlots.length > 0, [morningSlots, eveningSlots]);
 
     useEffect(() => {
         if (!date) {
@@ -332,32 +336,34 @@ export function RoomBookingCalendar() {
         });
     };
     
-    if (!date) {
-        return (
-            <div dir="rtl" className="p-4 space-y-6">
-                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
-                    <h1 className="text-lg font-bold">تقويم حجوزات القاعات</h1>
-                     <div className="flex items-center gap-2">
-                        <Skeleton className="h-10 w-[280px]" />
-                        <Skeleton className="h-10 w-32" />
-                     </div>
+    const renderSkeleton = () => (
+        <div dir="rtl" className="p-4 space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-lg border no-print">
+                <h1 className="text-lg font-bold">تقويم حجوزات القاعات</h1>
+                    <div className="flex items-center gap-2">
+                    <Skeleton className="h-10 w-[280px]" />
+                    <Skeleton className="h-10 w-32" />
+                    </div>
+            </div>
+            <div className="space-y-4">
+                <div className="border rounded-lg overflow-x-auto">
+                        <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
+                        <Skeleton className="h-6 w-24" />
+                        </h3>
+                    <Skeleton className="h-48 w-full" />
                 </div>
-                <div className="space-y-4">
-                    <div className="border rounded-lg overflow-x-auto">
-                         <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
-                            <Skeleton className="h-6 w-24" />
-                         </h3>
-                        <Skeleton className="h-48 w-full" />
-                    </div>
-                    <div className="border rounded-lg overflow-x-auto">
-                         <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
-                            <Skeleton className="h-6 w-24" />
-                         </h3>
-                        <Skeleton className="h-48 w-full" />
-                    </div>
+                <div className="border rounded-lg overflow-x-auto">
+                        <h3 className="font-bold text-lg p-3 bg-muted print:text-base">
+                        <Skeleton className="h-6 w-24" />
+                        </h3>
+                    <Skeleton className="h-48 w-full" />
                 </div>
             </div>
-        )
+        </div>
+    );
+
+    if (date === undefined || brandingLoading) {
+        return renderSkeleton();
     }
 
     const renderGridSection = (title: string, slots: string[]) => {
@@ -496,11 +502,25 @@ export function RoomBookingCalendar() {
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
                 
-                {loading || brandingLoading ? (
+                {loading ? (
                   <div className='space-y-4'>
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-48 w-full" />
                   </div>
+                ) : !hasWorkHours ? (
+                     <Card className="mt-4">
+                        <CardHeader>
+                            <CardTitle className="text-center">لم يتم تكوين أوقات الدوام</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-center text-muted-foreground">
+                            <p>الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات الدوام العامة للقاعات.</p>
+                            <Button asChild className="mt-4">
+                                <Link href="/dashboard/settings">
+                                    الذهاب إلى الإعدادات
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
                 ) : (
                     <div className="space-y-4">
                         {renderGridSection('الفترة الصباحية', morningSlots)}
