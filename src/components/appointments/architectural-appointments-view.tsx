@@ -929,4 +929,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     );
 }
 
-    
