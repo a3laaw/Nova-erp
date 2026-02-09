@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -65,6 +66,7 @@ export function PendingVisits() {
 
                 // CLIENT-SIDE FILTERING:
                 const filteredPending = allUserAppointments.filter(appt => 
+                    appt.status !== 'cancelled' &&
                     appt.appointmentDate && // Ensure date exists
                     isPast(appt.appointmentDate.toDate()) &&
                     !appt.workStageUpdated
