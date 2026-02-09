@@ -24,10 +24,21 @@ export function EmployeeFinancials({ employeeId }: EmployeeFinancialsProps) {
 
   const queryConstraints = useMemo(() => [
     where('employeeId', '==', employeeId),
-    orderBy('paymentDate', 'desc')
+    // orderBy('paymentDate', 'desc') // This causes a composite index requirement. Sorting will be done client-side.
   ], [employeeId]);
 
   const { data: vouchers, loading, error } = useSubscription<PaymentVoucher>(firestore, 'paymentVouchers', queryConstraints);
+
+  const sortedVouchers = useMemo(() => {
+    if (!vouchers) return [];
+    return [...vouchers].sort((a, b) => {
+        const dateA = toFirestoreDate(a.paymentDate);
+        const dateB = toFirestoreDate(b.paymentDate);
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB.getTime() - dateA.getTime();
+    });
+  }, [vouchers]);
 
   const formatDate = (date: any) => {
     const d = toFirestoreDate(date);
@@ -69,14 +80,14 @@ export function EmployeeFinancials({ employeeId }: EmployeeFinancialsProps) {
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && !error && vouchers.length === 0 && (
+              {!loading && !error && sortedVouchers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                     لا توجد سندات مالية مسجلة لهذا الموظف.
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && vouchers.map((voucher) => (
+              {!loading && sortedVouchers.map((voucher) => (
                 <TableRow key={voucher.id}>
                   <TableCell>
                     <Link href={`/dashboard/accounting/payment-vouchers/${voucher.id}`} className="font-mono hover:underline text-primary">
