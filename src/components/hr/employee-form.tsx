@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -64,6 +63,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         workEndTime: '17:00',
         pieceRateMode: 'salary_with_target' as 'salary_with_target' | 'per_piece',
         targetDescription: '',
+        pieceRate: '',
     });
 
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
@@ -106,6 +106,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 workEndTime: initialData.workEndTime || defaultEndTime,
                 pieceRateMode: initialData.pieceRateMode || 'salary_with_target',
                 targetDescription: initialData.targetDescription || '',
+                pieceRate: String(initialData.pieceRate || ''),
             });
             setShowHousingAllowance(!!initialData.housingAllowance && initialData.housingAllowance > 0);
             setShowTransportAllowance(!!initialData.transportAllowance && initialData.transportAllowance > 0);
@@ -124,9 +125,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     useEffect(() => {
         const noSalaryContractTypes = ['percentage'];
-        const fixedTimeContractTypes = ['permanent'];
+        const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate'].includes(formData.contractType);
 
-        if (noSalaryContractTypes.includes(formData.contractType)) {
+        if (noSalaryContractTypes.includes(formData.contractType) || (formData.contractType === 'piece-rate' && formData.pieceRateMode === 'per_piece')) {
             setFormData(prev => ({
                 ...prev,
                 basicSalary: '0',
@@ -137,7 +138,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setShowTransportAllowance(false);
         }
         
-        const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate'].includes(formData.contractType);
         if (workTimeShouldBeHidden && branding?.work_hours?.general) {
              setFormData(prev => ({
                 ...prev,
@@ -145,7 +145,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 workEndTime: branding.work_hours.general.evening_end_time || '17:00',
             }));
         }
-    }, [formData.contractType, branding]);
+    }, [formData.contractType, formData.pieceRateMode, branding]);
 
 
     useEffect(() => {
@@ -227,6 +227,17 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             return;
         }
         
+         if (formData.contractType === 'piece-rate') {
+            if (formData.pieceRateMode === 'salary_with_target' && !formData.targetDescription.trim()) {
+                toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'الرجاء إدخال وصف للتارجت المطلوب.' });
+                return;
+            }
+            if (formData.pieceRateMode === 'per_piece' && (!formData.pieceRate || parseFloat(formData.pieceRate) <= 0)) {
+                toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'الرجاء إدخال سعر القطعة ويجب أن يكون أكبر من صفر.' });
+                return;
+            }
+        }
+        
         const dataToSave: Partial<Employee> = {
             fullName: formData.fullName,
             nameEn: formData.nameEn,
@@ -252,13 +263,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             if (formData.pieceRateMode === 'salary_with_target') {
                 dataToSave.basicSalary = parseFloat(formData.basicSalary) || 0;
                 dataToSave.targetDescription = formData.targetDescription;
-                dataToSave.housingAllowance = 0;
-                dataToSave.transportAllowance = 0;
+                dataToSave.pieceRate = 0;
             } else { // per_piece
                 dataToSave.basicSalary = 0;
                 dataToSave.housingAllowance = 0;
                 dataToSave.transportAllowance = 0;
                 dataToSave.targetDescription = '';
+                dataToSave.pieceRate = parseFloat(formData.pieceRate) || 0;
             }
         } else {
              dataToSave.basicSalary = parseFloat(formData.basicSalary) || 0;
@@ -266,6 +277,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
              dataToSave.transportAllowance = showTransportAllowance ? (parseFloat(formData.transportAllowance) || 0) : 0;
              dataToSave.pieceRateMode = undefined;
              dataToSave.targetDescription = undefined;
+             dataToSave.pieceRate = undefined;
         }
 
         if (formData.nationality && formData.nationality.trim() !== 'كويتي' && formData.residencyExpiry) {
@@ -437,9 +449,31 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </div>
                             </RadioGroup>
 
+                            {formData.pieceRateMode === 'salary_with_target' && (
+                                <div className="space-y-4 pt-2">
+                                    <div className="grid gap-1.5 max-w-sm">
+                                        <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
+                                        <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
+                                    </div>
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="targetDescription">وصف التارجت المطلوب <span className="text-destructive">*</span></Label>
+                                        <Textarea id="targetDescription" value={formData.targetDescription} onChange={handleInputChange} placeholder="مثال: إنجاز 10 مخططات شهريًا" required/>
+                                    </div>
+                                </div>
+                            )}
+
                             {formData.pieceRateMode === 'per_piece' && (
-                                <div className="text-sm text-muted-foreground p-3 bg-background rounded-md">
-                                    سيتم حساب المستحقات بناءً على المهام المسندة والتي يتم إنجازها.
+                                <div className="grid gap-1.5 pt-2 max-w-sm">
+                                    <Label htmlFor="pieceRate">سعر القطعة (د.ك) <span className="text-destructive">*</span></Label>
+                                    <Input
+                                        id="pieceRate"
+                                        type="number"
+                                        step="any"
+                                        value={formData.pieceRate}
+                                        onChange={handleInputChange}
+                                        dir="ltr"
+                                        required
+                                    />
                                 </div>
                             )}
                         </div>
@@ -489,19 +523,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             </div>
                         </div>
                     )}
-                    
-                    {formData.contractType === 'piece-rate' && formData.pieceRateMode === 'salary_with_target' && (
-                        <div className="space-y-4 pt-2">
-                             <div className="grid gap-1.5 max-w-sm">
-                                <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                                <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="targetDescription">وصف التارجت المطلوب</Label>
-                                <Textarea id="targetDescription" value={formData.targetDescription} onChange={(e) => handleSelectChange('targetDescription', e.target.value)} placeholder="مثال: إنجاز 10 مخططات شهريًا"/>
-                            </div>
-                        </div>
-                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="grid gap-1.5">
@@ -544,5 +565,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
-    
