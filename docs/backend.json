@@ -512,7 +512,7 @@
         "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
-        "contractType": { "type": "string", "enum": ["permanent", "temporary", "percentage", "part-time"] },
+        "contractType": { "type": "string", "enum": ["permanent", "temporary", "percentage", "part-time", "special"] },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
         "department": { "type": "string" },
         "basicSalary": { "type": "number" },
@@ -1468,3 +1468,4 @@
     }
   }
 }
+    

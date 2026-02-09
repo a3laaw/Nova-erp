@@ -229,7 +229,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dataToSave.residencyExpiry = formData.residencyExpiry;
         }
         
-        if (['percentage', 'permanent', 'temporary', 'part-time'].includes(formData.contractType)) {
+        if (['percentage', 'permanent', 'temporary', 'part-time', 'special'].includes(formData.contractType)) {
             dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
         }
         
@@ -346,10 +346,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                     <SelectItem value="temporary">مؤقت</SelectItem>
                                     <SelectItem value="percentage">نسبة من العقود</SelectItem>
                                     <SelectItem value="part-time">دوام جزئي</SelectItem>
+                                    <SelectItem value="special">دوام خاص</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                         {['percentage', 'permanent', 'temporary', 'part-time'].includes(formData.contractType) && (
+                         {['percentage', 'permanent', 'temporary', 'part-time', 'special'].includes(formData.contractType) && (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="contractPercentage">
                                     نسبة العقد (%) {formData.contractType === 'percentage' && <span className="text-destructive">*</span>}
@@ -425,3 +426,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    
