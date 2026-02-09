@@ -430,9 +430,7 @@ export default function NewCashReceiptPage() {
                 const inquiriesStageIndex = currentStages.findIndex(s => s.name === 'استفسارات عامة');
                 if (inquiriesStageIndex !== -1 && currentStages[inquiriesStageIndex].status !== 'completed') {
                     currentStages[inquiriesStageIndex].status = 'completed';
-                    if (!(currentStages[inquiriesStageIndex] as any).endDate) {
-                        (currentStages[inquiriesStageIndex] as any).endDate = new Date();
-                    }
+                    (currentStages[inquiriesStageIndex] as any).endDate = new Date();
                     stagesHaveChanged = true;
                 }
 
@@ -480,45 +478,48 @@ export default function NewCashReceiptPage() {
         
         // --- POST-TRANSACTION WRITES (Batch) ---
         // Commission Journal Entry
-        if (selectedProjectId && transactionDataForCheck?.assignedEngineerId) {
-            const engineer = employees.find(e => e.id === transactionDataForCheck!.assignedEngineerId);
-            if (engineer && engineer.contractType === 'percentage' && engineer.contractPercentage && engineer.contractPercentage > 0) {
-                const commissionAmount = parseFloat(amount) * (engineer.contractPercentage / 100);
-                if (commissionAmount > 0) {
-                    const commissionBatch = writeBatch(firestore);
-                    const salaryExpenseAccount = accounts.find(a => a.code === '5201'); // مصروف الرواتب والأجور
-                    const accruedSalaryAccount = accounts.find(a => a.code === '210201'); // رواتب وأجور مستحقة
-                    
-                    if(salaryExpenseAccount && accruedSalaryAccount && date) {
-                        const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
-                        const jeCounterDoc = await getDoc(jeCounterRef);
-                        let jeNextNumber = 1;
-                        const currentYear = new Date().getFullYear();
-                        if (jeCounterDoc.exists()) {
-                             const counts = jeCounterDoc.data()?.counts || {};
-                             jeNextNumber = (counts[currentYear] || 0) + 1;
+        if (selectedProjectId) {
+            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+            if (selectedProject?.assignedEngineerId) {
+                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
+                if (engineer && engineer.contractPercentage && engineer.contractPercentage > 0) {
+                    const commissionAmount = parseFloat(amount) * (engineer.contractPercentage / 100);
+                    if (commissionAmount > 0) {
+                        const salaryExpenseAccount = accounts.find(a => a.code === '5201'); // مصروف الرواتب والأجور
+                        const accruedSalaryAccount = accounts.find(a => a.code === '210201'); // رواتب وأجور مستحقة
+                        
+                        if(salaryExpenseAccount && accruedSalaryAccount && date) {
+                            const commissionBatch = writeBatch(firestore);
+                            const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
+                            const jeCounterDoc = await getDoc(jeCounterRef);
+                            let jeNextNumber = 1;
+                            const currentYear = new Date().getFullYear();
+                            if (jeCounterDoc.exists()) {
+                                 const counts = jeCounterDoc.data()?.counts || {};
+                                 jeNextNumber = (counts[currentYear] || 0) + 1;
+                            }
+                            const commissionJeNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
+    
+                            const commissionJeRef = doc(collection(firestore, 'journalEntries'));
+                            commissionBatch.set(commissionJeRef, {
+                                entryNumber: commissionJeNumber,
+                                date: Timestamp.fromDate(date),
+                                narration: `إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${newVoucherNumberForCommission}`,
+                                totalDebit: commissionAmount,
+                                totalCredit: commissionAmount,
+                                status: 'posted',
+                                lines: [
+                                    { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: commissionAmount, credit: 0, auto_resource_id: engineer.id },
+                                    { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: 0, credit: commissionAmount, auto_resource_id: engineer.id }
+                                ],
+                                linkedReceiptId: newReceiptId,
+                                createdAt: serverTimestamp(),
+                                createdBy: 'system-auto-commission',
+                            });
+                            commissionBatch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber } }, { merge: true });
+                            await commissionBatch.commit();
+                            toast({ title: 'إشعار', description: `تم إنشاء قيد عمولة تلقائي للمهندس ${engineer.fullName}.` });
                         }
-                        const commissionJeNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
-
-                        const commissionJeRef = doc(collection(firestore, 'journalEntries'));
-                        commissionBatch.set(commissionJeRef, {
-                            entryNumber: commissionJeNumber,
-                            date: Timestamp.fromDate(date),
-                            narration: `إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${newVoucherNumberForCommission}`,
-                            totalDebit: commissionAmount,
-                            totalCredit: commissionAmount,
-                            status: 'posted',
-                            lines: [
-                                { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: commissionAmount, credit: 0, auto_resource_id: engineer.id },
-                                { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: 0, credit: commissionAmount, auto_resource_id: engineer.id }
-                            ],
-                            linkedReceiptId: newReceiptId,
-                            createdAt: serverTimestamp(),
-                            createdBy: 'system-auto-commission',
-                        });
-                        commissionBatch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber } }, { merge: true });
-                        await commissionBatch.commit();
-                        toast({ title: 'إشعار', description: `تم إنشاء قيد عمولة تلقائي للمهندس ${engineer.fullName}.` });
                     }
                 }
             }

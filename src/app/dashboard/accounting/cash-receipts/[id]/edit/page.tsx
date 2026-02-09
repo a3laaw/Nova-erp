@@ -293,9 +293,9 @@ export default function EditCashReceiptPage() {
 
 
  const handleSave = async () => {
-    if (!firestore || !currentUser || !id || !originalReceipt) return;
+    if (!firestore || !currentUser || !id || !originalReceipt || !date) return;
 
-    if (!amount || !date || !paymentMethod || !debitAccountId) {
+    if (!amount || !paymentMethod || !debitAccountId) {
         toast({
             variant: 'destructive',
             title: 'حقول ناقصة',
@@ -392,6 +392,63 @@ export default function EditCashReceiptPage() {
                 transaction_fs.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
             }
         });
+
+        // --- Commission logic ---
+        const commissionJeQuery = query(collection(firestore, 'journalEntries'), where('linkedReceiptId', '==', id));
+        const oldCommissionEntries = await getDocs(commissionJeQuery);
+        
+        const deleteBatch = writeBatch(firestore);
+        oldCommissionEntries.forEach(doc => {
+            deleteBatch.delete(doc.ref);
+        });
+        await deleteBatch.commit();
+
+        const projectIdForCommission = selectedProjectId || originalReceipt.projectId || null;
+        if (projectIdForCommission) {
+            const projectForCommission = clientProjects.find(p => p.id === projectIdForCommission);
+            if (projectForCommission?.assignedEngineerId) {
+                 const engineer = employees.find(e => e.id === projectForCommission.assignedEngineerId);
+                 if (engineer && engineer.contractPercentage && engineer.contractPercentage > 0) {
+                    const commissionAmount = parseFloat(amount) * (engineer.contractPercentage / 100);
+                    if (commissionAmount > 0) {
+                        const salaryExpenseAccount = accounts.find(a => a.code === '5201');
+                        const accruedSalaryAccount = accounts.find(a => a.code === '210201');
+                        if (salaryExpenseAccount && accruedSalaryAccount && date) {
+                            const createBatch = writeBatch(firestore);
+                            const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
+                            const jeCounterDoc = await getDoc(jeCounterRef);
+                            let jeNextNumber = 1;
+                            const currentYear = new Date().getFullYear();
+                            if (jeCounterDoc.exists()) {
+                                 const counts = jeCounterDoc.data()?.counts || {};
+                                 jeNextNumber = (counts[currentYear] || 0) + 1;
+                            }
+                            const commissionJeNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
+
+                            const commissionJeRef = doc(collection(firestore, 'journalEntries'));
+                            createBatch.set(commissionJeRef, {
+                                entryNumber: commissionJeNumber,
+                                date: Timestamp.fromDate(date),
+                                narration: `(تحديث) إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${originalReceipt.voucherNumber}`,
+                                totalDebit: commissionAmount,
+                                totalCredit: commissionAmount,
+                                status: 'posted',
+                                lines: [
+                                    { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: commissionAmount, credit: 0, auto_resource_id: engineer.id },
+                                    { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: 0, credit: commissionAmount, auto_resource_id: engineer.id }
+                                ],
+                                linkedReceiptId: id,
+                                createdAt: serverTimestamp(),
+                                createdBy: 'system-auto-commission',
+                            });
+                            createBatch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber } }, { merge: true });
+                            await createBatch.commit();
+                            toast({ title: 'إشعار', description: `تم تحديث قيد العمولة التلقائي للمهندس ${engineer.fullName}.` });
+                        }
+                    }
+                 }
+            }
+        }
 
         // --- POST-TRANSACTION WRITES (Batch) ---
         if (projectId && transactionDataForCheck) {
