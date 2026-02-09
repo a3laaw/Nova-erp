@@ -28,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface ProspectiveClient {
   id: string; // Using mobile as a unique ID for grouping
@@ -89,13 +90,15 @@ export function ProspectiveClientsList() {
 
     const result: ProspectiveClient[] = [];
     clientsMap.forEach((data, mobile) => {
-        const sortedAppointments = data.appointments.sort((a,b) => b.appointmentDate.toDate().getTime() - a.appointmentDate.toDate().getTime());
+        const sortedAppointments = data.appointments.sort((a,b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
         const lastAppointment = sortedAppointments[0];
         
         let status: ProspectiveClient['status'] = 'active-visit';
+        const lastAppointmentDate = toFirestoreDate(lastAppointment.appointmentDate);
+
         if (lastAppointment.status === 'cancelled') {
             status = 'cancelled-visit';
-        } else if (isPast(lastAppointment.appointmentDate.toDate()) && !lastAppointment.workStageUpdated) {
+        } else if (lastAppointmentDate && isPast(lastAppointmentDate) && !lastAppointment.workStageUpdated) {
             status = 'no-show';
         }
 
@@ -105,7 +108,7 @@ export function ProspectiveClientsList() {
             mobile: mobile,
             engineerId: lastAppointment.engineerId,
             engineerName: engineersMap.get(lastAppointment.engineerId) || 'غير معروف',
-            lastAppointmentDate: lastAppointment.appointmentDate.toDate(),
+            lastAppointmentDate: lastAppointmentDate!,
             visitCount: data.appointments.filter(a => a.status !== 'cancelled').length,
             status,
         });
