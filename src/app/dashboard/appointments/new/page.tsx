@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -16,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp, updateDoc, doc, deleteField, writeBatch } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp, updateDoc, doc, deleteField, writeBatch, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -227,6 +228,14 @@ export default function NewArchitecturalAppointmentPage() {
                 if (!querySnapshot.empty) {
                     throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}.`);
                 }
+                
+                const appointmentsRef = collection(firestore, 'appointments');
+                const prospectiveQuery = query(appointmentsRef, where('clientMobile', '==', newClientMobile), limit(1));
+                const prospectiveSnapshot = await getDocs(prospectiveQuery);
+                
+                if (!prospectiveSnapshot.empty) {
+                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
+                }
             }
             
             // --- Conflict Validation ---
@@ -253,6 +262,7 @@ export default function NewArchitecturalAppointmentPage() {
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
                 type: 'architectural',
+                status: 'scheduled',
             };
             
             if(isNewClient) {

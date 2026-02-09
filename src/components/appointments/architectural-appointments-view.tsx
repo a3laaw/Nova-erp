@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy, limit } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -625,6 +625,26 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 throw new Error('لا يمكن حجز موعد في وقت قد مضى.');
             }
 
+            if (isNewClient) {
+                if (!newClientName || !newClientMobile) {
+                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
+                }
+                const clientsRef = collection(firestore, 'clients');
+                const q = query(clientsRef, where('mobile', '==', newClientMobile));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`);
+                }
+                const prospectiveApptsRef = collection(firestore, 'appointments');
+                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), limit(1));
+                const prospectiveSnapshot = await getDocs(prospectiveQuery);
+                if (!prospectiveSnapshot.empty) {
+                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
+                }
+            } else if (!selectedClientId) {
+                 throw new Error('الرجاء اختيار عميل.');
+            }
+
             const dataToSave: any = {
                 title: title.trim() || (isNewClient ? newClientName : clients.find((c:any) => c.id === selectedClientId)?.nameAr),
                 notes: notes,
@@ -638,18 +658,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             let reconcileIdentifier: { clientId?: string | null; clientMobile?: string | null } = {};
 
             if (isNewClient) {
-                if (!newClientName || !newClientMobile) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('mobile', '==', newClientMobile));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`);
-                }
                 dataToSave.clientName = newClientName;
                 dataToSave.clientMobile = newClientMobile;
                 reconcileIdentifier = { clientMobile: newClientMobile };
             } else {
-                if (!selectedClientId) throw new Error('الرجاء اختيار عميل.');
                 dataToSave.clientId = selectedClientId;
                 reconcileIdentifier = { clientId: selectedClientId };
             }
