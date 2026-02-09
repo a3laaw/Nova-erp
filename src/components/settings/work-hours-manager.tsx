@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useBranding } from '@/context/branding-context';
+import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -281,12 +281,15 @@ export function WorkHoursManager() {
                      <div className="p-4 border rounded-lg space-y-4">
                         <Label className="font-semibold">يوم نصف الدوام (اختياري)</Label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Select value={halfDay.day || ''} onValueChange={(d) => setHalfDay(p => ({...p, day: d}))}>
+                            <Select 
+                                value={halfDay.day || '_NONE_'} 
+                                onValueChange={(d) => setHalfDay(p => ({...p, day: d === '_NONE_' ? '' : d}))}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="اختر اليوم..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">لا يوجد</SelectItem>
+                                    <SelectItem value="_NONE_">لا يوجد</SelectItem>
                                     {weekDays.filter(d => !holidays.includes(d.id)).map(day => (
                                         <SelectItem key={day.id} value={day.id}>{day.label}</SelectItem>
                                     ))}
