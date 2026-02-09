@@ -57,16 +57,17 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
       currentTime = new Date(currentTime.getTime() + buffer * 60000);
     }
     
-    const totalIncrement = slotDuration + buffer;
-
     while (currentTime < endTime) {
-        // Ensure the slot itself doesn't push past the end time
         const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
+        
         if (slotEndTime > endTime) {
-            break; // This slot would end too late, so we don't add it
+            break; // This slot would end too late
         }
+        
         slots.push(format(currentTime, 'HH:mm'));
-        currentTime = new Date(currentTime.getTime() + totalIncrement * 60000);
+        
+        // Move to the end of the current slot, then add the buffer for the next one
+        currentTime = new Date(slotEndTime.getTime() + buffer * 60000);
     }
     return slots;
 };
@@ -724,13 +725,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const prospectiveApptsRef = collection(firestore, 'appointments');
                 const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '!=', 'cancelled'), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
-                if (!prospectiveSnapshot.empty) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'عميل محتمل موجود',
-                        description: 'هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".',
-                    });
-                    setIsSaving(false); return;
+                if (!prospectiveSnapshot.empty && (!isEditing || prospectiveSnapshot.docs[0].id !== dialogData.id)) {
+                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
                 }
 
                 const newAppointmentData = {
@@ -738,22 +734,29 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime),
                     type: 'architectural' as const, status: 'scheduled' as const, visitCount: 1, color: '#facc15', createdAt: serverTimestamp(),
                 };
-                await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+                if(isEditing) {
+                    await updateDoc(doc(firestore, 'appointments', dialogData.id), newAppointmentData);
+                } else {
+                    await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+                }
                 toast({ title: 'نجاح', description: 'تم حفظ الموعد للعميل الجديد بنجاح.' });
             } else {
                 const client = clients.find((c: Client) => c.id === selectedClientId);
                 if (!client) {
                     throw new Error('الرجاء اختيار العميل.');
                 }
+                
                 const batch = writeBatch(firestore);
                 if (isEditing) {
                     const oldApptRef = doc(firestore, 'appointments', dialogData.id);
                     batch.delete(oldApptRef);
                 }
+
                 const allClientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'));
                 const allClientApptsSnap = await getDocs(allClientApptsQuery);
                 const existingAppointments = allClientApptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment)).filter(a => isEditing ? a.id !== dialogData.id : true);
                 const contractSigned = client.status === 'contracted' || client.status === 'reContracted';
+                
                 const newAppointmentObject = {
                     id: 'new-temp-id', appointmentDate: Timestamp.fromDate(appointmentDateTime),
                     clientId: client.id, title: title || client.nameAr, notes: notes, engineerId: dialogData.engineerId,

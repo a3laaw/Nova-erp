@@ -68,16 +68,17 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
       currentTime = new Date(currentTime.getTime() + buffer * 60000);
     }
     
-    const totalIncrement = slotDuration + buffer;
-
     while (currentTime < endTime) {
-        // Ensure the slot itself doesn't push past the end time
         const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
+        
         if (slotEndTime > endTime) {
-            break; // This slot would end too late, so we don't add it
+            break; // This slot would end too late
         }
+        
         slots.push(format(currentTime, 'HH:mm'));
-        currentTime = new Date(currentTime.getTime() + totalIncrement * 60000);
+        
+        // Move to the end of the current slot, then add the buffer for the next one
+        currentTime = new Date(slotEndTime.getTime() + buffer * 60000);
     }
     return slots;
 };
