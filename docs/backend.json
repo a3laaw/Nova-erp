@@ -398,8 +398,7 @@
         "endDate": { "type": ["string", "null"], "format": "date-time", "description": "When the stage was completed." },
         "expectedEndDate": { "type": ["string", "null"], "format": "date-time", "description": "The expected completion date for countdowns." },
         "notes": { "type": ["string", "null"], "description": "Notes specific to this stage." },
-        "completedCount": { "type": ["number", "null"], "description": "How many times this stage has been completed (if trackingType is 'occurrence')."},
-        "modificationCount": { "type": ["number", "null"], "description": "How many times modifications were requested during this stage."}
+        "completedCount": { "type": ["number", "null"], "description": "How many times this stage has been completed (if trackingType is 'occurrence')."}
       },
       "required": ["stageId", "name", "status"]
     },
@@ -708,7 +707,6 @@
         "nextStageIds": { "type": "array", "description": "A list of possible next stage IDs to transition to from this stage.", "items": { "type": "string" } },
         "allowedDuringStages": { "type": "array", "description": "For parallel stages only. A list of sequential stage IDs during which this parallel stage can be initiated.", "items": { "type": "string" } },
         "trackingType": { "type": "string", "enum": ["duration", "occurrence", "none"], "description": "How to track progress: by time, occurrences, or as a single event." },
-        "enableModificationTracking": { "type": "boolean", "description": "If true, enables a counter for modifications on this stage." },
         "expectedDurationDays": { "type": ["number", "null"], "description": "The expected duration in days for this stage (if trackingType is 'duration')." },
         "maxOccurrences": { "type": ["number", "null"], "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')." },
         "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." }
@@ -757,6 +755,11 @@
           "type": "string",
           "description": "Distinguishes between architectural appointments and room bookings.",
           "enum": ["architectural", "room"]
+        },
+        "status": {
+            "type": "string",
+            "description": "The current status of the appointment, especially for cancellation tracking.",
+            "enum": ["scheduled", "cancelled"]
         },
         "appointmentDate": {
           "type": "string",
@@ -1064,8 +1067,6 @@
         "voucherYear": { "type": "number" },
         "payeeName": { "type": "string" },
         "payeeType": { "type": "string", "enum": ["vendor", "employee", "other"] },
-        "employeeId": { "type": "string", "description": "Link to employee for specific payments like residency renewal." },
-        "renewalExpiryDate": { "type": "string", "format": "date-time", "description": "Stores the new expiry date when renewing residency."},
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "paymentDate": { "type": "string", "format": "date-time" },
@@ -1363,14 +1364,8 @@
         "$ref": "#/entities/PurchaseOrder"
       },
       "description": "Stores all purchase orders issued to vendors."
-    },
-    "/residencyRenewals/{renewalId}": {
-      "schema": {
-        "$ref": "#/entities/ResidencyRenewal"
-      },
-      "description": "Stores records of employee residency renewals and their costs."
     }
   }
 }
 
-    
+  

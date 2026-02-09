@@ -2,15 +2,21 @@
 'use client';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { NoShowClientsReport } from '@/components/reports/no-show-clients-report';
-import { FollowUpClientsReport } from '@/components/reports/follow-up-clients-report';
-import { useAnalyticalData } from '@/hooks/use-analytical-data';
+import { NoShowClientsReport } from './no-show-clients-report';
+import { FollowUpClientsReport } from './follow-up-clients-report';
+import type { Appointment, Client, Employee, ClientTransaction } from '@/lib/types';
 
-export default function ProspectiveClientsReportPage() {
-    const { appointments, employees, clients, transactions, loading } = useAnalyticalData();
+interface Props {
+    appointments: Appointment[];
+    employees: Employee[];
+    clients: Client[];
+    transactions: (ClientTransaction & { clientId: string })[];
+    loading: boolean;
+}
 
+export function ProspectiveClientsDashboard({ appointments, employees, clients, transactions, loading }: Props) {
     return (
-        <Card>
+        <Card className="col-span-1 md:col-span-2">
             <CardHeader>
                 <CardTitle>متابعة العملاء المحتملين</CardTitle>
                 <CardDescription>تحليل العملاء الذين لم يتعاقدوا بعد، سواء لم يحضروا أو توقفوا بعد الاستفسارات.</CardDescription>
