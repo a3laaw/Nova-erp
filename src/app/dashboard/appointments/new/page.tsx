@@ -226,7 +226,13 @@ export default function NewArchitecturalAppointmentPage() {
                 const q = query(clientsRef, where('mobile', '==', newClientMobile));
                 const querySnapshot = await getDocs(q);
                 if (!querySnapshot.empty) {
-                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}.`);
+                    toast({
+                        variant: 'destructive',
+                        title: 'رقم الجوال مسجل',
+                        description: `رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}.`,
+                    });
+                    setIsSaving(false);
+                    return;
                 }
                 
                 const appointmentsRef = collection(firestore, 'appointments');
@@ -234,7 +240,13 @@ export default function NewArchitecturalAppointmentPage() {
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 
                 if (!prospectiveSnapshot.empty) {
-                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
+                    toast({
+                        variant: 'destructive',
+                        title: 'عميل محتمل موجود',
+                        description: 'هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".',
+                    });
+                    setIsSaving(false);
+                    return;
                 }
             }
             
