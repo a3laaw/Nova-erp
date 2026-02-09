@@ -512,7 +512,7 @@
         "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
-        "contractType": { "type": "string", "enum": ["permanent", "temporary", "percentage", "part-time", "special", "piece-rate"] },
+        "contractType": { "type": "string", "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special"] },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
         "pieceRateMode": {
           "type": "string",
@@ -522,6 +522,10 @@
         "targetDescription": {
             "type": "string",
             "description": "For salary-with-target contracts, this describes the monthly/weekly target."
+        },
+        "pieceRate": {
+            "type": "number",
+            "description": "The price per piece for 'per_piece' contract types."
         },
         "department": { "type": "string" },
         "basicSalary": { "type": "number" },
@@ -1477,4 +1481,3 @@
     }
   }
 }
-    
