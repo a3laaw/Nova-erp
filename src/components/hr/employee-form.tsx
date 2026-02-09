@@ -105,7 +105,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 workStartTime: initialData.workStartTime || defaultStartTime,
                 workEndTime: initialData.workEndTime || defaultEndTime,
                 pieceRateMode: initialData.pieceRateMode || 'salary_with_target',
-                targetDescription: initialData.targetDescription || '',
+                targetDescription: String(initialData.targetDescription || ''),
                 pieceRate: String(initialData.pieceRate || ''),
             });
             setShowHousingAllowance(!!initialData.housingAllowance && initialData.housingAllowance > 0);
@@ -229,7 +229,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         
          if (formData.contractType === 'piece-rate') {
             if (formData.pieceRateMode === 'salary_with_target' && !formData.targetDescription.trim()) {
-                toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'الرجاء إدخال وصف للتارجت المطلوب.' });
+                toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'الرجاء إدخال العدد المستهدف (التارجت).' });
                 return;
             }
             if (formData.pieceRateMode === 'per_piece' && (!formData.pieceRate || parseFloat(formData.pieceRate) <= 0)) {
@@ -262,13 +262,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dataToSave.pieceRateMode = formData.pieceRateMode;
             if (formData.pieceRateMode === 'salary_with_target') {
                 dataToSave.basicSalary = parseFloat(formData.basicSalary) || 0;
-                dataToSave.targetDescription = formData.targetDescription;
+                dataToSave.targetDescription = parseFloat(formData.targetDescription) || 0;
                 dataToSave.pieceRate = 0;
             } else { // per_piece
                 dataToSave.basicSalary = 0;
                 dataToSave.housingAllowance = 0;
                 dataToSave.transportAllowance = 0;
-                dataToSave.targetDescription = '';
+                dataToSave.targetDescription = 0;
                 dataToSave.pieceRate = parseFloat(formData.pieceRate) || 0;
             }
         } else {
@@ -456,8 +456,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                         <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
                                     </div>
                                     <div className="grid gap-1.5">
-                                        <Label htmlFor="targetDescription">وصف التارجت المطلوب <span className="text-destructive">*</span></Label>
-                                        <Textarea id="targetDescription" value={formData.targetDescription} onChange={handleInputChange} placeholder="مثال: إنجاز 10 مخططات شهريًا" required/>
+                                        <Label htmlFor="targetDescription">العدد المستهدف (تارجت) <span className="text-destructive">*</span></Label>
+                                        <Input id="targetDescription" type="number" value={formData.targetDescription} onChange={handleInputChange} placeholder="مثال: 10" required dir="ltr"/>
                                     </div>
                                 </div>
                             )}
@@ -565,3 +565,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    

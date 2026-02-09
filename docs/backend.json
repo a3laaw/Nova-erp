@@ -520,8 +520,8 @@
           "description": "For piece-rate contracts, defines if it's a fixed salary with a target, or purely per piece."
         },
         "targetDescription": {
-            "type": "string",
-            "description": "For salary-with-target contracts, this describes the monthly/weekly target."
+            "type": "number",
+            "description": "For salary-with-target contracts, this defines the numerical monthly/weekly target."
         },
         "pieceRate": {
             "type": "number",
@@ -1481,3 +1481,4 @@
     }
   }
 }
+    

@@ -253,7 +253,7 @@ export type Employee = {
     contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special';
     contractPercentage?: number;
     pieceRateMode?: 'salary_with_target' | 'per_piece';
-    targetDescription?: string;
+    targetDescription?: number;
     pieceRate?: number;
     department: string;
     basicSalary: number; 
@@ -682,4 +682,5 @@ export interface ResidencyRenewal {
     lastAmortizationDate?: any;
 }
 
+    
     
