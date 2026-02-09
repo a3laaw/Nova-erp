@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -265,95 +264,25 @@ export function ArchitecturalAppointmentsView() {
         setIsDialogOpen(true);
     };
 
-    const handleDeleteBooking = async () => {
+    const handleCancelBooking = async () => {
         if (!appointmentToDelete || !firestore || !currentUser) return;
     
         setIsDeleting(true);
         try {
-            const batch = writeBatch(firestore);
-            const { id: apptId, workStageProgressId, transactionId, clientId, visitCount, title, clientMobile } = appointmentToDelete;
-    
-            let stageRevertedMessage = '';
-    
-            if (workStageProgressId && transactionId && clientId) {
-                const progressRef = doc(firestore, 'work_stages_progress', workStageProgressId);
-                const progressSnap = await getDoc(progressRef);
-                
-                if (progressSnap.exists()) {
-                    const { stageId, stageName } = progressSnap.data();
-                    const transactionRef = doc(firestore, 'clients', clientId, 'transactions', transactionId);
-                    const transactionSnap = await getDoc(transactionRef);
-                    
-                    if (transactionSnap.exists()) {
-                        const transactionData = transactionSnap.data();
-                        const currentStages = transactionData.stages ? JSON.parse(JSON.stringify(transactionData.stages)) : [];
-                        const stageToRevertIndex = currentStages.findIndex((s: TransactionStage) => s.stageId === stageId && s.status === 'completed');
-                        
-                        if (stageToRevertIndex !== -1) {
-                            currentStages[stageToRevertIndex].status = 'pending';
-                            currentStages[stageToRevertIndex].endDate = null;
-                            
-                            const deptId = transactionData.departmentId;
-                            if (deptId) {
-                                const stagesTemplateQuery = query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'));
-                                const stagesTemplateSnap = await getDocs(stagesTemplateQuery);
-                                const stagesTemplate = stagesTemplateSnap.docs.map(d => ({id: d.id, ...d.data()} as WorkStage));
-                                const revertedStageTemplate = stagesTemplate.find(s => s.id === stageId);
-    
-                                if (revertedStageTemplate && revertedStageTemplate.order !== undefined) {
-                                    const nextStageTemplate = stagesTemplate.find(s => s.order === revertedStageTemplate.order! + 1 && s.stageType !== 'parallel');
-                                    if (nextStageTemplate) {
-                                        const nextStageIndexInProg = currentStages.findIndex((s: TransactionStage) => s.stageId === nextStageTemplate.id);
-                                        if (nextStageIndexInProg > -1 && currentStages[nextStageIndexInProg].status === 'in-progress') {
-                                            currentStages[nextStageIndexInProg].status = 'pending';
-                                            currentStages[nextStageIndexInProg].startDate = null;
-                                        }
-                                    }
-                                }
-                            }
-    
-                            batch.update(transactionRef, { stages: currentStages });
-                            stageRevertedMessage = ` مما أدى إلى التراجع التلقائي عن مرحلة "${stageName}".`;
-                        }
-                    }
-                    batch.delete(progressRef);
-                }
-            }
-    
-            if (clientId) {
-                const logContent = `قام ${currentUser.fullName} بإلغاء موعد الزيارة رقم ${visitCount || ''} ("${title}").${stageRevertedMessage}`;
-                const logData = {
-                    type: 'log' as const,
-                    content: logContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                };
-    
-                const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
-                batch.set(historyRef, { ...logData, content: `[موعد] ${logContent}` });
-    
-                if (transactionId) {
-                    const timelineRef = doc(collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`));
-                    batch.set(timelineRef, logData);
-                }
-            }
+            const { id: apptId, clientId, clientMobile } = appointmentToDelete;
     
             const apptToDeleteRef = doc(firestore, 'appointments', apptId!);
-            batch.update(apptToDeleteRef, { status: 'cancelled' });
+            await updateDoc(apptToDeleteRef, { status: 'cancelled' });
     
-            await batch.commit();
-
             if (clientId || clientMobile) {
                 await reconcileClientAppointments(firestore, { clientId, clientMobile });
             }
     
-            toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث البيانات المرتبطة به.' });
+            toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث الجدول.' });
             if(date) await fetchAppointments(date);
     
         } catch (error) {
-            console.error("Error deleting appointment:", error);
+            console.error("Error cancelling appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
         } finally {
             setIsDeleting(false);
@@ -572,7 +501,7 @@ export function ArchitecturalAppointmentsView() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeleting}>تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteBooking} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                        <AlertDialogAction onClick={handleCancelBooking} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
                             {isDeleting ? 'جاري الإلغاء...' : 'نعم، قم بالإلغاء'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -698,6 +627,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 engineerId: dialogData.engineerId,
                 type: 'architectural',
+                status: 'scheduled',
                 transactionId: selectedTransactionId || null,
             };
 
@@ -828,7 +758,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : (!selectedClientId)) }>
+                        <Button type="submit" disabled={isSaving || (!isNewClient && !selectedClientId) }>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
@@ -838,4 +768,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-

@@ -10,23 +10,48 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Calendar, User } from 'lucide-react';
+import { UserPlus, Calendar, UserX, Repeat, MoreHorizontal } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Appointment, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { Badge } from '../ui/badge';
+import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ProspectiveClient {
+  id: string; // Using mobile as a unique ID for grouping
   name: string;
   mobile: string;
   engineerId: string;
   engineerName: string;
   lastAppointmentDate: Date;
   visitCount: number;
+  status: 'active-visit' | 'no-show' | 'cancelled-visit';
 }
+
+const statusTranslations: Record<ProspectiveClient['status'], string> = {
+    'active-visit': 'زيارة قادمة',
+    'no-show': 'لم يحضر',
+    'cancelled-visit': 'زيارة ملغاة'
+};
+
+const statusColors: Record<ProspectiveClient['status'], string> = {
+    'active-visit': 'bg-blue-100 text-blue-800 border-blue-200',
+    'no-show': 'bg-red-100 text-red-800 border-red-200',
+    'cancelled-visit': 'bg-gray-100 text-gray-800 border-gray-200',
+};
+
 
 export function ProspectiveClientsList() {
   const { firestore } = useFirebase();
@@ -51,34 +76,43 @@ export function ProspectiveClientsList() {
   const prospectiveClients = useMemo(() => {
     if (!prospectiveAppointments) return [];
 
-    const clientsMap = new Map<string, ProspectiveClient>();
+    const clientsMap = new Map<string, { appointments: Appointment[] }>();
 
     prospectiveAppointments.forEach(appt => {
-      if (!appt.clientMobile || !appt.clientName) return;
+      if (!appt.clientMobile) return;
 
-      const existing = clientsMap.get(appt.clientMobile);
-      const appointmentDate = appt.appointmentDate?.toDate ? appt.appointmentDate.toDate() : new Date();
-
-      if (existing) {
-        existing.visitCount += 1;
-        if (appointmentDate > existing.lastAppointmentDate) {
-          existing.lastAppointmentDate = appointmentDate;
-          existing.engineerName = engineersMap.get(appt.engineerId) || 'غير معروف';
-          existing.engineerId = appt.engineerId;
-        }
-      } else {
-        clientsMap.set(appt.clientMobile, {
-          name: appt.clientName,
-          mobile: appt.clientMobile,
-          engineerId: appt.engineerId,
-          engineerName: engineersMap.get(appt.engineerId) || 'غير معروف',
-          lastAppointmentDate: appointmentDate,
-          visitCount: 1,
-        });
+      if (!clientsMap.has(appt.clientMobile)) {
+        clientsMap.set(appt.clientMobile, { appointments: [] });
       }
+      clientsMap.get(appt.clientMobile)!.appointments.push(appt);
     });
 
-    return Array.from(clientsMap.values()).sort((a,b) => b.lastAppointmentDate.getTime() - a.lastAppointmentDate.getTime());
+    const result: ProspectiveClient[] = [];
+    clientsMap.forEach((data, mobile) => {
+        const sortedAppointments = data.appointments.sort((a,b) => b.appointmentDate.toDate().getTime() - a.appointmentDate.toDate().getTime());
+        const lastAppointment = sortedAppointments[0];
+        
+        let status: ProspectiveClient['status'] = 'active-visit';
+        if (lastAppointment.status === 'cancelled') {
+            status = 'cancelled-visit';
+        } else if (isPast(lastAppointment.appointmentDate.toDate()) && !lastAppointment.workStageUpdated) {
+            status = 'no-show';
+        }
+
+        result.push({
+            id: mobile,
+            name: lastAppointment.clientName || 'اسم غير معروف',
+            mobile: mobile,
+            engineerId: lastAppointment.engineerId,
+            engineerName: engineersMap.get(lastAppointment.engineerId) || 'غير معروف',
+            lastAppointmentDate: lastAppointment.appointmentDate.toDate(),
+            visitCount: data.appointments.filter(a => a.status !== 'cancelled').length,
+            status,
+        });
+    });
+
+    return result.sort((a,b) => b.lastAppointmentDate.getTime() - a.lastAppointmentDate.getTime());
+
   }, [prospectiveAppointments, engineersMap]);
   
   const filteredClients = useMemo(() => {
@@ -106,37 +140,61 @@ export function ProspectiveClientsList() {
                       <TableRow>
                           <TableHead>الاسم</TableHead>
                           <TableHead>الجوال</TableHead>
-                          <TableHead>آخر زيارة</TableHead>
-                          <TableHead>المهندس المسؤول</TableHead>
-                          <TableHead className="text-center">عدد الزيارات</TableHead>
+                          <TableHead>آخر تفاعل</TableHead>
+                          <TableHead>الحالة</TableHead>
                           <TableHead className="text-center">الإجراء</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
                       {loading && Array.from({ length: 3 }).map((_, i) => (
                           <TableRow key={i}>
-                              <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+                              <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
                           </TableRow>
                       ))}
                       {!loading && filteredClients.length === 0 && (
                            <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">لا يوجد عملاء محتملون حالياً.</TableCell>
+                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">لا يوجد عملاء محتملون حالياً.</TableCell>
                            </TableRow>
                       )}
                       {!loading && filteredClients.map(client => (
-                          <TableRow key={client.mobile}>
+                          <TableRow key={client.id}>
                               <TableCell className="font-medium">{client.name}</TableCell>
                               <TableCell dir="ltr" className="text-left">{client.mobile}</TableCell>
-                              <TableCell>{format(client.lastAppointmentDate, "PPP", { locale: ar })}</TableCell>
-                              <TableCell>{client.engineerName}</TableCell>
-                              <TableCell className="text-center">{client.visitCount}</TableCell>
+                              <TableCell>
+                                  <div>{format(client.lastAppointmentDate, "PPP", { locale: ar })}</div>
+                                  <div className="text-xs text-muted-foreground">{client.engineerName}</div>
+                              </TableCell>
+                               <TableCell>
+                                <Badge variant="outline" className={cn(statusColors[client.status])}>
+                                    {statusTranslations[client.status]}
+                                </Badge>
+                              </TableCell>
                               <TableCell className="text-center">
-                                  <Button asChild variant="outline" size="sm">
-                                      <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}&engineerId=${encodeURIComponent(client.engineerId)}`}>
-                                          <UserPlus className="ml-2 h-4 w-4" />
-                                          إنشاء ملف
-                                      </Link>
-                                  </Button>
+                                  <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent dir="rtl">
+                                          <DropdownMenuLabel>إجراءات المتابعة</DropdownMenuLabel>
+                                          <DropdownMenuItem asChild>
+                                             <Link href={`/dashboard/appointments/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}&engineerId=${encodeURIComponent(client.engineerId)}`}>
+                                                <Calendar className="ml-2 h-4 w-4" />
+                                                حجز موعد جديد
+                                             </Link>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem asChild>
+                                            <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}&engineerId=${encodeURIComponent(client.engineerId)}`}>
+                                                <UserPlus className="ml-2 h-4 w-4" />
+                                                تحويل إلى عميل
+                                            </Link>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                              <Trash2 className="ml-2 h-4 w-4" />
+                                              إلغاء المتابعة
+                                          </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
                               </TableCell>
                           </TableRow>
                       ))}

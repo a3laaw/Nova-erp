@@ -1,6 +1,5 @@
 
 
-
 export interface Company {
     id?: string;
     name: string;
@@ -121,11 +120,13 @@ export type Appointment = {
   clientId?: string;
   clientName?: string;
   clientMobile?: string;
+  prospectiveClientId?: string; // NEW: Link to a prospective client record
   engineerId: string;
   engineerName?: string;
   meetingRoom?: string;
   department?: string;
   type: 'architectural' | 'room';
+  status?: 'scheduled' | 'cancelled';
   notes?: string;
   transactionId?: string;
   workStageUpdated?: boolean;
