@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import type { LeaveRequest } from '@/lib/types';
@@ -21,6 +21,10 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { LeaveRequestForm } from './leave-request-form';
 import { toFirestoreDate } from '@/services/date-converter';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
+
 
 const statusColors: Record<LeaveRequest['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -36,16 +40,34 @@ const statusTranslations: Record<LeaveRequest['status'], string> = {
 
 export function LeaveRequestsList() {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: leaveRequests, loading, error, setData: setLeaveRequests } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+  const { data: leaveRequests, loading, error } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
+  const handleDeleteRequest = async () => {
+    if (!requestToDelete || !firestore) return;
+    setIsDeleting(true);
+    try {
+        await deleteDoc(doc(firestore, 'leaveRequests', requestToDelete.id));
+        toast({ title: 'نجاح', description: 'تم حذف طلب الإجازة بنجاح.' });
+    } catch (e) {
+        console.error("Error deleting leave request:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف طلب الإجازة.' });
+    } finally {
+        setIsDeleting(false);
+        setRequestToDelete(null);
+    }
+  };
+
   return (
     <>
       <div className="flex justify-end mb-4">
@@ -82,7 +104,18 @@ export function LeaveRequestsList() {
                 <TableCell>{req.workingDays} أيام عمل</TableCell>
                 <TableCell><Badge variant="outline" className={statusColors[req.status]}>{statusTranslations[req.status]}</Badge></TableCell>
                 <TableCell>
-                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent dir="rtl">
+                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
+                                <Trash2 className="ml-2 h-4 w-4" />
+                                حذف
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -95,6 +128,23 @@ export function LeaveRequestsList() {
         onClose={() => setIsFormOpen(false)} 
         onSaveSuccess={() => { /* Real-time will handle update */ }} 
       />
+
+       <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في حذف طلب الإجازة الخاص بـ "{requestToDelete?.employeeName}"؟ لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالحذف'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
