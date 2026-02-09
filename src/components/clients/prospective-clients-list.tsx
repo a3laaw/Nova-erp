@@ -104,18 +104,16 @@ export function ProspectiveClientsList() {
 
     const result: ProspectiveClient[] = [];
     clientsMap.forEach((data, mobile) => {
-        // Filter out cancelled appointments from the main list view
-        const activeAppointments = data.appointments.filter(a => a.status !== 'cancelled');
-        if (activeAppointments.length === 0) return;
+        if (data.appointments.length === 0) return;
 
-        const sortedAppointments = activeAppointments.sort((a,b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
+        // Sort ALL appointments to find the most recent one
+        const sortedAppointments = data.appointments.sort((a, b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
         const lastAppointment = sortedAppointments[0];
         
-        let status: ProspectiveClient['status'] = 'active-visit';
         const lastAppointmentDate = toFirestoreDate(lastAppointment.appointmentDate);
+        if (!lastAppointmentDate) return; // Skip if date is invalid
 
-        if (!lastAppointmentDate) return;
-
+        let status: ProspectiveClient['status'] = 'active-visit';
         if (lastAppointment.status === 'cancelled') {
             status = 'cancelled-visit';
         } else if (isPast(lastAppointmentDate) && !lastAppointment.workStageUpdated) {
@@ -128,7 +126,7 @@ export function ProspectiveClientsList() {
             mobile: mobile,
             engineerId: lastAppointment.engineerId,
             engineerName: engineersMap.get(lastAppointment.engineerId) || 'غير معروف',
-            lastAppointmentDate: lastAppointmentDate!,
+            lastAppointmentDate: lastAppointmentDate,
             visitCount: data.appointments.filter(a => a.status !== 'cancelled').length,
             status,
         });

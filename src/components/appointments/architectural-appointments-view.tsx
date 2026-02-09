@@ -231,6 +231,7 @@ export function ArchitecturalAppointmentsView() {
         if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
 
+        // Check if the appointment is in the past
         if (isPast(appointmentDate)) {
             toast({
                 title: 'لا يمكن الحجز في الماضي',
@@ -638,6 +639,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
             if (isNewClient) {
                 if (!newClientName || !newClientMobile) throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
+                const clientsRef = collection(firestore, 'clients');
+                const q = query(clientsRef, where('mobile', '==', newClientMobile));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    throw new Error(`رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`);
+                }
                 dataToSave.clientName = newClientName;
                 dataToSave.clientMobile = newClientMobile;
                 reconcileIdentifier = { clientMobile: newClientMobile };
@@ -761,7 +768,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || (!isNewClient && !selectedClientId) }>
+                        <Button type="submit" disabled={isSaving || (isNewClient ? (!newClientName || !newClientMobile) : !selectedClientId) }>
                             {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ الموعد'}
                         </Button>
