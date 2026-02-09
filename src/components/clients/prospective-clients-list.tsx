@@ -10,9 +10,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Calendar, UserX, Repeat, MoreHorizontal, Trash2 } from 'lucide-react';
+import { UserPlus, Calendar, UserX, Repeat, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, writeBatch, getDocs, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Appointment, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 import { toFirestoreDate } from '@/services/date-converter';
 
 interface ProspectiveClient {
@@ -56,7 +67,10 @@ const statusColors: Record<ProspectiveClient['status'], string> = {
 
 export function ProspectiveClientsList() {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [clientToUnfollow, setClientToUnfollow] = useState<ProspectiveClient | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Fetch prospective appointments by checking for the existence of 'clientMobile'
   const prospectiveQuery = useMemo(() => [where('clientMobile', '>', '')], []);
@@ -90,7 +104,11 @@ export function ProspectiveClientsList() {
 
     const result: ProspectiveClient[] = [];
     clientsMap.forEach((data, mobile) => {
-        const sortedAppointments = data.appointments.sort((a,b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
+        // Filter out cancelled appointments from the main list view
+        const activeAppointments = data.appointments.filter(a => a.status !== 'cancelled');
+        if (activeAppointments.length === 0) return;
+
+        const sortedAppointments = activeAppointments.sort((a,b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
         const lastAppointment = sortedAppointments[0];
         
         let status: ProspectiveClient['status'] = 'active-visit';
@@ -130,8 +148,44 @@ export function ProspectiveClientsList() {
   }, [prospectiveClients, searchQuery]);
 
   const loading = appointmentsLoading || employeesLoading;
+  
+  const handleUnfollowClick = (client: ProspectiveClient) => {
+    setClientToUnfollow(client);
+  };
+
+  const handleConfirmUnfollow = async () => {
+    if (!clientToUnfollow || !firestore) return;
+
+    setIsProcessing(true);
+    try {
+        const appointmentsRef = collection(firestore, 'appointments');
+        const q = query(appointmentsRef, where('clientMobile', '==', clientToUnfollow.mobile));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            toast({ title: 'ملاحظة', description: 'لم يتم العثور على مواعيد مرتبطة لإلغائها.' });
+            return;
+        }
+
+        const batch = writeBatch(firestore);
+        querySnapshot.forEach(doc => {
+            batch.update(doc.ref, { status: 'cancelled' });
+        });
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: `تم إلغاء متابعة العميل ${clientToUnfollow.name}.` });
+    } catch (error) {
+        console.error("Error unfollowing client:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء المتابعة.' });
+    } finally {
+        setIsProcessing(false);
+        setClientToUnfollow(null);
+    }
+  };
+
 
   return (
+    <>
       <div className="space-y-4">
           <Input
               placeholder="ابحث بالاسم أو رقم الجوال..."
@@ -194,7 +248,7 @@ export function ProspectiveClientsList() {
                                             </Link>
                                           </DropdownMenuItem>
                                           <DropdownMenuSeparator />
-                                          <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleUnfollowClick(client)}>
                                               <Trash2 className="ml-2 h-4 w-4" />
                                               إلغاء المتابعة
                                           </DropdownMenuItem>
@@ -207,5 +261,26 @@ export function ProspectiveClientsList() {
               </Table>
           </div>
       </div>
+      <AlertDialog open={!!clientToUnfollow} onOpenChange={() => setClientToUnfollow(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد إلغاء المتابعة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من رغبتك في إلغاء متابعة العميل "{clientToUnfollow?.name}"؟ سيتم إلغاء جميع مواعيده وإخفاؤه من هذه القائمة.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>تراجع</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleConfirmUnfollow}
+                    disabled={isProcessing}
+                    className="bg-destructive hover:bg-destructive/90"
+                >
+                    {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالإلغاء'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
