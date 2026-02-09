@@ -201,7 +201,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             dataToSave.residencyExpiry = formData.residencyExpiry;
         }
         
-        if (formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary') {
+        if (formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary' || formData.contractType === 'part-time') {
             dataToSave.contractPercentage = parseFloat(formData.contractPercentage) || 0;
         }
         
@@ -305,7 +305,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </SelectContent>
                             </Select>
                         </div>
-                         {(formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary') && (
+                         {(formData.contractType === 'percentage' || formData.contractType === 'permanent' || formData.contractType === 'temporary' || formData.contractType === 'part-time') && (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="contractPercentage">
                                     نسبة العقد (%) {formData.contractType === 'percentage' && <span className="text-destructive">*</span>}
@@ -325,9 +325,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 </section>
 
                 {/* Section 3: Financial Information */}
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-lg border-b pb-2">المعلومات المالية</h3>
-                     {formData.contractType !== 'percentage' && (
+                {formData.contractType !== 'percentage' && (
+                  <section className="space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">المعلومات المالية</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
@@ -342,37 +342,37 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr"/>
                             </div>
                         </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
-                            <Select value={formData.salaryPaymentType || 'cash'} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl">
-                                <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="cash">نقداً</SelectItem>
-                                    <SelectItem value="cheque">شيك</SelectItem>
-                                    <SelectItem value="transfer">تحويل بنكي</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    {formData.salaryPaymentType === 'transfer' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-md bg-muted/50">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="bankName">اسم البنك</Label>
-                                <Input id="bankName" value={formData.bankName} onChange={handleInputChange} />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="accountNumber">رقم الحساب</Label>
-                                <Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr" />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="iban">IBAN</Label>
-                                <Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" />
-                            </div>
-                        </div>
-                    )}
-                </section>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid gap-1.5">
+                              <Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label>
+                              <Select value={formData.salaryPaymentType || 'cash'} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl">
+                                  <SelectTrigger><SelectValue/></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="cash">نقداً</SelectItem>
+                                      <SelectItem value="cheque">شيك</SelectItem>
+                                      <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                      </div>
+                      {formData.salaryPaymentType === 'transfer' && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-md bg-muted/50">
+                              <div className="grid gap-1.5">
+                                  <Label htmlFor="bankName">اسم البنك</Label>
+                                  <Input id="bankName" value={formData.bankName} onChange={handleInputChange} />
+                              </div>
+                              <div className="grid gap-1.5">
+                                  <Label htmlFor="accountNumber">رقم الحساب</Label>
+                                  <Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr" />
+                              </div>
+                              <div className="grid gap-1.5">
+                                  <Label htmlFor="iban">IBAN</Label>
+                                  <Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" />
+                              </div>
+                          </div>
+                      )}
+                  </section>
+                )}
             </div>
             <DialogFooter className="mt-6 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
