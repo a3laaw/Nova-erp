@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Checkbox } from '../ui/checkbox';
+import { useBranding } from '@/context/branding-context';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -40,6 +41,7 @@ const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n })
 export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false, employeeNumber = null }: EmployeeFormProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const { branding } = useBranding();
     
     const [formData, setFormData] = useState({
         fullName: '', nameEn: '', civilId: '', mobile: '',
@@ -66,6 +68,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     
     useEffect(() => {
+        const generalHours = branding?.work_hours?.general;
+        const defaultStartTime = generalHours?.morning_start_time || '08:00';
+        const defaultEndTime = generalHours?.evening_end_time || '17:00';
+
         if (initialData) {
             setFormData({
                 fullName: initialData.fullName || '',
@@ -88,11 +94,19 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 dob: toFirestoreDate(initialData.dob) || undefined,
                 nationality: initialData.nationality || '',
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
-                workStartTime: initialData.workStartTime || '08:00',
-                workEndTime: initialData.workEndTime || '17:00',
+                workStartTime: initialData.workStartTime || defaultStartTime,
+                workEndTime: initialData.workEndTime || defaultEndTime,
             });
+        } else {
+             setFormData(prev => ({
+                ...prev,
+                fullName: initialData?.fullName || '',
+                mobile: initialData?.mobile || '',
+                workStartTime: defaultStartTime,
+                workEndTime: defaultEndTime,
+             }));
         }
-    }, [initialData]);
+    }, [initialData, branding]);
 
     useEffect(() => {
         if (formData.contractType === 'percentage') {
@@ -406,5 +420,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
-    
