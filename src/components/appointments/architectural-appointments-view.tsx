@@ -1,10 +1,9 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy, limit } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -42,11 +41,7 @@ import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
-
-
-// --- Constants & Helpers ---
-const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
-const eveningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 13 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`));
+import { useBranding } from '@/context/branding-context';
 
 
 function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean }) {
@@ -111,10 +106,27 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
 }
 
 
+// --- New Helper for generating time slots ---
+const generateTimeSlots = (start: string, end: string, duration: number): string[] => {
+    if (!start || !end || !duration) return [];
+    
+    const slots: string[] = [];
+    let currentTime = parse(start, 'HH:mm', new Date());
+    const endTime = parse(end, 'HH:mm', new Date());
+
+    while (currentTime < endTime) {
+        slots.push(format(currentTime, 'HH:mm'));
+        currentTime = new Date(currentTime.getTime() + duration * 60000);
+    }
+    return slots;
+};
+
+
 export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { user: currentUser } = useAuth();
+    const { branding, loading: brandingLoading } = useBranding();
     
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
@@ -128,9 +140,26 @@ export function ArchitecturalAppointmentsView() {
 
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const workHours = useMemo(() => {
+        return branding?.work_hours || {
+            morning_start_time: '08:00',
+            morning_end_time: '12:00',
+            evening_start_time: '13:00',
+            evening_end_time: '17:00',
+            appointment_slot_duration: 30
+        };
+    }, [branding]);
+
+    const { morningSlots, eveningSlots } = useMemo(() => {
+        const duration = workHours.appointment_slot_duration;
+        return {
+            morningSlots: generateTimeSlots(workHours.morning_start_time, workHours.morning_end_time, duration),
+            eveningSlots: generateTimeSlots(workHours.evening_start_time, workHours.evening_end_time, duration)
+        };
+    }, [workHours]);
     
     useEffect(() => {
-        // Set date on client-side to avoid hydration mismatch
         if (!date) {
             setDate(new Date());
         }
@@ -197,8 +226,7 @@ export function ArchitecturalAppointmentsView() {
 
     const appointments = useMemo(() => {
       if (!rawAppointments) return [];
-      // If clients haven't loaded yet, return raw data to avoid losing appointments from view
-      if (clients.length === 0) return rawAppointments.map(appt => ({ ...appt, clientName: appt.clientName || '...' }));
+      if (clients.length === 0 && !brandingLoading) return rawAppointments.map(appt => ({ ...appt, clientName: appt.clientName || '...' }));
 
       return rawAppointments
           .filter(appt => appt.status !== 'cancelled')
@@ -206,7 +234,7 @@ export function ArchitecturalAppointmentsView() {
           ...appt,
           clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
       }));
-    }, [rawAppointments, clients]);
+    }, [rawAppointments, clients, brandingLoading]);
 
 
     const bookingsGrid = useMemo(() => {
@@ -225,13 +253,12 @@ export function ArchitecturalAppointmentsView() {
             }
         });
         return grid;
-    }, [appointments, engineers]);
+    }, [appointments, engineers, morningSlots, eveningSlots]);
 
     const handleCellClick = (engineer: Employee, time: string) => {
         if (!date) return;
         const appointmentDate = setMinutes(setHours(date, Number(time.split(':')[0])), Number(time.split(':')[1]));
 
-        // Check if the appointment is in the past
         if (isPast(appointmentDate)) {
             toast({
                 title: 'لا يمكن الحجز في الماضي',
@@ -246,7 +273,7 @@ export function ArchitecturalAppointmentsView() {
             engineerId: engineer.id,
             engineerName: engineer.fullName,
             appointmentDate,
-            appointments, // Pass current appointments to dialog
+            appointments,
         });
         setIsDialogOpen(true);
     };
@@ -296,7 +323,7 @@ export function ArchitecturalAppointmentsView() {
 
 
     const handleSave = async () => {
-        if (date) { // Re-fetch data for the current date
+        if (date) {
             await fetchAppointments(date);
         }
     };
@@ -348,7 +375,9 @@ export function ArchitecturalAppointmentsView() {
         );
     }
 
-    const renderGridSection = (title: string, slots: string[]) => (
+    const renderGridSection = (title: string, slots: string[]) => {
+      if (slots.length === 0) return null;
+      return (
         <div className="border rounded-lg overflow-x-auto">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
@@ -422,7 +451,7 @@ export function ArchitecturalAppointmentsView() {
                 </tbody>
             </table>
         </div>
-    );
+    )};
 
     return (
         <div className="space-y-6" dir='rtl'>
@@ -463,7 +492,7 @@ export function ArchitecturalAppointmentsView() {
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
                 
-                {loading ? (
+                {loading || brandingLoading ? (
                   <div className='space-y-4'>
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-48 w-full" />
@@ -500,7 +529,7 @@ export function ArchitecturalAppointmentsView() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد من الإلغاء؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيتم إلغاء هذا الموعد ولن يظهر في التقويم. إذا كان الموعد مرتبطاً بإكمال مرحلة عمل، فسيتم التراجع عن ذلك الإجراء أيضاً.
+                           سيتم تغيير حالة الموعد إلى "ملغي". سيؤثر هذا الإجراء على ترقيم وتلوين الزيارات المتبقية للعميل.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -629,35 +658,14 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         try {
             if (isNewClient) {
                 if (!newClientName || !newClientMobile) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال اسم وجوال العميل الجديد.' });
-                    setIsSaving(false); return;
+                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
                 }
-                 // Check for existing mobile number before proceeding
-                const clientsRef = collection(firestore, 'clients');
-                const q = query(clientsRef, where('mobile', '==', newClientMobile));
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                     toast({
-                        variant: 'destructive',
-                        title: 'عميل موجود بالفعل',
-                        description: `رقم الجوال هذا مسجل بالفعل للعميل: ${querySnapshot.docs[0].data().nameAr}. الرجاء اختيار العميل من القائمة.`,
-                    });
-                    setIsSaving(false);
-                    return;
-                }
-
+                 
                 const prospectiveApptsRef = collection(firestore, 'appointments');
                 const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 if (!prospectiveSnapshot.empty) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'عميل محتمل موجود',
-                        description: 'هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".',
-                    });
-                    setIsSaving(false);
-                    return;
+                    throw new Error(`هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`);
                 }
 
                 const newAppointmentData = {
@@ -670,8 +678,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             } else {
                 const client = clients.find((c: Client) => c.id === selectedClientId);
                 if (!client) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار العميل.' });
-                    setIsSaving(false); return;
+                    throw new Error('الرجاء اختيار العميل.');
                 }
                 const batch = writeBatch(firestore);
                 if (isEditing) {
@@ -837,4 +844,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-

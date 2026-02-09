@@ -49,6 +49,17 @@
         "financial_statement_notes": {
             "type": "string",
             "description": "The full text content for the notes to the financial statements."
+        },
+        "work_hours": {
+            "type": "object",
+            "description": "Defines the company's working hours and appointment slot settings.",
+            "properties": {
+                "morning_start_time": { "type": "string", "description": "e.g., '08:00'" },
+                "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
+                "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
+                "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
+                "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" }
+            }
         }
       },
       "required": ["company_name"]
@@ -1367,5 +1378,3 @@
     }
   }
 }
-
-  

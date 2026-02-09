@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format, isPast } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -38,12 +38,9 @@ import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useBranding } from '@/context/branding-context';
 
-// --- Constants ---
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
-const morningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 8 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`)); // 8:00 to 9:30
-const eveningSlots = Array.from({ length: 4 }, (_, i) => format(setHours(setMinutes(new Date(), 0), 13 + Math.floor(i/2)), `HH:${i%2 === 0 ? '00' : '30'}`)); // 13:00 to 14:30
-
 
 const departmentStyles: Record<string, React.CSSProperties> = {
   "الكهرباء": { backgroundColor: '#fee2e2', borderLeft: '4px solid #ef4444', color: '#991b1b' },
@@ -54,19 +51,33 @@ const departmentStyles: Record<string, React.CSSProperties> = {
 };
 const departmentOptions = ['الكهرباء', 'الصحي', 'الإنشائي', 'المعماري', 'أخرى'];
 
-// --- Helper Functions ---
 const parseTime = (timeStr: string): { hours: number, minutes: number } => {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return { hours, minutes };
+};
+
+const generateTimeSlots = (start: string, end: string, duration: number): string[] => {
+    if (!start || !end || !duration) return [];
+    
+    const slots: string[] = [];
+    let currentTime = parse(start, 'HH:mm', new Date());
+    const endTime = parse(end, 'HH:mm', new Date());
+
+    while (currentTime < endTime) {
+        slots.push(format(currentTime, 'HH:mm'));
+        currentTime = new Date(currentTime.getTime() + duration * 60000);
+    }
+    return slots;
 };
 
 
 export function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const { branding, loading: brandingLoading } = useBranding();
 
     const [date, setDate] = useState<Date | undefined>(undefined);
-    const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -79,6 +90,24 @@ export function RoomBookingCalendar() {
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+     const workHours = useMemo(() => {
+        return branding?.work_hours || {
+            morning_start_time: '08:00',
+            morning_end_time: '12:00',
+            evening_start_time: '13:00',
+            evening_end_time: '17:00',
+            appointment_slot_duration: 30
+        };
+    }, [branding]);
+
+    const { morningSlots, eveningSlots } = useMemo(() => {
+        const duration = workHours.appointment_slot_duration;
+        return {
+            morningSlots: generateTimeSlots(workHours.morning_start_time, workHours.morning_end_time, duration),
+            eveningSlots: generateTimeSlots(workHours.evening_start_time, workHours.evening_end_time, duration)
+        };
+    }, [workHours]);
+
     useEffect(() => {
         if (!date) {
             setDate(new Date());
@@ -88,7 +117,6 @@ export function RoomBookingCalendar() {
     useEffect(() => {
         if (!firestore) return;
         const fetchStaticData = async () => {
-            setLoading(true);
             try {
                 const [clientSnap, engSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
@@ -103,8 +131,6 @@ export function RoomBookingCalendar() {
             } catch (error) {
                 console.error("Error fetching static booking data:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
-            } finally {
-                setLoading(false);
             }
         };
         fetchStaticData();
@@ -123,32 +149,31 @@ export function RoomBookingCalendar() {
                 where('appointmentDate', '<=', dayEnd)
             ));
             
-            const roomAppointments = apptSnap.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Appointment))
-                .filter(appt => appt.type === 'room');
+            const allAppointmentsForDay = apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
-            setRawAppointments(roomAppointments);
+            const augmentedAppointments = allAppointmentsForDay
+                .filter(appt => appt.type === 'room')
+                .map(appt => ({
+                    ...appt,
+                    clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
+                    engineerName: appt.engineerId ? engineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
+                }));
+            setAppointments(augmentedAppointments);
         } catch (error) {
             console.error("Error fetching room appointments:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث قائمة الحجوزات.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast]);
+    }, [firestore, toast, clients, engineers]);
 
     useEffect(() => {
-        if(date) {
+        if(date && (clients.length > 0 || engineers.length > 0)) {
+            fetchAppointments(date);
+        } else if (date && !loading) {
             fetchAppointments(date);
         }
-    }, [date, fetchAppointments]);
-
-    const appointments = useMemo(() => {
-        return rawAppointments.map(appt => ({
-            ...appt,
-            clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-            engineerName: appt.engineerId ? engineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
-        }));
-    }, [rawAppointments, clients, engineers]);
+    }, [date, clients, engineers, fetchAppointments, loading]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -167,6 +192,7 @@ export function RoomBookingCalendar() {
             
             const startTime = toFirestoreDate(appt.appointmentDate);
             if (!startTime) {
+                console.error("Could not process appointment with invalid date:", appt);
                 return;
             }
 
@@ -181,7 +207,7 @@ export function RoomBookingCalendar() {
         });
 
         return grid;
-    }, [appointments]);
+    }, [appointments, morningSlots, eveningSlots]);
 
 
     const handleOpenDialog = (data: Partial<Appointment> & { room: string, time?: string, id?: string }) => {
@@ -224,7 +250,7 @@ export function RoomBookingCalendar() {
         try {
             await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
-            setRawAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
+            setAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
         } catch (error) {
             console.error("Error deleting appointment:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إلغاء الموعد.' });
@@ -280,7 +306,9 @@ export function RoomBookingCalendar() {
         )
     }
 
-    const renderGridSection = (title: string, slots: string[]) => (
+    const renderGridSection = (title: string, slots: string[]) => {
+        if (slots.length === 0) return null;
+        return (
         <div className="border rounded-lg overflow-x-auto">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
@@ -370,7 +398,7 @@ export function RoomBookingCalendar() {
                 </tbody>
             </table>
         </div>
-    );
+    )};
 
     return (
         <div dir="rtl" className="p-4 space-y-6">
@@ -414,7 +442,7 @@ export function RoomBookingCalendar() {
                     {date && <p className="text-sm text-muted-foreground">{format(date, "PPP", { locale: ar })}</p>}
                 </div>
                 
-                {loading ? (
+                {loading || brandingLoading ? (
                   <div className='space-y-4'>
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-48 w-full" />

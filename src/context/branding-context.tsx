@@ -18,6 +18,13 @@ export interface BrandingSettings {
   footer_image_url?: string;
   watermark_image_url?: string;
   system_background_url?: string;
+  work_hours?: {
+    morning_start_time: string;
+    morning_end_time: string;
+    evening_start_time: string;
+    evening_end_time: string;
+    appointment_slot_duration: number;
+  }
 }
 
 interface BrandingContextType {
@@ -81,5 +88,3 @@ export const useBranding = () => {
   }
   return context;
 };
-
-    
