@@ -164,26 +164,23 @@ export function ArchitecturalAppointmentsView() {
 
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    
-    const workHours = useMemo(() => {
-        return branding?.work_hours?.architectural;
-    }, [branding]);
 
-    const { morningSlots, eveningSlots } = useMemo(() => {
+    const { morningSlots, eveningSlots, hasWorkHours } = useMemo(() => {
+        const workHours = branding?.work_hours?.architectural;
         if (!workHours || !date) {
-            return { morningSlots: [], eveningSlots: [] };
+            return { morningSlots: [], eveningSlots: [], hasWorkHours: false };
         }
         
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
     
-        const todayDayIndex = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
+        const todayDayIndex = date.getDay(); 
         const todayDayName = weekDays[todayDayIndex].id;
     
         const isHoliday = branding?.work_hours?.holidays?.includes(todayDayName);
     
         if (isHoliday) {
-            return { morningSlots: [], eveningSlots: [] };
+            return { morningSlots: [], eveningSlots: [], hasWorkHours: true };
         }
     
         const halfDaySettings = branding?.work_hours?.half_day;
@@ -207,14 +204,16 @@ export function ArchitecturalAppointmentsView() {
             }
         }
     
+        const mSlots = generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer);
+        const eSlots = generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer);
+        
         return {
-            morningSlots: generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer),
-            eveningSlots: generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer)
+            morningSlots: mSlots,
+            eveningSlots: eSlots,
+            hasWorkHours: mSlots.length > 0 || eSlots.length > 0
         };
-    }, [workHours, date, branding]);
+    }, [branding, date]);
     
-    const hasWorkHours = useMemo(() => morningSlots.length > 0 || eveningSlots.length > 0, [morningSlots, eveningSlots]);
-
     useEffect(() => {
         // Set date on client-side to avoid hydration mismatch
         if (!date) {
@@ -435,6 +434,24 @@ export function ArchitecturalAppointmentsView() {
         return renderSkeleton();
     }
 
+    if (!hasWorkHours && !loading) {
+        return (
+             <Card className="mt-4">
+                <CardHeader>
+                    <CardTitle className="text-center">لم يتم تكوين أوقات الدوام</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center text-muted-foreground">
+                    <p>الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات عمل القسم المعماري.</p>
+                    <Button asChild className="mt-4">
+                        <Link href="/dashboard/settings">
+                            الذهاب إلى الإعدادات
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        )
+    }
+
     const renderGridSection = (title: string, slots: string[]) => {
       if (slots.length === 0) return null;
       return (
@@ -557,20 +574,6 @@ export function ArchitecturalAppointmentsView() {
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-48 w-full" />
                   </div>
-                ) : !hasWorkHours ? (
-                    <Card className="mt-4">
-                        <CardHeader>
-                            <CardTitle className="text-center">لم يتم تكوين أوقات الدوام</CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-center text-muted-foreground">
-                            <p>الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات عمل القسم المعماري.</p>
-                            <Button asChild className="mt-4">
-                                <Link href="/dashboard/settings">
-                                    الذهاب إلى الإعدادات
-                                </Link>
-                            </Button>
-                        </CardContent>
-                    </Card>
                 ) : (
                   <div className="space-y-4">
                     {renderGridSection('الفترة الصباحية', morningSlots)}
