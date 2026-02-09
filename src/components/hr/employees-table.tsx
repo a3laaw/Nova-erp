@@ -140,7 +140,11 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                         )}
                         {!loading && filteredEmployees.map((employee) => (
                             <TableRow key={employee.id}>
-                                <TableCell className="font-medium">{employee.fullName}</TableCell>
+                                <TableCell className="font-medium">
+                                    <Link href={`/dashboard/hr/employees/${employee.id}`} className="hover:underline">
+                                        {employee.fullName}
+                                    </Link>
+                                </TableCell>
                                 <TableCell className="font-mono">{employee.employeeNumber}</TableCell>
                                 <TableCell>{employee.department}</TableCell>
                                 <TableCell>{formatDate(employee.hireDate)}</TableCell>
@@ -153,20 +157,19 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                                 <TableCell>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                                <span className="sr-only">Toggle menu</span>
+                                            </Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent>
+                                        <DropdownMenuContent align="end" dir="rtl">
                                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                            {/* FIXED: Enabled menu items and linked them to the correct pages. */}
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/dashboard/hr/employees/${employee.id}`}>عرض الملف</Link>
-                                            </DropdownMenuItem>
                                             <DropdownMenuItem asChild>
                                                 <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             {employee.status !== 'terminated' && (
-                                                <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive">إنهاء الخدمة</DropdownMenuItem>
                                             )}
                                         </DropdownMenuContent>
                                     </DropdownMenu>
