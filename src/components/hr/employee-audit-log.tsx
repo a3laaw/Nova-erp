@@ -33,7 +33,7 @@ export function EmployeeAuditLog({ employeeId }: EmployeeAuditLogProps) {
     loadingMore,
     hasMore,
     loaderRef
-  } = useInfiniteScroll<AuditLogEvent>(`employees/${employeeId}/auditLogs`);
+  } = useInfiniteScroll<AuditLogEvent>(`employees/${employeeId}/auditLogs`, [], 'effectiveDate');
   
   return (
     <Card>
@@ -63,7 +63,7 @@ export function EmployeeAuditLog({ employeeId }: EmployeeAuditLogProps) {
                     <div key={event.id} className="relative flex items-start gap-4">
                         <div className="z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card ring-4 ring-card">
                              <Avatar className="h-8 w-8">
-                                <AvatarFallback>{'S'}</AvatarFallback>
+                                <AvatarFallback>{event.changedBy?.charAt(0) || 'S'}</AvatarFallback>
                             </Avatar>
                         </div>
                         
