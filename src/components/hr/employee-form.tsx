@@ -331,16 +331,18 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
                             <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
                         </div>
-                        <div className="grid grid-cols-2 gap-4 col-span-3">
-                           <div className="grid gap-1.5">
-                               <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
-                               <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} disabled={formData.contractType === 'permanent'} />
-                           </div>
-                           <div className="grid gap-1.5">
-                               <Label htmlFor="workEndTime">وقت انتهاء الدوام</Label>
-                               <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} disabled={formData.contractType === 'permanent'}/>
-                           </div>
-                        </div>
+                        {formData.contractType !== 'permanent' && (
+                            <div className="grid grid-cols-2 gap-4 col-span-3">
+                               <div className="grid gap-1.5">
+                                   <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
+                                   <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} />
+                               </div>
+                               <div className="grid gap-1.5">
+                                   <Label htmlFor="workEndTime">وقت انتهاء الدوام</Label>
+                                   <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} />
+                               </div>
+                            </div>
+                        )}
                      </div>
                 </section>
 
