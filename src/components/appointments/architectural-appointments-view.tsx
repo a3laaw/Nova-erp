@@ -43,6 +43,7 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
+import { DateInput } from '../ui/date-input';
 
 
 // --- Constants & Helpers ---
@@ -652,7 +653,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     const [loadingTransactions, setLoadingTransactions] = useState(false);
     const [selectedTransactionId, setSelectedTransactionId] = useState('');
 
-    const [newDate, setNewDate] = useState('');
+    const [newDate, setNewDate] = useState<Date | undefined>();
     const [newTime, setNewTime] = useState('');
     
     const [isNewClient, setIsNewClient] = useState(false);
@@ -675,7 +676,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 setNotes(dialogData.notes || '');
                 setSelectedTransactionId(dialogData.transactionId || '');
                 if (apptDate) {
-                  setNewDate(format(apptDate, 'yyyy-MM-dd'));
+                  setNewDate(apptDate);
                   setNewTime(format(apptDate, 'HH:mm'));
                 }
                 setIsNewClient(!dialogData.clientId);
@@ -689,7 +690,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 setTitle('');
                 setNotes('');
                 setSelectedTransactionId('');
-                setNewDate('');
+                setNewDate(undefined);
                 setNewTime('');
                 setIsNewClient(false);
                 setNewClientName('');
@@ -764,9 +765,17 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 }
                  // Check if prospective client already exists
                 const prospectiveApptsRef = collection(firestore, 'appointments');
-                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '!=', 'cancelled'), limit(1));
+                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
-                if (!prospectiveSnapshot.empty && (!isEditing || prospectiveSnapshot.docs[0].id !== dialogData.id)) {
+                
+                const activeExistingAppt = prospectiveSnapshot.docs.find(doc => {
+                    const appt = doc.data();
+                    const isNotCancelled = appt.status !== 'cancelled';
+                    const isDifferentAppointment = !isEditing || doc.id !== dialogData.id;
+                    return isNotCancelled && isDifferentAppointment;
+                });
+                
+                if (activeExistingAppt) {
                     toast({
                         variant: 'destructive',
                         title: 'عميل محتمل موجود',
@@ -898,7 +907,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="date">التاريخ الجديد</Label>
-                                    <Input id="date" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required/>
+                                    <DateInput id="date" value={newDate} onChange={setNewDate} required />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="time">الوقت الجديد</Label>
@@ -966,3 +975,5 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
+    
