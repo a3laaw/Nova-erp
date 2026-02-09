@@ -183,12 +183,12 @@ export function WorkHoursManager() {
                      <div className="p-4 border rounded-lg space-y-4">
                         <Label>يوم نصف الدوام (اختياري)</Label>
                         <div className="grid grid-cols-2 gap-4">
-                            <Select value={halfDay.day} onValueChange={(d) => setHalfDay(p => ({...p, day: d}))}>
+                            <Select value={halfDay.day || 'none'} onValueChange={(d) => setHalfDay(p => ({...p, day: d === 'none' ? '' : d}))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="اختر اليوم..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">لا يوجد</SelectItem>
+                                    <SelectItem value="none">لا يوجد</SelectItem>
                                     {weekDays.filter(d => !holidays.includes(d.id)).map(day => (
                                         <SelectItem key={day.id} value={day.id}>{day.label}</SelectItem>
                                     ))}
@@ -215,5 +215,6 @@ export function WorkHoursManager() {
     );
 }
 
+    
 
     
