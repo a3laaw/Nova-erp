@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "CompanyBranding": {
@@ -41,16 +40,6 @@
             "format": "uri",
             "description": "URL to the company's full letterhead image."
         },
-        "footer_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to an image to be displayed at the bottom of printable documents."
-        },
-        "watermark_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to an image to be used as a watermark on printable documents."
-        },
         "system_background_url": {
             "type": "string",
             "format": "uri",
@@ -72,7 +61,8 @@
                         "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
                         "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
                         "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
-                        "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" }
+                        "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" },
+                        "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
                     }
                 },
                 "architectural": {
@@ -97,6 +87,7 @@
                     "description": "Defines a weekly half-day.",
                     "properties": {
                         "day": { "type": "string", "enum": ["", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+                        "type": { "type": "string", "enum": ["morning_only", "custom_end_time"] },
                         "end_time": { "type": "string", "description": "e.g., '13:00'" }
                     }
                 }
@@ -446,10 +437,6 @@
             "type": "boolean",
             "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count."
         },
-        "enableModificationTracking": {
-            "type": "boolean",
-            "description": "If true, allows a modification counter to be incremented for this stage."
-        },
         "modificationCount": {
             "type": ["number", "null"],
             "description": "How many times a modification has been recorded for this stage."
@@ -767,10 +754,10 @@
         "nextStageIds": { "type": "array", "description": "A list of possible next stage IDs to transition to from this stage.", "items": { "type": "string" } },
         "allowedDuringStages": { "type": "array", "description": "For parallel stages only. A list of sequential stage IDs during which this parallel stage can be initiated.", "items": { "type": "string" } },
         "trackingType": { "type": "string", "enum": ["duration", "occurrence", "none"], "description": "How to track progress: by time, occurrences, or as a single event." },
+        "enableModificationTracking": { "type": "boolean", "description": "If true, allows a modification counter to be incremented for this stage." },
         "expectedDurationDays": { "type": ["number", "null"], "description": "The expected duration in days for this stage (if trackingType is 'duration')." },
         "maxOccurrences": { "type": ["number", "null"], "description": "The maximum number of times this stage can occur (if trackingType is 'occurrence')." },
-        "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." },
-        "enableModificationTracking": { "type": "boolean", "description": "If true, allows a modification counter to be incremented for this stage." }
+        "allowManualCompletion": { "type": "boolean", "description": "If true, allows manually completing an 'occurrence' stage before reaching its max count." }
       },
       "required": ["name", "order", "stageType", "trackingType"]
     },
@@ -1454,6 +1441,3 @@
     }
   }
 }
-    
-
-    

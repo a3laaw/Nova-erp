@@ -11,7 +11,6 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
@@ -77,7 +76,7 @@ const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSched
                 <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} />
             </div>
              <div className="grid gap-2">
-                <Label>فترة راحة بين المواعيد (بالدقائق)</Label>
+                <Label>فترة الراحة بين المواعيد (بالدقائق)</Label>
                 <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} />
             </div>
         </div>
@@ -154,34 +153,26 @@ export function WorkHoursManager() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-                 <Tabs defaultValue="general">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="general">الدوام العام (للقاعات)</TabsTrigger>
-                        <TabsTrigger value="architectural">دوام القسم المعماري</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="general" className="mt-6">
-                         <Card>
-                            <CardHeader>
-                                <CardTitle>أوقات الدوام العامة</CardTitle>
-                                <CardDescription>تطبق على حجز قاعات الاجتماعات والأقسام العامة.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ScheduleForm schedule={generalSchedule} setSchedule={setGeneralSchedule} />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="architectural" className="mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>أوقات دوام القسم المعماري</CardTitle>
-                                <CardDescription>أوقات مخصصة لزيارات العملاء مع المهندسين المعماريين.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ScheduleForm schedule={architecturalSchedule} setSchedule={setArchitecturalSchedule} />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>الدوام العام (للقاعات)</CardTitle>
+                            <CardDescription>تطبق على حجز قاعات الاجتماعات والأقسام العامة.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScheduleForm schedule={generalSchedule} setSchedule={setGeneralSchedule} />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>دوام القسم المعماري</CardTitle>
+                            <CardDescription>أوقات مخصصة لزيارات العملاء مع المهندسين المعماريين.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScheduleForm schedule={architecturalSchedule} setSchedule={setArchitecturalSchedule} />
+                        </CardContent>
+                    </Card>
+                 </div>
 
                 <div className="space-y-4 pt-6 border-t">
                     <h3 className="font-semibold text-lg">إعدادات أيام الأسبوع</h3>
