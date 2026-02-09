@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -60,11 +59,15 @@ export function PayslipsList() {
         return [
             where('year', '==', parseInt(year)),
             where('month', '==', parseInt(month)),
-            orderBy('employeeName', 'asc')
         ];
     }, [firestore, year, month]);
 
     const { data: payslips, loading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
+
+    const sortedPayslips = useMemo(() => {
+        if (!payslips) return [];
+        return [...payslips].sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'ar'));
+    }, [payslips]);
 
     const handleConfirmAndPay = async () => {
         // TODO: Implement payment confirmation and journal entry creation
@@ -75,11 +78,11 @@ export function PayslipsList() {
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
     const totals = useMemo(() => {
-        if (!payslips) return { netSalary: 0 };
+        if (!sortedPayslips) return { netSalary: 0 };
         return {
-            netSalary: payslips.reduce((sum, p) => sum + p.netSalary, 0),
+            netSalary: sortedPayslips.reduce((sum, p) => sum + p.netSalary, 0),
         }
-    }, [payslips]);
+    }, [sortedPayslips]);
 
     return (
         <div className="space-y-4">
@@ -103,13 +106,13 @@ export function PayslipsList() {
                     </Select>
                 </div>
                  <div className="flex-grow"></div>
-                 <Button onClick={handleConfirmAndPay} disabled={isProcessing || !payslips || payslips.length === 0}>
+                 <Button onClick={handleConfirmAndPay} disabled={isProcessing || !sortedPayslips || sortedPayslips.length === 0}>
                     {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <CheckCircle className="ml-2 h-4 w-4" />}
                     تأكيد دفع الرواتب وإنشاء قيد
                  </Button>
             </div>
             
-            {payslips && payslips.length === 0 && !loading && (
+            {sortedPayslips && sortedPayslips.length === 0 && !loading && (
                  <Alert>
                     <AlertTitle>لا توجد بيانات</AlertTitle>
                     <AlertDescription>
@@ -134,7 +137,7 @@ export function PayslipsList() {
                                 <TableCell colSpan={4}><Skeleton className="h-6 w-full"/></TableCell>
                              </TableRow>
                         ))}
-                        {!loading && payslips.map(payslip => (
+                        {!loading && sortedPayslips.map(payslip => (
                              <TableRow key={payslip.id}>
                                 <TableCell className="font-medium">{payslip.employeeName}</TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(payslip.netSalary)}</TableCell>
