@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -40,6 +41,7 @@ import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
+import { Textarea } from '@/components/ui/textarea';
 
 
 // --- Constants & Helpers ---
@@ -195,6 +197,7 @@ export function ArchitecturalAppointmentsView() {
 
     const appointments = useMemo(() => {
       if (!rawAppointments) return [];
+      // If clients haven't loaded yet, return raw data to avoid losing appointments from view
       if (clients.length === 0) return rawAppointments.map(appt => ({ ...appt, clientName: appt.clientName || '...' }));
 
       return rawAppointments
