@@ -250,7 +250,7 @@ export type Employee = {
     noticeStartDate: any | null; 
     terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
-    contractType: 'permanent' | 'temporary' | 'percentage' | 'part-time' | 'special';
+    contractType: 'permanent' | 'temporary' | 'subcontractor' | 'percentage' | 'part-time' | 'special';
     contractPercentage?: number;
     department: string;
     basicSalary: number; 
@@ -678,7 +678,5 @@ export interface ResidencyRenewal {
     amortizationStatus: 'in-progress' | 'completed';
     lastAmortizationDate?: any;
 }
-
-    
 
     

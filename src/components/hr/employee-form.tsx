@@ -116,7 +116,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [initialData, branding]);
 
     useEffect(() => {
-        if (formData.contractType === 'percentage') {
+        if (formData.contractType === 'percentage' || formData.contractType === 'subcontractor') {
             setFormData(prev => ({
                 ...prev,
                 basicSalary: '0',
@@ -206,7 +206,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).' });
             return;
         }
-        if (formData.contractType !== 'percentage' && !formData.basicSalary) {
+        if (formData.contractType !== 'percentage' && formData.contractType !== 'subcontractor' && !formData.basicSalary) {
              toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء إدخال الراتب الأساسي.' });
             return;
         }
@@ -331,7 +331,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
                             <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
                         </div>
-                        {!['permanent', 'percentage'].includes(formData.contractType) && (
+                        {!['permanent', 'percentage', 'subcontractor'].includes(formData.contractType) && (
                             <div className="grid grid-cols-2 gap-4 col-span-3">
                                <div className="grid gap-1.5">
                                    <Label htmlFor="workStartTime">وقت بدء الدوام</Label>
@@ -357,6 +357,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <SelectContent>
                                     <SelectItem value="permanent">دائم</SelectItem>
                                     <SelectItem value="temporary">مؤقت</SelectItem>
+                                    <SelectItem value="subcontractor">مقاول باطن (بالقطعة)</SelectItem>
                                     <SelectItem value="percentage">نسبة من العقود</SelectItem>
                                     <SelectItem value="part-time">دوام جزئي</SelectItem>
                                     <SelectItem value="special">دوام خاص</SelectItem>
@@ -381,7 +382,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         )}
                      </div>
 
-                    {formData.contractType !== 'percentage' && (
+                    {formData.contractType !== 'percentage' && formData.contractType !== 'subcontractor' && (
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
