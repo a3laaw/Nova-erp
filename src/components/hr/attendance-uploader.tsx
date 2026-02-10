@@ -15,7 +15,22 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse } from 'date-fns';
 
 // Expected columns in the Excel file
-const EXPECTED_COLUMNS = ['employeeNumber', 'date', 'checkIn', 'checkOut'];
+const EXPECTED_COLUMNS = ['employeeNumber', 'date', 'checkIn1', 'checkOut1', 'checkIn2', 'checkOut2'];
+
+const parseExcelTime = (excelTime: any): { hours: number, minutes: number } | null => {
+    if (typeof excelTime !== 'number' || excelTime < 0 || excelTime > 1) {
+        // If it's a string like '08:00', try parsing it
+        if (typeof excelTime === 'string' && excelTime.includes(':')) {
+            const [h, m] = excelTime.split(':').map(Number);
+            if (!isNaN(h) && !isNaN(m)) {
+                return { hours: h, minutes: m };
+            }
+        }
+        return null;
+    }
+    const date = XLSX.SSF.parse_date_code(excelTime);
+    return { hours: date.h, minutes: date.m };
+};
 
 export function AttendanceUploader() {
   const { firestore } = useFirebase();
@@ -55,8 +70,10 @@ export function AttendanceUploader() {
     const templateData = employees.map(emp => ({
         employeeNumber: emp.employeeNumber,
         date: '',
-        checkIn: '',
-        checkOut: '',
+        checkIn1: '',
+        checkOut1: '',
+        checkIn2: '',
+        checkOut2: '',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -64,8 +81,10 @@ export function AttendanceUploader() {
     worksheet['!cols'] = [
       { wch: 20 }, // employeeNumber
       { wch: 15 }, // date
-      { wch: 15 }, // checkIn
-      { wch: 15 }, // checkOut
+      { wch: 15 }, // checkIn1
+      { wch: 15 }, // checkOut1
+      { wch: 15 }, // checkIn2
+      { wch: 15 }, // checkOut2
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -91,7 +110,6 @@ export function AttendanceUploader() {
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-        // Validate columns
         const firstRow = json[0];
         if (!firstRow || !EXPECTED_COLUMNS.every(col => col in firstRow)) {
             throw new Error(`الملف يجب أن يحتوي على الأعمدة التالية باللغة الإنجليزية: ${EXPECTED_COLUMNS.join(', ')}`);
@@ -111,40 +129,66 @@ export function AttendanceUploader() {
                 }
                 const attendanceData = attendanceByEmployee.get(employee.id)!;
                 
-                let status: 'present' | 'absent' | 'late' | 'leave' = 'absent';
-                const checkInValue = row.checkIn;
+                const t1 = parseExcelTime(row.checkIn1);
+                const t2 = parseExcelTime(row.checkOut1);
+                const t3 = parseExcelTime(row.checkIn2);
+                const t4 = parseExcelTime(row.checkOut2);
                 
-                if (checkInValue) {
+                let totalWorkMinutes = 0;
+                if (t1 && t4) {
+                    const date1 = new Date(0, 0, 0, t1.hours, t1.minutes);
+                    const date4 = new Date(0, 0, 0, t4.hours, t4.minutes);
+                    let duration = (date4.getTime() - date1.getTime()) / (1000 * 60);
+
+                    if (t2 && t3) {
+                        const date2 = new Date(0, 0, 0, t2.hours, t2.minutes);
+                        const date3 = new Date(0, 0, 0, t3.hours, t3.minutes);
+                        const breakDuration = (date3.getTime() - date2.getTime()) / (1000 * 60);
+                        if (breakDuration > 0) {
+                            duration -= breakDuration;
+                        }
+                    }
+                    totalWorkMinutes = duration;
+                } else if (t1 && t2) { // Handles case with only 2 check-ins
+                    const date1 = new Date(0, 0, 0, t1.hours, t1.minutes);
+                    const date2 = new Date(0, 0, 0, t2.hours, t2.minutes);
+                    totalWorkMinutes = (date2.getTime() - date1.getTime()) / (1000 * 60);
+                }
+
+                let status: 'present' | 'absent' | 'late' | 'leave' = 'absent';
+                if (t1) {
                     status = 'present';
-                    // Check for lateness
                     if (employee.workStartTime) {
                         try {
                             const workStartTime = parse(employee.workStartTime, 'HH:mm', new Date());
-                            // Excel times can be tricky. Assuming it's a number from 0-1 representing the fraction of the day.
-                            if (typeof checkInValue === 'number') {
-                                const checkInDate = XLSX.SSF.parse_date_code(checkInValue);
-                                const checkInTime = new Date(0, 0, 0, checkInDate.h, checkInDate.m, checkInDate.s);
-
-                                if (checkInTime > workStartTime) {
-                                    status = 'late';
-                                }
+                            const checkInTime = new Date(0, 0, 0, t1.hours, t1.minutes);
+                            if (checkInTime > workStartTime) {
+                                status = 'late';
                             }
                         } catch (timeError) {
-                            console.warn("Could not parse time for lateness check", { checkInValue, workStartTime: employee.workStartTime });
+                            console.warn("Could not parse time for lateness check", { checkInValue: row.checkIn1, workStartTime: employee.workStartTime });
                         }
                     }
                 }
 
+                const formatTime = (time: { hours: number, minutes: number } | null) => {
+                    if (!time) return null;
+                    return `${String(time.hours).padStart(2, '0')}:${String(time.minutes).padStart(2, '0')}`;
+                };
+
                 attendanceData.records.push({
                     date: new Date((row.date - (25567 + 1)) * 86400 * 1000), // Convert Excel date
-                    checkIn: checkInValue || null,
-                    checkOut: row.checkOut || null,
+                    checkIn1: formatTime(t1),
+                    checkOut1: formatTime(t2),
+                    checkIn2: formatTime(t3),
+                    checkOut2: formatTime(t4),
+                    totalHours: totalWorkMinutes > 0 ? parseFloat((totalWorkMinutes / 60).toFixed(2)) : null,
                     status: status
                 });
 
                 if (status === 'present') attendanceData.summary.presentDays++;
                 else if (status === 'late') {
-                    attendanceData.summary.presentDays++; // It's a present day, but late
+                    attendanceData.summary.presentDays++;
                     attendanceData.summary.lateDays++;
                 }
                 else if (status === 'absent') attendanceData.summary.absentDays++;
@@ -241,3 +285,4 @@ export function AttendanceUploader() {
     </div>
   );
 }
+

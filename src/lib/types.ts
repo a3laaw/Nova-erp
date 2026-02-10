@@ -318,9 +318,12 @@ export type AuditLog = {
 };
 
 export type AttendanceRecord = {
-    date: string; 
-    checkIn?: string; 
-    checkOut?: string; 
+    date: string;
+    checkIn1?: string | null;
+    checkOut1?: string | null;
+    checkIn2?: string | null;
+    checkOut2?: string | null;
+    totalHours?: number | null;
     status: 'present' | 'absent' | 'late' | 'leave';
 };
 
@@ -688,3 +691,4 @@ export interface ResidencyRenewal {
 
     
     
+

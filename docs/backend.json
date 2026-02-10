@@ -512,7 +512,7 @@
         "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
-        "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor", "percentage", "part-time", "piece-rate", "special"] },
+        "contractType": { "type": "string", "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special"] },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
         "pieceRateMode": {
           "type": "string",
@@ -577,7 +577,8 @@
             "approvedAt": { "type": "string", "format": "date-time" },
             "rejectionReason": { "type": "string", "description": "Reason for rejecting the leave request." },
             "isBackFromLeave": { "type": "boolean", "description": "Indicates if the employee has returned from this specific leave." },
-            "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." }
+            "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." },
+            "isSalaryPaid": { "type": "boolean", "description": "Indicates if the salary for this leave has been processed." }
         },
         "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
     },
@@ -620,8 +621,11 @@
             "type": "object",
             "properties": {
               "date": { "type": "string", "format": "date" },
-              "checkIn": { "type": "string" },
-              "checkOut": { "type": "string" },
+              "checkIn1": { "type": ["string", "null"] },
+              "checkOut1": { "type": ["string", "null"] },
+              "checkIn2": { "type": ["string", "null"] },
+              "checkOut2": { "type": ["string", "null"] },
+              "totalHours": { "type": ["number", "null"] },
               "status": { "type": "string", "enum": ["present", "absent", "late", "leave"] }
             },
             "required": ["date", "status"]
@@ -651,6 +655,8 @@
         "year": { "type": "number" },
         "month": { "type": "number" },
         "attendanceId": { "type": "string", "description": "Reference to the attendance document ID." },
+        "type": { "type": "string", "enum": ["Monthly", "Leave"], "description": "The type of payslip, either a regular monthly salary or a leave salary payout." },
+        "leaveRequestId": { "type": "string", "description": "If type is 'Leave', this links to the LeaveRequest document." },
         "salaryPaymentType": { "type": "string", "enum": ["cash", "cheque", "transfer"] },
         "earnings": {
           "type": "object",
@@ -671,7 +677,8 @@
         },
         "netSalary": { "type": "number" },
         "status": { "type": "string", "enum": ["draft", "processed", "paid"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string", "description": "Auto-generated notes, e.g., regarding leave." }
       },
       "required": ["employeeId", "year", "month", "earnings", "netSalary", "status", "createdAt"]
     },
