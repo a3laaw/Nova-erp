@@ -6,14 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, Timestamp, getDoc } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, Account, JournalEntry, LeaveRequest } from '@/lib/types';
-import { Loader2, Sheet, RefreshCw } from 'lucide-react';
+import { collection, query, where, getDocs, writeBatch, doc, Timestamp } from 'firebase/firestore';
+import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
+import { Loader2, Sheet } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
-import { createNotification } from '@/services/notification-service';
+import { Checkbox } from '../ui/checkbox';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -24,9 +24,7 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<string | null>(null);
-
-  const [isSettlingCommissions, setIsSettlingCommissions] = useState(false);
-  const [settleResult, setSettleResult] = useState<string | null>(null);
+  const [ignoreAttendance, setIgnoreAttendance] = useState(false);
 
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const { data: allLeaves = [], loading: leavesLoading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests');
@@ -63,7 +61,9 @@ export function PayrollGenerator() {
 
           const attendance = attendanceMap.get(employee.id);
           
-          if (attendance && attendance.summary) {
+          if (ignoreAttendance) {
+            payslipNotes = "تم احتساب حضور كامل بناءً على طلب المستخدم.";
+          } else if (attendance && attendance.summary) {
               absenceDeduction = (attendance.summary.absentDays || 0) * dailyRate;
               lateDeduction = Math.floor((attendance.summary.lateDays || 0) / 3) * dailyRate;
           } else {
@@ -73,7 +73,6 @@ export function PayrollGenerator() {
               }
           }
 
-          // Check for approved unpaid leave in the period
           const unpaidLeaveDaysInMonth = (allLeaves || []).reduce((totalDays, leave) => {
             if (leave.employeeId === employee.id && leave.leaveType === 'Unpaid' && leave.status === 'approved') {
                 const leaveStart = toFirestoreDate(leave.startDate);
@@ -83,7 +82,6 @@ export function PayrollGenerator() {
                 
                 if(leaveStart && leaveEnd) {
                     if (leaveStart <= payrollEnd && leaveEnd >= payrollStart) {
-                       // This is a simplified calculation. A more robust solution would iterate through each day of the leave.
                        return totalDays + (leave.workingDays || 0);
                     }
                 }
@@ -149,130 +147,13 @@ export function PayrollGenerator() {
       setIsProcessing(false);
     }
   };
-
-  const handleSettleCommissions = async () => {
-    if (!firestore || !currentUser) return;
-    setIsSettlingCommissions(true);
-    setSettleResult(null);
-
-    try {
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
-        
-        const accruedSalaryAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('code', '==', '210201'), limit(1));
-        const cashAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('code', '==', '110101'), limit(1));
-        const [accruedSalarySnap, cashSnap] = await Promise.all([getDocs(accruedSalaryAccountQuery), getDocs(cashAccountQuery)]);
-
-        if (accruedSalarySnap.empty || cashSnap.empty) {
-            throw new Error("لم يتم العثور على حسابات الرواتب المستحقة أو الصندوق. يرجى مراجعة شجرة الحسابات.");
-        }
-        const accruedSalaryAccount = { id: accruedSalarySnap.docs[0].id, ...accruedSalarySnap.docs[0].data() as Account };
-        const cashAccount = { id: cashSnap.docs[0].id, ...cashSnap.docs[0].data() as Account };
-
-
-        const commissionEntriesQuery = query(
-            collection(firestore, 'journalEntries'),
-            where('status', '==', 'posted'),
-            where('date', '>=', Timestamp.fromDate(startDate)),
-            where('date', '<=', Timestamp.fromDate(endDate)),
-            where('linkedReceiptId', '!=', null)
-        );
-        const commissionEntriesSnap = await getDocs(commissionEntriesQuery);
-        
-        const commissionsByEmployee = new Map<string, { total: number, employeeName: string }>();
-
-        commissionEntriesSnap.forEach(doc => {
-            const entry = doc.data() as JournalEntry;
-            entry.lines.forEach(line => {
-                if (line.accountId === accruedSalaryAccount.id && line.auto_resource_id) {
-                    const empId = line.auto_resource_id;
-                    const emp = employees.find(e => e.id === empId);
-                    if (emp) {
-                        const current = commissionsByEmployee.get(empId) || { total: 0, employeeName: emp.fullName };
-                        current.total += line.credit || 0;
-                        commissionsByEmployee.set(empId, current);
-                    }
-                }
-            });
-        });
-
-        if (commissionsByEmployee.size === 0) {
-            throw new Error("لا توجد عمولات مسجلة ومرحّلة لهذا الشهر ليتم تسويتها.");
-        }
-
-        const batch = writeBatch(firestore);
-        let settledEmployeesCount = 0;
-        const notificationPromises: Promise<void>[] = [];
-
-        const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
-        const accountantsSnap = await getDocs(accountantsQuery);
-        const accountantUserIds = accountantsSnap.docs.map(doc => doc.id);
-
-        const currentYear = new Date().getFullYear();
-        const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
-        const jeCounterDoc = await getDoc(jeCounterRef);
-        let jeNextNumber = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-
-
-        for (const [employeeId, data] of commissionsByEmployee.entries()) {
-            if (data.total > 0) {
-                const newEntryNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
-                jeNextNumber++;
-
-                const settlementEntryRef = doc(collection(firestore, 'journalEntries'));
-                const settlementEntryData = {
-                    entryNumber: newEntryNumber,
-                    date: serverTimestamp(),
-                    narration: `تسوية عمولات ${data.employeeName} عن شهر ${month}/${year}`,
-                    totalDebit: data.total,
-                    totalCredit: data.total,
-                    status: 'draft',
-                    lines: [
-                        { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: data.total, credit: 0, auto_resource_id: employeeId },
-                        { accountId: cashAccount.id, accountName: cashAccount.name, debit: 0, credit: data.total }
-                    ],
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser?.id,
-                };
-                batch.set(settlementEntryRef, settlementEntryData);
-
-                accountantUserIds.forEach(userId => {
-                   notificationPromises.push(createNotification(firestore, {
-                        userId,
-                        title: 'قيد تسوية عمولات جاهز للمراجعة',
-                        body: `تم إنشاء قيد تسوية عمولات للموظف ${data.employeeName} عن شهر ${month}/${year}. الرجاء مراجعته وترحيله.`,
-                        link: `/dashboard/accounting/journal-entries/${settlementEntryRef.id}`
-                   }));
-                });
-
-                settledEmployeesCount++;
-            }
-        }
-        
-        batch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber - 1 } }, { merge: true });
-        
-        await batch.commit();
-        await Promise.all(notificationPromises);
-
-        const message = `تم إنشاء قيود تسوية غير مرحّلة لـ ${settledEmployeesCount} موظف بنجاح.`;
-        setSettleResult(message);
-        toast({ title: 'نجاح', description: message });
-
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'فشل تسوية العمولات.';
-        setSettleResult(message);
-        toast({ variant: 'destructive', title: 'خطأ', description: message });
-    } finally {
-        setIsSettlingCommissions(false);
-    }
-  };
-
+  
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div className="grid gap-2">
           <Label htmlFor="payroll-year-select">السنة</Label>
           <Select value={year} onValueChange={setYear}>
@@ -291,26 +172,20 @@ export function PayrollGenerator() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading}>
-            {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Sheet className="ml-2 h-4 w-4" />}
-            {isProcessing ? 'جاري المعالجة...' : 'توليد كشوف الرواتب'}
-        </Button>
-         <Button onClick={handleSettleCommissions} disabled={isSettlingCommissions || employeesLoading} variant="outline">
-            {isSettlingCommissions ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
-            {isSettlingCommissions ? 'جاري التسوية...' : 'تسوية العمولات'}
-          </Button>
+        <div className="flex items-center space-x-2 rtl:space-x-reverse self-center pt-6">
+          <Checkbox id="ignoreAttendance" checked={ignoreAttendance} onCheckedChange={(checked) => setIgnoreAttendance(checked as boolean)} />
+          <Label htmlFor="ignoreAttendance">تجاهل سجلات الحضور واحتساب حضور كامل للجميع</Label>
+        </div>
       </div>
+      <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading}>
+          {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Sheet className="ml-2 h-4 w-4" />}
+          {isProcessing ? 'جاري المعالجة...' : 'توليد كشوف الرواتب'}
+      </Button>
 
        {processingResult && (
         <Alert>
-            <AlertTitle>نتيجة معالجة الرواتب</AlertTitle>
+            <AlertTitle>نتيجة المعالجة</AlertTitle>
             <AlertDescription>{processingResult}</AlertDescription>
-        </Alert>
-      )}
-       {settleResult && (
-        <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <AlertTitle className="text-blue-800">نتيجة تسوية العمولات</AlertTitle>
-            <AlertDescription className="text-blue-700">{settleResult}</AlertDescription>
         </Alert>
       )}
     </div>
