@@ -20,6 +20,7 @@ const SystemExpertOutputSchema = z.object({
 });
 export type SystemExpertOutput = z.infer<typeof SystemExpertOutputSchema>;
 
+// SIMPLIFIED DOCUMENTATION to avoid syntax errors from long template literals.
 const systemDocumentation = `
 # System Documentation Overview
 
@@ -42,11 +43,17 @@ const systemDocumentation = `
 
 const systemPrompt = `You are a helpful and friendly system expert for an ERP system. Your capabilities are:
 1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. You can understand and respond in both formal and colloquial Arabic (like Egyptian, Gulf dialects), as well as English. Always respond in the same language as the user's question.
-2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action (e.g., "create a new invoice", "I want to see the appointments", "أريد إضافة عميل جديد", "أحجز موعد", "أضيف موظف", "أصدر سند قبض"), you MUST use the 'findNavigation' tool to get the correct link.
+2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action, you MUST use the 'findNavigation' tool to get the correct link. Examples of such requests include:
+    - "create a new invoice"
+    - "I want to see the appointments"
+    - "أريد إضافة عميل جديد"
+    - "عايز أحجز موعد للقسم المعماري"
+    - "افتح صفحة إضافة موظف"
+    - "أضيف سند قبض للعميل محمد"
 
 **Behavioral Guidelines:**
 - When using the 'findNavigation' tool, present the result to the user as a helpful, clickable link in Markdown format. For example: "بالتأكيد, يمكنك [إضافة عميل جديد من هنا](/dashboard/clients/new)."
-- If the tool returns an error, you MUST inform the user you could not find a direct link and then explain how to navigate to the page manually based on the System Documentation.
+- If the tool returns an error, you MUST inform the user you could not find a direct link and then explain how to navigate to the page manually based on the System Documentation. For example, if the user asks to add a receipt for a specific client, and you can't find a direct link with the client's name, you should provide the general link and explain how they can select the client on that page.
 - If the user's intent is ambiguous, ask for clarification before using a tool or answering.
 - Do not invent features or links. 
 - Always respond in the same language as the user's question.
@@ -57,13 +64,7 @@ ${systemDocumentation}
 ---
 `;
 
-export const systemExpertFlow = ai.defineFlow(
-  {
-    name: 'systemExpertFlow',
-    inputSchema: SystemExpertInputSchema,
-    outputSchema: SystemExpertOutputSchema,
-  },
-  async (input) => {
+export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
     const { question, history } = input;
     const llmHistory = history?.map(msg => ({
       role: msg.role,
@@ -71,16 +72,20 @@ export const systemExpertFlow = ai.defineFlow(
     })) || [];
     
     const response = await ai.generate({
-      system: systemPrompt,
       history: llmHistory,
       prompt: `Question: "${question}"\n\nAnswer:`,
       tools: [findNavigationTool]
     });
     
     return { answer: response.text };
-  }
-);
-
-export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
-  return systemExpertFlow(input);
 }
+
+export const systemExpertFlow = ai.defineFlow(
+  {
+    name: 'systemExpertFlow',
+    inputSchema: SystemExpertInputSchema,
+    outputSchema: SystemExpertOutputSchema,
+    system: systemPrompt,
+  },
+  askSystemExpert
+);
