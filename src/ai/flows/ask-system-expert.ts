@@ -1,10 +1,10 @@
 'use server';
 /**
- * @fileOverview A system expert AI that answers questions based on provided documentation.
+ * @fileOverview A system expert AI that answers questions based on provided documentation and can perform actions.
  */
-
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { findNavigationTool } from '../tools/find-navigation';
 
 const SystemExpertInputSchema = z.object({
   question: z.string().describe("The user's question about the system."),
@@ -20,8 +20,6 @@ const SystemExpertOutputSchema = z.object({
 });
 export type SystemExpertOutput = z.infer<typeof SystemExpertOutputSchema>;
 
-// This is where you would ideally load the documentation from files.
-// Since we can't do that in this environment, we'll paste the content directly.
 const systemDocumentation = `
 # System Documentation
 
@@ -218,7 +216,7 @@ const systemDocumentation = `
 
 *   **توليد ذكي لوصف الدفعة (أهم ميزة):**
     *   عندما تختار عقدًا معينًا وتدخل المبلغ المستلم، يقوم النظام **بتحليل بنود الدفعات في العقد تلقائيًا**.
-    *   يقوم بإنشاء وصف مفصل يوضح أي الدفعات يتم سدادها بهذا المبلغ (سواء كان سدادًا كاملاً أو جزئيًا).
+    *   يقوم بإنشاء وصف مفصل يوضح أي الدفعات يتم سدادها بهذا المبلغ (سواء كان سدادًا كاملًا أو جزئيًا).
     *   **مثال:** إذا أدخلت مبلغ 700 دينار، وكان هناك دفعة مستحقة بقيمة 500 وأخرى بقيمة 1000، سيكتب النظام تلقائيًا في الوصف:
         > سداد كامل للدفعة "الأولى" بقيمة 500 د.ك
         > سداد جزئي من الدفعة "الثانية" بقيمة 200 د.ك
@@ -427,7 +425,7 @@ const systemDocumentation = `
 *   **البيانات المرجعية:** إدارة مركزية للقوائم الأساسية (مثل الأقسام، الوظائف، المناطق) لضمان توحيد البيانات.
 *   **الإشعارات التلقائية:** يقوم النظام بإبقاء الجميع على اطلاع بالأحداث الهامة المتعلقة بعملهم.
 
-`;
+\`;
 
 
 export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
@@ -441,17 +439,17 @@ const systemExpertFlow = ai.defineFlow(
     outputSchema: SystemExpertOutputSchema,
   },
   async ({ question, history }) => {
-    const prompt = `أنت مساعد ذكي وخبير في نظام ERP. وظيفتك هي الإجابة على أسئلة الموظفين حول كيفية استخدام النظام. يمكنك فهم اللغة العربية الفصحى واللهجات العامية المختلفة (مثل المصرية والكويتية والعراقية) بالإضافة إلى اللغة الإنجليزية. أجب دائمًا بلغة السؤال.
+    const prompt = \`أنت مساعد ذكي وخبير في نظام ERP. وظيفتك هي الإجابة على أسئلة الموظفين حول كيفية استخدام النظام. يمكنك فهم اللغة العربية الفصحى واللهجات العامية المختلفة (مثل المصرية والكويتية والعراقية) بالإضافة إلى اللغة الإنجليزية. أجب دائمًا بلغة السؤال.
 استخدم المستندات التالية كمصدر أساسي لمعلوماتك. أجب بأسلوب واضح ومباشر.
 
 System Documentation:
 ---
-${systemDocumentation}
+\${systemDocumentation}
 ---
 
-Question: "${question}"
+Question: "\${question}"
 
-Answer:`;
+Answer:\`;
     
     const llmHistory = history?.map(msg => ({
       role: msg.role,
@@ -467,3 +465,57 @@ Answer:`;
     return { answer: response.text };
   }
 );
+`;
+
+const systemPrompt = `You are a helpful and friendly system expert for an ERP system. Your capabilities are:
+1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. Your answers should be clear, concise, and in the same language as the user's question (Arabic or English).
+2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action (e.g., "create a new invoice", "I want to see the appointments", "أريد إضافة عميل جديد"), you MUST use the \`findNavigation\` tool to get the correct link.
+
+**Behavioral Guidelines:**
+- When using the \`findNavigation\` tool, present the result to the user as a helpful, clickable link in Markdown format. For example: "بالتأكيد, يمكنك [إضافة عميل جديد من هنا](/dashboard/clients/new)."
+- If the tool doesn't find a relevant link, just say you couldn't find a direct link but explain how to get there based on the documentation.
+- If the user's intent is ambiguous, ask for clarification before using a tool or answering.
+- Do not invent features or links. 
+- Always respond in the same language as the user's question.
+
+System Documentation:
+---
+${systemDocumentation}
+---
+`;
+
+const expertPrompt = ai.definePrompt(
+  {
+    name: 'systemExpertPrompt',
+    tools: [findNavigationTool],
+    system: systemPrompt,
+  },
+  async ({ question, history }: SystemExpertInput) => {
+    // Build the history for the prompt
+    const llmHistory = history?.map(msg => ({
+      role: msg.role,
+      content: [{ text: msg.content }],
+    }));
+
+    return {
+      history: llmHistory,
+      prompt: `Question: "${question}"\n\nAnswer:`,
+    };
+  }
+);
+
+// const systemExpertFlow = ai.defineFlow(
+//   {
+//     name: 'systemExpertFlow',
+//     inputSchema: SystemExpertInputSchema,
+//     outputSchema: SystemExpertOutputSchema,
+//   },
+//   async ({ question, history }) => {
+//     const response = await expertPrompt({ question, history });
+//     return { answer: response.text };
+//   }
+// );
+
+// Note: definePrompt returns a function that can be used directly as a flow.
+export const systemExpertFlow = expertPrompt;
+

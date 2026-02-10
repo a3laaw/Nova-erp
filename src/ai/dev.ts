@@ -6,3 +6,4 @@ import '@/ai/flows/suggest-task-prioritization.ts';
 import '@/ai/flows/accounting-assistant.ts';
 import '@/ai/flows/cash-flow-projection.ts';
 import '@/ai/flows/ask-system-expert.ts';
+import '@/ai/tools/find-navigation';
