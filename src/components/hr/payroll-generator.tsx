@@ -6,12 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, Timestamp, limit, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, Timestamp, getDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, Account, JournalEntry, LeaveRequest } from '@/lib/types';
 import { Loader2, Sheet, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useAuth } from '@/context/auth-context';
+import { toFirestoreDate } from '@/services/date-converter';
 import { createNotification } from '@/services/notification-service';
 
 export function PayrollGenerator() {
@@ -27,11 +28,12 @@ export function PayrollGenerator() {
   const [isSettlingCommissions, setIsSettlingCommissions] = useState(false);
   const [settleResult, setSettleResult] = useState<string | null>(null);
 
-
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+  const { data: allLeaves = [], loading: leavesLoading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests');
+
 
   const handleGeneratePayroll = async () => {
-    if (!firestore) return;
+    if (!firestore || !currentUser) return;
 
     setIsProcessing(true);
     setProcessingResult(null);
@@ -39,10 +41,6 @@ export function PayrollGenerator() {
     try {
       const attendanceQuery = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)));
       const attendanceSnap = await getDocs(attendanceQuery);
-      
-      if (attendanceSnap.empty) {
-        throw new Error('لم يتم العثور على سجلات حضور للشهر المحدد. يرجى رفعها أولاً.');
-      }
       
       const attendanceMap = new Map<string, MonthlyAttendance>();
       attendanceSnap.forEach(doc => {
@@ -57,21 +55,53 @@ export function PayrollGenerator() {
           if (!employee.id) continue;
           
           const fullSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-          const dailyRate = fullSalary / 26;
+          const dailyRate = fullSalary > 0 ? fullSalary / 26 : 0;
 
           let absenceDeduction = 0;
           let lateDeduction = 0;
+          let payslipNotes = '';
 
           const attendance = attendanceMap.get(employee.id);
+          
           if (attendance) {
               absenceDeduction = (attendance.summary.absentDays || 0) * dailyRate;
               lateDeduction = Math.floor((attendance.summary.lateDays || 0) / 3) * dailyRate;
+          } else {
+              // If employee is on a contract that requires attendance, assume full attendance if no record found
+              const requiresAttendance = employee.contractType === 'permanent' || employee.contractType === 'temporary' || (employee.contractType === 'piece-rate' && employee.pieceRateMode === 'salary_with_target');
+              if (requiresAttendance) {
+                 payslipNotes = "لم يتم العثور على سجل حضور، تم احتساب الراتب على أساس الحضور الكامل.";
+              }
+          }
+
+          // Check for approved unpaid leave in the period
+          const unpaidLeaveDaysInMonth = (allLeaves || []).reduce((totalDays, leave) => {
+            if (leave.employeeId === employee.id && leave.leaveType === 'Unpaid' && leave.status === 'approved') {
+                const leaveStart = toFirestoreDate(leave.startDate);
+                const leaveEnd = toFirestoreDate(leave.endDate);
+                const payrollStart = new Date(parseInt(year), parseInt(month) - 1, 1);
+                const payrollEnd = new Date(parseInt(year), parseInt(month), 0);
+                
+                if(leaveStart && leaveEnd) {
+                    if (leaveStart <= payrollEnd && leaveEnd >= payrollStart) {
+                       // This is a simplified calculation. A more robust solution would iterate through each day of the leave.
+                       return totalDays + (leave.workingDays || 0);
+                    }
+                }
+            }
+            return totalDays;
+          }, 0);
+          
+          if (unpaidLeaveDaysInMonth > 0) {
+              absenceDeduction += unpaidLeaveDaysInMonth * dailyRate;
+              payslipNotes += (payslipNotes ? '\n' : '') + `تم خصم ${unpaidLeaveDaysInMonth} أيام إجازة بدون راتب.`;
           }
 
           const earnings = {
               basicSalary: employee.basicSalary || 0,
               housingAllowance: employee.housingAllowance || 0,
               transportAllowance: employee.transportAllowance || 0,
+              commission: 0,
           };
           const totalEarnings = Object.values(earnings).reduce((sum, val) => sum + val, 0);
 
@@ -91,7 +121,7 @@ export function PayrollGenerator() {
               employeeName: employee.fullName,
               year: parseInt(year),
               month: parseInt(month),
-              attendanceId: attendanceMap.get(employee.id)?.id,
+              attendanceId: attendance?.id,
               salaryPaymentType: employee.salaryPaymentType,
               earnings,
               deductions,
@@ -99,6 +129,7 @@ export function PayrollGenerator() {
               status: 'draft',
               createdAt: new Date(),
               type: 'Monthly',
+              notes: payslipNotes.trim(),
           };
           
           batch.set(payslipRef, payslipData, { merge: true });
