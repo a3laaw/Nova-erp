@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,12 +8,13 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
-import { Loader2, Sheet } from 'lucide-react';
+import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Checkbox } from '../ui/checkbox';
+import { Separator } from '../ui/separator';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -29,6 +30,18 @@ export function PayrollGenerator() {
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const { data: allLeaves = [], loading: leavesLoading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests');
 
+  const [attendanceRecordsExist, setAttendanceRecordsExist] = useState(false);
+
+  // Check if attendance for the selected month/year exists
+  useEffect(() => {
+    if(!firestore) return;
+    const checkAttendance = async () => {
+        const q = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)), where('__name__', '!=', ''));
+        const snap = await getDocs(q);
+        setAttendanceRecordsExist(!snap.empty);
+    };
+    checkAttendance();
+  }, [firestore, year, month]);
 
   const handleGeneratePayroll = async () => {
     if (!firestore || !currentUser) return;
@@ -118,7 +131,6 @@ export function PayrollGenerator() {
               employeeName: employee.fullName,
               year: parseInt(year),
               month: parseInt(month),
-              ...(attendance?.id && { attendanceId: attendance.id }),
               salaryPaymentType: employee.salaryPaymentType,
               earnings,
               deductions,
@@ -127,6 +139,7 @@ export function PayrollGenerator() {
               createdAt: new Date(),
               type: 'Monthly',
               notes: payslipNotes.trim(),
+              ...(attendance?.id && { attendanceId: attendance.id }),
           };
           
           batch.set(payslipRef, payslipData, { merge: true });
@@ -151,43 +164,69 @@ export function PayrollGenerator() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-        <div className="grid gap-2">
-          <Label htmlFor="payroll-year-select">السنة</Label>
-          <Select value={year} onValueChange={setYear}>
-            <SelectTrigger id="payroll-year-select"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="payroll-month-select">الشهر</Label>
-          <Select value={month} onValueChange={setMonth}>
-            <SelectTrigger id="payroll-month-select"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center space-x-2 rtl:space-x-reverse self-center pt-6">
-          <Checkbox id="ignoreAttendance" checked={ignoreAttendance} onCheckedChange={(checked) => setIgnoreAttendance(checked as boolean)} />
-          <Label htmlFor="ignoreAttendance">تجاهل سجلات الحضور واحتساب حضور كامل للجميع</Label>
-        </div>
-      </div>
-      <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading}>
-          {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Sheet className="ml-2 h-4 w-4" />}
-          {isProcessing ? 'جاري المعالجة...' : 'توليد كشوف الرواتب'}
-      </Button>
+  const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
-       {processingResult && (
-        <Alert>
-            <AlertTitle>نتيجة المعالجة</AlertTitle>
-            <AlertDescription>{processingResult}</AlertDescription>
-        </Alert>
-      )}
+  return (
+    <div className="grid lg:grid-cols-2 gap-8 items-start">
+        <div className="space-y-6">
+            <h3 className="font-semibold text-lg">1. حدد الإعدادات</h3>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="payroll-year-select">السنة</Label>
+                    <Select value={year} onValueChange={setYear}>
+                        <SelectTrigger id="payroll-year-select"><SelectValue /></SelectTrigger>
+                        <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="payroll-month-select">الشهر</Label>
+                    <Select value={month} onValueChange={setMonth}>
+                        <SelectTrigger id="payroll-month-select"><SelectValue /></SelectTrigger>
+                        <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <div className="flex items-center space-x-2 rtl:space-x-reverse self-center pt-2">
+                <Checkbox id="ignoreAttendance" checked={ignoreAttendance} onCheckedChange={(checked) => setIgnoreAttendance(checked as boolean)} />
+                <Label htmlFor="ignoreAttendance">تجاهل سجلات الحضور واحتساب حضور كامل للجميع</Label>
+            </div>
+        </div>
+
+        <div className="border rounded-lg p-6 bg-muted/50 space-y-4">
+            <h3 className="font-semibold text-lg">2. تأكيد العملية</h3>
+            <p className="text-sm text-muted-foreground">
+                أنت على وشك إنشاء كشوف رواتب لشهر <strong>{monthName} {year}</strong> لـِ <strong>{employees.length}</strong> موظف نشط.
+            </p>
+            {!ignoreAttendance && !attendanceRecordsExist && (
+                <Alert variant="destructive">
+                    <FileWarning className="h-4 w-4" />
+                    <AlertTitle>تنبيه</AlertTitle>
+                    <AlertDescription>
+                        لم يتم رفع سجلات الحضور لهذا الشهر. سيتم احتساب حضور كامل للموظفين ذوي العقود التي تتطلب حضورًا.
+                    </AlertDescription>
+                </Alert>
+            )}
+            {ignoreAttendance && (
+                 <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>ملاحظة</AlertTitle>
+                    <AlertDescription>
+                       سيتم تجاهل أي سجلات حضور مرفوعة لهذا الشهر واحتساب حضور كامل لجميع الموظفين.
+                    </AlertDescription>
+                </Alert>
+            )}
+            <Separator />
+            <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading} className="w-full">
+                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Sheet className="ml-2 h-4 w-4" />}
+                {isProcessing ? 'جاري المعالجة...' : `توليد كشوف رواتب شهر ${monthName}`}
+            </Button>
+             {processingResult && (
+                <Alert>
+                    <AlertTitle>نتيجة المعالجة</AlertTitle>
+                    <AlertDescription>{processingResult}</AlertDescription>
+                </Alert>
+            )}
+        </div>
     </div>
   );
 }

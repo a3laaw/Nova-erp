@@ -31,7 +31,7 @@ export default function PayrollPage() {
                     <CardHeader>
                         <CardTitle>معالجة كشوف الرواتب</CardTitle>
                         <CardDescription>
-                           توليد كشوف الرواتب الشهرية بناءً على سجلات الحضور والغياب.
+                           توليد كشوف الرواتب الشهرية بناءً على سجلات الحضور والغياب للموظفين.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
