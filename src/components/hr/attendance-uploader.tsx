@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,13 +13,12 @@ import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Info } from '
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse } from 'date-fns';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 
-// Expected columns in the Excel file
 const EXPECTED_COLUMNS = ['employeeNumber', 'date', 'checkIn1', 'checkOut1', 'checkIn2', 'checkOut2'];
 
 const parseExcelTime = (excelTime: any): { hours: number, minutes: number } | null => {
     if (typeof excelTime !== 'number' || excelTime < 0 || excelTime > 1) {
-        // If it's a string like '08:00', try parsing it
         if (typeof excelTime === 'string' && excelTime.includes(':')) {
             const [h, m] = excelTime.split(':').map(Number);
             if (!isNaN(h) && !isNaN(m)) {
@@ -44,11 +43,25 @@ export function AttendanceUploader() {
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0]);
-      setProcessingResult(null); // Clear previous results
+      setProcessingResult(null);
     }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (event.dataTransfer.files && event.dataTransfer.files[0]) {
+      setFile(event.dataTransfer.files[0]);
+      setProcessingResult(null);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
   };
 
   const handleDownloadTemplate = () => {
@@ -80,12 +93,12 @@ export function AttendanceUploader() {
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     
     worksheet['!cols'] = [
-      { wch: 20 }, // employeeNumber
-      { wch: 15 }, // date
-      { wch: 15 }, // checkIn1
-      { wch: 15 }, // checkOut1
-      { wch: 15 }, // checkIn2
-      { wch: 15 }, // checkOut2
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -150,7 +163,7 @@ export function AttendanceUploader() {
                         }
                     }
                     totalWorkMinutes = duration;
-                } else if (t1 && t2) { // Handles case with only 2 check-ins
+                } else if (t1 && t2) { 
                     const date1 = new Date(0, 0, 0, t1.hours, t1.minutes);
                     const date2 = new Date(0, 0, 0, t2.hours, t2.minutes);
                     totalWorkMinutes = (date2.getTime() - date1.getTime()) / (1000 * 60);
@@ -225,71 +238,111 @@ export function AttendanceUploader() {
         setIsProcessing(false);
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsBinaryString(file!);
   };
   
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        <div className="grid gap-2">
-            <Label htmlFor="year-select">السنة</Label>
-            <Select value={year} onValueChange={setYear}>
-                <SelectTrigger id="year-select"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                    {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                </SelectContent>
-            </Select>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="lg:col-span-1 space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>تعليمات الرفع</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-muted-foreground">
+                    <ol className="list-decimal list-inside space-y-3">
+                        <li><strong>تنزيل النموذج:</strong> قم بتنزيل النموذج الرسمي لملف الحضور. يحتوي على أرقام الموظفين النشطين وأعمدة باللغة الإنجليزية يجب عدم تغييرها.</li>
+                        <li><strong>ملء البيانات:</strong> املأ بيانات الحضور لكل موظف. يمكنك ترك صفوف الموظفين الذين ليس لديهم بصمة فارغة.</li>
+                        <li><strong>تحديد الفترة:</strong> اختر السنة والشهر الصحيحين.</li>
+                        <li><strong>رفع الملف:</strong> اسحب الملف إلى منطقة الرفع أو اضغط لاختياره.</li>
+                        <li><strong>تأكيد:</strong> اضغط على زر "رفع وتحديث السجلات" لمعالجة البيانات.</li>
+                    </ol>
+                    <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
+                        <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
+                        <AlertTitle>ملاحظة هامة</AlertTitle>
+                        <AlertDescription>
+                            للتصحيح، ما عليك سوى رفع ملف جديد بنفس الشهر والسنة. سيتم استبدال البيانات القديمة تلقائيًا.
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
         </div>
-         <div className="grid gap-2">
-            <Label htmlFor="month-select">الشهر</Label>
-            <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger id="month-select"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                    {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
-                </SelectContent>
-            </Select>
-        </div>
-         <div className="grid gap-2 md:col-span-2">
-            <Label htmlFor="attendance-file">ملف الحضور (Excel)</Label>
-            <Input id="attendance-file" type="file" onChange={handleFileChange} accept=".xlsx, .xls" />
-        </div>
-      </div>
-       <Alert variant="default" className="bg-blue-50 border-blue-200">
-          <Info className="h-4 w-4 !text-blue-600" />
-          <AlertTitle className="text-blue-800">كيفية التصحيح</AlertTitle>
-          <AlertDescription className="text-blue-700">
-              إذا قمت برفع ملف خاطئ، ببساطة قم بتصحيح البيانات في ملف الإكسل ثم قم برفعه مرة أخرى لنفس الشهر والسنة. سيقوم النظام تلقائيًا بتحديث السجلات القديمة بالبيانات الجديدة.
-          </AlertDescription>
-      </Alert>
-      <div className="flex items-center gap-4">
-        <Button onClick={handleUpload} disabled={!file || isProcessing}>
-            {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
-            {isProcessing ? 'جاري المعالجة...' : 'رفع وتحديث السجلات'}
-        </Button>
-        <Button onClick={handleDownloadTemplate} variant="outline" disabled={employeesLoading}>
-            {employeesLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="ml-2 h-4 w-4" />}
-            تنزيل النموذج الرسمي
-        </Button>
-      </div>
 
-       <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <AlertTriangle className="h-4 w-4 !text-blue-600" />
-            <AlertTitle className="text-blue-800">ملاحظة هامة</AlertTitle>
-            <AlertDescription className="text-blue-700">
-                النموذج الذي يتم تنزيله يحتوي على أسماء أعمدة باللغة الإنجليزية. هذه الأسماء ضرورية لعملية الرفع الآلي ويجب عدم تغييرها.
-            </AlertDescription>
-        </Alert>
+        <div className="lg:col-span-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle>رفع سجلات الحضور الشهرية</CardTitle>
+                    <CardDescription>
+                        قم برفع ملف Excel يحتوي على بيانات الحضور والانصراف للموظفين عن شهر محدد.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                        <div className="grid gap-2">
+                            <Label htmlFor="year-select">السنة</Label>
+                            <Select value={year} onValueChange={setYear}>
+                                <SelectTrigger id="year-select"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="month-select">الشهر</Label>
+                            <Select value={month} onValueChange={setMonth}>
+                                <SelectTrigger id="month-select"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
 
-      {processingResult && (
-        <Alert variant={processingResult.success ? 'default' : 'destructive'} className={processingResult.success ? 'bg-green-50 border-green-200' : ''}>
-            {processingResult.success ? <FileCheck className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-            <AlertTitle>{processingResult.success ? 'نجاح' : 'خطأ'}</AlertTitle>
-            <AlertDescription>{processingResult.message}</AlertDescription>
-        </Alert>
-      )}
+                    <div className="space-y-2">
+                        <Label>ملف الحضور (Excel)</Label>
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+                        >
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                onChange={handleFileChange}
+                                accept=".xlsx, .xls"
+                            />
+                            <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                            {file ? (
+                                <p className="mt-4 text-sm font-semibold text-primary">{file.name}</p>
+                            ) : (
+                                <p className="mt-4 text-sm text-muted-foreground">اسحب وأفلت الملف هنا، أو اضغط للاختيار</p>
+                            )}
+                        </div>
+                    </div>
+                     {processingResult && (
+                        <Alert variant={processingResult.success ? 'default' : 'destructive'} className={processingResult.success ? 'bg-green-50 border-green-200' : ''}>
+                            {processingResult.success ? <FileCheck className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                            <AlertTitle>{processingResult.success ? 'نجاح' : 'خطأ'}</AlertTitle>
+                            <AlertDescription>{processingResult.message}</AlertDescription>
+                        </Alert>
+                      )}
+                </CardContent>
+                <CardFooter className="justify-between">
+                    <Button onClick={handleUpload} disabled={!file || isProcessing}>
+                        {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
+                        {isProcessing ? 'جاري المعالجة...' : 'رفع وتحديث السجلات'}
+                    </Button>
+                    <Button onClick={handleDownloadTemplate} variant="outline" disabled={employeesLoading}>
+                        {employeesLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                        تنزيل النموذج الرسمي
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
     </div>
   );
 }

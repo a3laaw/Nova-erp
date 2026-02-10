@@ -24,17 +24,7 @@ export default function PayrollPage() {
                 </TabsTrigger>
             </TabsList>
             <TabsContent value="attendance" className="mt-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>سجلات الحضور الشهرية</CardTitle>
-                        <CardDescription>
-                            قم برفع ملف Excel يحتوي على بيانات الحضور والانصراف للموظفين عن شهر محدد.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <AttendanceUploader />
-                    </CardContent>
-                </Card>
+                <AttendanceUploader />
             </TabsContent>
             <TabsContent value="payroll" className="mt-4">
                  <Card>
