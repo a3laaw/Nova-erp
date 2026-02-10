@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
 import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useAuth } from '@/context/auth-context';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -126,7 +126,7 @@ export function PayrollGenerator() {
           const payslipId = `${year}-${month}-${employee.id}`;
           const payslipRef = doc(firestore, 'payroll', payslipId);
 
-          const payslipData: Omit<Payslip, 'id'> = {
+          const payslipData: Partial<Payslip> = {
               employeeId: employee.id,
               employeeName: employee.fullName,
               year: parseInt(year),
@@ -139,10 +139,13 @@ export function PayrollGenerator() {
               createdAt: new Date(),
               type: 'Monthly',
               notes: payslipNotes.trim(),
-              ...(attendance?.id && { attendanceId: attendance.id }),
           };
+
+          if (attendance?.id) {
+            payslipData.attendanceId = attendance.id;
+          }
           
-          batch.set(payslipRef, payslipData, { merge: true });
+          batch.set(payslipRef, cleanFirestoreData(payslipData), { merge: true });
           payslipsCreated++;
       }
       
