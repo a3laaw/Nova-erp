@@ -5,6 +5,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { findNavigationTool } from '@/ai/tools/find-navigation';
+import { getFirebaseServices } from '@/firebase/init';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const SystemExpertInputSchema = z.object({
   question: z.string().describe("The user's question about the system."),
@@ -20,7 +22,69 @@ const SystemExpertOutputSchema = z.object({
 });
 export type SystemExpertOutput = z.infer<typeof SystemExpertOutputSchema>;
 
-// SIMPLIFIED DOCUMENTATION to avoid syntax errors from long template literals.
+// Define the new tool
+const getClientDebt = ai.defineTool(
+  {
+    name: 'getClientDebt',
+    description: 'Gets the total outstanding debt for a specific client by their name or file number.',
+    inputSchema: z.object({
+      clientNameOrNumber: z.string().describe('The name or file number of the client to look up.'),
+    }),
+    outputSchema: z.object({
+      debt: z.number().optional(),
+      clientName: z.string().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  async ({ clientNameOrNumber }) => {
+    const { firestore } = getFirebaseServices();
+    if (!firestore) {
+      return { error: 'Firestore not initialized.' };
+    }
+
+    try {
+      const nameQuery = query(collection(firestore, 'clients'), where('nameAr', '==', clientNameOrNumber));
+      const fileIdQuery = query(collection(firestore, 'clients'), where('fileId', '==', clientNameOrNumber));
+
+      const [nameSnap, fileIdSnap] = await Promise.all([
+        getDocs(nameQuery),
+        getDocs(fileIdQuery),
+      ]);
+
+      const clientDoc = nameSnap.docs[0] || fileIdSnap.docs[0];
+
+      if (clientDoc) {
+        const clientData = clientDoc.data();
+        
+        // Per the prompt's assumption, we are looking for a 'totalDue' or 'outstandingBalance' field.
+        // Since the schema doesn't have it, we'll calculate it based on contract clauses.
+        const transactionsQuery = query(collection(firestore, `clients/${clientDoc.id}/transactions`));
+        const transactionsSnap = await getDocs(transactionsQuery);
+
+        let totalDue = 0;
+        transactionsSnap.forEach(txDoc => {
+            const txData = txDoc.data();
+            if (txData.contract && Array.isArray(txData.contract.clauses)) {
+                txData.contract.clauses.forEach((clause: any) => {
+                    if (clause.status === 'مستحقة') {
+                        totalDue += clause.amount || 0;
+                    }
+                });
+            }
+        });
+
+        return { debt: totalDue, clientName: clientData.nameAr };
+      }
+
+      return { error: `لم يتم العثور على عميل بالاسم أو رقم الملف: ${clientNameOrNumber}` };
+    } catch (e) {
+      console.error(e);
+      return { error: 'حدث خطأ أثناء البحث في قاعدة البيانات.' };
+    }
+  }
+);
+
+
 const systemDocumentation = `
 # System Documentation Overview
 
@@ -43,19 +107,16 @@ const systemDocumentation = `
 
 const systemPrompt = `You are a helpful and friendly system expert for an ERP system. Your capabilities are:
 1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. You can understand and respond in both formal and colloquial Arabic (like Egyptian, Gulf dialects), as well as English. Always respond in the same language as the user's question.
-2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action, you MUST use the 'findNavigation' tool to get the correct link. Examples of such requests include:
-    - "create a new invoice"
-    - "I want to see the appointments"
-    - "أريد إضافة عميل جديد"
-    - "عايز أحجز موعد للقسم المعماري"
-    - "افتح صفحة إضافة موظف"
-    - "أضيف سند قبض للعميل محمد"
+2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action (e.g., "create a new invoice", "I want to see the appointments", "أريد إضافة عميل جديد", "أحجز موعد", "أضيف موظف", "أصدر سند قبض"), you MUST use the 'findNavigation' tool to get the correct link.
+3.  **Fetching Live Data**: If the user asks for specific data from the system, like a client's debt (e.g., "كم مديونية العميل محمد؟", "check client balance"), you MUST use the appropriate tool like 'getClientDebt'.
 
 **Behavioral Guidelines:**
-- When using the 'findNavigation' tool, present the result to the user as a helpful, clickable link in Markdown format. For example: "بالتأكيد, يمكنك [إضافة عميل جديد من هنا](/dashboard/clients/new)."
-- If the tool returns an error, you MUST inform the user you could not find a direct link and then explain how to navigate to the page manually based on the System Documentation. For example, if the user asks to add a receipt for a specific client, and you can't find a direct link with the client's name, you should provide the general link and explain how they can select the client on that page.
+- When using tools, present the result clearly and naturally.
+- For \`findNavigation\`: present the result as a helpful, clickable link in Markdown format. For example: "بالتأكيد, يمكنك [إضافة عميل جديد من هنا](/dashboard/clients/new)."
+- For \`getClientDebt\`: state the debt clearly, e.g., "مديونية العميل محمد علي هي 1,250 د.ك."
+- If a tool returns an error (e.g., client not found), inform the user gracefully. For example: "لم أتمكن من العثور على العميل بهذا الاسم. هل يمكنك التحقق من الاسم أو رقم الملف؟"
 - If the user's intent is ambiguous, ask for clarification before using a tool or answering.
-- Do not invent features or links. 
+- Do not invent features, links, or data.
 - Always respond in the same language as the user's question.
 
 System Documentation:
@@ -74,7 +135,7 @@ export async function askSystemExpert(input: SystemExpertInput): Promise<SystemE
     const response = await ai.generate({
       history: llmHistory,
       prompt: `Question: "${question}"\n\nAnswer:`,
-      tools: [findNavigationTool]
+      tools: [findNavigationTool, getClientDebt]
     });
     
     return { answer: response.text };
