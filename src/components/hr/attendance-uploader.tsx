@@ -9,7 +9,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud } from 'lucide-react';
+import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Info } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse } from 'date-fns';
@@ -47,6 +47,7 @@ export function AttendanceUploader() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0]);
+      setProcessingResult(null); // Clear previous results
     }
   };
 
@@ -213,8 +214,8 @@ export function AttendanceUploader() {
 
         await batch.commit();
 
-        setProcessingResult({ success: true, message: `تمت معالجة و حفظ سجلات الحضور لـ ${attendanceByEmployee.size} موظف بنجاح.` });
-        toast({ title: 'نجاح', description: 'تم رفع ملف الحضور بنجاح.' });
+        setProcessingResult({ success: true, message: `تم تحديث سجلات الحضور لـ ${attendanceByEmployee.size} موظف بنجاح.` });
+        toast({ title: 'نجاح', description: 'تم تحديث ملف الحضور بنجاح.' });
         
       } catch (error) {
         const message = error instanceof Error ? error.message : 'فشل في قراءة ومعالجة الملف.';
@@ -256,10 +257,17 @@ export function AttendanceUploader() {
             <Input id="attendance-file" type="file" onChange={handleFileChange} accept=".xlsx, .xls" />
         </div>
       </div>
+       <Alert variant="default" className="bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4 !text-blue-600" />
+          <AlertTitle className="text-blue-800">كيفية التصحيح</AlertTitle>
+          <AlertDescription className="text-blue-700">
+              إذا قمت برفع ملف خاطئ، ببساطة قم بتصحيح البيانات في ملف الإكسل ثم قم برفعه مرة أخرى لنفس الشهر والسنة. سيقوم النظام تلقائيًا بتحديث السجلات القديمة بالبيانات الجديدة.
+          </AlertDescription>
+      </Alert>
       <div className="flex items-center gap-4">
         <Button onClick={handleUpload} disabled={!file || isProcessing}>
             {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
-            {isProcessing ? 'جاري المعالجة...' : 'رفع ومعالجة الملف'}
+            {isProcessing ? 'جاري المعالجة...' : 'رفع وتحديث السجلات'}
         </Button>
         <Button onClick={handleDownloadTemplate} variant="outline" disabled={employeesLoading}>
             {employeesLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="ml-2 h-4 w-4" />}
@@ -285,4 +293,3 @@ export function AttendanceUploader() {
     </div>
   );
 }
-
