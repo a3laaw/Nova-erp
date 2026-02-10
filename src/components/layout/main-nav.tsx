@@ -35,6 +35,7 @@ import {
   LogOut,
   LineChart,
   ClipboardCheck,
+  Bot,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -83,7 +84,7 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
-        { href: '/dashboard/accounting/assistant', label: 'المساعد الذكي' },
+        { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي' },
         {
           label: 'قيود وسندات',
           children: [

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { useBranding } from '@/context/branding-context';
 import { cn } from '@/lib/utils';
+import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 export default function DashboardLayout({
   children,
@@ -83,6 +84,7 @@ export default function DashboardLayout({
           </SidebarInset>
         </div>
       </SidebarProvider>
+      <SystemExpertChatWidget />
     </div>
   );
 }
