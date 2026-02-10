@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, writeBatch, getDocs } from 'firebase/firestore';
 import type { Payslip, Employee } from '@/lib/types';
 import {
   Table,
@@ -20,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { MoreHorizontal, Eye, CheckCircle, Loader2, Info } from 'lucide-react';
+import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
+import { toFirestoreDate } from '@/services/date-converter';
+import * as XLSX from 'xlsx';
+import { useBranding } from '@/context/branding-context';
+import { Logo } from '../layout/logo';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { Input } from '../ui/input';
 
 const statusColors: Record<Payslip['status'], string> = {
   draft: 'bg-yellow-100 text-yellow-800',
@@ -61,9 +69,11 @@ export function PayslipsList() {
     const { firestore } = useFirebase();
     const router = useRouter();
     const { toast } = useToast();
+    const { branding } = useBranding();
 
     const [year, setYear] = useState(new Date().getFullYear().toString());
     const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+    const [searchQuery, setSearchQuery] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
     const payslipsQuery = useMemo(() => {
@@ -83,7 +93,7 @@ export function PayslipsList() {
         if (!payslips || !employees) return [];
         const employeeIdSet = new Set(employees.map(e => e.id));
         
-        return payslips
+        const filteredAndSorted = payslips
             .filter(p => p.employeeId && employeeIdSet.has(p.employeeId))
             .map(p => {
                 const employee = employees.find(e => e.id === p.employeeId);
@@ -93,11 +103,47 @@ export function PayslipsList() {
                 };
             })
             .sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'ar'));
-    }, [payslips, employees]);
+
+        if (!searchQuery) return filteredAndSorted;
+
+        return filteredAndSorted.filter(p => 
+            p.employeeName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+    }, [payslips, employees, searchQuery]);
 
     const handleConfirmAndPay = async () => {
-        // TODO: Implement payment confirmation and journal entry creation
         toast({ title: 'قيد التنفيذ', description: 'سيتم تنفيذ هذه الميزة قريباً.' });
+    };
+    
+    const handleExcelExport = () => {
+        if (!sortedPayslips || sortedPayslips.length === 0) {
+            toast({ title: 'لا توجد بيانات للتصدير' });
+            return;
+        }
+
+        const dataForSheet = sortedPayslips.map(p => {
+            const totalEarnings = (p.earnings.basicSalary || 0) + (p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0) + (p.earnings.commission || 0);
+            const totalDeductions = (p.deductions.absenceDeduction || 0) + (p.deductions.otherDeductions || 0);
+            return {
+                'اسم الموظف': p.employeeName,
+                'نوع الكشف': payslipTypeTranslations[p.type || 'Monthly'],
+                'إجمالي الاستحقاقات': totalEarnings,
+                'إجمالي الاستقطاعات': totalDeductions,
+                'صافي الراتب': p.netSalary,
+                'الحالة': statusTranslations[p.status],
+                'ملاحظات': p.notes || ''
+            }
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `Payslips_${year}_${month}`);
+        XLSX.writeFile(workbook, `Payslips_${year}-${month}.xlsx`);
+    };
+
+    const handlePrint = () => {
+        window.print();
     };
     
     const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
@@ -110,109 +156,141 @@ export function PayslipsList() {
         }
     }, [sortedPayslips]);
 
+    const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
+
     return (
         <div className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4 items-end bg-muted/50 p-4 rounded-lg">
-                <div className="grid gap-2">
-                    <Label htmlFor="year-select">السنة</Label>
-                    <Select value={year} onValueChange={setYear}>
-                        <SelectTrigger id="year-select" className="w-[120px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+             <div id="payslips-printable-area">
+                <div className="hidden print:block mb-6">
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-4">
+                            <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                             <div>
+                                <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
+                                <p className="text-sm text-muted-foreground">{branding?.address}</p>
+                             </div>
+                        </div>
+                        <div className="text-left">
+                            <h2 className="text-xl font-bold">كشف رواتب الموظفين</h2>
+                            <p className="text-muted-foreground">عن شهر {monthName} {year}</p>
+                        </div>
+                    </div>
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="month-select">الشهر</Label>
-                    <Select value={month} onValueChange={setMonth}>
-                        <SelectTrigger id="month-select" className="w-[120px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+
+                <div className="bg-muted/50 p-4 rounded-lg mb-6 no-print">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-end flex-grow">
+                             <div className="grid gap-2">
+                                <Label htmlFor="year-select">السنة</Label>
+                                <Select value={year} onValueChange={setYear}>
+                                    <SelectTrigger id="year-select"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="month-select">الشهر</Label>
+                                <Select value={month} onValueChange={setMonth}>
+                                    <SelectTrigger id="month-select"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2 col-span-2 md:col-span-1">
+                                <Label htmlFor="search">بحث بالاسم</Label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input id="search" placeholder="ابحث..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 rtl:pr-10"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                           <Button onClick={handlePrint} variant="outline" disabled={loading || sortedPayslips.length === 0}><Printer className="ml-2 h-4 w-4" /> طباعة</Button>
+                           <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0}><Download className="ml-2 h-4 w-4" /> تنزيل كـ Excel</Button>
+                           <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0}>
+                                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <CheckCircle className="ml-2 h-4 w-4" />}
+                                تأكيد ودفع
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                 <div className="flex-grow"></div>
-                 <Button onClick={handleConfirmAndPay} disabled={isProcessing || !sortedPayslips || sortedPayslips.length === 0}>
-                    {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <CheckCircle className="ml-2 h-4 w-4" />}
-                    تأكيد دفع الرواتب وإنشاء قيد
-                 </Button>
-            </div>
-            
-            {sortedPayslips && sortedPayslips.length === 0 && !loading && (
-                 <Alert>
-                    <AlertTitle>لا توجد بيانات</AlertTitle>
-                    <AlertDescription>
-                        لم يتم توليد كشوف رواتب للشهر المحدد. الرجاء الذهاب إلى تبويب "معالجة الرواتب" لإنشائها أولاً.
-                    </AlertDescription>
-                </Alert>
-            )}
-            
-            <div className="border rounded-lg">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>اسم الموظف</TableHead>
-                            <TableHead>نوع الكشف</TableHead>
-                            <TableHead className="text-left">صافي الراتب</TableHead>
-                            <TableHead>الحالة</TableHead>
-                            <TableHead>الإجراءات</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loading && Array.from({length: 5}).map((_, i) => (
-                             <TableRow key={i}>
-                                <TableCell colSpan={5}><Skeleton className="h-6 w-full"/></TableCell>
-                             </TableRow>
-                        ))}
-                        {!loading && sortedPayslips.map(payslip => (
-                             <TableRow key={payslip.id}>
-                                <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2">
-                                        <span>{payslip.employeeName}</span>
-                                        {payslip.notes && (
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger>
-                                                        <Info className="h-4 w-4 text-muted-foreground" />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>{payslip.notes}</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        )}
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={payslipTypeColors[payslip.type || 'Monthly']}>
-                                        {payslipTypeTranslations[payslip.type || 'Monthly']}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-left font-mono">{formatCurrency(payslip.netSalary)}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={statusColors[payslip.status]}>
-                                        {statusTranslations[payslip.status]}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                     <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                        <Link href={`/dashboard/hr/payroll/${payslip.id}`}>
-                                            <Eye className="h-4 w-4" />
-                                        </Link>
-                                     </Button>
-                                </TableCell>
+                
+                {sortedPayslips && sortedPayslips.length === 0 && !loading && (
+                    <Alert>
+                        <AlertTitle>لا توجد بيانات</AlertTitle>
+                        <AlertDescription>
+                            لم يتم توليد كشوف رواتب للشهر المحدد. الرجاء الذهاب إلى تبويب "معالجة الرواتب" لإنشائها أولاً.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                
+                <div className="border rounded-lg">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>اسم الموظف</TableHead>
+                                <TableHead>نوع الكشف</TableHead>
+                                <TableHead className="text-left">إجمالي الاستحقاقات</TableHead>
+                                <TableHead className="text-left">إجمالي الاستقطاعات</TableHead>
+                                <TableHead className="text-left font-bold">صافي الراتب</TableHead>
+                                <TableHead>الحالة</TableHead>
+                                <TableHead className="no-print"><span className="sr-only">الإجراءات</span></TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                    <TableFooter>
-                         <TableRow className="font-bold bg-muted">
-                            <TableCell colSpan={2}>الإجمالي</TableCell>
-                            <TableCell className="text-left font-mono">{formatCurrency(totals.netSalary)}</TableCell>
-                            <TableCell colSpan={2}></TableCell>
-                        </TableRow>
-                    </TableFooter>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {loading && Array.from({length: 5}).map((_, i) => (
+                                <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
+                            ))}
+                            {!loading && sortedPayslips.map(payslip => {
+                                const totalEarnings = (payslip.earnings.basicSalary || 0) + (payslip.earnings.housingAllowance || 0) + (payslip.earnings.transportAllowance || 0) + (payslip.earnings.commission || 0);
+                                const totalDeductions = (payslip.deductions.absenceDeduction || 0) + (payslip.deductions.otherDeductions || 0);
+                                return (
+                                <TableRow key={payslip.id}>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <span>{payslip.employeeName}</span>
+                                            {payslip.notes && (
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
+                                                        <TooltipContent><p>{payslip.notes}</p></TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={payslipTypeColors[payslip.type || 'Monthly']}>
+                                            {payslipTypeTranslations[payslip.type || 'Monthly']}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-left font-mono">{formatCurrency(totalEarnings)}</TableCell>
+                                    <TableCell className="text-left font-mono text-destructive">{formatCurrency(totalDeductions)}</TableCell>
+                                    <TableCell className="text-left font-mono font-bold text-base">{formatCurrency(payslip.netSalary)}</TableCell>
+                                    <TableCell><Badge variant="outline" className={statusColors[payslip.status]}>{statusTranslations[payslip.status]}</Badge></TableCell>
+                                    <TableCell className="no-print">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                            <Link href={`/dashboard/hr/payroll/${payslip.id}`}>
+                                                <Eye className="h-4 w-4" />
+                                            </Link>
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            )})}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow className="font-bold text-base bg-muted">
+                                <TableCell colSpan={4}>الإجمالي</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(totals.netSalary)}</TableCell>
+                                <TableCell colSpan={2}></TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </div>
             </div>
         </div>
     );
 }
+
