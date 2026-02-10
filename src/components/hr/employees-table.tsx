@@ -35,7 +35,7 @@ import { Skeleton } from '../ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
-import { format } from 'date-fns';
+import { format, differenceInYears } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
@@ -67,11 +67,10 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // ADDED: فلاتر حالة + قسم + تاريخ التعيين
+    // ADDED: فلاتر حالة + قسم + مدة خدمة
     const [statusFilter, setStatusFilter] = useState('all');
     const [departmentFilter, setDepartmentFilter] = useState('all');
-    const [hireDateFrom, setHireDateFrom] = useState<Date | undefined>();
-    const [hireDateTo, setHireDateTo] = useState<Date | undefined>();
+    const [serviceDurationFilter, setServiceDurationFilter] = useState('all');
     
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -92,7 +91,9 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     }, [employees]);
 
 
+    // CHANGED: فلتر تاريخ التعيين تحول إلى مدة الخدمة
     const filteredEmployees = useMemo(() => {
+        const today = new Date();
         let filtered = employees;
 
         if (statusFilter !== 'all') {
@@ -103,20 +104,30 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
             filtered = filtered.filter(emp => emp.department === departmentFilter);
         }
         
-        if (hireDateFrom || hireDateTo) {
+        if (serviceDurationFilter !== 'all') {
             filtered = filtered.filter(emp => {
                 const hireDate = toFirestoreDate(emp.hireDate);
                 if (!hireDate) return false;
 
-                const matchesDateFrom = !hireDateFrom || (hireDate >= new Date(new Date(hireDateFrom).setHours(0, 0, 0, 0)));
-                const matchesDateTo = !hireDateTo || (hireDate <= new Date(new Date(hireDateTo).setHours(23, 59, 59, 999)));
+                const yearsOfService = differenceInYears(today, hireDate);
 
-                return matchesDateFrom && matchesDateTo;
+                switch (serviceDurationFilter) {
+                    case '1-3':
+                        return yearsOfService >= 1 && yearsOfService < 3;
+                    case '3-6':
+                        return yearsOfService >= 3 && yearsOfService < 6;
+                    case '6-10':
+                        return yearsOfService >= 6 && yearsOfService < 10;
+                    case '10+':
+                        return yearsOfService >= 10;
+                    default:
+                        return true;
+                }
             });
         }
         
         return searchEmployees(filtered, searchQuery);
-    }, [employees, searchQuery, statusFilter, departmentFilter, hireDateFrom, hireDateTo]);
+    }, [employees, searchQuery, statusFilter, departmentFilter, serviceDurationFilter]);
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
@@ -184,20 +195,19 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                     </Select>
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="hire-date-from">تاريخ التعيين (من)</Label>
-                    <DateInput 
-                        id="hire-date-from"
-                        value={hireDateFrom} 
-                        onChange={setHireDateFrom}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="hire-date-to">تاريخ التعيين (إلى)</Label>
-                    <DateInput 
-                        id="hire-date-to"
-                        value={hireDateTo} 
-                        onChange={setHireDateTo} 
-                    />
+                    <Label htmlFor="service-duration-filter">مدة الخدمة</Label>
+                    <Select value={serviceDurationFilter} onValueChange={setServiceDurationFilter}>
+                        <SelectTrigger id="service-duration-filter" className="w-full sm:w-[180px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">الكل</SelectItem>
+                            <SelectItem value="1-3">من 1-3 سنوات</SelectItem>
+                            <SelectItem value="3-6">من 3-6 سنوات</SelectItem>
+                            <SelectItem value="6-10">من 6-10 سنوات</SelectItem>
+                            <SelectItem value="10+">أكثر من 10 سنوات</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
@@ -208,7 +218,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                             <TableHead>الاسم الكامل</TableHead>
                             <TableHead>الرقم الوظيفي</TableHead>
                             <TableHead>القسم</TableHead>
-                            {/* CHANGED: استبدال عمود رصيد الإجازات بعمود تاريخ التعيين (بناءً على طلب المستخدم) */}
                             <TableHead>تاريخ التعيين</TableHead>
                             <TableHead>الحالة</TableHead>
                             <TableHead><span className="sr-only">الإجراءات</span></TableHead>
