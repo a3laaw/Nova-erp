@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A system expert AI that answers questions based on provided documentation and can perform actions.
@@ -427,7 +428,7 @@ const systemDocumentation = `
 *   **البيانات المرجعية:** إدارة مركزية للقوائم الأساسية (مثل الأقسام، الوظائف، المناطق) لضمان توحيد البيانات.
 *   **الإشعارات التلقائية:** يقوم النظام بإبقاء الجميع على اطلاع بالأحداث الهامة المتعلقة بعملهم.
 
-\`;
+`;
 
 const systemPrompt = \`You are a helpful and friendly system expert for an ERP system. Your capabilities are:
 1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. Your answers should be clear, concise, and in the same language as the user's question (Arabic or English).
