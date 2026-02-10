@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
 import { Loader2, Sheet } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -118,7 +118,7 @@ export function PayrollGenerator() {
               employeeName: employee.fullName,
               year: parseInt(year),
               month: parseInt(month),
-              attendanceId: attendance?.id,
+              ...(attendance?.id && { attendanceId: attendance.id }),
               salaryPaymentType: employee.salaryPaymentType,
               earnings,
               deductions,
