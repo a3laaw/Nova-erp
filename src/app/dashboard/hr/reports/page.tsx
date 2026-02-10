@@ -30,7 +30,7 @@ import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { Employee, LeaveRequest } from '@/lib/types';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { toFirestoreDate } from '@/services/date-converter';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Printer, AlertCircle, CalendarClock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -144,20 +144,22 @@ function OngoingLeavesReport() {
     const todayEnd = new Date();
     todayEnd.setHours(23,59,59,999);
 
+    // CHANGED: Simplified query to avoid composite index and filtered client-side.
     const leavesQuery = useMemo(() => [
-        where('status', '==', 'approved'),
         where('endDate', '>=', todayStart),
     ], [todayStart]);
     
-    const { data: approvedLeaves, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', leavesQuery);
+    const { data: futureLeaves, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', leavesQuery);
     
     const ongoingLeaves = useMemo(() => {
-        if (!approvedLeaves) return [];
-        return approvedLeaves.filter(leave => {
+        if (!futureLeaves) return [];
+        return futureLeaves.filter(leave => {
             const startDate = toFirestoreDate(leave.startDate);
-            return startDate && startDate <= todayEnd;
+            // Client-side filter for approved status and start date.
+            return leave.status === 'approved' && startDate && startDate <= todayEnd;
         })
-    }, [approvedLeaves, todayEnd]);
+    }, [futureLeaves, todayEnd]);
+
 
     const handlePrint = () => {
         const element = document.getElementById('ongoing-leaves-printable-area');
