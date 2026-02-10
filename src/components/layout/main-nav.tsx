@@ -127,6 +127,7 @@ const navItems = {
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان' },
         { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب' },
         { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة' },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية' },
       ]
     },
     { 
@@ -211,6 +212,7 @@ const navItems = {
         { href: '/dashboard/hr/permissions', label: 'Permission Requests' },
         { href: '/dashboard/hr/payroll', label: 'Payroll' },
         { href: '/dashboard/hr/gratuity-calculator', label: 'Gratuity Calculator' },
+        { href: '/dashboard/hr/reports', label: 'HR Reports' },
       ]
     },
     { 
