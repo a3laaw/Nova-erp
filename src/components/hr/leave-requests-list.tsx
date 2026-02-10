@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -13,10 +13,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import type { LeaveRequest, Employee } from '@/lib/types';
+import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { LeaveRequestForm } from './leave-request-form';
@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { formatCurrency } from '@/lib/utils';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -56,6 +57,7 @@ export function LeaveRequestsList() {
   const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
   const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
   const [requestToUndoRejection, setRequestToUndoRejection] = useState<LeaveRequest | null>(null);
+  const [requestToPay, setRequestToPay] = useState<LeaveRequest | null>(null);
 
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
@@ -109,7 +111,7 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToApprove.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const daysToDeduct = requestToApprove.days || 0; // Use total calendar days for balance deduction
+            const daysToDeduct = requestToApprove.days || 0;
             let employeeUpdate: Partial<Employee> = {};
             
             switch (requestToApprove.leaveType) {
@@ -192,7 +194,7 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const daysToRevert = requestToUndoApproval.days || 0; // Use total calendar days
+            const daysToRevert = requestToUndoApproval.days || 0;
             let employeeUpdate: Partial<Employee> = {};
             
             switch (requestToUndoApproval.leaveType) {
@@ -206,7 +208,6 @@ export function LeaveRequestsList() {
                      employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) - daysToRevert;
                     break;
             }
-            // Ensure balances don't go negative
             if(employeeUpdate.annualLeaveUsed !== undefined) employeeUpdate.annualLeaveUsed = Math.max(0, employeeUpdate.annualLeaveUsed);
             if(employeeUpdate.sickLeaveUsed !== undefined) employeeUpdate.sickLeaveUsed = Math.max(0, employeeUpdate.sickLeaveUsed);
             if(employeeUpdate.emergencyLeaveUsed !== undefined) employeeUpdate.emergencyLeaveUsed = Math.max(0, employeeUpdate.emergencyLeaveUsed);
@@ -240,6 +241,61 @@ export function LeaveRequestsList() {
         setRequestToUndoRejection(null);
     }
   };
+  
+  const handleConfirmLeavePayment = async () => {
+    if (!requestToPay || !firestore) return;
+    setIsProcessingAction(true);
+    
+    try {
+        const employee = employees.find(e => e.id === requestToPay.employeeId);
+        if (!employee) throw new Error("لم يتم العثور على بيانات الموظف.");
+
+        const fullSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
+        const dailyRate = fullSalary / 26;
+        const leaveSalary = dailyRate * (requestToPay.workingDays || 0);
+
+        const batch = writeBatch(firestore);
+
+        const payslipId = `leave-${requestToPay.id}`;
+        const payslipRef = doc(firestore, 'payroll', payslipId);
+
+        const payslipData: Omit<Payslip, 'id'> = {
+            employeeId: employee.id!,
+            employeeName: employee.fullName,
+            year: toFirestoreDate(requestToPay.startDate)!.getFullYear(),
+            month: toFirestoreDate(requestToPay.startDate)!.getMonth() + 1,
+            type: 'Leave',
+            leaveRequestId: requestToPay.id,
+            earnings: {
+                basicSalary: leaveSalary,
+            },
+            deductions: {
+                absenceDeduction: 0,
+                otherDeductions: 0,
+            },
+            netSalary: leaveSalary,
+            status: 'draft',
+            createdAt: serverTimestamp(),
+            notes: `راتب إجازة ${statusTranslations[requestToPay.status]} من ${formatDate(requestToPay.startDate)} إلى ${formatDate(requestToPay.endDate)}`,
+        };
+        batch.set(payslipRef, payslipData);
+        
+        const leaveRef = doc(firestore, 'leaveRequests', requestToPay.id);
+        batch.update(leaveRef, { isSalaryPaid: true });
+
+        await batch.commit();
+
+        toast({ title: 'نجاح', description: 'تم إنشاء كشف راتب الإجازة بنجاح.' });
+
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : 'فشل صرف راتب الإجازة.';
+        toast({ variant: 'destructive', title: 'خطأ', description: msg });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToPay(null);
+    }
+  };
+
 
   return (
     <>
@@ -274,7 +330,7 @@ export function LeaveRequestsList() {
                 <TableCell className="font-medium">{req.employeeName}</TableCell>
                 <TableCell>{req.leaveType}</TableCell>
                 <TableCell>{formatDate(req.startDate)} - {formatDate(req.endDate)}</TableCell>
-                <TableCell>{req.days} أيام</TableCell>
+                <TableCell>{req.workingDays} يوم عمل</TableCell>
                 <TableCell><Badge variant="outline" className={statusColors[req.status]}>{statusTranslations[req.status]}</Badge></TableCell>
                 <TableCell>
                     <DropdownMenu>
@@ -283,9 +339,13 @@ export function LeaveRequestsList() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent dir="rtl">
                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                            
-                            {currentUser?.role === 'Admin' || currentUser?.role === 'HR' ? (
+                             {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                                 <>
+                                    {req.status === 'approved' && !req.isSalaryPaid && (
+                                        <DropdownMenuItem onClick={() => setRequestToPay(req)}>
+                                            <Banknote className="ml-2 h-4 w-4" /> صرف راتب الإجازة
+                                        </DropdownMenuItem>
+                                    )}
                                     {req.status === 'pending' && (
                                         <>
                                             <DropdownMenuItem onClick={() => setRequestToApprove(req)} className="text-green-600 focus:text-green-700 focus:bg-green-50">
@@ -311,7 +371,7 @@ export function LeaveRequestsList() {
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                 </>
-                            ) : null}
+                            )}
                             
                             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
                                 <Trash2 className="ml-2 h-4 w-4" /> حذف
@@ -423,6 +483,22 @@ export function LeaveRequestsList() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+     <AlertDialog open={!!requestToPay} onOpenChange={() => setRequestToPay(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد صرف راتب الإجازة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    سيتم إنشاء كشف راتب إجازة مسودة للموظف. هل تود المتابعة؟
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmLeavePayment} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700">
+                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالصرف'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

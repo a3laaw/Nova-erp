@@ -295,6 +295,7 @@ export interface LeaveRequest {
     rejectionReason?: string;
     isBackFromLeave?: boolean;
     actualReturnDate?: any;
+    isSalaryPaid?: boolean;
 }
 
 
@@ -362,6 +363,8 @@ export type Payslip = {
     status: 'draft' | 'processed' | 'paid';
     createdAt: any;
     notes?: string;
+    type?: 'Monthly' | 'Leave';
+    leaveRequestId?: string;
 };
 
 export interface TransactionStage {

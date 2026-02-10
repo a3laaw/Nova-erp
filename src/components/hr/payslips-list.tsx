@@ -46,6 +46,17 @@ const statusTranslations: Record<Payslip['status'], string> = {
   paid: 'مدفوع',
 };
 
+const payslipTypeColors: Record<string, string> = {
+    Monthly: 'bg-transparent',
+    Leave: 'bg-sky-100 text-sky-800',
+};
+
+const payslipTypeTranslations: Record<string, string> = {
+    Monthly: 'راتب شهري',
+    Leave: 'راتب إجازة',
+};
+
+
 export function PayslipsList() {
     const { firestore } = useFirebase();
     const router = useRouter();
@@ -141,6 +152,7 @@ export function PayslipsList() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>اسم الموظف</TableHead>
+                            <TableHead>نوع الكشف</TableHead>
                             <TableHead className="text-left">صافي الراتب</TableHead>
                             <TableHead>الحالة</TableHead>
                             <TableHead>الإجراءات</TableHead>
@@ -149,7 +161,7 @@ export function PayslipsList() {
                     <TableBody>
                         {loading && Array.from({length: 5}).map((_, i) => (
                              <TableRow key={i}>
-                                <TableCell colSpan={4}><Skeleton className="h-6 w-full"/></TableCell>
+                                <TableCell colSpan={5}><Skeleton className="h-6 w-full"/></TableCell>
                              </TableRow>
                         ))}
                         {!loading && sortedPayslips.map(payslip => (
@@ -171,6 +183,11 @@ export function PayslipsList() {
                                         )}
                                     </div>
                                 </TableCell>
+                                <TableCell>
+                                    <Badge variant="outline" className={payslipTypeColors[payslip.type || 'Monthly']}>
+                                        {payslipTypeTranslations[payslip.type || 'Monthly']}
+                                    </Badge>
+                                </TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(payslip.netSalary)}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={statusColors[payslip.status]}>
@@ -189,7 +206,7 @@ export function PayslipsList() {
                     </TableBody>
                     <TableFooter>
                          <TableRow className="font-bold bg-muted">
-                            <TableCell>الإجمالي</TableCell>
+                            <TableCell colSpan={2}>الإجمالي</TableCell>
                             <TableCell className="text-left font-mono">{formatCurrency(totals.netSalary)}</TableCell>
                             <TableCell colSpan={2}></TableCell>
                         </TableRow>
