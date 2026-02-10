@@ -63,11 +63,10 @@ export function PayrollGenerator() {
 
           const attendance = attendanceMap.get(employee.id);
           
-          if (attendance) {
+          if (attendance && attendance.summary) {
               absenceDeduction = (attendance.summary.absentDays || 0) * dailyRate;
               lateDeduction = Math.floor((attendance.summary.lateDays || 0) / 3) * dailyRate;
           } else {
-              // If employee is on a contract that requires attendance, assume full attendance if no record found
               const requiresAttendance = employee.contractType === 'permanent' || employee.contractType === 'temporary' || (employee.contractType === 'piece-rate' && employee.pieceRateMode === 'salary_with_target');
               if (requiresAttendance) {
                  payslipNotes = "لم يتم العثور على سجل حضور، تم احتساب الراتب على أساس الحضور الكامل.";
