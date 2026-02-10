@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -75,6 +74,9 @@ export default function EditEmployeePage() {
             const newValue = updatedData[key];
 
             const formatValue = (val: any) => {
+                if (isCurrency) {
+                    return formatCurrency(Number(val || 0));
+                }
                 if (val === null || val === undefined || val === '') return '-';
                 if (key === 'contractType') {
                     return contractTypeTranslations[val as string] || val;
@@ -82,9 +84,6 @@ export default function EditEmployeePage() {
                 if (key.toLowerCase().includes('date') || key.toLowerCase().includes('expiry')) {
                     const date = toFirestoreDate(val);
                     return date ? format(date, 'dd/MM/yyyy') : '-';
-                }
-                if(isCurrency) {
-                    return formatCurrency(Number(val));
                 }
                 return String(val);
             };
