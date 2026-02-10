@@ -5,7 +5,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { findNavigationTool } from '@/ai/tools/find-navigation';
-import { getFirebaseServices } from '@/firebase/init';
+import { firestore } from '@/firebase/server-init';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const SystemExpertInputSchema = z.object({
@@ -37,7 +37,6 @@ const getClientDebt = ai.defineTool(
     }),
   },
   async ({ clientNameOrNumber }) => {
-    const { firestore } = getFirebaseServices();
     if (!firestore) {
       return { error: 'Firestore not initialized.' };
     }
@@ -134,7 +133,7 @@ export async function askSystemExpert(input: SystemExpertInput): Promise<SystemE
     
     const response = await ai.generate({
       history: llmHistory,
-      prompt: `Question: "${question}"\n\nAnswer:`,
+      prompt: \`Question: "${question}"\n\nAnswer:\`,
       tools: [findNavigationTool, getClientDebt]
     });
     

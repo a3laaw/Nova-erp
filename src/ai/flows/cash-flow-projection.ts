@@ -11,7 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { getFirebaseServices } from '@/firebase/init';
+import { firestore } from '@/firebase/server-init';
 import { addMonths, format, startOfMonth } from 'date-fns';
 import type { Client, ClientTransaction, Employee } from '@/lib/types';
 
@@ -43,11 +43,9 @@ export type CashFlowProjectionOutput = z.infer<typeof CashFlowProjectionOutputSc
 
 
 export async function runCashFlowProjection(input: CashFlowProjectionInput): Promise<CashFlowProjectionOutput> {
-  const firebaseServices = getFirebaseServices();
-  if (!firebaseServices) {
+  if (!firestore) {
     throw new Error('Firebase is not initialized.');
   }
-  const { firestore } = firebaseServices;
 
   // 1. Prepare date ranges
   const today = new Date();
