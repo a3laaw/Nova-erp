@@ -1,4 +1,5 @@
 
+'use client';
 import {
   Card,
   CardContent,
@@ -14,14 +15,39 @@ import {
     CircleDollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic'; // Import dynamic
 import { Button } from '@/components/ui/button';
 import { projects, clients } from '@/lib/data';
 import { formatCurrency } from '@/lib/utils';
-import { TaskPrioritization } from '@/components/dashboard/task-prioritization';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 import { RecentActivity } from '@/components/dashboard/recent-activity';
 import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments';
 import { UpcomingAppointmentsCard } from '@/components/dashboard/upcoming-appointments-card';
 import { PendingVisits } from '@/components/dashboard/pending-visits';
+
+
+// Dynamically import the TaskPrioritization component
+const TaskPrioritization = dynamic(
+  () => import('@/components/dashboard/task-prioritization').then(mod => mod.TaskPrioritization),
+  { 
+    ssr: false,
+    loading: () => (
+        <Card className="h-full flex flex-col">
+            <CardHeader>
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-3/4 mt-2" />
+            </CardHeader>
+            <CardContent className="flex-grow">
+                <Skeleton className="h-24 w-full" />
+            </CardContent>
+            <CardFooter>
+                <Skeleton className="h-10 w-full" />
+            </CardFooter>
+        </Card>
+    ),
+  }
+);
+
 
 export default function DashboardPage() {
 
