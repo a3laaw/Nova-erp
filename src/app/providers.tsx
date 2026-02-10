@@ -1,6 +1,5 @@
 'use client';
 
-import { AuthProvider } from '@/context/auth-context';
 import { LanguageProvider, useLanguage } from '@/context/language-context';
 import { BrandingProvider } from '@/context/branding-context';
 import { SyncStatusProvider } from '@/context/sync-context';
@@ -18,6 +17,20 @@ const DynamicFirebaseProvider = dynamic(
         <p className="text-muted-foreground">جاري تهيئة الاتصال...</p>
       </div>
     ),
+  }
+);
+
+// NEW: Dynamically import AuthProvider to further reduce initial bundle size.
+const DynamicAuthProvider = dynamic(
+  () => import('@/context/auth-context').then(mod => mod.AuthProvider),
+  {
+      ssr: false,
+      loading: () => (
+          <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
+              <Loader className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">جاري التحقق من الهوية...</p>
+          </div>
+      )
   }
 );
 
@@ -40,11 +53,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <BrandingProvider>
                 <LanguageProvider>
                     <SyncStatusProvider>
-                        <AuthProvider>
+                        <DynamicAuthProvider>
                             <LanguageManager>
                                 {children}
                             </LanguageManager>
-                        </AuthProvider>
+                        </DynamicAuthProvider>
                     </SyncStatusProvider>
                 </LanguageProvider>
             </BrandingProvider>
