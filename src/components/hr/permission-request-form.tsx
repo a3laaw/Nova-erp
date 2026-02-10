@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import type { Employee, PermissionRequest } from '@/lib/types';
 import { Loader2, Save } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, getCountFromServer } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -76,17 +76,22 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار.');
       
       if (!isEditing) {
-        const start = startOfMonth(date);
-        const end = endOfMonth(date);
+        const startOfMonthDate = startOfMonth(date);
+        const endOfMonthDate = endOfMonth(date);
+
         const permissionsQuery = query(
           collection(firestore, 'permissionRequests'),
           where('employeeId', '==', selectedEmployeeId),
-          where('status', '==', 'approved'),
-          where('date', '>=', start),
-          where('date', '<=', end)
+          where('status', '==', 'approved')
         );
-        const permissionsSnapshot = await getCountFromServer(permissionsQuery);
-        if (permissionsSnapshot.data().count >= 3) {
+        
+        const permissionsSnapshot = await getDocs(permissionsQuery);
+        const approvedCountInMonth = permissionsSnapshot.docs.filter(doc => {
+            const permissionDate = toFirestoreDate(doc.data().date);
+            return permissionDate && permissionDate >= startOfMonthDate && permissionDate <= endOfMonthDate;
+        }).length;
+
+        if (approvedCountInMonth >= 3) {
             throw new Error('لقد استنفذ الموظف الحد الأقصى للاستئذانات (3) لهذا الشهر.');
         }
       }
