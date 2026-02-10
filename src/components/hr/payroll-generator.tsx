@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, documentId } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, limit } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
 import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -38,7 +38,12 @@ export function PayrollGenerator() {
   useEffect(() => {
     if(!firestore) return;
     const checkAttendance = async () => {
-        const q = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)), where(documentId(), '!=', ''));
+        const q = query(
+            collection(firestore, 'attendance'), 
+            where('year', '==', parseInt(year)), 
+            where('month', '==', parseInt(month)),
+            limit(1) // More efficient way to check for existence
+        );
         const snap = await getDocs(q);
         setAttendanceRecordsExist(!snap.empty);
     };
