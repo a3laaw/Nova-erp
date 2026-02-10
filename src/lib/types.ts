@@ -298,6 +298,20 @@ export interface LeaveRequest {
     isSalaryPaid?: boolean;
 }
 
+export interface PermissionRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: any;
+  type: 'late_arrival' | 'early_departure';
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+  approvedBy?: string;
+  approvedAt?: any;
+  rejectionReason?: string;
+}
+
 
 export interface Holiday {
     id?: string;
@@ -691,4 +705,3 @@ export interface ResidencyRenewal {
 
     
     
-

@@ -34,6 +34,7 @@ import {
   ShoppingCart,
   LogOut,
   LineChart,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -122,6 +123,7 @@ const navItems = {
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين' },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات' },
+        { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان' },
         { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب' },
         { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة' },
       ]
@@ -205,6 +207,7 @@ const navItems = {
       children: [
         { href: '/dashboard/hr/employees', label: 'Employee Files' },
         { href: '/dashboard/hr/leaves', label: 'Leave Requests' },
+        { href: '/dashboard/hr/permissions', label: 'Permission Requests' },
         { href: '/dashboard/hr/payroll', label: 'Payroll' },
         { href: '/dashboard/hr/gratuity-calculator', label: 'Gratuity Calculator' },
       ]

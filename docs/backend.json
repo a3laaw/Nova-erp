@@ -582,6 +582,24 @@
         },
         "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
     },
+    "PermissionRequest": {
+      "title": "Permission Request",
+      "description": "Represents a permission request from an employee for late arrival or early departure.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string", "description": "ID of the employee requesting permission." },
+        "employeeName": { "type": "string", "description": "Full name of the employee." },
+        "date": { "type": "string", "format": "date-time", "description": "The date for which the permission is requested." },
+        "type": { "type": "string", "enum": ["late_arrival", "early_departure"], "description": "The type of permission request." },
+        "reason": { "type": "string", "description": "The reason for the request." },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The current status of the request." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "approvedBy": { "type": "string", "description": "UID of the user who approved/rejected the request." },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "rejectionReason": { "type": "string", "description": "Reason for rejecting the request." }
+      },
+      "required": ["employeeId", "employeeName", "date", "type", "reason", "status", "createdAt"]
+    },
     "Holiday": {
         "title": "Holiday",
         "description": "Represents an official public holiday.",
@@ -1375,6 +1393,10 @@
     "/leaveRequests/{leaveRequestId}": {
         "schema": { "$ref": "#/entities/LeaveRequest" },
         "description": "Stores all employee leave requests."
+    },
+    "/permissionRequests/{permissionId}": {
+        "schema": { "$ref": "#/entities/PermissionRequest" },
+        "description": "Stores all employee permission requests for late arrival or early departure."
     },
     "/holidays/{holidayId}": {
         "schema": { "$ref": "#/entities/Holiday" },
