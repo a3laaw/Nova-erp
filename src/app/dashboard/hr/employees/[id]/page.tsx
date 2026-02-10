@@ -8,7 +8,7 @@ import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw } from 'lucide-react';
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInDays } from 'date-fns';
@@ -16,8 +16,10 @@ import { formatCurrency } from '@/lib/utils';
 import { ResidencyRenewalDialog } from '@/components/hr/residency-renewal-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmployeeAuditLog } from '@/components/hr/employee-audit-log';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-
+// InfoRow component for consistent display
 function InfoRow({ label, value, icon, children }: { label: string, value: React.ReactNode, icon: React.ReactNode, children?: React.ReactNode }) {
     return (
         <div className="flex items-start gap-3">
@@ -50,6 +52,16 @@ export default function EmployeeProfilePage() {
         return d ? format(d, 'dd/MM/yyyy') : '-';
     }
     
+    // IMPROVED: display detailed leave balance + low balance alert
+    const leaveData = useMemo(() => {
+        if (!employee) return null;
+        const balance = calculateAnnualLeaveBalance(employee, new Date());
+        return {
+            balance,
+            isLow: balance < 5,
+        }
+    }, [employee]);
+
     const residencyExpiryDate = useMemo(() => toFirestoreDate(employee?.residencyExpiry), [employee]);
     const canRenewResidency = useMemo(() => {
         if (!residencyExpiryDate || employee?.nationality === 'كويتي') return false;
@@ -110,7 +122,7 @@ export default function EmployeeProfilePage() {
                         <CardContent className="space-y-8">
                             <section>
                                 <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الشخصية</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
                                     <InfoRow label="الرقم المدني" value={employee.civilId} icon={<User className="h-4 w-4"/>} />
                                     <InfoRow label="رقم الجوال" value={<span dir="ltr">{employee.mobile}</span>} icon={<Phone className="h-4 w-4"/>} />
                                     <InfoRow label="تاريخ الميلاد" value={formatDate(employee.dob)} icon={<CalendarIcon className="h-4 w-4"/>} />
@@ -133,12 +145,63 @@ export default function EmployeeProfilePage() {
                             </section>
                             <section>
                                 <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الوظيفية</h3>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
                                     <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} icon={<Briefcase className="h-4 w-4"/>} />
                                     <InfoRow label="تاريخ التعيين" value={formatDate(employee.hireDate)} icon={<CalendarIcon className="h-4 w-4"/>} />
                                     <InfoRow label="نوع العقد" value={employee.contractType} icon={<FileSignature className="h-4 w-4"/>} />
-                                    <InfoRow label="الراتب الأساسي" value={`${formatCurrency(employee.basicSalary)}`} icon={<Banknote className="h-4 w-4"/>} />
                                  </div>
+                            </section>
+                             <section>
+                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات المالية</h3>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                                    <InfoRow label="الراتب الأساسي" value={`${formatCurrency(employee.basicSalary)}`} icon={<Banknote className="h-4 w-4"/>} />
+                                    <InfoRow label="بدل السكن" value={`${formatCurrency(employee.housingAllowance || 0)}`} icon={<Banknote className="h-4 w-4"/>} />
+                                    <InfoRow label="بدل المواصلات" value={`${formatCurrency(employee.transportAllowance || 0)}`} icon={<Banknote className="h-4 w-4"/>} />
+                                 </div>
+                            </section>
+                             <section>
+                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">رصيد الإجازات</h3>
+                                 {leaveData?.isLow && (
+                                     <Alert variant="destructive" className="mb-4">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>تنبيه: رصيد إجازات منخفض</AlertTitle>
+                                        <AlertDescription>
+                                            الرصيد المتبقي للموظف أقل من 5 أيام.
+                                        </AlertDescription>
+                                    </Alert>
+                                 )}
+                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                      <div className="p-3 bg-muted rounded-lg">
+                                        <p className="text-sm text-muted-foreground">الرصيد المرحل</p>
+                                        <p className="text-2xl font-bold">{employee.carriedLeaveDays || 0}</p>
+                                      </div>
+                                      <div className="p-3 bg-muted rounded-lg">
+                                        <p className="text-sm text-muted-foreground">المكتسب</p>
+                                        <p className="text-2xl font-bold">{employee.annualLeaveAccrued || 0}</p>
+                                      </div>
+                                       <div className="p-3 bg-muted rounded-lg">
+                                        <p className="text-sm text-muted-foreground">المستخدم</p>
+                                        <p className="text-2xl font-bold text-destructive">{employee.annualLeaveUsed || 0}</p>
+                                      </div>
+                                       <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                                        <p className="text-sm text-green-700 dark:text-green-300">الرصيد المتبقي</p>
+                                        <p className="text-2xl font-bold text-green-800 dark:text-green-200">{leaveData?.balance || 0}</p>
+                                      </div>
+                                 </div>
+                                  <div className="flex gap-4 mt-6">
+                                     <Button asChild>
+                                        <Link href="/dashboard/hr/leaves">
+                                            <CalendarIcon className="ml-2 h-4 w-4" />
+                                            تقديم طلب إجازة
+                                        </Link>
+                                     </Button>
+                                      <Button asChild variant="outline">
+                                        <Link href="/dashboard/hr/permissions">
+                                            <CalendarPlus className="ml-2 h-4 w-4" />
+                                            تقديم طلب استئذان
+                                        </Link>
+                                     </Button>
+                                  </div>
                             </section>
                         </CardContent>
                     </Card>
