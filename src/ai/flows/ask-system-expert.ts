@@ -104,7 +104,7 @@ const systemDocumentation = `
     - **System Expert (this chatbot)**: Answers questions about system functionality and provides navigation links.
 `;
 
-const systemPrompt = \`You are a helpful and friendly system expert for an ERP system. Your capabilities are:
+const systemPrompt = `You are a helpful and friendly system expert for an ERP system. Your capabilities are:
 1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. You can understand and respond in both formal and colloquial Arabic (like Egyptian, Gulf dialects), as well as English. Always respond in the same language as the user's question.
 2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action (e.g., "create a new invoice", "I want to see the appointments", "أريد إضافة عميل جديد", "أحجز موعد", "أضيف موظف", "أصدر سند قبض"), you MUST use the 'findNavigation' tool to get the correct link.
 3.  **Fetching Live Data**: If the user asks for specific data from the system, like a client's debt (e.g., "كم مديونية العميل محمد؟", "check client balance"), you MUST use the appropriate tool like 'getClientDebt'.
@@ -122,7 +122,7 @@ System Documentation:
 ---
 ${systemDocumentation}
 ---
-\`;
+`;
 
 export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
     const { question, history } = input;
@@ -133,7 +133,7 @@ export async function askSystemExpert(input: SystemExpertInput): Promise<SystemE
     
     const response = await ai.generate({
       history: llmHistory,
-      prompt: \`Question: "${question}"\n\nAnswer:\`,
+      prompt: `Question: "${question}"\n\nAnswer:`,
       tools: [findNavigationTool, getClientDebt]
     });
     
