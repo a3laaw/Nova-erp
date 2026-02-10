@@ -103,10 +103,10 @@ export function PermissionRequestsList() {
 
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'permissionRequests', requestToAction.request.id);
+        const reqRef = doc(firestore, 'permissionRequests', requestToAction.request.id);
         const newStatus = requestToAction.action === 'approve' ? 'approved' : 'rejected';
         
-        await updateDoc(leaveRef, {
+        await updateDoc(reqRef, {
             status: newStatus,
             approvedBy: currentUser.id,
             approvedAt: new Date(),
