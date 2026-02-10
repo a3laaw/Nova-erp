@@ -9,7 +9,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, FileCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse } from 'date-fns';
@@ -27,12 +27,50 @@ export function AttendanceUploader() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<{ success: boolean, message: string } | null>(null);
   
-  const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+  const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0]);
     }
+  };
+
+  const handleDownloadTemplate = () => {
+    if (employeesLoading) {
+      toast({
+        title: 'الرجاء الانتظار',
+        description: 'جاري تحميل قائمة الموظفين.',
+      });
+      return;
+    }
+    if (employees.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'لا يوجد موظفون',
+        description: 'لا يوجد موظفون نشطون لإنشاء نموذج لهم.',
+      });
+      return;
+    }
+
+    const templateData = employees.map(emp => ({
+        employeeNumber: emp.employeeNumber,
+        date: '',
+        checkIn: '',
+        checkOut: '',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    worksheet['!cols'] = [
+      { wch: 20 }, // employeeNumber
+      { wch: 15 }, // date
+      { wch: 15 }, // checkIn
+      { wch: 15 }, // checkOut
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+    XLSX.writeFile(workbook, `Attendance_Template_${year}-${month}.xlsx`);
   };
 
   const handleUpload = async () => {
@@ -56,7 +94,7 @@ export function AttendanceUploader() {
         // Validate columns
         const firstRow = json[0];
         if (!firstRow || !EXPECTED_COLUMNS.every(col => col in firstRow)) {
-            throw new Error(`الملف يجب أن يحتوي على الأعمدة التالية: ${EXPECTED_COLUMNS.join(', ')}`);
+            throw new Error(`الملف يجب أن يحتوي على الأعمدة التالية باللغة الإنجليزية: ${EXPECTED_COLUMNS.join(', ')}`);
         }
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
@@ -174,10 +212,24 @@ export function AttendanceUploader() {
             <Input id="attendance-file" type="file" onChange={handleFileChange} accept=".xlsx, .xls" />
         </div>
       </div>
-      <Button onClick={handleUpload} disabled={!file || isProcessing}>
-        {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
-        {isProcessing ? 'جاري المعالجة...' : 'رفع ومعالجة الملف'}
-      </Button>
+      <div className="flex items-center gap-4">
+        <Button onClick={handleUpload} disabled={!file || isProcessing}>
+            {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
+            {isProcessing ? 'جاري المعالجة...' : 'رفع ومعالجة الملف'}
+        </Button>
+        <Button onClick={handleDownloadTemplate} variant="outline" disabled={employeesLoading}>
+            {employeesLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="ml-2 h-4 w-4" />}
+            تنزيل النموذج الرسمي
+        </Button>
+      </div>
+
+       <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <AlertTriangle className="h-4 w-4 !text-blue-600" />
+            <AlertTitle className="text-blue-800">ملاحظة هامة</AlertTitle>
+            <AlertDescription className="text-blue-700">
+                النموذج الذي يتم تنزيله يحتوي على أسماء أعمدة باللغة الإنجليزية. هذه الأسماء ضرورية لعملية الرفع الآلي ويجب عدم تغييرها.
+            </AlertDescription>
+        </Alert>
 
       {processingResult && (
         <Alert variant={processingResult.success ? 'default' : 'destructive'} className={processingResult.success ? 'bg-green-50 border-green-200' : ''}>
@@ -189,5 +241,3 @@ export function AttendanceUploader() {
     </div>
   );
 }
-
-    
