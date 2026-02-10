@@ -59,13 +59,15 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
 
 export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
     const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'تاريخ التعيين غير صالح.' };
+    if (!hireDate) {
+      return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'تاريخ التعيين غير صالح.', yearsOfService: 0, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
+    }
 
     const yearsOfService = differenceInYears(asOfDate, hireDate);
     const lastSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
 
     if (lastSalary === 0) {
-        return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.' };
+        return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.', yearsOfService, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
     }
 
     let rawGratuity = 0;
@@ -112,5 +114,9 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
         leaveBalancePay, 
         total: finalGratuity + leaveBalancePay, 
         notice,
+        yearsOfService,
+        lastSalary,
+        leaveBalance,
+        dailyWage,
     };
 };

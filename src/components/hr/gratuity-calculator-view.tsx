@@ -26,14 +26,24 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { calculateGratuity } from '@/services/leave-calculator';
 import { formatCurrency } from '@/lib/utils';
 import { Calculator } from 'lucide-react';
-import { toFirestoreDate } from '@/services/date-converter';
-import { differenceInYears } from 'date-fns';
+import { Separator } from '../ui/separator';
+
+interface GratuityResult {
+    gratuity: number;
+    leaveBalancePay: number;
+    total: number;
+    notice: string;
+    yearsOfService: number;
+    lastSalary: number;
+    leaveBalance: number;
+    dailyWage: number;
+}
 
 export function GratuityCalculatorView() {
   const { firestore } = useFirebase();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination'>('termination');
-  const [result, setResult] = useState<{ gratuity: number; leaveBalancePay: number; total: number; notice: string } | null>(null);
+  const [result, setResult] = useState<GratuityResult | null>(null);
 
   const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
 
@@ -94,7 +104,7 @@ export function GratuityCalculatorView() {
         </div>
 
         {result && selectedEmployee && (
-          <div className="pt-6 border-t">
+          <div className="pt-6 border-t space-y-6">
             <h3 className="text-lg font-semibold mb-4 text-center">نتيجة الحساب لـِ {selectedEmployee.fullName}</h3>
             <div className="max-w-md mx-auto space-y-2 text-center">
                 <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
@@ -111,6 +121,18 @@ export function GratuityCalculatorView() {
                 </div>
                 <p className="text-xs text-muted-foreground pt-2">{result.notice}</p>
             </div>
+            
+            <Card className="bg-slate-50 dark:bg-slate-800/50 max-w-lg mx-auto">
+                <CardHeader><CardTitle className="text-base">تفاصيل الحسبة</CardTitle></CardHeader>
+                <CardContent className="text-sm space-y-2">
+                    <p><strong>آخر راتب شامل:</strong> {formatCurrency(result.lastSalary)}</p>
+                    <p><strong>عدد سنوات الخدمة:</strong> {result.yearsOfService.toFixed(1)} سنة</p>
+                    <p><strong>رصيد الإجازات المتبقي:</strong> {result.leaveBalance.toFixed(1)} يوم</p>
+                    <Separator className="my-2" />
+                    <p><strong>معادلة بدل الإجازات:</strong> (أجر اليوم الواحد) × (رصيد الأيام)</p>
+                    <p className="font-mono pr-4">= {formatCurrency(result.dailyWage)} × {result.leaveBalance.toFixed(1)} = {formatCurrency(result.leaveBalancePay)}</p>
+                </CardContent>
+            </Card>
           </div>
         )}
       </CardContent>
