@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
@@ -12,7 +13,14 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { useBranding } from '@/context/branding-context';
 import { cn } from '@/lib/utils';
-import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
+
+const SystemExpertChatWidget = dynamic(
+  () => import('@/components/ai/chat-widget').then(mod => mod.SystemExpertChatWidget),
+  {
+    ssr: false,
+    loading: () => <div className="fixed bottom-6 right-6 h-16 w-16 rounded-full bg-primary/50" />, // A simple placeholder for the button
+  }
+);
 
 export default function DashboardLayout({
   children,
