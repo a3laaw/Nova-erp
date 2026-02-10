@@ -4,7 +4,7 @@
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { findNavigationTool } from '../tools/find-navigation';
+import { findNavigationTool } from '@/ai/tools/find-navigation';
 
 const SystemExpertInputSchema = z.object({
   question: z.string().describe("The user's question about the system."),
@@ -20,6 +20,8 @@ const SystemExpertOutputSchema = z.object({
 });
 export type SystemExpertOutput = z.infer<typeof SystemExpertOutputSchema>;
 
+// This is where you would ideally load the documentation from files.
+// Since we can't do that in this environment, we'll paste the content directly.
 const systemDocumentation = `
 # System Documentation
 
@@ -427,47 +429,7 @@ const systemDocumentation = `
 
 \`;
 
-
-export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
-  return systemExpertFlow(input);
-}
-
-const systemExpertFlow = ai.defineFlow(
-  {
-    name: 'systemExpertFlow',
-    inputSchema: SystemExpertInputSchema,
-    outputSchema: SystemExpertOutputSchema,
-  },
-  async ({ question, history }) => {
-    const prompt = \`أنت مساعد ذكي وخبير في نظام ERP. وظيفتك هي الإجابة على أسئلة الموظفين حول كيفية استخدام النظام. يمكنك فهم اللغة العربية الفصحى واللهجات العامية المختلفة (مثل المصرية والكويتية والعراقية) بالإضافة إلى اللغة الإنجليزية. أجب دائمًا بلغة السؤال.
-استخدم المستندات التالية كمصدر أساسي لمعلوماتك. أجب بأسلوب واضح ومباشر.
-
-System Documentation:
----
-\${systemDocumentation}
----
-
-Question: "\${question}"
-
-Answer:\`;
-    
-    const llmHistory = history?.map(msg => ({
-      role: msg.role,
-      content: [{ text: msg.content }],
-    })) || [];
-    
-    
-    const response = await ai.generate({
-      history: llmHistory,
-      prompt: prompt,
-    });
-    
-    return { answer: response.text };
-  }
-);
-`;
-
-const systemPrompt = `You are a helpful and friendly system expert for an ERP system. Your capabilities are:
+const systemPrompt = \`You are a helpful and friendly system expert for an ERP system. Your capabilities are:
 1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. Your answers should be clear, concise, and in the same language as the user's question (Arabic or English).
 2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action (e.g., "create a new invoice", "I want to see the appointments", "أريد إضافة عميل جديد"), you MUST use the \`findNavigation\` tool to get the correct link.
 
@@ -480,42 +442,33 @@ const systemPrompt = `You are a helpful and friendly system expert for an ERP sy
 
 System Documentation:
 ---
-${systemDocumentation}
+\${systemDocumentation}
 ---
-`;
+\`;
 
-const expertPrompt = ai.definePrompt(
-  {
-    name: 'systemExpertPrompt',
-    tools: [findNavigationTool],
-    system: systemPrompt,
-  },
-  async ({ question, history }: SystemExpertInput) => {
-    // Build the history for the prompt
+export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
+    const { question, history } = input;
     const llmHistory = history?.map(msg => ({
       role: msg.role,
       content: [{ text: msg.content }],
-    }));
-
-    return {
+    })) || [];
+    
+    const response = await ai.generate({
       history: llmHistory,
-      prompt: `Question: "${question}"\n\nAnswer:`,
-    };
-  }
-);
-
-// const systemExpertFlow = ai.defineFlow(
-//   {
-//     name: 'systemExpertFlow',
-//     inputSchema: SystemExpertInputSchema,
-//     outputSchema: SystemExpertOutputSchema,
-//   },
-//   async ({ question, history }) => {
-//     const response = await expertPrompt({ question, history });
-//     return { answer: response.text };
-//   }
-// );
+      prompt: \`Question: "\${question}"\n\nAnswer:\`,
+      tools: [findNavigationTool]
+    });
+    
+    return { answer: response.text };
+}
 
 // Note: definePrompt returns a function that can be used directly as a flow.
-export const systemExpertFlow = expertPrompt;
-
+export const systemExpertFlow = ai.defineFlow(
+  {
+    name: 'systemExpertFlow',
+    inputSchema: SystemExpertInputSchema,
+    outputSchema: SystemExpertOutputSchema,
+    system: systemPrompt,
+  },
+  askSystemExpert
+);
