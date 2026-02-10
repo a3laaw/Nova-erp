@@ -17,6 +17,7 @@ import { InlineSearchList } from '../ui/inline-search-list';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface PermissionRequestFormProps {
   isOpen: boolean;
@@ -45,7 +46,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         if (isEditing && permissionToEdit) {
             setSelectedEmployeeId(permissionToEdit.employeeId);
             setPermissionType(permissionToEdit.type);
-            setDate(permissionToEdit.date.toDate());
+            setDate(toFirestoreDate(permissionToEdit.date) || undefined);
             setReason(permissionToEdit.reason);
         } else {
              if (currentUser?.role !== 'Admin' && currentUser?.role !== 'HR') {
