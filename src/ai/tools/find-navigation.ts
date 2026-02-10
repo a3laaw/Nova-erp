@@ -50,8 +50,9 @@ export const findNavigationTool = ai.defineTool(
       query: z.string().describe('The user\'s request, like "create a new invoice" or "show me the dashboard".'),
     }),
     outputSchema: z.object({
-      path: z.string().describe('The absolute URL path for the destination, e.g., "/dashboard/clients/new".'),
-      name: z.string().describe('The name of the destination page, e.g., "New Client".'),
+      path: z.string().optional(),
+      name: z.string().optional(),
+      error: z.string().optional(),
     }),
   },
   async ({ query }) => {
@@ -62,9 +63,8 @@ export const findNavigationTool = ai.defineTool(
         name: results[0].item.name,
       };
     }
-    // If no good match is found, we can decide what to do.
-    // For now, let's indicate no path was found by returning an empty object,
-    // and the main flow can handle this case.
-    throw new Error('No relevant navigation link found.');
+    return {
+        error: 'No relevant navigation link found for the query.'
+    };
   }
 );
