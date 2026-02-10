@@ -41,6 +41,8 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '../ui/input';
 
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
@@ -65,6 +67,11 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
+    // ADDED: فلاتر حالة + قسم + رصيد إجازة
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [leaveBalanceFilter, setLeaveBalanceFilter] = useState('all');
+    
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
         return [orderBy('createdAt', 'desc')];
@@ -85,11 +92,32 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
         }));
     }, [employees]);
 
+    // IMPROVED: جمع الأقسام تلقائيًا من البيانات
+    const departmentOptions = useMemo(() => {
+        if (!employees) return [];
+        const depts = new Set(employees.map(emp => emp.department).filter(Boolean));
+        return Array.from(depts);
+    }, [employees]);
+
 
     const filteredEmployees = useMemo(() => {
-        if (!augmentedEmployees) return [];
-        return searchEmployees(augmentedEmployees, searchQuery);
-    }, [augmentedEmployees, searchQuery]);
+        let filtered = augmentedEmployees;
+
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(emp => emp.status === statusFilter);
+        }
+
+        if (departmentFilter !== 'all') {
+            filtered = filtered.filter(emp => emp.department === departmentFilter);
+        }
+
+        if (leaveBalanceFilter !== 'all') {
+            const limit = parseInt(leaveBalanceFilter, 10);
+            filtered = filtered.filter(emp => emp.annualLeaveBalance !== undefined && emp.annualLeaveBalance < limit);
+        }
+        
+        return searchEmployees(filtered, searchQuery);
+    }, [augmentedEmployees, searchQuery, statusFilter, departmentFilter, leaveBalanceFilter]);
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
@@ -127,6 +155,50 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
 
     return (
         <>
+            <div className="flex flex-wrap gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
+                <div className="grid gap-2">
+                    <Label htmlFor="status-filter">الحالة</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger id="status-filter" className="w-[180px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">الكل</SelectItem>
+                            {Object.entries(statusTranslations).map(([key, value]) => (
+                                <SelectItem key={key} value={key}>{value}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="department-filter">القسم</Label>
+                    <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                        <SelectTrigger id="department-filter" className="w-[180px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">الكل</SelectItem>
+                            {departmentOptions.map(dept => (
+                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="leave-filter">رصيد الإجازة</Label>
+                    <Select value={leaveBalanceFilter} onValueChange={setLeaveBalanceFilter}>
+                        <SelectTrigger id="leave-filter" className="w-[180px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">الكل</SelectItem>
+                            <SelectItem value="5">أقل من 5 أيام</SelectItem>
+                            <SelectItem value="10">أقل من 10 أيام</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
             <div className="border rounded-lg">
                 <Table>
                     <TableHeader>
