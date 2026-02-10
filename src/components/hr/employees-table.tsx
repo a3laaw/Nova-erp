@@ -42,6 +42,7 @@ import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
+import { DateInput } from '../ui/date-input';
 
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
@@ -66,8 +67,11 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
+    // ADDED: فلاتر حالة + قسم + تاريخ التعيين
     const [statusFilter, setStatusFilter] = useState('all');
     const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [hireDateFrom, setHireDateFrom] = useState<Date | undefined>();
+    const [hireDateTo, setHireDateTo] = useState<Date | undefined>();
     
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -80,6 +84,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const [isTerminating, setIsTerminating] = useState(false);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
 
+    // IMPROVED: جمع الأقسام تلقائيًا من البيانات
     const departmentOptions = useMemo(() => {
         if (!employees) return [];
         const depts = new Set(employees.map(emp => emp.department).filter(Boolean));
@@ -98,8 +103,20 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
             filtered = filtered.filter(emp => emp.department === departmentFilter);
         }
         
+        if (hireDateFrom || hireDateTo) {
+            filtered = filtered.filter(emp => {
+                const hireDate = toFirestoreDate(emp.hireDate);
+                if (!hireDate) return false;
+
+                const matchesDateFrom = !hireDateFrom || (hireDate >= new Date(new Date(hireDateFrom).setHours(0, 0, 0, 0)));
+                const matchesDateTo = !hireDateTo || (hireDate <= new Date(new Date(hireDateTo).setHours(23, 59, 59, 999)));
+
+                return matchesDateFrom && matchesDateTo;
+            });
+        }
+        
         return searchEmployees(filtered, searchQuery);
-    }, [employees, searchQuery, statusFilter, departmentFilter]);
+    }, [employees, searchQuery, statusFilter, departmentFilter, hireDateFrom, hireDateTo]);
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
@@ -141,7 +158,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                 <div className="grid gap-2">
                     <Label htmlFor="status-filter">الحالة</Label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger id="status-filter" className="w-[180px]">
+                        <SelectTrigger id="status-filter" className="w-full sm:w-[180px]">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -155,7 +172,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                  <div className="grid gap-2">
                     <Label htmlFor="department-filter">القسم</Label>
                     <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                        <SelectTrigger id="department-filter" className="w-[180px]">
+                        <SelectTrigger id="department-filter" className="w-full sm:w-[180px]">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -165,6 +182,22 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                             ))}
                         </SelectContent>
                     </Select>
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="hire-date-from">تاريخ التعيين (من)</Label>
+                    <DateInput 
+                        id="hire-date-from"
+                        value={hireDateFrom} 
+                        onChange={setHireDateFrom}
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="hire-date-to">تاريخ التعيين (إلى)</Label>
+                    <DateInput 
+                        id="hire-date-to"
+                        value={hireDateTo} 
+                        onChange={setHireDateTo} 
+                    />
                 </div>
             </div>
 
