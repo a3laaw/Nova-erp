@@ -40,7 +40,6 @@ import { Label } from '@/components/ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
 import { searchEmployees } from '@/lib/cache/fuse-search';
-import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
 
@@ -67,10 +66,8 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // ADDED: فلاتر حالة + قسم + رصيد إجازة
     const [statusFilter, setStatusFilter] = useState('all');
     const [departmentFilter, setDepartmentFilter] = useState('all');
-    const [leaveBalanceFilter, setLeaveBalanceFilter] = useState('all');
     
     const employeesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -83,16 +80,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const [isTerminating, setIsTerminating] = useState(false);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
 
-    const augmentedEmployees = useMemo(() => {
-        if (!employees) return [];
-        const today = new Date();
-        return employees.map(emp => ({
-            ...emp,
-            annualLeaveBalance: calculateAnnualLeaveBalance(emp, today)
-        }));
-    }, [employees]);
-
-    // IMPROVED: جمع الأقسام تلقائيًا من البيانات
     const departmentOptions = useMemo(() => {
         if (!employees) return [];
         const depts = new Set(employees.map(emp => emp.department).filter(Boolean));
@@ -101,7 +88,7 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
 
 
     const filteredEmployees = useMemo(() => {
-        let filtered = augmentedEmployees;
+        let filtered = employees;
 
         if (statusFilter !== 'all') {
             filtered = filtered.filter(emp => emp.status === statusFilter);
@@ -110,14 +97,9 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
         if (departmentFilter !== 'all') {
             filtered = filtered.filter(emp => emp.department === departmentFilter);
         }
-
-        if (leaveBalanceFilter !== 'all') {
-            const limit = parseInt(leaveBalanceFilter, 10);
-            filtered = filtered.filter(emp => emp.annualLeaveBalance !== undefined && emp.annualLeaveBalance < limit);
-        }
         
         return searchEmployees(filtered, searchQuery);
-    }, [augmentedEmployees, searchQuery, statusFilter, departmentFilter, leaveBalanceFilter]);
+    }, [employees, searchQuery, statusFilter, departmentFilter]);
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
@@ -184,19 +166,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                         </SelectContent>
                     </Select>
                 </div>
-                 <div className="grid gap-2">
-                    <Label htmlFor="leave-filter">رصيد الإجازة</Label>
-                    <Select value={leaveBalanceFilter} onValueChange={setLeaveBalanceFilter}>
-                        <SelectTrigger id="leave-filter" className="w-[180px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">الكل</SelectItem>
-                            <SelectItem value="5">أقل من 5 أيام</SelectItem>
-                            <SelectItem value="10">أقل من 10 أيام</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
             </div>
 
             <div className="border rounded-lg">
@@ -206,18 +175,18 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                             <TableHead>الاسم الكامل</TableHead>
                             <TableHead>الرقم الوظيفي</TableHead>
                             <TableHead>القسم</TableHead>
+                            {/* CHANGED: استبدال عمود رصيد الإجازات بعمود تاريخ التعيين (بناءً على طلب المستخدم) */}
                             <TableHead>تاريخ التعيين</TableHead>
-                            <TableHead>رصيد الإجازة</TableHead>
                             <TableHead>الحالة</TableHead>
                             <TableHead><span className="sr-only">الإجراءات</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading && Array.from({ length: 5 }).map((_, i) => (
-                            <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                            <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                         ))}
                         {!loading && filteredEmployees.length === 0 && (
-                            <TableRow><TableCell colSpan={7} className="h-24 text-center">
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center">
                                 {searchQuery ? 'لا توجد نتائج تطابق البحث.' : 'لا يوجد موظفون لعرضهم.'}
                             </TableCell></TableRow>
                         )}
@@ -231,7 +200,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
                                 <TableCell className="font-mono">{employee.employeeNumber}</TableCell>
                                 <TableCell>{employee.department}</TableCell>
                                 <TableCell>{formatDate(employee.hireDate)}</TableCell>
-                                <TableCell>{employee.annualLeaveBalance ?? '-'}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={statusColors[employee.status]}>
                                         {statusTranslations[employee.status]}
