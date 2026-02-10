@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, limit } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, PermissionRequest } from '@/lib/types';
 import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -57,13 +57,39 @@ export function PayrollGenerator() {
     setProcessingResult(null);
 
     try {
+      const payrollStart = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const payrollEnd = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+
       const attendanceQuery = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)));
-      const attendanceSnap = await getDocs(attendanceQuery);
+      
+      const permissionsQuery = query(
+          collection(firestore, 'permissionRequests'),
+          where('status', '==', 'approved'),
+          where('date', '>=', payrollStart),
+          where('date', '<=', payrollEnd)
+      );
+      
+      const [attendanceSnap, permissionsSnap] = await Promise.all([
+          getDocs(attendanceQuery),
+          getDocs(permissionsQuery)
+      ]);
       
       const attendanceMap = new Map<string, MonthlyAttendance>();
       attendanceSnap.forEach(doc => {
           const data = doc.data() as MonthlyAttendance;
           attendanceMap.set(data.employeeId, {id: doc.id, ...data});
+      });
+
+      const permissionsMap = new Map<string, Map<string, string>>(); // employeeId -> dateString -> type
+      permissionsSnap.forEach(doc => {
+        const perm = doc.data();
+        const permDate = toFirestoreDate(perm.date)?.toISOString().split('T')[0];
+        if (permDate) {
+            if (!permissionsMap.has(perm.employeeId)) {
+                permissionsMap.set(perm.employeeId, new Map());
+            }
+            permissionsMap.get(perm.employeeId)!.set(permDate, perm.type);
+        }
       });
       
       const batch = writeBatch(firestore);
@@ -84,8 +110,27 @@ export function PayrollGenerator() {
           if (ignoreAttendance) {
             payslipNotes = "تم احتساب حضور كامل بناءً على طلب المستخدم.";
           } else if (attendance && attendance.summary) {
+              const employeePermissions = permissionsMap.get(employee.id!);
+              let chargeableLateDays = 0;
+              
+              if ((attendance.summary.lateDays || 0) > 0) {
+                  attendance.records.forEach(rec => {
+                      if (rec.status === 'late') {
+                          const recDate = toFirestoreDate(rec.date)?.toISOString().split('T')[0];
+                          if (!recDate || employeePermissions?.get(recDate) !== 'late_arrival') {
+                              chargeableLateDays++;
+                          }
+                      }
+                  });
+              }
+
               absenceDeduction = (attendance.summary.absentDays || 0) * dailyRate;
-              lateDeduction = Math.floor((attendance.summary.lateDays || 0) / 3) * dailyRate;
+              lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate;
+              
+              const waivedLates = (attendance.summary.lateDays || 0) - chargeableLateDays;
+              if (waivedLates > 0) {
+                  payslipNotes = `تم تجاهل خصم ${waivedLates} أيام تأخير لوجود استئذان موافق عليه.`;
+              }
           } else {
               const requiresAttendance = employee.contractType === 'permanent' || employee.contractType === 'temporary' || (employee.contractType === 'piece-rate' && employee.pieceRateMode === 'salary_with_target');
               if (requiresAttendance) {
@@ -97,8 +142,6 @@ export function PayrollGenerator() {
             if (leave.employeeId === employee.id && leave.leaveType === 'Unpaid' && leave.status === 'approved') {
                 const leaveStart = toFirestoreDate(leave.startDate);
                 const leaveEnd = toFirestoreDate(leave.endDate);
-                const payrollStart = new Date(parseInt(year), parseInt(month) - 1, 1);
-                const payrollEnd = new Date(parseInt(year), parseInt(month), 0);
                 
                 if(leaveStart && leaveEnd) {
                     if (leaveStart <= payrollEnd && leaveEnd >= payrollStart) {

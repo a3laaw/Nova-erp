@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, PermissionRequest } from '@/lib/types';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Upload } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -78,21 +78,33 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       if (!isEditing) {
         const startOfMonthDate = startOfMonth(date);
         const endOfMonthDate = endOfMonth(date);
-
-        const permissionsQuery = query(
-          collection(firestore, 'permissionRequests'),
-          where('employeeId', '==', selectedEmployeeId),
-          where('status', '==', 'approved')
-        );
         
+        // Query for requests within the month for this employee
+        const permissionsQuery = query(
+            collection(firestore, 'permissionRequests'),
+            where('employeeId', '==', selectedEmployeeId),
+            where('date', '>=', startOfMonthDate),
+            where('date', '<=', endOfMonthDate)
+        );
         const permissionsSnapshot = await getDocs(permissionsQuery);
-        const approvedCountInMonth = permissionsSnapshot.docs.filter(doc => {
-            const permissionDate = toFirestoreDate(doc.data().date);
-            return permissionDate && permissionDate >= startOfMonthDate && permissionDate <= endOfMonthDate;
-        }).length;
 
+        // Check 1: Monthly limit of APPROVED requests
+        const approvedCountInMonth = permissionsSnapshot.docs.filter(doc => doc.data().status === 'approved').length;
         if (approvedCountInMonth >= 3) {
-            throw new Error('لقد استنفذ الموظف الحد الأقصى للاستئذانات (3) لهذا الشهر.');
+            throw new Error('لقد استنفذ الموظف الحد الأقصى للاستئذانات الموافق عليها (3) لهذا الشهر.');
+        }
+        
+        // Check 2: Existence of ANY request on the same day
+        const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
+        const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
+        
+        const sameDayRequest = permissionsSnapshot.docs.some(doc => {
+            const permissionDate = toFirestoreDate(doc.data().date);
+            return permissionDate && permissionDate >= dayStart && permissionDate <= dayEnd;
+        });
+
+        if (sameDayRequest) {
+             throw new Error('يوجد طلب استئذان آخر مسجل لهذا الموظف في نفس اليوم.');
         }
       }
 
@@ -176,7 +188,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 <Info className="h-4 w-4" />
                 <AlertTitle>ملاحظة</AlertTitle>
                 <AlertDescription>
-                    الحد الأقصى المسموح به لطلبات الاستئذان هو 3 طلبات موافق عليها شهريًا.
+                    الحد الأقصى المسموح به لطلبات الاستئذان الموافق عليها هو 3 طلبات شهريًا.
                 </AlertDescription>
             </Alert>
           </div>
