@@ -361,6 +361,7 @@ export type Payslip = {
     salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
     status: 'draft' | 'processed' | 'paid';
     createdAt: any;
+    notes?: string;
 };
 
 export interface TransactionStage {

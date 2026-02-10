@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { MoreHorizontal, Eye, CheckCircle, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Eye, CheckCircle, Loader2, Info } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 
 const statusColors: Record<Payslip['status'], string> = {
   draft: 'bg-yellow-100 text-yellow-800',
@@ -153,7 +154,23 @@ export function PayslipsList() {
                         ))}
                         {!loading && sortedPayslips.map(payslip => (
                              <TableRow key={payslip.id}>
-                                <TableCell className="font-medium">{payslip.employeeName}</TableCell>
+                                <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                        <span>{payslip.employeeName}</span>
+                                        {payslip.notes && (
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Info className="h-4 w-4 text-muted-foreground" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{payslip.notes}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        )}
+                                    </div>
+                                </TableCell>
                                 <TableCell className="text-left font-mono">{formatCurrency(payslip.netSalary)}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={statusColors[payslip.status]}>
