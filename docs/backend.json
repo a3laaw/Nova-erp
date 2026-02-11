@@ -1312,40 +1312,6 @@
       },
       "required": ["name"]
     },
-    "PurchaseOrder": {
-      "title": "Purchase Order",
-      "description": "Represents a purchase order for materials or services.",
-      "type": "object",
-      "properties": {
-        "poNumber": { "type": "string", "description": "Sequential PO number." },
-        "orderDate": { "type": "string", "format": "date-time" },
-        "vendorId": { "type": "string" },
-        "vendorName": { "type": "string" },
-        "projectId": { "type": "string", "description": "Optional link to a project." },
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "description": { "type": "string" },
-              "quantity": { "type": "number" },
-              "unitPrice": { "type": "number" },
-              "total": { "type": "number" }
-            },
-            "required": ["description", "quantity", "unitPrice", "total"]
-          }
-        },
-        "totalAmount": { "type": "number" },
-        "paymentTerms": { "type": "string" },
-        "notes": { "type": "string" },
-        "status": {
-          "type": "string",
-          "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
-        },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
-    },
     "ResidencyRenewal": {
       "title": "Residency Renewal",
       "description": "Tracks the financial transaction for an employee's residency renewal.",
@@ -1361,6 +1327,166 @@
         "lastAmortizationDate": { "type": "string", "format": "date-time" }
       },
       "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId"]
+    },
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Represents a storage location for inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["name"]
+    },
+    "ItemCategory": {
+      "title": "Item Category",
+      "description": "A category for inventory items.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "parentCategoryId": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Item": {
+      "title": "Inventory Item",
+      "description": "An item in the inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "sku": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "itemType": { "type": "string", "enum": ["storable", "consumable", "service"] },
+        "unitOfMeasure": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "expiryTracked": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku", "categoryId", "itemType", "unitOfMeasure"]
+    },
+    "SupplierItem": {
+        "title": "Supplier Item",
+        "description": "Maps a supplier's specific item code and name to an internal inventory item.",
+        "type": "object",
+        "properties": {
+            "supplierId": { "type": "string" },
+            "internalItemId": { "type": "string" },
+            "supplierSku": { "type": "string", "description": "The SKU or item code used by the supplier." },
+            "supplierItemName": { "type": "string", "description": "The name of the item as it appears on the supplier's documents." }
+        },
+        "required": ["supplierId", "internalItemId", "supplierSku"]
+    },
+    "RequestForQuotation": {
+        "title": "Request for Quotation",
+        "description": "A request sent to vendors for pricing on specific items.",
+        "type": "object",
+        "properties": {
+            "rfqNumber": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "status": { "type": "string", "enum": ["draft", "sent", "closed", "cancelled"] },
+            "vendorIds": { "type": "array", "items": { "type": "string" } },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "internalItemId": { "type": "string" },
+                        "itemName": { "type": "string" },
+                        "quantity": { "type": "number" }
+                    },
+                    "required": ["internalItemId", "itemName", "quantity"]
+                }
+            }
+        },
+        "required": ["rfqNumber", "date", "status", "items"]
+    },
+    "SupplierQuotation": {
+        "title": "Supplier Quotation",
+        "description": "A quotation received from a supplier in response to an RFQ.",
+        "type": "object",
+        "properties": {
+            "rfqId": { "type": "string" },
+            "vendorId": { "type": "string" },
+            "quotationReference": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "deliveryTimeDays": { "type": "number" },
+            "paymentTerms": { "type": "string" },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "supplierItemId": { "type": "string" },
+                        "unitPrice": { "type": "number" }
+                    },
+                    "required": ["supplierItemId", "unitPrice"]
+                }
+            }
+        },
+        "required": ["rfqId", "vendorId", "date"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "description": "Represents a purchase order for materials or services.",
+      "type": "object",
+      "properties": {
+        "poNumber": { "type": "string", "description": "Sequential PO number." },
+        "orderDate": { "type": "string", "format": "date-time" },
+        "vendorId": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "supplierQuotationId": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "internalItemId": { "type": "string" },
+              "itemName": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" }
+            },
+            "required": ["internalItemId", "itemName", "quantity", "unitPrice", "total"]
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "paymentTerms": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
+        }
+      },
+      "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
+    },
+    "GoodsReceiptNote": {
+        "title": "Goods Receipt Note",
+        "description": "A document to record the receipt of items into a warehouse.",
+        "type": "object",
+        "properties": {
+            "grnNumber": { "type": "string" },
+            "purchaseOrderId": { "type": "string" },
+            "warehouseId": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "itemsReceived": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "internalItemId": { "type": "string" },
+                        "quantityReceived": { "type": "number" },
+                        "batchNumber": { "type": "string" },
+                        "expiryDate": { "type": "string", "format": "date" }
+                    },
+                    "required": ["internalItemId", "quantityReceived"]
+                }
+            }
+        },
+        "required": ["grnNumber", "purchaseOrderId", "warehouseId", "date", "itemsReceived"]
     }
   },
   "auth": {
@@ -1517,31 +1643,49 @@
       "schema": { "$ref": "#/entities/CashReceipt" },
       "description": "Stores all cash receipt vouchers received by the company."
     },
-    "/quotations/{quotationId}": {
-      "schema": {
-        "$ref": "#/entities/Quotation"
-      },
-      "description": "Stores all quotations sent to clients."
-    },
     "/vendors/{vendorId}": {
       "schema": {
         "$ref": "#/entities/Vendor"
       },
       "description": "Stores information about suppliers and vendors."
     },
-    "/purchaseOrders/{poId}": {
-      "schema": {
-        "$ref": "#/entities/PurchaseOrder"
-      },
-      "description": "Stores all purchase orders issued to vendors."
-    },
     "/residencyRenewals/{renewalId}": {
         "schema": {
             "$ref": "#/entities/ResidencyRenewal"
         },
         "description": "Stores financial records for employee residency renewals."
+    },
+    "/items/{itemId}": {
+        "schema": { "$ref": "#/entities/Item" },
+        "description": "Stores all inventory items."
+    },
+    "/warehouses/{warehouseId}": {
+        "schema": { "$ref": "#/entities/Warehouse" },
+        "description": "Stores all warehouses and storage locations."
+    },
+    "/itemCategories/{categoryId}": {
+        "schema": { "$ref": "#/entities/ItemCategory" },
+        "description": "Stores inventory item categories in a hierarchical structure."
+    },
+    "/supplierItems/{supplierItemId}": {
+        "schema": { "$ref": "#/entities/SupplierItem" },
+        "description": "Maps supplier-specific item codes to internal item codes."
+    },
+    "/rfqs/{rfqId}": {
+      "schema": { "$ref": "#/entities/RequestForQuotation" },
+      "description": "Stores all Requests for Quotation sent to vendors."
+    },
+    "/supplierQuotations/{quotationId}": {
+        "schema": { "$ref": "#/entities/SupplierQuotation" },
+        "description": "Stores quotations received from suppliers."
+    },
+    "/purchaseOrders/{poId}": {
+      "schema": { "$ref": "#/entities/PurchaseOrder" },
+      "description": "Stores all purchase orders issued to vendors."
+    },
+    "/grns/{grnId}": {
+        "schema": { "$ref": "#/entities/GoodsReceiptNote" },
+        "description": "Stores all Goods Receipt Notes for incoming inventory."
     }
   }
 }
-
-    
