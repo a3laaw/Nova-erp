@@ -15,7 +15,7 @@ export function PrintableDocument({ children }: PrintableDocumentProps) {
     }
 
     return (
-        <div id="printable-area" className="printable-container bg-white dark:bg-card">
+        <table id="printable-area" className="printable-container w-full border-collapse bg-white dark:bg-card shadow-lg rounded-lg print:shadow-none print:border-none print:bg-transparent">
             {branding?.letterhead_image_url && (
                 <thead className="print-header">
                   <tr><td>
@@ -59,6 +59,6 @@ export function PrintableDocument({ children }: PrintableDocumentProps) {
                   </td></tr>
                 </tfoot>
             )}
-        </div>
+        </table>
     );
 }
