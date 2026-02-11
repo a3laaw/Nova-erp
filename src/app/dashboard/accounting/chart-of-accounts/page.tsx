@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -21,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -190,15 +189,16 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
 
 
 export default function ChartOfAccountsPage() {
-    const router = useRouter();
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
     // UI and data state
     const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set(['1', '2', '3', '4', '5']));
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [accountBalances, setAccountBalances] = useState<Map<string, number>>(new Map());
+    
+    const { data: accounts, loading: accountsLoading, error: accountsError } = useSubscription<Account>(firestore, 'chartOfAccounts');
+    const { data: journalEntries, loading: entriesLoading, error: entriesError } = useSubscription<JournalEntry>(firestore, 'journalEntries', [where('status', '==', 'posted')]);
+    
+    const loading = accountsLoading || entriesLoading;
 
     // Form and Dialog state
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -211,67 +211,41 @@ export default function ChartOfAccountsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isSeeding, setIsSeeding] = useState(false);
 
+    const accountBalances = useMemo(() => {
+        if (!accounts || !journalEntries) return new Map<string, number>();
 
-    const fetchAllData = useCallback(async () => {
-        if (!firestore) return;
-        setLoading(true);
-        try {
-            const accountsQuery = query(collection(firestore, 'chartOfAccounts'));
-            const entriesQuery = query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'));
-
-            const [accountsSnapshot, entriesSnapshot] = await Promise.all([
-                getDocs(accountsQuery),
-                getDocs(entriesQuery),
-            ]);
-
-            const fetchedAccounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-            setAccounts(fetchedAccounts);
-
-            const journalEntries = entriesSnapshot.docs.map(doc => doc.data() as JournalEntry);
-            
-            const directBalances = new Map<string, number>();
-            journalEntries.forEach(entry => {
-                entry.lines.forEach(line => {
-                    const acc = fetchedAccounts.find(a => a.id === line.accountId);
-                    if (!acc) return; 
-                    
-                    const currentBalance = directBalances.get(line.accountId) || 0;
-                    let balanceChange = 0;
-                    
-                    if (acc.balanceType === 'Debit') {
-                        balanceChange = (line.debit || 0) - (line.credit || 0);
-                    } else {
-                        balanceChange = (line.credit || 0) - (line.debit || 0);
-                    }
-                    directBalances.set(line.accountId, currentBalance + balanceChange);
-                });
+        const directBalances = new Map<string, number>();
+        journalEntries.forEach(entry => {
+            entry.lines.forEach(line => {
+                const acc = accounts.find(a => a.id === line.accountId);
+                if (!acc) return; 
+                
+                const currentBalance = directBalances.get(line.accountId) || 0;
+                let balanceChange = 0;
+                
+                if (acc.balanceType === 'Debit') {
+                    balanceChange = (line.debit || 0) - (line.credit || 0);
+                } else {
+                    balanceChange = (line.credit || 0) - (line.debit || 0);
+                }
+                directBalances.set(line.accountId, currentBalance + balanceChange);
             });
+        });
 
-            const aggregatedBalances = new Map<string, number>();
-            fetchedAccounts
-              .sort((a, b) => (b.level || 0) - (a.level || 0)) 
-              .forEach(account => {
-                  let totalBalance = directBalances.get(account.id!) || 0;
-                  const children = fetchedAccounts.filter(child => child.parentCode === account.code);
-                  children.forEach(child => {
-                      totalBalance += aggregatedBalances.get(child.id!) || 0;
-                  });
-                  aggregatedBalances.set(account.id!, totalBalance);
+        const aggregatedBalances = new Map<string, number>();
+        [...accounts]
+          .sort((a, b) => (b.level || 0) - (a.level || 0)) 
+          .forEach(account => {
+              let totalBalance = directBalances.get(account.id!) || 0;
+              const children = accounts.filter(child => child.parentCode === account.code);
+              children.forEach(child => {
+                  totalBalance += aggregatedBalances.get(child.id!) || 0;
               });
+              aggregatedBalances.set(account.id!, totalBalance);
+          });
 
-            setAccountBalances(aggregatedBalances);
-
-        } catch (e) {
-            console.error("Error fetching data: ", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات.' });
-        } finally {
-            setLoading(false);
-        }
-    }, [firestore, toast]);
-    
-    useEffect(() => {
-        fetchAllData();
-    }, [fetchAllData]);
+        return aggregatedBalances;
+    }, [accounts, journalEntries]);
 
     const displayedAccounts = useMemo(() => {
         if (accounts.length === 0) return [];
@@ -353,7 +327,7 @@ export default function ChartOfAccountsPage() {
             setIsFormOpen(false);
             setEditingAccount(null);
             setParentAccount(null);
-            await fetchAllData();
+            // No need to call fetchAllData, useSubscription handles it.
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الحساب.' });
@@ -370,7 +344,7 @@ export default function ChartOfAccountsPage() {
             toast({ title: 'نجاح', description: 'تم حذف الحساب.' });
             setIsAlertOpen(false);
             setAccountToDelete(null);
-            await fetchAllData();
+            // No need to call fetchAllData, useSubscription handles it.
         } catch (e) {
              console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الحساب. قد يكون مرتبطًا ببيانات أخرى.' });
@@ -398,7 +372,6 @@ export default function ChartOfAccountsPage() {
 
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم مسح الشجرة القديمة وتنزيل شجرة الحسابات الأساسية بنجاح.' });
-            await fetchAllData();
             setConfirmSeedText('');
             setIsSeedAlertOpen(false);
         } catch (e) {
@@ -587,7 +560,3 @@ export default function ChartOfAccountsPage() {
         </div>
     );
 }
-
-    
-
-    
