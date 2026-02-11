@@ -84,6 +84,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
+        { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي' },
         {
@@ -141,7 +142,6 @@ const navItems = {
       children: [
         { href: '/dashboard/purchasing', label: 'لوحة المعلومات' },
         { href: '/dashboard/purchasing/items', label: 'الأصناف' },
-        { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
         { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
@@ -176,6 +176,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/quotations', label: 'Quotations' },
+        { href: '/dashboard/purchasing/vendors', label: 'Vendors' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
         { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
         {
@@ -233,7 +234,6 @@ const navItems = {
       children: [
         { href: '/dashboard/purchasing', label: 'Dashboard' },
         { href: '/dashboard/purchasing/items', label: 'Items' },
-        { href: '/dashboard/purchasing/vendors', label: 'Vendors' },
         { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
         { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
