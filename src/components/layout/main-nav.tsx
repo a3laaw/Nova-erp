@@ -62,7 +62,6 @@ import {
 const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { href: '/dashboard/notifications', label: 'تنبيهات النظام', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       label: 'التقارير', 
       icon: LineChart, 
@@ -77,7 +76,6 @@ const navItems = {
     },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
     { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Building, roles: ['Admin', 'Accountant'] },
-    { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
     { 
       label: 'المحاسبة', 
       icon: Wallet, 
@@ -148,12 +146,19 @@ const navItems = {
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
       ]
     },
-    { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
-    { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings, roles: ['Admin'] },
+    { 
+      label: 'الإعدادات', 
+      icon: Settings, 
+      roles: ['Admin'],
+      hrefPrefix: '/dashboard/settings',
+      children: [
+        { href: '/dashboard/settings', label: 'الإعدادات العامة' },
+        { href: '/dashboard/contracts', label: 'العقود والنماذج' },
+      ]
+    },
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       label: 'Reports', 
       icon: LineChart, 
@@ -169,7 +174,6 @@ const navItems = {
     { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
     { href: '/dashboard/purchasing/vendors', label: 'Vendors', icon: Building, roles: ['Admin', 'Accountant'] },
-    { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
     { 
       label: 'Accounting', 
       icon: Wallet, 
@@ -240,8 +244,16 @@ const navItems = {
         { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
       ]
     },
-    { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
-    { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
+    { 
+      label: 'Settings', 
+      icon: Settings, 
+      roles: ['Admin'],
+      hrefPrefix: '/dashboard/settings',
+      children: [
+        { href: '/dashboard/settings', label: 'General Settings' },
+        { href: '/dashboard/contracts', label: 'Contract Templates' },
+      ]
+    },
   ]
 };
 
