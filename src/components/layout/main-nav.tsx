@@ -63,7 +63,7 @@ const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
-      label: 'التقارير', 
+      label: 'إدارة علاقات العملاء', 
       icon: LineChart, 
       roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
       hrefPrefix: '/dashboard/reports',
@@ -160,7 +160,7 @@ const navItems = {
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
-      label: 'Reports', 
+      label: 'CRM', 
       icon: LineChart, 
       roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
       hrefPrefix: '/dashboard/reports',
