@@ -94,11 +94,11 @@ const navItems = {
             { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
           ]
         },
-        { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: Scale },
         {
           label: 'التقارير المالية',
           children: [
             { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير المالي اليومي' },
+            { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية' },
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
@@ -181,11 +181,11 @@ const navItems = {
             { href: '/dashboard/accounting/invoices', label: 'Invoices' },
           ]
         },
-        { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation', icon: Scale },
         {
           label: 'Financial Reports',
           children: [
             { href: '/dashboard/accounting/reports/daily-summary', label: 'Daily Financial Report' },
+            { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation' },
             { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
             { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
             { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
