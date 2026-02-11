@@ -139,6 +139,8 @@ export function WorkHoursManager() {
                     half_day: halfDay,
                     ramadan: {
                         ...ramadanSchedule,
+                        start_date: ramadanSchedule.start_date || null,
+                        end_date: ramadanSchedule.end_date || null,
                         appointment_slot_duration: Number(ramadanSchedule.appointment_slot_duration),
                         appointment_buffer_time: Number(ramadanSchedule.appointment_buffer_time),
                     }
