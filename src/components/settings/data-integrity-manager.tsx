@@ -11,23 +11,12 @@ import { Loader2, ShieldCheck, Microscope, AlertTriangle, Trash2 } from 'lucide-
 import { InlineSearchList } from '../ui/inline-search-list';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
-import { Input } from '../ui/input';
 
 interface Discrepancy {
     nonStandardName: string;
     count: number;
     docIds: string[];
 }
-
-interface VoucherDiscrepancy {
-    nonStandardName: string;
-    count: number;
-    occurrences: {
-        docId: string;
-        fieldName: 'debitAccountName' | 'creditAccountName';
-    }[];
-}
-
 
 // Reusable Analysis Section Component
 function AnalysisSection({
@@ -165,17 +154,12 @@ export function DataIntegrityManager() {
     const [deptAnalysisResults, setDeptAnalysisResults] = useState<Discrepancy[] | null>(null);
     const [deptCorrections, setDeptCorrections] = useState<Record<string, string>>({});
     const [allDeptsOptions, setAllDeptsOptions] = useState<any[]>([]);
-    
-    // State for Data Deletion
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [confirmText, setConfirmText] = useState('');
 
-    // State for Appointments Deletion
-    const [isAppointmentsDeleteDialogOpen, setIsAppointmentsDeleteDialogOpen] = useState(false);
-    const [isAppointmentsDeleting, setIsAppointmentsDeleting] = useState(false);
-    const [confirmAppointmentsText, setConfirmAppointmentsText] = useState('');
-
+    // State for Unlinked Employees Analysis
+    const [unlinkedEmployees, setUnlinkedEmployees] = useState<Employee[] | null>(null);
+    const [loadingUnlinked, setLoadingUnlinked] = useState(false);
+    const [isDeletingUnlinked, setIsDeletingUnlinked] = useState(false);
+    const [isDeleteUnlinkedOpen, setIsDeleteUnlinkedOpen] = useState(false);
 
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
@@ -282,61 +266,51 @@ export function DataIntegrityManager() {
     const handleAnalyzeDepartments = () => handleAnalyzeGeneric(setIsLoadingDepts, setDeptAnalysisResults, setDeptCorrections, 'departments', 'employees', 'department', false);
     const handleApplyDepartmentCorrections = () => handleApplyCorrectionsGeneric(deptCorrections, deptAnalysisResults, 'employees', 'department');
     
-    const handleDeleteAllEmployees = async () => {
+    // --- Handlers for Unlinked Employees ---
+    const handleAnalyzeUnlinkedEmployees = async () => {
         if (!firestore) return;
-        setIsDeleting(true);
+        setLoadingUnlinked(true);
+        setUnlinkedEmployees(null);
         try {
-            const employeesRef = collection(firestore, 'employees');
-            const snapshot = await getDocs(employeesRef);
-            if (snapshot.empty) {
-                toast({ title: 'لا يوجد بيانات', description: 'مجموعة الموظفين فارغة بالفعل.' });
-                return;
+            const [usersSnap, employeesSnap] = await Promise.all([
+                getDocs(collection(firestore, 'users')),
+                getDocs(collection(firestore, 'employees'))
+            ]);
+            const linkedEmployeeIds = new Set(usersSnap.docs.map(doc => doc.data().employeeId));
+            const allEmployees = employeesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+            const unlinked = allEmployees.filter(emp => !linkedEmployeeIds.has(emp.id!));
+            setUnlinkedEmployees(unlinked);
+    
+            if (unlinked.length === 0) {
+                toast({ title: 'فحص مكتمل', description: 'جميع الموظفين مرتبطون بحسابات مستخدمين.' });
             }
-            const batch = writeBatch(firestore);
-            snapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            toast({ title: 'نجاح', description: 'تم مسح جميع بيانات الموظفين بنجاح.' });
         } catch (error) {
-            console.error("Error deleting all employees:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في مسح بيانات الموظفين.' });
+            console.error("Error analyzing unlinked employees:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل فحص الموظفين غير المرتبطين.' });
         } finally {
-            setIsDeleting(false);
-            setIsDeleteDialogOpen(false);
-            setConfirmText('');
+            setLoadingUnlinked(false);
         }
     };
-
-    const handleDeleteAllAppointments = async () => {
-        if (!firestore) return;
-        setIsAppointmentsDeleting(true);
+    
+    const handleDeleteUnlinked = async () => {
+        if (!firestore || !unlinkedEmployees || unlinkedEmployees.length === 0) return;
+        setIsDeletingUnlinked(true);
         try {
-            const appointmentsRef = collection(firestore, 'appointments');
-            const snapshot = await getDocs(appointmentsRef);
-            if (snapshot.empty) {
-                toast({ title: 'لا يوجد بيانات', description: 'مجموعة المواعيد فارغة بالفعل.' });
-                setIsAppointmentsDeleting(false);
-                setIsAppointmentsDeleteDialogOpen(false);
-                setConfirmAppointmentsText('');
-                return;
-            }
             const batch = writeBatch(firestore);
-            snapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
+            unlinkedEmployees.forEach(emp => {
+                batch.delete(doc(firestore, 'employees', emp.id!));
             });
             await batch.commit();
-            toast({ title: 'نجاح', description: 'تم مسح جميع بيانات المواعيد بنجاح.' });
+            toast({ title: 'نجاح', description: `تم حذف ${unlinkedEmployees.length} موظفين غير مرتبطين بنجاح.` });
+            setUnlinkedEmployees([]); 
         } catch (error) {
-            console.error("Error deleting all appointments:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في مسح بيانات المواعيد.' });
+            console.error("Error deleting unlinked employees:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الموظفين.' });
         } finally {
-            setIsAppointmentsDeleting(false);
-            setIsAppointmentsDeleteDialogOpen(false);
-            setConfirmAppointmentsText('');
+            setIsDeletingUnlinked(false);
+            setIsDeleteUnlinkedOpen(false);
         }
     };
-
 
     // Fetch options for dropdowns
     useEffect(() => {
@@ -394,92 +368,73 @@ export function DataIntegrityManager() {
                 />
                 
                 <Separator />
-
+                
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="font-semibold text-destructive">مسح جميع المواعيد (إجراء خطير)</h3>
-                            <p className="text-sm text-muted-foreground">استخدم هذا الخيار لمسح جميع المواعيد المحجوزة والسابقة من النظام.</p>
+                            <h3 className="font-semibold text-destructive">تنظيف بيانات الموظفين القديمة</h3>
+                            <p className="text-sm text-muted-foreground">البحث عن سجلات الموظفين التي ليس لها حساب مستخدم فعال في النظام وحذفها.</p>
                         </div>
-                        <Button onClick={() => setIsAppointmentsDeleteDialogOpen(true)} variant="destructive">
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            مسح بيانات المواعيد
+                        <Button onClick={handleAnalyzeUnlinkedEmployees} disabled={loadingUnlinked} variant="outline" size="sm">
+                            {loadingUnlinked ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Microscope className="ml-2 h-4 w-4" />}
+                            فحص الموظفين غير المرتبطين
                         </Button>
                     </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    {loadingUnlinked && (
+                        <div className="text-center p-8 text-muted-foreground">
+                            <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                            <p className="mt-2">جاري الفحص...</p>
+                        </div>
+                    )}
+                    {unlinkedEmployees && !loadingUnlinked && (
                         <div>
-                            <h3 className="font-semibold text-destructive">مسح البيانات القديمة (إجراء خطير)</h3>
-                            <p className="text-sm text-muted-foreground">استخدم هذا الخيار لمسح جميع البيانات في مجموعة محددة للبدء من جديد.</p>
+                            {unlinkedEmployees.length === 0 ? (
+                                <div className="text-center p-8 text-green-600 bg-green-50 rounded-lg border border-green-200">
+                                    <ShieldCheck className="mx-auto h-12 w-12" />
+                                    <h3 className="mt-4 text-lg font-semibold">لا يوجد موظفون غير مرتبطين</h3>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <h3 className="font-semibold text-yellow-800 flex items-center gap-2">
+                                            <AlertTriangle />
+                                            تم العثور على {unlinkedEmployees.length} موظفين غير مرتبطين بحسابات
+                                        </h3>
+                                    </div>
+                                    <ul className="list-disc list-inside text-sm text-muted-foreground max-h-40 overflow-y-auto border p-2 rounded-md">
+                                        {unlinkedEmployees.map(emp => (
+                                            <li key={emp.id}>{emp.fullName} (الرقم الوظيفي: {emp.employeeNumber || 'لا يوجد'})</li>
+                                        ))}
+                                    </ul>
+                                    <div className="flex justify-end pt-4">
+                                        <Button variant="destructive" onClick={() => setIsDeleteUnlinkedOpen(true)}>
+                                            <Trash2 className="ml-2 h-4 w-4"/> حذف الموظفين المحددين ({unlinkedEmployees.length})
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive">
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            مسح بيانات الموظفين
-                        </Button>
-                    </div>
+                    )}
                 </div>
 
             </CardContent>
 
-             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+             <AlertDialog open={isDeleteUnlinkedOpen} onOpenChange={setIsDeleteUnlinkedOpen}>
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                        <AlertDialogTitle>تأكيد حذف الموظفين غير المرتبطين؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            <span className="block font-bold">هذا الإجراء سيقوم بحذف جميع الموظفين من قاعدة البيانات بشكل نهائي. لا يمكن التراجع عن هذا الإجراء إطلاقًا.</span>
-                            <span className="block mt-4">للتأكيد، الرجاء كتابة العبارة التالية في المربع أدناه: <code className="font-mono text-destructive bg-destructive/10 px-1 py-0.5 rounded">مسح الموظفين</code></span>
+                            سيتم حذف الموظفين الذين تم العثور عليهم بشكل نهائي. هذا الإجراء لا يمكن التراجع عنه.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Input
-                        value={confirmText}
-                        onChange={(e) => setConfirmText(e.target.value)}
-                        placeholder="اكتب 'مسح الموظفين' هنا"
-                        className="mt-2"
-                        dir="ltr"
-                    />
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeletingUnlinked}>إلغاء</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDeleteAllEmployees}
-                            disabled={isDeleting || confirmText !== 'مسح الموظفين'}
+                            onClick={handleDeleteUnlinked}
+                            disabled={isDeletingUnlinked}
                             className="bg-destructive hover:bg-destructive/90"
                         >
-                            {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
-                            {isDeleting ? 'جاري المسح...' : 'نعم، قم بالمسح'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            
-            <AlertDialog open={isAppointmentsDeleteDialogOpen} onOpenChange={setIsAppointmentsDeleteDialogOpen}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد تمامًا من مسح المواعيد؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            <span className="block font-bold">هذا الإجراء سيقوم بحذف جميع المواعيد من قاعدة البيانات بشكل نهائي. لا يمكن التراجع عن هذا الإجراء إطلاقًا.</span>
-                            <span className="block mt-4">للتأكيد، الرجاء كتابة العبارة التالية في المربع أدناه: <code className="font-mono text-destructive bg-destructive/10 px-1 py-0.5 rounded">مسح المواعيد</code></span>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <Input
-                        value={confirmAppointmentsText}
-                        onChange={(e) => setConfirmAppointmentsText(e.target.value)}
-                        placeholder="اكتب 'مسح المواعيد' هنا"
-                        className="mt-2"
-                        dir="ltr"
-                    />
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isAppointmentsDeleting}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDeleteAllAppointments}
-                            disabled={isAppointmentsDeleting || confirmAppointmentsText !== 'مسح المواعيد'}
-                            className="bg-destructive hover:bg-destructive/90"
-                        >
-                            {isAppointmentsDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}
-                            {isAppointmentsDeleting ? 'جاري المسح...' : 'نعم، قم بالمسح'}
+                            {isDeletingUnlinked ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'نعم، قم بالحذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
