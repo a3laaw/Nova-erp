@@ -185,7 +185,7 @@ function SystemWipeManager() {
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تحذير: هل أنت متأكد تماماً؟</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription asChild>
                             <div className="space-y-4">
                                 <p>أنت على وشك حذف **جميع البيانات** في هذا النظام. سيتم مسح كل شيء أدخلته: العملاء، الموظفين، المعاملات، القيود المحاسبية، الإعدادات، وكل شيء آخر.</p>
                                 <p className="font-bold text-destructive">هذا الإجراء لا يمكن التراجع عنه نهائياً.</p>
