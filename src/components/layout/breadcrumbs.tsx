@@ -48,6 +48,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'trial-balance': 'ميزان المراجعة',
     'general-ledger': 'دفتر الأستاذ العام',
     statement: 'كشف حساب',
+    'bank-reconciliation': 'التسوية البنكية',
   },
   en: {
     dashboard: 'Dashboard',
@@ -90,6 +91,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'trial-balance': 'Trial Balance',
     'general-ledger': 'General Ledger',
     statement: 'Statement',
+    'bank-reconciliation': 'Bank Reconciliation',
   },
 };
 
