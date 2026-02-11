@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, LeaveRequest, Payslip } from '@/lib/types';
+import type { Employee, MonthlyAttendance, LeaveRequest, Payslip, JournalEntry, Account } from '@/lib/types';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { toFirestoreDate } from '@/services/date-converter';
-import { format, differenceInYears, startOfMonth, endOfMonth } from 'date-fns';
-import { Printer, UserCheck, UserX, CalendarIcon, Wallet, FileWarning, Search, Download, FileSpreadsheet } from 'lucide-react';
+import { format, differenceInYears, startOfMonth, endOfMonth, differenceInMonths } from 'date-fns';
+import { Printer, UserCheck, UserX, CalendarIcon, Wallet, FileWarning, Search, Download, FileSpreadsheet, HandCoins } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,8 @@ import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { useAnalyticalData } from '@/hooks/use-analytical-data';
+import Link from 'next/link';
 
 // --- Status Translations & Colors ---
 const statusTranslations: Record<string, string> = {
@@ -249,7 +251,7 @@ function LeaveBalanceReport() {
     )
 }
 
-// ADDED: تبويب الحضور والغياب الشهري مع فلتر الشهر وإجماليات
+// --- MonthlyAttendanceReport Component ---
 function MonthlyAttendanceReport() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -257,10 +259,8 @@ function MonthlyAttendanceReport() {
     const [year, setYear] = useState(new Date().getFullYear().toString());
     const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
 
-    // Fetch all active employees
     const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     
-    // Fetch attendance for the selected month and year
     const attendanceQuery = useMemo(() => {
         if (!firestore) return null;
         return [
@@ -272,7 +272,6 @@ function MonthlyAttendanceReport() {
 
     const loading = employeesLoading || attendanceLoading;
 
-    // IMPROVED: عرض نسبة الحضور + تنبيه للغياب الكثير (اختياري)
     const reportData = useMemo(() => {
         if (!attendanceData || !employees) return [];
         const employeeMap = new Map(employees.map(e => [e.id, e]));
@@ -385,7 +384,7 @@ function MonthlyAttendanceReport() {
     );
 }
 
-// ADDED: تبويب الرواتب والمستحقات الشهرية مع فلتر الشهر + إجماليات + تنبيه للمتأخر
+// --- MonthlyPayrollReport Component ---
 function MonthlyPayrollReport() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -405,11 +404,11 @@ function MonthlyPayrollReport() {
         if (!payslips || !employees) return [];
         return payslips.map(p => {
             const employee = employees.find(e => e.id === p.employeeId);
-            const totalEarnings = (p.earnings?.basicSalary || 0) + (p.earnings?.housingAllowance || 0) + (p.earnings?.transportAllowance || 0) + (p.earnings?.commission || 0);
-            const totalDeductions = (p.deductions?.absenceDeduction || 0) + (p.deductions?.otherDeductions || 0);
+            const totalEarnings = (p.earnings.basicSalary || 0) + (p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0) + (p.earnings.commission || 0);
+            const totalDeductions = (p.deductions.absenceDeduction || 0) + (p.deductions.otherDeductions || 0);
             return {
                 ...p,
-                employeeName: employee?.fullName || p.employeeName,
+                employeeName: employee ? employee.fullName : p.employeeName,
                 employeeNumber: employee?.employeeNumber || '-',
                 department: employee?.department || '-',
                 totalEarnings,
@@ -502,6 +501,122 @@ function MonthlyPayrollReport() {
     );
 }
 
+// ADDED: تبويب السلف والاستقطاعات الشهرية
+function AdvancesAndDeductionsReport() {
+    const { journalEntries, employees, accounts, loading } = useAnalyticalData();
+    const { toast } = useToast();
+    const [year, setYear] = useState(new Date().getFullYear().toString());
+    const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+
+    const reportData = useMemo(() => {
+        if (loading || !employees.length || !accounts.length) return [];
+        
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+
+        const employeeMap = new Map(employees.map(e => [e.id, e]));
+        const advancesAccount = accounts.find(a => a.code === '110302'); // سلف الموظفين
+        if (!advancesAccount) return [];
+        
+        const advances = journalEntries.filter(entry => {
+            const entryDate = toFirestoreDate(entry.date);
+            return entryDate && entryDate >= startDate && entryDate <= endDate && entry.status === 'posted';
+        })
+        .flatMap(entry => 
+            entry.lines.filter(line => line.accountId === advancesAccount.id && (line.debit || 0) > 0 && line.auto_resource_id)
+            .map(line => ({
+                id: entry.id! + '-' + line.accountId,
+                employeeId: line.auto_resource_id!,
+                amount: line.debit,
+                reason: entry.narration,
+                date: toFirestoreDate(entry.date)!,
+            }))
+        );
+
+        return advances.map(adv => {
+            const employee = employeeMap.get(adv.employeeId);
+            return {
+                ...adv,
+                employeeName: employee?.fullName || 'غير معروف',
+                department: employee?.department || '-',
+            };
+        }).sort((a,b) => b.date.getTime() - a.date.getTime());
+
+    }, [journalEntries, employees, accounts, loading, year, month]);
+
+    const totalAmount = useMemo(() => reportData.reduce((sum, item) => sum + item.amount, 0), [reportData]);
+
+    const handlePrint = () => {
+        toast({ title: 'قيد التطوير', description: 'سيتم إضافة خاصية الطباعة قريبًا.' });
+    };
+    
+    const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    
+    return (
+        <Card>
+             <CardHeader className="flex-row items-center justify-between">
+                <div>
+                    <CardTitle>تقرير السلف والاستقطاعات</CardTitle>
+                    <CardDescription>السلف النقدية المقدمة للموظفين خلال الشهر.</CardDescription>
+                </div>
+                <Button variant="outline" onClick={handlePrint}><Printer className="ml-2 h-4"/> طباعة</Button>
+            </CardHeader>
+             <CardContent>
+                <div className="flex flex-wrap gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
+                    <div className="grid gap-2">
+                        <Label htmlFor="year-filter-advances">السنة</Label>
+                        <Select value={year} onValueChange={setYear}>
+                            <SelectTrigger id="year-filter-advances" className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="month-filter-advances">الشهر</Label>
+                        <Select value={month} onValueChange={setMonth}>
+                            <SelectTrigger id="month-filter-advances" className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                 <div className="border rounded-lg">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>اسم الموظف</TableHead>
+                                <TableHead>القسم</TableHead>
+                                <TableHead>تاريخ السلفة</TableHead>
+                                <TableHead>البيان</TableHead>
+                                <TableHead className="text-left">المبلغ</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                         <TableBody>
+                            {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full"/></TableCell></TableRow>)}
+                            {!loading && reportData.length === 0 && <TableRow><TableCell colSpan={5} className="h-24 text-center">لا توجد سلف أو استقطاعات لهذا الشهر.</TableCell></TableRow>}
+                            {!loading && reportData.map(item => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="font-medium">{item.employeeName}</TableCell>
+                                    <TableCell>{item.department}</TableCell>
+                                    <TableCell>{format(item.date, 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{item.reason}</TableCell>
+                                    <TableCell className="text-left font-mono">{formatCurrency(item.amount)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow className="font-bold text-base">
+                                <TableCell colSpan={4}>إجمالي السلف والاستقطاعات</TableCell>
+                                <TableCell className="text-left font-mono">{formatCurrency(totalAmount)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                 </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+
 // Main Page Component
 export default function HrReportsPage() {
     return (
@@ -512,11 +627,12 @@ export default function HrReportsPage() {
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="general" dir="rtl">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="general">الموظفين العام</TabsTrigger>
                         <TabsTrigger value="leave-balance">أرصدة الإجازات</TabsTrigger>
                         <TabsTrigger value="attendance">الحضور والغياب</TabsTrigger>
-                        <TabsTrigger value="payroll">الرواتب والمستحقات</TabsTrigger>
+                        <TabsTrigger value="payroll">الرواتب الشهرية</TabsTrigger>
+                        <TabsTrigger value="advances">السلف والاستقطاعات</TabsTrigger>
                     </TabsList>
                     <TabsContent value="general" className="mt-4">
                         <GeneralEmployeeReport />
@@ -529,6 +645,9 @@ export default function HrReportsPage() {
                     </TabsContent>
                     <TabsContent value="payroll" className="mt-4">
                         <MonthlyPayrollReport />
+                    </TabsContent>
+                    <TabsContent value="advances" className="mt-4">
+                        <AdvancesAndDeductionsReport />
                     </TabsContent>
                 </Tabs>
             </CardContent>
