@@ -1,6 +1,8 @@
 
 
 
+
+
 export interface Company {
     id?: string;
     name: string;
@@ -718,4 +720,41 @@ export interface PaymentMethod {
     expenseAccountId: string;
     expenseAccountName: string;
 }
+
+// INVENTORY TYPES
+export interface Warehouse {
+  id?: string;
+  name: string;
+  location?: string;
+  isDefault?: boolean;
+}
+
+export interface ItemCategory {
+  id?: string;
+  name: string;
+  parentCategoryId?: string | null;
+}
+
+export interface Item {
+  id?: string;
+  name: string;
+  description?: string;
+  sku: string; // Stock Keeping Unit
+  categoryId: string;
+  itemType: 'storable' | 'consumable' | 'service';
+  unitOfMeasure: string; // e.g., 'piece', 'kg', 'box'
+  costPrice?: number;
+  sellingPrice?: number;
+  reorderLevel?: number; // Minimum stock level to trigger reorder
+  expiryTracked?: boolean;
+  createdAt: any;
+}
+
+export interface StockLevel {
+    itemId: string;
+    warehouseId: string;
+    quantity: number;
+    lastUpdated: any;
+}
     
+```
