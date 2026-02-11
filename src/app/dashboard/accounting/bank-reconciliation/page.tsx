@@ -29,19 +29,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Upload, AlertCircle, Check, Link2, Sparkles, Wand2 } from 'lucide-react';
+import { Loader2, Upload, AlertCircle, Check, Link2, Sparkles, Wand2, GitMerge } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import type { Account, JournalEntry } from '@/lib/types';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { startOfMonth, endOfMonth, parse, isValid, format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { reconcileBankStatementFlow, type ReconciliationOutput } from '@/ai/flows/reconcile-bank-statement';
 import { Separator } from '@/components/ui/separator';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { GroupedReconciliationDialog } from '@/components/accounting/grouped-reconciliation-dialog';
 
 
 interface BankTransaction {
@@ -51,8 +52,8 @@ interface BankTransaction {
   amount: number;
 }
 
-interface SystemTransaction {
-  id: string;
+interface SystemTransactionView {
+  id: string; // This will be the JournalEntry ID
   date: Date;
   description: string;
   amount: number;
@@ -72,16 +73,20 @@ export default function BankReconciliationPage() {
     
     // Data states
     const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
-    const [systemTransactions, setSystemTransactions] = useState<SystemTransaction[]>([]);
+    const [systemJournalEntries, setSystemJournalEntries] = useState<JournalEntry[]>([]);
     
     // Processing states
     const [isFileLoading, setIsFileLoading] = useState(false);
     const [isReconciling, setIsReconciling] = useState(false);
+    const [isProcessingManualMatch, setIsProcessingManualMatch] = useState(false);
+
 
     // Result and selection states
     const [reconciliationResult, setReconciliationResult] = useState<ReconciliationOutput | null>(null);
     const [selectedBankTx, setSelectedBankTx] = useState<string | null>(null);
-    const [selectedSystemTx, setSelectedSystemTx] = useState<string | null>(null);
+    const [selectedSystemTxs, setSelectedSystemTxs] = useState<string[]>([]);
+    const [isGroupMatchOpen, setIsGroupMatchOpen] = useState(false);
+
 
     const bankAccountOptions = useMemo(() => 
         accounts
@@ -91,7 +96,7 @@ export default function BankReconciliationPage() {
 
     const fetchSystemTransactions = useCallback(async () => {
         if (!bankAccountId || !dateFrom || !dateTo || !firestore) {
-            setSystemTransactions([]);
+            setSystemJournalEntries([]);
             return;
         }
 
@@ -102,30 +107,34 @@ export default function BankReconciliationPage() {
         const entriesQuery = query(
             collection(firestore, 'journalEntries'),
             where('status', '==', 'posted'),
-            // where('reconciliationStatus', '!=', 'reconciled'), // We will handle this client side for now
+            where('reconciliationStatus', '!=', 'reconciled'),
             where('date', '>=', startDate),
             where('date', '<=', endDate)
         );
 
         const entriesSnap = await getDocs(entriesQuery);
-        const relevantTransactions = entriesSnap.docs.flatMap(doc => {
-            const entry = doc.data() as JournalEntry;
-            return entry.lines
-                .filter(line => line.accountId === bankAccountId)
-                .map(line => ({
-                    id: `${doc.id}|${line.debit > 0 ? 'd' : 'c'}`,
-                    date: toFirestoreDate(entry.date)!,
-                    description: entry.narration,
-                    amount: (line.debit || 0) - (line.credit || 0),
-                    entryNumber: entry.entryNumber,
-                }));
-        });
-        setSystemTransactions(relevantTransactions);
+        const relevantTransactions = entriesSnap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry))
+            .filter(entry => entry.lines.some(line => line.accountId === bankAccountId));
+        setSystemJournalEntries(relevantTransactions);
     }, [bankAccountId, dateFrom, dateTo, firestore]);
 
     useEffect(() => {
         fetchSystemTransactions();
     }, [fetchSystemTransactions]);
+    
+    const systemTransactionsForDisplay = useMemo((): SystemTransactionView[] => {
+      return systemJournalEntries.map(entry => {
+        const line = entry.lines.find(l => l.accountId === bankAccountId)!;
+        return {
+            id: entry.id!,
+            date: toFirestoreDate(entry.date)!,
+            description: entry.narration,
+            amount: (line.debit || 0) - (line.credit || 0),
+            entryNumber: entry.entryNumber,
+        };
+      });
+    }, [systemJournalEntries, bankAccountId]);
 
 
     const handleFileProcess = async (file: File) => {
@@ -194,7 +203,7 @@ export default function BankReconciliationPage() {
     };
     
     const handleAiReconciliation = async () => {
-        if (bankTransactions.length === 0 || systemTransactions.length === 0) {
+        if (bankTransactions.length === 0 || systemTransactionsForDisplay.length === 0) {
             toast({ title: 'بيانات غير كافية', description: 'يجب رفع ملف البنك ووجود حركات في النظام أولاً.'});
             return;
         }
@@ -203,7 +212,7 @@ export default function BankReconciliationPage() {
         try {
             const result = await reconcileBankStatementFlow({
                 bankTransactions: bankTransactions.map(tx => ({...tx, date: tx.date.toISOString()})),
-                systemTransactions: systemTransactions.map(tx => ({...tx, date: tx.date.toISOString(), amount: -tx.amount, description: tx.description || tx.entryNumber})),
+                systemTransactions: systemTransactionsForDisplay.map(tx => ({...tx, date: tx.date.toISOString(), amount: -tx.amount, description: tx.description || tx.entryNumber})),
             });
             setReconciliationResult(result);
              toast({ title: 'نجاح', description: `تمت مطابقة ${result.matchedPairs.length} حركة بنجاح.` });
@@ -214,26 +223,103 @@ export default function BankReconciliationPage() {
             setIsReconciling(false);
         }
     };
+
+    const handleSystemTxSelect = (txId: string) => {
+        setSelectedSystemTxs(prev =>
+            prev.includes(txId)
+                ? prev.filter(id => id !== txId)
+                : [...prev, txId]
+        );
+    };
+
+    const handleManualMatch = async () => {
+        if (!selectedBankTx || selectedSystemTxs.length !== 1 || !firestore) return;
+        
+        setIsProcessingManualMatch(true);
+        try {
+            const systemTxId = selectedSystemTxs[0];
+            const bankTx = bankTransactions.find(btx => btx.id === selectedBankTx);
+            const systemTx = systemTransactionsForDisplay.find(stx => stx.id === systemTxId);
+
+            if (!bankTx || !systemTx) throw new Error("لم يتم العثور على الحركات المختارة.");
+
+            // Check if amounts match (with opposite signs)
+            if (Math.abs(bankTx.amount + systemTx.amount) > 0.01) {
+                toast({ variant: 'destructive', title: 'المبالغ غير متطابقة', description: 'لا يمكن مطابقة حركتين بمبالغ مختلفة.' });
+                return;
+            }
+
+            await updateDoc(doc(firestore, 'journalEntries', systemTxId), {
+                reconciliationStatus: 'reconciled',
+                reconciliationInfo: {
+                    reconciledAt: new Date(),
+                    bankTransactionId: bankTx.id,
+                }
+            });
+            
+            toast({ title: 'نجاح', description: 'تمت مطابقة الحركة بنجاح.' });
+            
+            // Refresh local state
+            setBankTransactions(prev => prev.filter(btx => btx.id !== selectedBankTx));
+            setSystemJournalEntries(prev => prev.filter(stx => stx.id !== systemTxId));
+            setSelectedBankTx(null);
+            setSelectedSystemTxs([]);
+
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في إتمام المطابقة اليدوية.' });
+        } finally {
+            setIsProcessingManualMatch(false);
+        }
+    };
     
     const { unmatchedBank, unmatchedSystem, matchedPairs } = useMemo(() => {
         if (!reconciliationResult) {
-            return { unmatchedBank: bankTransactions, unmatchedSystem: systemTransactions, matchedPairs: [] };
+            return { unmatchedBank: bankTransactions, unmatchedSystem: systemTransactionsForDisplay, matchedPairs: [] };
         }
         const matchedBankIds = new Set(reconciliationResult.matchedPairs.map(p => p.bankTransactionId));
         const matchedSystemIds = new Set(reconciliationResult.matchedPairs.map(p => p.systemTransactionId));
         
         return {
             unmatchedBank: bankTransactions.filter(tx => !matchedBankIds.has(tx.id)),
-            unmatchedSystem: systemTransactions.filter(tx => !matchedSystemIds.has(tx.id)),
+            unmatchedSystem: systemTransactionsForDisplay.filter(tx => !matchedSystemIds.has(tx.id)),
             matchedPairs: reconciliationResult.matchedPairs.map(pair => ({
                 bankTx: bankTransactions.find(btx => btx.id === pair.bankTransactionId)!,
-                systemTx: systemTransactions.find(stx => stx.id === pair.systemTransactionId)!,
+                systemTx: systemTransactionsForDisplay.find(stx => stx.id === pair.systemTransactionId)!,
                 confidence: pair.confidence,
             })).filter(p => p.bankTx && p.systemTx),
         };
-    }, [bankTransactions, systemTransactions, reconciliationResult]);
+    }, [bankTransactions, systemTransactionsForDisplay, reconciliationResult]);
+
+    const selectedSystemTotal = useMemo(() => {
+        if (selectedSystemTxs.length === 0) return 0;
+        return selectedSystemTxs.reduce((sum, id) => {
+            const tx = systemTransactionsForDisplay.find(t => t.id === id);
+            return sum + Math.abs(tx?.amount || 0); 
+        }, 0);
+    }, [selectedSystemTxs, systemTransactionsForDisplay]);
+    
+    const selectedBankAmount = useMemo(() => {
+        if (!selectedBankTx) return 0;
+        return bankTransactions.find(t => t.id === selectedBankTx)?.amount || 0;
+    }, [selectedBankTx, bankTransactions]);
+
+    const calculatedFee = useMemo(() => {
+        if (selectedSystemTotal > 0 && selectedBankAmount > 0) {
+            return selectedSystemTotal - selectedBankAmount;
+        }
+        return 0;
+    }, [selectedSystemTotal, selectedBankAmount]);
+
+    const handleGroupMatchSuccess = () => {
+        fetchSystemTransactions(); // Re-fetch to get updated statuses
+        setBankTransactions(prev => prev.filter(btx => btx.id !== selectedBankTx));
+        setSelectedBankTx(null);
+        setSelectedSystemTxs([]);
+    };
+
 
     return (
+        <>
         <Card dir="rtl">
             <CardHeader>
                 <CardTitle>التسوية البنكية</CardTitle>
@@ -275,7 +361,7 @@ export default function BankReconciliationPage() {
                             <CardTitle>2. المطابقة الذكية</CardTitle>
                         </CardHeader>
                         <CardContent>
-                           <Button onClick={handleAiReconciliation} disabled={isReconciling || bankTransactions.length === 0 || systemTransactions.length === 0} className="w-full">
+                           <Button onClick={handleAiReconciliation} disabled={isReconciling || bankTransactions.length === 0 || systemTransactionsForDisplay.length === 0} className="w-full">
                                {isReconciling ? <Loader2 className="animate-spin ml-2" /> : <Sparkles className="ml-2"/>}
                                مطابقة تلقائية بالذكاء الاصطناعي
                            </Button>
@@ -287,6 +373,32 @@ export default function BankReconciliationPage() {
                 </div>
                 
                 <Separator />
+                
+                <div className="flex flex-col items-center justify-center gap-4 p-4 border rounded-lg bg-muted/50">
+                    <div className="flex flex-wrap items-center justify-center gap-4">
+                        <div className="text-center">
+                            <p className="text-sm text-muted-foreground">إجمالي الحركات المحددة</p>
+                            <p className="text-xl font-bold text-green-600">{formatCurrency(selectedSystemTotal)}</p>
+                        </div>
+                        <div className="text-2xl font-bold text-muted-foreground">-</div>
+                        <div className="text-center">
+                            <p className="text-sm text-muted-foreground">مبلغ الإيداع المحدد</p>
+                            <p className="text-xl font-bold">{formatCurrency(selectedBankAmount)}</p>
+                        </div>
+                         <div className="text-2xl font-bold text-muted-foreground">=</div>
+                        <div className="text-center">
+                            <p className="text-sm text-muted-foreground">الرسوم/الفرق</p>
+                            <p className={cn("text-xl font-bold", calculatedFee >= 0 ? 'text-red-600' : 'text-blue-600')}>
+                                {formatCurrency(calculatedFee)}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex gap-4">
+                         <Button onClick={handleManualMatch} disabled={isProcessingManualMatch || !selectedBankTx || selectedSystemTxs.length !== 1}><Link2 className="ml-2"/> مطابقة يدوية (1-to-1)</Button>
+                         <Button variant="secondary" onClick={() => setIsGroupMatchOpen(true)} disabled={isProcessingManualMatch || !selectedBankTx || selectedSystemTxs.length < 2}><GitMerge className="ml-2"/> مطابقة مجمّعة (للوسيط)</Button>
+                    </div>
+                </div>
+
                 <h3 className="text-lg font-semibold text-center">نتائج التسوية</h3>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -296,7 +408,7 @@ export default function BankReconciliationPage() {
                             <Table>
                                 {unmatchedBank.map(tx => (
                                     <TableRow key={tx.id}>
-                                        <TableCell><Checkbox checked={selectedBankTx === tx.id} onCheckedChange={() => setSelectedBankTx(tx.id)}/></TableCell>
+                                        <TableCell><Checkbox checked={selectedBankTx === tx.id} onCheckedChange={() => setSelectedBankTx(prev => prev === tx.id ? null : tx.id)}/></TableCell>
                                         <TableCell>{format(tx.date, 'dd/MM')}<br/><span className="text-xs text-muted-foreground">{tx.description}</span></TableCell>
                                         <TableCell className="text-left font-mono">{formatCurrency(tx.amount)}</TableCell>
                                     </TableRow>
@@ -310,7 +422,7 @@ export default function BankReconciliationPage() {
                              <Table>
                                 {unmatchedSystem.map(tx => (
                                     <TableRow key={tx.id}>
-                                        <TableCell><Checkbox checked={selectedSystemTx === tx.id} onCheckedChange={() => setSelectedSystemTx(tx.id)}/></TableCell>
+                                        <TableCell><Checkbox checked={selectedSystemTxs.includes(tx.id)} onCheckedChange={() => handleSystemTxSelect(tx.id)}/></TableCell>
                                         <TableCell>{format(tx.date, 'dd/MM')}<br/><span className="text-xs text-muted-foreground">{tx.description}</span></TableCell>
                                         <TableCell className="text-left font-mono">{formatCurrency(tx.amount)}</TableCell>
                                     </TableRow>
@@ -319,9 +431,6 @@ export default function BankReconciliationPage() {
                         </CardContent>
                     </Card>
                 </div>
-                 <div className="text-center">
-                    <Button disabled={!selectedBankTx || !selectedSystemTx}><Link2 className="ml-2"/> مطابقة يدوية</Button>
-                 </div>
                 
                  <Card>
                     <CardHeader><CardTitle>الحركات التي تمت مطابقتها</CardTitle></CardHeader>
@@ -341,5 +450,18 @@ export default function BankReconciliationPage() {
                 </Card>
             </CardContent>
         </Card>
+        {isGroupMatchOpen && selectedBankTx && (
+             <GroupedReconciliationDialog
+                isOpen={isGroupMatchOpen}
+                onClose={() => setIsGroupMatchOpen(false)}
+                onSuccess={handleGroupMatchSuccess}
+                bankTx={bankTransactions.find(btx => btx.id === selectedBankTx)!}
+                systemJEs={systemJournalEntries.filter(je => selectedSystemTxs.includes(je.id!))}
+                bankAccountId={bankAccountId}
+                accounts={accounts}
+             />
+        )}
+        </>
     );
 }
+
