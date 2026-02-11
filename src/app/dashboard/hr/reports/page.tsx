@@ -1,10 +1,17 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator, Wallet, UserX } from 'lucide-react';
+import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator, Wallet, UserX, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const reportList = [
+    { 
+        title: 'الإحصائيات العامة', 
+        description: 'نظرة عامة سريعة على أهم مؤشرات أداء الموارد البشرية.', 
+        href: '/dashboard/hr/reports/general-stats', 
+        icon: BarChart3,
+        color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-300'
+    },
     { 
         title: 'تقرير الموظفين العام', 
         description: 'عرض بيانات الموظفين مع فلاتر متقدمة.', 
