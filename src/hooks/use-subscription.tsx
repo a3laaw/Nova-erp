@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { type QueryConstraint } from 'firebase/firestore';
 import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
+import { cleanFirestoreData } from '@/lib/utils';
 
 const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 
 export function useSubscription<T extends { id?: string }>(
   firestore: any,
-  collectionPath: string, 
+  collectionPath: string | null, 
   constraints: QueryConstraint[] = EMPTY_CONSTRAINTS
 ): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
     const [data, setData] = useState<T[]>([]);
@@ -85,8 +86,8 @@ export function useSubscription<T extends { id?: string }>(
                 if (isMounted) {
                     setData(newData);
                     setError(null);
-                    const plainData = JSON.parse(JSON.stringify(newData));
-                    cache.set(cacheKey, plainData); // Update cache on new data
+                    const plainData = cleanFirestoreData(newData); // Update cache on new data
+                    cache.set(cacheKey, plainData);
                     if (isFirstLoad) {
                         setLoading(false);
                         isFirstLoad = false;

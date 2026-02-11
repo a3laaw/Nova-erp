@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { cache } from '@/lib/cache/smart-cache';
 import { useSyncStatus } from '@/context/sync-context';
+import { cleanFirestoreData } from '@/lib/utils';
 
 export function useDocument<T extends { id?: string }>(
   firestore: any,
@@ -40,7 +41,7 @@ export function useDocument<T extends { id?: string }>(
           setError(null);
           if (newData !== null) {
             // Sanitize before setting to cache to ensure serializability
-            const plainData = JSON.parse(JSON.stringify(newData));
+            const plainData = cleanFirestoreData(newData);
             cache.set(cacheKey, plainData);
           } else {
              cache.invalidate(cacheKey);

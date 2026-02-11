@@ -107,13 +107,17 @@ export function cleanFirestoreData(obj: any): any {
   if (obj === null || obj === undefined) {
     return obj;
   }
+  
+  // Convert Firestore Timestamps to JS Date objects for serialization
+  if (obj && typeof obj.toDate === 'function') {
+    return obj.toDate();
+  }
 
   if (Array.isArray(obj)) {
     return obj.map(v => cleanFirestoreData(v));
   }
 
-  // Do not recurse into Date or Timestamp objects
-  if (typeof obj !== 'object' || obj instanceof Date || (obj.constructor && obj.constructor.name === 'Timestamp')) {
+  if (typeof obj !== 'object' || obj instanceof Date) {
     return obj;
   }
 
