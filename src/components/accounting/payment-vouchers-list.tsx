@@ -157,15 +157,15 @@ export function PaymentVouchersList() {
                 <div className="grid gap-2">
                     <Label htmlFor="dateFrom">من تاريخ</Label>
                     <DateInput 
-                        value={dateFrom}
-                        onChange={setDateFrom}
+                        value={dateFrom ? new Date(dateFrom) : undefined}
+                        onChange={(d) => setDateFrom(d ? d.toISOString().split('T')[0] : '')}
                     />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="dateTo">إلى تاريخ</Label>
                     <DateInput 
-                        value={dateTo}
-                        onChange={setDateTo}
+                        value={dateTo ? new Date(dateTo) : undefined}
+                        onChange={(d) => setDateTo(d ? d.toISOString().split('T')[0] : '')}
                     />
                 </div>
             </div>

@@ -220,7 +220,9 @@ export default function NewJournalEntryPage() {
                 totalCredit,
                 status: 'draft',
                 createdAt: serverTimestamp(),
-                createdBy: currentUser.id
+                createdBy: currentUser.id,
+                clientId: data.lines.some(l => l.projectLink) ? data.lines.find(l => l.projectLink)!.projectLink!.split('/')[0] : undefined,
+                transactionId: data.lines.some(l => l.projectLink) ? data.lines.find(l => l.projectLink)!.projectLink!.split('/')[1] : undefined,
             }));
         });
         
@@ -286,7 +288,7 @@ export default function NewJournalEntryPage() {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('5');
+                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('51');
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>

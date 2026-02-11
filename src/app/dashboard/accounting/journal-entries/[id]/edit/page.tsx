@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -295,7 +294,7 @@ export default function EditJournalEntryPage() {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('5');
+                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('51');
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
