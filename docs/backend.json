@@ -511,7 +511,7 @@
         "hireDate": { "type": "string", "format": "date-time" },
         "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
-        "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
+        "terminationReason": { "type": "string", "enum": ["resignation", "termination", "probation", null] },
         "contractType": { "type": "string", "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special"] },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
         "pieceRateMode": {
