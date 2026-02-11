@@ -36,6 +36,7 @@ import {
   LineChart,
   ClipboardCheck,
   Bot,
+  Scale,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -73,8 +74,7 @@ const navItems = {
         { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية' },
       ]
     },
-    { href: '/dashboard/projects', label: 'المشاريع', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
-    { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
     { 
       label: 'المحاسبة', 
@@ -94,12 +94,11 @@ const navItems = {
             { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
           ]
         },
+        { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: Scale },
         {
           label: 'التقارير المالية',
           children: [
             { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير المالي اليومي' },
-            { href: '/dashboard/accounting/bank-reconciliation', label: 'التسوية البنكية' },
-            { href: '/dashboard/accounting/intermediary-reconciliation', label: 'تسوية شركات الوساطة' },
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
@@ -182,12 +181,11 @@ const navItems = {
             { href: '/dashboard/accounting/invoices', label: 'Invoices' },
           ]
         },
+        { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation', icon: Scale },
         {
           label: 'Financial Reports',
           children: [
             { href: '/dashboard/accounting/reports/daily-summary', label: 'Daily Financial Report' },
-            { href: '/dashboard/accounting/bank-reconciliation', label: 'Bank Reconciliation' },
-            { href: '/dashboard/accounting/intermediary-reconciliation', label: 'Intermediary Reconciliation' },
             { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
             { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
             { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
