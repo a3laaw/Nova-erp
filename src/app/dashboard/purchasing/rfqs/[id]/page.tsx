@@ -1,0 +1,105 @@
+'use client';
+import { useMemo, useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
+import { doc, collection, query, where, orderBy } from 'firebase/firestore';
+import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, FileText, GanttChartSquare } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toFirestoreDate } from '@/services/date-converter';
+import { format } from 'date-fns';
+import { SupplierQuotationCard } from '@/components/purchasing/supplier-quotation-card';
+
+export default function RfqDetailsPage() {
+    const params = useParams();
+    const router = useRouter();
+    const { firestore } = useFirebase();
+    const id = Array.isArray(params.id) ? params.id[0] : params.id;
+
+    const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
+    const { data: rfq, loading: rfqLoading, error } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
+
+    const vendorsQuery = useMemo(() => {
+        if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) return null;
+        return [where('__name__', 'in', rfq.vendorIds)];
+    }, [firestore, rfq?.vendorIds]);
+    const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', vendorsQuery || []);
+    
+    const supplierQuotesQuery = useMemo(() => {
+        if (!firestore || !id) return null;
+        return [where('rfqId', '==', id)];
+    }, [firestore, id]);
+    const { data: supplierQuotations, loading: quotesLoading } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations', supplierQuotesQuery || []);
+
+    const loading = rfqLoading || vendorsLoading || quotesLoading;
+
+    if (loading) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-24 w-full" />
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                </div>
+            </div>
+        );
+    }
+    
+    if (!rfq) {
+        return <div className="text-center py-10">لم يتم العثور على طلب التسعير.</div>;
+    }
+
+    return (
+        <div className="space-y-6" dir="rtl">
+             <Card>
+                <CardHeader>
+                     <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                                <FileText />
+                                {`طلب تسعير #${rfq.rfqNumber}`}
+                            </CardTitle>
+                            <CardDescription>
+                                تاريخ الطلب: {toFirestoreDate(rfq.date) ? format(toFirestoreDate(rfq.date)!, 'PPP') : '-'}
+                            </CardDescription>
+                        </div>
+                         <Button variant="outline" onClick={() => router.back()}><ArrowRight className="ml-2 h-4"/> العودة للقائمة</Button>
+                    </div>
+                </CardHeader>
+                 <CardContent>
+                    <h3 className="font-semibold mb-2">الأصناف المطلوبة ({rfq.items.length})</h3>
+                     <div className="border rounded-md">
+                        {rfq.items.map(item => (
+                            <div key={item.internalItemId} className="flex justify-between items-center p-3 border-b last:border-b-0">
+                                <span className="font-medium">{item.itemName}</span>
+                                <span className="text-sm font-mono bg-muted px-2 py-1 rounded-md">{item.quantity}</span>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><GanttChartSquare /> عروض أسعار الموردين</CardTitle>
+                    <CardDescription>أدخل عروض الأسعار المستلمة من الموردين أدناه للبدء في المقارنة.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {vendors.map(vendor => {
+                        const existingQuote = supplierQuotations.find(q => q.vendorId === vendor.id);
+                        return (
+                            <SupplierQuotationCard 
+                                key={vendor.id}
+                                rfq={rfq}
+                                vendor={vendor}
+                                existingQuote={existingQuote}
+                            />
+                        )
+                    })}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}

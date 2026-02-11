@@ -154,7 +154,11 @@ export function RfqsList() {
                 ) : (
                     filteredRfqs.map((rfq) => (
                         <TableRow key={rfq.id}>
-                            <TableCell className="font-mono">{rfq.rfqNumber}</TableCell>
+                            <TableCell className="font-mono">
+                                <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="hover:underline text-primary">
+                                    {rfq.rfqNumber}
+                                </Link>
+                            </TableCell>
                             <TableCell>{formatDate(rfq.date)}</TableCell>
                             <TableCell className="text-center">{rfq.vendorIds?.length || 0}</TableCell>
                             <TableCell className="text-center">{rfq.items?.length || 0}</TableCell>
@@ -168,8 +172,12 @@ export function RfqsList() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" dir="rtl">
                                         <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                        <DropdownMenuItem disabled>عرض ومقارنة</DropdownMenuItem>
-                                        <DropdownMenuItem disabled>تعديل</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/purchasing/rfqs/${rfq.id}`)}>
+                                            <Eye className="ml-2 h-4 w-4"/> عرض ومقارنة
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem disabled>
+                                            <Pencil className="ml-2 h-4 w-4"/> تعديل
+                                        </DropdownMenuItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => setItemToDelete(rfq)} className="text-destructive focus:text-destructive">
                                             <Trash2 className="ml-2 h-4 w-4" /> حذف

@@ -645,6 +645,41 @@ export interface QuotationItem {
   condition?: string;
 }
 
+export interface RequestForQuotation {
+    id?: string;
+    rfqNumber: string;
+    date: any;
+    status: 'draft' | 'sent' | 'closed' | 'cancelled';
+    vendorIds: string[];
+    items: RfqItem[];
+    createdAt?: any;
+}
+
+export interface RfqItem {
+    id: string;
+    internalItemId: string;
+    itemName: string;
+    quantity: number;
+}
+
+export interface SupplierQuotationItem {
+    rfqItemId: string; // Links to the ID in the RFQ's items array
+    unitPrice: number;
+}
+
+export interface SupplierQuotation {
+    id?: string;
+    rfqId: string;
+    vendorId: string;
+    quotationReference?: string;
+    date: any;
+    deliveryTimeDays?: number;
+    paymentTerms?: string;
+    items: SupplierQuotationItem[];
+    createdAt?: any;
+}
+
+
 export interface Quotation {
   id?: string;
   quotationNumber: string;
@@ -751,11 +786,12 @@ export interface Item {
   createdAt: any;
 }
 
-export interface RfqItem {
-    id: string;
+export interface SupplierItem {
+    id?: string;
+    supplierId: string;
     internalItemId: string;
-    itemName: string;
-    quantity: number;
+    supplierSku: string;
+    supplierItemName?: string;
 }
 
 export interface RequestForQuotation {
@@ -764,7 +800,12 @@ export interface RequestForQuotation {
     date: any;
     status: 'draft' | 'sent' | 'closed' | 'cancelled';
     vendorIds: string[];
-    items: RfqItem[];
+    items: {
+        id: string;
+        internalItemId: string;
+        itemName: string;
+        quantity: number;
+    }[];
 }
 
 export interface SupplierQuotation {
@@ -781,10 +822,37 @@ export interface SupplierQuotation {
     }[];
 }
 
-export interface StockLevel {
-    itemId: string;
+export interface PurchaseOrder {
+    id?: string;
+    poNumber: string;
+    orderDate: any;
+    vendorId: string;
+    vendorName: string;
+    supplierQuotationId?: string;
+    items: {
+        internalItemId: string;
+        itemName: string;
+        quantity: number;
+        unitPrice: number;
+        total: number;
+    }[];
+    totalAmount: number;
+    paymentTerms?: string;
+    notes?: string;
+    status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
+}
+
+export interface GoodsReceiptNote {
+    id?: string;
+    grnNumber: string;
+    purchaseOrderId: string;
     warehouseId: string;
-    quantity: number;
-    lastUpdated: any;
+    date: any;
+    itemsReceived: {
+        internalItemId: string;
+        quantityReceived: number;
+        batchNumber?: string;
+        expiryDate?: any;
+    }[];
 }
     
