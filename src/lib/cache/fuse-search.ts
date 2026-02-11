@@ -36,4 +36,3 @@ export const searchPurchaseOrders = (items: PurchaseOrder[], query: string) => {
 export const searchItems = (items: Item[], query: string) => {
     return cache.search(items, query, ['name', 'sku', 'description'], 0.4);
 };
-```
