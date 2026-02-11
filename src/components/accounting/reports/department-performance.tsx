@@ -22,6 +22,9 @@ export function DepartmentPerformanceReport() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
+  // IMPROVED: Filter for active employees to avoid including terminated ones in calculations.
+  const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
+
   const reportData = useMemo(() => {
     if (loading || !dateFrom || !dateTo) return [];
 
@@ -34,14 +37,14 @@ export function DepartmentPerformanceReport() {
     const projectsPerDept = new Map<string, Set<string>>();
     
     const transactionMap = new Map(transactions.map(t => [t.id, t]));
-    const employeeMap = new Map(employees.map(e => [e.id, e]));
+    const employeeMap = new Map(activeEmployees.map(e => [e.id, e]));
 
     departments.forEach(dept => {
       deptStats.set(dept.id, { id: dept.id, name: dept.name, totalProfit: 0, totalSalaries: 0, netContribution: 0, projectCount: 0 });
       projectsPerDept.set(dept.id, new Set());
     });
     
-    employees.forEach(emp => {
+    activeEmployees.forEach(emp => {
       const dept = departments.find(d => d.name === emp.department);
       if (dept && deptStats.has(dept.id)) {
         const stats = deptStats.get(dept.id)!;
@@ -96,7 +99,7 @@ export function DepartmentPerformanceReport() {
     });
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, employees, accounts, departments, transactions, loading, dateFrom, dateTo]);
+  }, [journalEntries, activeEmployees, accounts, departments, transactions, loading, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4">

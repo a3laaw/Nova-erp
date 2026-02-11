@@ -22,6 +22,9 @@ export function ResourceAnalysisReport() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
+  // IMPROVED: Filter for active employees to avoid including terminated ones in calculations.
+  const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
+
   const reportData = useMemo(() => {
     if (loading || !dateFrom || !dateTo) return [];
     
@@ -34,7 +37,7 @@ export function ResourceAnalysisReport() {
     const engineerStats = new Map<string, ResourceStats>();
     const projectsPerEngineer = new Map<string, Set<string>>();
 
-    employees.forEach(emp => {
+    activeEmployees.forEach(emp => {
       if (emp.id && emp.jobTitle?.includes('مهندس')) {
         const monthlySalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
         engineerStats.set(emp.id, {
@@ -90,7 +93,7 @@ export function ResourceAnalysisReport() {
     });
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, employees, accounts, transactions, loading, dateFrom, dateTo]);
+  }, [journalEntries, activeEmployees, accounts, transactions, loading, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4">

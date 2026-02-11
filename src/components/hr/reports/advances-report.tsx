@@ -22,14 +22,17 @@ export function AdvancesAndDeductionsReport() {
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
+    // IMPROVED: Filter for active employees to avoid including terminated ones in calculations
+    const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
+
     const reportData = useMemo(() => {
-        if (loading || !employees.length || !accounts.length) return [];
+        if (loading || !activeEmployees.length || !accounts.length) return [];
         
         const startDate = dateFrom;
         const endDate = new Date(dateTo!);
         endDate.setHours(23, 59, 59, 999);
 
-        const employeeMap = new Map(employees.map(e => [e.id, e]));
+        const employeeMap = new Map(activeEmployees.map(e => [e.id, e]));
         const advancesAccount = accounts.find(a => a.code === '110302'); // سلف الموظفين
         if (!advancesAccount) return [];
         
@@ -53,7 +56,7 @@ export function AdvancesAndDeductionsReport() {
             return { ...adv, employeeName: employee?.fullName || 'غير معروف', department: employee?.department || '-' };
         }).sort((a,b) => b.date.getTime() - a.date.getTime());
 
-    }, [journalEntries, employees, accounts, loading, dateFrom, dateTo]);
+    }, [journalEntries, activeEmployees, accounts, loading, dateFrom, dateTo]);
     
     const totalAmount = useMemo(() => reportData.reduce((sum, item) => sum + item.amount, 0), [reportData]);
     

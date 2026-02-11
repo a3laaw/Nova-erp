@@ -15,9 +15,8 @@ import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import { useAnalyticalData } from '@/hooks/use-analytical-data';
 
-// ADDED: تبويب التكاليف والمصروفات الشهرية مع فلتر الشهر/السنة + إجماليات + نسبة التكلفة
-// IMPROVED: حساب صافي التكلفة لكل موظف + إجمالي الشركة
 
 const payslipTypeColors: Record<string, string> = {
     Monthly: 'bg-transparent',
@@ -32,18 +31,18 @@ const payslipTypeTranslations: Record<string, string> = {
 export function MonthlyCostsReport() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const { employees, loading: employeesLoadingFromHook } = useAnalyticalData();
     const [year, setYear] = useState(new Date().getFullYear().toString());
     const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
     const [searchQuery, setSearchQuery] = useState('');
     
-    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
     const payslipsQuery = useMemo(() => {
         if (!firestore) return null;
         return [where('year', '==', parseInt(year)), where('month', '==', parseInt(month))];
     }, [firestore, year, month]);
     const { data: payslips, loading: payslipsLoading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
 
-    const loading = employeesLoading || payslipsLoading;
+    const loading = employeesLoadingFromHook || payslipsLoading;
     
     const reportData = useMemo(() => {
         if (!payslips || !employees) return [];
@@ -63,15 +62,17 @@ export function MonthlyCostsReport() {
                 totalEarnings, 
                 totalDeductions,
                 netCost,
+                // Only include if employee is currently active or was terminated this month
+                isActiveOrRecent: employee ? (employee.status === 'active' || (employee.status === 'terminated' && toFirestoreDate(employee.terminationDate)?.getMonth() === parseInt(month) - 1)) : false
             };
         });
 
         if (!searchQuery) return data;
         return data.filter(p => 
             p.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.employeeNumber.includes(searchQuery)
+            (p.employeeNumber && p.employeeNumber.includes(searchQuery))
         );
-    }, [payslips, employees, searchQuery]);
+    }, [payslips, employees, searchQuery, month]);
     
     const totals = useMemo(() => {
         const netCostTotal = reportData.reduce((sum, p) => sum + p.netCost, 0);
@@ -113,10 +114,7 @@ export function MonthlyCostsReport() {
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>تقرير التكاليف والمصروفات الشهرية</CardTitle>
-                <CardDescription>تحليل لتكلفة الموظفين الإجمالية خلال شهر محدد.</CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>تقرير التكاليف والمصروفات الشهرية</CardTitle><CardDescription>تحليل لتكلفة الموظفين الإجمالية خلال شهر محدد.</CardDescription></CardHeader>
             <CardContent>
                 <div className="flex flex-wrap gap-4 mb-4 p-4 bg-muted/50 rounded-lg justify-between items-end">
                     <div className="flex flex-wrap gap-4">
