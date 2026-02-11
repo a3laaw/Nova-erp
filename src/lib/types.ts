@@ -3,6 +3,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -618,6 +619,7 @@ export interface JournalEntry {
     reconciledAt: any;
     reconciledBy: string;
     bankTransactionId: string;
+    reconciliationEntryId?: string;
   };
   lines: JournalEntryLine[];
   clientId?: string;
@@ -645,6 +647,13 @@ export interface QuotationItem {
   condition?: string;
 }
 
+export interface RfqItem {
+    id: string;
+    internalItemId: string;
+    itemName: string;
+    quantity: number;
+}
+
 export interface RequestForQuotation {
     id?: string;
     rfqNumber: string;
@@ -653,13 +662,6 @@ export interface RequestForQuotation {
     vendorIds: string[];
     items: RfqItem[];
     createdAt?: any;
-}
-
-export interface RfqItem {
-    id: string;
-    internalItemId: string;
-    itemName: string;
-    quantity: number;
 }
 
 export interface SupplierQuotationItem {
@@ -792,54 +794,6 @@ export interface SupplierItem {
     internalItemId: string;
     supplierSku: string;
     supplierItemName?: string;
-}
-
-export interface RequestForQuotation {
-    id?: string;
-    rfqNumber: string;
-    date: any;
-    status: 'draft' | 'sent' | 'closed' | 'cancelled';
-    vendorIds: string[];
-    items: {
-        id: string;
-        internalItemId: string;
-        itemName: string;
-        quantity: number;
-    }[];
-}
-
-export interface SupplierQuotation {
-    id?: string;
-    rfqId: string;
-    vendorId: string;
-    quotationReference: string;
-    date: any;
-    deliveryTimeDays?: number;
-    paymentTerms?: string;
-    items: {
-        rfqItemId: string;
-        unitPrice: number;
-    }[];
-}
-
-export interface PurchaseOrder {
-    id?: string;
-    poNumber: string;
-    orderDate: any;
-    vendorId: string;
-    vendorName: string;
-    supplierQuotationId?: string;
-    items: {
-        internalItemId: string;
-        itemName: string;
-        quantity: number;
-        unitPrice: number;
-        total: number;
-    }[];
-    totalAmount: number;
-    paymentTerms?: string;
-    notes?: string;
-    status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
 }
 
 export interface GoodsReceiptNote {
