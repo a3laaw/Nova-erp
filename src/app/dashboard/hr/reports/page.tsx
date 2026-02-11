@@ -2,6 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
 import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const reportList = [
     { 
@@ -55,15 +56,15 @@ export default function HrReportsDashboard() {
             <CardTitle>تقارير الموارد البشرية</CardTitle>
             <CardDescription>اختر التقرير الذي ترغب في عرضه من القائمة أدناه.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {reportList.map((report) => {
                 const Icon = report.icon;
                 return (
-                    <Link href={report.href} key={report.href} className="group block">
-                        <Card className="h-full transition-all duration-200 group-hover:border-primary group-hover:shadow-lg group-hover:-translate-y-1">
+                    <Link href={report.href} key={report.href} className="group block [perspective:1000px]">
+                        <Card className="h-full transition-all duration-300 ease-out [transform-style:preserve-3d] group-hover:shadow-2xl group-hover:[transform:rotateY(-12deg)_rotateX(4deg)]">
                             <CardHeader>
                                 <div className="flex items-center gap-4">
-                                    <div className={`flex-shrink-0 p-3 rounded-lg ${report.color}`}>
+                                    <div className={cn("flex-shrink-0 p-3 rounded-lg", report.color)}>
                                         <Icon className="h-7 w-7" />
                                     </div>
                                     <CardTitle className="text-base font-bold">{report.title}</CardTitle>
