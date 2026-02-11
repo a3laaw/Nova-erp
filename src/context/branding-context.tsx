@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { useFirebase, useCollection } from '@/firebase';
 import { collection, query, limit, onSnapshot, type DocumentData } from 'firebase/firestore';
+import type { PaymentMethod } from '@/lib/types';
 
 export interface BrandingSettings {
   id: string;
@@ -18,6 +19,7 @@ export interface BrandingSettings {
   watermark_image_url?: string;
   system_background_url?: string;
   financial_statement_notes?: string;
+  payment_methods?: PaymentMethod[];
   work_hours?: {
     general: {
       morning_start_time: string;
@@ -114,5 +116,3 @@ export const useBranding = () => {
   }
   return context;
 };
-
-    

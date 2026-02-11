@@ -115,6 +115,22 @@
                     }
                 }
             }
+        },
+        "payment_methods": {
+            "type": "array",
+            "description": "Configurable payment methods and their associated fees.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "type": { "type": "string", "enum": ["percentage", "fixed"] },
+                    "value": { "type": "number" },
+                    "expenseAccountId": { "type": "string" },
+                    "expenseAccountName": { "type": "string" }
+                },
+                "required": ["id", "name", "type", "value", "expenseAccountId"]
+            }
         }
       },
       "required": ["company_name"]
@@ -578,6 +594,7 @@
             "rejectionReason": { "type": "string", "description": "Reason for rejecting the leave request." },
             "isBackFromLeave": { "type": "boolean", "description": "Indicates if the employee has returned from this specific leave." },
             "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." },
+            "passportReceived": { "type": "boolean", "description": "Indicates if the employee's passport has been received for the leave." },
             "isSalaryPaid": { "type": "boolean", "description": "Indicates if the salary for this leave has been processed." }
         },
         "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
@@ -1212,7 +1229,9 @@
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "receiptDate": { "type": "string", "format": "date-time" },
-        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "K-Net"] },
+        "paymentMethod": { "type": "string", "description": "The name of the payment method used, from settings." },
+        "bankFeeAmount": { "type": "number", "description": "The calculated bank fee for this transaction, if any." },
+        "netAmount": { "type": "number", "description": "The net amount received after deducting bank fees (amount - bankFeeAmount)." },
         "description": { "type": "string" },
         "reference": { "type": "string" },
         "journalEntryId": {
@@ -1510,3 +1529,5 @@
     }
   }
 }
+
+    
