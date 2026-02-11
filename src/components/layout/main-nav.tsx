@@ -100,7 +100,7 @@ const navItems = {
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
-            { href: '/dashboard/accounting/reports', label: 'التقارير المحاسبية' },
+            { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية' },
           ]
         },
         {
@@ -185,7 +185,7 @@ const navItems = {
             { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
             { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
             { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
-            { href: '/dashboard/accounting/reports', label: 'Accounting Reports' },
+            { href: '/dashboard/accounting/reports', label: 'Analytical Reports' },
           ]
         },
         {
