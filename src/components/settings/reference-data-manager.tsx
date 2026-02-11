@@ -47,6 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { defaultDepartments, defaultJobs, defaultGovernorates, defaultAreas, defaultTransactionTypes, defaultWorkStages } from '@/lib/default-reference-data';
 
 
 // --- NEW StatCard Component ---
@@ -128,6 +129,10 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = useState(false);
   const [secondaryOrderValues, setSecondaryOrderValues] = useState<Record<string, string>>({});
   const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = useState(false);
+
+  // States for import
+  const [isImporting, setIsImporting] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
 
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -407,6 +412,97 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     }
   };
 
+    const handleImportDefaults = async () => {
+    if (!firestore) return;
+    setIsImporting(true);
+
+    try {
+        const batch = writeBatch(firestore);
+        
+        const primarySnap = await getDocs(query(collection(firestore, primaryCollectionName)));
+        for (const doc of primarySnap.docs) {
+            if (secondaryCollectionName) {
+                const secondarySnap = await getDocs(query(collection(firestore, `${primaryCollectionName}/${doc.id}/${secondaryCollectionName}`)));
+                secondarySnap.forEach(secDoc => batch.delete(secDoc.ref));
+            }
+            batch.delete(doc.ref);
+        }
+
+        switch(primaryCollectionName) {
+            case 'departments':
+                for (const dept of defaultDepartments) {
+                    const newDeptRef = doc(collection(firestore, 'departments'));
+                    batch.set(newDeptRef, dept);
+                    
+                    const jobsForDept = defaultJobs[dept.name as keyof typeof defaultJobs];
+                    if (jobsForDept && secondaryCollectionName === 'jobs') {
+                        for (const job of jobsForDept) {
+                            const newJobRef = doc(collection(firestore, `${newDeptRef.path}/jobs`));
+                            batch.set(newJobRef, job);
+                        }
+                    }
+                }
+                break;
+            case 'governorates':
+                for (const gov of defaultGovernorates) {
+                    const newGovRef = doc(collection(firestore, 'governorates'));
+                    batch.set(newGovRef, gov);
+                    
+                    const areasForGov = defaultAreas[gov.name as keyof typeof defaultAreas];
+                    if (areasForGov && secondaryCollectionName === 'areas') {
+                        for (const area of areasForGov) {
+                            const newAreaRef = doc(collection(firestore, `${newGovRef.path}/areas`));
+                            batch.set(newAreaRef, area);
+                        }
+                    }
+                }
+                break;
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم استيراد البيانات الافتراضية بنجاح.' });
+        fetchPrimaryItems();
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات.' });
+    } finally {
+        setIsImporting(false);
+        setIsImportConfirmOpen(false);
+    }
+};
+
+const handleImportWorkStages = async () => {
+    if (!firestore) return;
+    setIsImporting(true);
+    try {
+        const batch = writeBatch(firestore);
+        const deptsSnapshot = await getDocs(query(collection(firestore, 'departments')));
+
+        for (const deptDoc of deptsSnapshot.docs) {
+            const deptName = deptDoc.data().name;
+            const stagesForDept = defaultWorkStages[deptName as keyof typeof defaultWorkStages];
+            
+            if (stagesForDept) {
+                const existingStagesSnap = await getDocs(query(collection(firestore, `departments/${deptDoc.id}/workStages`)));
+                existingStagesSnap.forEach(doc => batch.delete(doc.ref));
+                
+                for (const stage of stagesForDept) {
+                    const newStageRef = doc(collection(firestore, `departments/${deptDoc.id}/workStages`));
+                    batch.set(newStageRef, stage);
+                }
+            }
+        }
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم استيراد/تحديث مراحل العمل الافتراضية لجميع الأقسام.' });
+        fetchSecondaryItems();
+    } catch(e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد مراحل العمل.' });
+    } finally {
+        setIsImporting(false);
+        setIsImportConfirmOpen(false);
+    }
+};
 
   return (
     <Card>
@@ -424,7 +520,15 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         <div>
           <div className="flex justify-between items-center mb-2">
             <h4 className="font-semibold">{primaryTitle}</h4>
-            <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+            <div className="flex gap-2">
+                 {secondaryCollectionName !== 'workStages' && (
+                    <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={disablePrimaryActions || isImporting}>
+                        {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                        استيراد الافتراضي
+                    </Button>
+                 )}
+                 <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+            </div>
           </div>
           <ScrollArea className="h-72 border rounded-md">
             {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
@@ -465,7 +569,15 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
                 <h4 className="font-semibold">
                     {selectedPrimary ? `${secondaryTitle} (${selectedPrimary.name})` : `اختر ${primarySingularTitle} لعرض ${secondaryTitle}`}
                 </h4>
-                 <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+                 <div className="flex gap-2">
+                    {secondaryCollectionName === 'workStages' && (
+                        <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
+                            {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                            استيراد مراحل العمل
+                        </Button>
+                    )}
+                    <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+                 </div>
               </div>
               <ScrollArea className="h-72 border rounded-md">
                 {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
@@ -657,6 +769,25 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
+                <AlertDialogDescription>
+                   {secondaryCollectionName === 'workStages' 
+                        ? 'سيتم مسح جميع مراحل العمل الحالية واستبدالها بالقائمة الافتراضية لجميع الأقسام.'
+                        : `سيؤدي هذا الإجراء إلى مسح جميع ${primaryTitle} الحالية واستبدالها بالقائمة الافتراضية. لا يمكن التراجع عن هذا الإجراء.`
+                   }
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={secondaryCollectionName === 'workStages' ? handleImportWorkStages : handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
+                    {isImporting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الاستيراد...</> : 'نعم، قم بالاستيراد'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </Card>
   );
 }
@@ -674,6 +805,8 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   const [editingItem, setEditingItem] = useState<TransactionType | null>(null);
   const [itemToDelete, setItemToDelete] = useState<TransactionType | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+
 
   const [itemName, setItemName] = useState('');
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
@@ -838,6 +971,38 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const handleImportDefaults = async () => {
+    if (!firestore || !departments.length) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'يجب تحميل بيانات الأقسام أولاً.' });
+        return;
+    }
+    setIsImporting(true);
+    try {
+        const batch = writeBatch(firestore);
+        
+        const existingSnap = await getDocs(query(collection(firestore, 'transactionTypes')));
+        existingSnap.forEach(doc => batch.delete(doc.ref));
+
+        const deptsMap = new Map(departments.map(d => [d.name, d.id]));
+
+        for (const type of defaultTransactionTypes) {
+            const newTypeRef = doc(collection(firestore, 'transactionTypes'));
+            const departmentIds = type.departmentNames.map(name => deptsMap.get(name)).filter(Boolean) as string[];
+            batch.set(newTypeRef, { name: type.name, order: type.order, departmentIds });
+        };
+        
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم استيراد أنواع المعاملات الافتراضية.' });
+        fetchData(); // to refresh the list
+    } catch(e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات.' });
+    } finally {
+        setIsImporting(false);
+        setIsImportConfirmOpen(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -849,8 +1014,14 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
       </CardHeader>
       <CardContent>
         <div className="flex justify-between items-center mb-4">
-          <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
-            <Button onClick={handleImportOldTypes} size="sm" variant="outline" disabled={isImporting}>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
+            <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
+                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                استيراد الافتراضي
+            </Button>
+          </div>
+            <Button onClick={handleImportOldTypes} size="sm" variant="secondary" disabled={isImporting}>
                 {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
                 استيراد الأنواع القديمة
             </Button>
@@ -947,6 +1118,23 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
             <AlertDialogFooter>
                 <AlertDialogCancel>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">نعم، حذف</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
+                <AlertDialogDescription>
+                    سيؤدي هذا الإجراء إلى مسح جميع أنواع المعاملات الحالية واستبدالها بالقائمة الافتراضية.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
+                    {isImporting ? 'جاري الاستيراد...' : 'نعم، قم بالاستيراد'}
+                </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1104,5 +1292,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
-    
