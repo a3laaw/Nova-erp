@@ -20,7 +20,7 @@ const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 export function useInfiniteScroll<T extends { id?: string }>(
   collectionPath: string | null,
   constraints: QueryConstraint[] = EMPTY_CONSTRAINTS,
-  orderByField: string = 'createdAt' // Add orderByField parameter
+  orderByField: string = 'createdAt'
 ) {
   const { firestore } = useFirebase();
   const [items, setItems] = useState<T[]>([]);
@@ -29,36 +29,29 @@ export function useInfiniteScroll<T extends { id?: string }>(
   const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
+  
+  const isFetching = useRef(false);
 
-  const fetchItems = useCallback(async (isLoadMore: boolean) => {
-    if (!firestore || !collectionPath || (isLoadMore && !hasMore)) return;
+  const fetchMore = useCallback(() => {
+    if (!firestore || !collectionPath || isFetching.current || !hasMore) return;
 
-    if (isLoadMore) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-      setItems([]); // Reset for new fetches
-      setLastVisible(null);
-      setHasMore(true);
+    isFetching.current = true;
+    setLoadingMore(true);
+    
+    const queryConstraints: QueryConstraint[] = [
+      ...constraints,
+      orderBy(orderByField, 'desc'),
+      limit(PAGE_SIZE),
+    ];
+
+    if (lastVisible) {
+      queryConstraints.push(startAfter(lastVisible));
     }
 
-    try {
-      const queryConstraints: QueryConstraint[] = [
-        ...constraints,
-        orderBy(orderByField, 'desc'), // Use the parameter here
-        limit(PAGE_SIZE),
-      ];
-
-      if (isLoadMore && lastVisible) {
-        queryConstraints.push(startAfter(lastVisible));
-      }
-
-      const q = query(collection(firestore, collectionPath), ...queryConstraints);
-      const snapshot = await getDocs(q);
-
+    const q = query(collection(firestore, collectionPath), ...queryConstraints);
+    getDocs(q).then(snapshot => {
       const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-      
-      setItems(prev => isLoadMore ? [...prev, ...newItems] : newItems);
+      setItems(prev => [...prev, ...newItems]);
       
       const lastDoc = snapshot.docs[snapshot.docs.length - 1];
       setLastVisible(lastDoc || null);
@@ -66,29 +59,57 @@ export function useInfiniteScroll<T extends { id?: string }>(
       if (snapshot.docs.length < PAGE_SIZE) {
         setHasMore(false);
       }
-    } catch (error) {
+    }).catch(error => {
       console.error(`Error fetching from ${collectionPath}:`, error);
-    } finally {
-      setLoading(false);
+    }).finally(() => {
       setLoadingMore(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, collectionPath, JSON.stringify(constraints), hasMore, lastVisible, orderByField]);
+      isFetching.current = false;
+    });
 
-  // Initial Fetch Effect
+  }, [firestore, collectionPath, JSON.stringify(constraints), orderByField, lastVisible, hasMore]);
+  
+  // Effect for resetting and initial fetch
   useEffect(() => {
-    if (collectionPath) {
-        fetchItems(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionPath, JSON.stringify(constraints), orderByField]);
+    if (!firestore || !collectionPath) return;
+
+    setItems([]);
+    setLastVisible(null);
+    setHasMore(true);
+    setLoading(true);
+    isFetching.current = true;
+
+    const queryConstraints: QueryConstraint[] = [
+      ...constraints,
+      orderBy(orderByField, 'desc'),
+      limit(PAGE_SIZE),
+    ];
+
+    const q = query(collection(firestore, collectionPath), ...queryConstraints);
+    getDocs(q).then(snapshot => {
+        const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+        setItems(newItems);
+        
+        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        setLastVisible(lastDoc || null);
+
+        if (snapshot.docs.length < PAGE_SIZE) {
+            setHasMore(false);
+        }
+    }).catch(error => {
+        console.error(`Error fetching from ${collectionPath}:`, error);
+    }).finally(() => {
+        setLoading(false);
+        isFetching.current = false;
+    });
+    
+  }, [collectionPath, JSON.stringify(constraints), orderByField, firestore]);
 
   // Intersection Observer Effect
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchItems(true);
+            fetchMore();
         }
       },
       { threshold: 1.0 }
@@ -104,7 +125,7 @@ export function useInfiniteScroll<T extends { id?: string }>(
         observer.unobserve(loader);
       }
     };
-  }, [hasMore, loadingMore, loading, fetchItems]);
+  }, [hasMore, loadingMore, loading, fetchMore]);
 
   return { items, setItems, loading, loadingMore, hasMore, loaderRef };
 }
