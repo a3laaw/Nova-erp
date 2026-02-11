@@ -55,8 +55,8 @@ const reportList = [
         color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300'
     },
     { 
-        title: 'تكاليف الموظفين الشهرية', 
-        description: 'تحليل تكلفة الرواتب والبدلات لكل موظف.', 
+        title: 'التكاليف والمصروفات السنوية', 
+        description: 'تحليل سنوي لتكاليف الرواتب والبدلات والمستحقات.', 
         href: '/dashboard/hr/reports/costs',
         icon: Wallet,
         color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300'

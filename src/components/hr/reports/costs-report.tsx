@@ -1,139 +1,156 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Employee, Payslip } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Download } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import * as XLSX from 'xlsx';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import Link from 'next/link';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatCurrency } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { calculateGratuity } from '@/services/leave-calculator';
+import { toFirestoreDate } from '@/services/date-converter';
+import { useSubscription, useFirebase } from '@/firebase';
+import { where } from 'firebase/firestore';
+import type { Payslip } from '@/lib/types';
+import { Wallet, Users, HandCoins, FileText, Banknote } from 'lucide-react';
 
+const StatCard = ({ title, value, icon, loading }: { title: string, value: string, icon: React.ReactNode, loading: boolean }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <div className="text-muted-foreground">{icon}</div>
+        </CardHeader>
+        <CardContent>
+            {loading ? <Skeleton className="h-8 w-32" /> : <div className="text-2xl font-bold">{value}</div>}
+        </CardContent>
+    </Card>
+);
 
-const payslipTypeColors: Record<string, string> = {
-    Monthly: 'bg-transparent',
-    Leave: 'bg-sky-100 text-sky-800',
-};
-
-const payslipTypeTranslations: Record<string, string> = {
-    Monthly: 'راتب شهري',
-    Leave: 'راتب إجازة',
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background border p-2 rounded-md shadow-lg">
+        <p className="font-bold">{`${payload[0].name}: ${formatCurrency(payload[0].value)}`}</p>
+      </div>
+    );
+  }
+  return null;
 };
 
 export function MonthlyCostsReport() {
+    const { employees, loading: employeesLoading } = useAnalyticalData();
     const { firestore } = useFirebase();
-    const { toast } = useToast();
-    const { employees, loading: employeesLoadingFromHook } = useAnalyticalData();
     const [year, setYear] = useState(new Date().getFullYear().toString());
-    const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
-    const [searchQuery, setSearchQuery] = useState('');
     
     const payslipsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [where('year', '==', parseInt(year)), where('month', '==', parseInt(month))];
-    }, [firestore, year, month]);
+        if (!firestore || year === 'all') return null;
+        return [where('year', '==', parseInt(year))];
+    }, [firestore, year]);
+
     const { data: payslips, loading: payslipsLoading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
 
-    const loading = employeesLoadingFromHook || payslipsLoading;
-    
+    const loading = employeesLoading || payslipsLoading;
+
     const reportData = useMemo(() => {
-        if (!payslips || !employees) return [];
-        const employeeMap = new Map(employees.map(e => [e.id, e]));
+        if (loading) return null;
+        
+        const activeEmployees = employees.filter(e => e.status === 'active');
+        const payslipsThisYear = year === 'all' ? payslips : payslips.filter(p => p.year.toString() === year);
 
-        const data = payslips.map(p => {
-            const employee = employeeMap.get(p.employeeId);
-            const totalEarnings = (p.earnings.basicSalary || 0) + (p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0) + (p.earnings.commission || 0);
-            const totalDeductions = (p.deductions.absenceDeduction || 0) + (p.deductions.otherDeductions || 0);
-            // The net cost to the company is the total gross pay (earnings).
-            const netCost = totalEarnings;
-            return { 
-                ...p,
-                employeeName: employee?.fullName || p.employeeName,
-                employeeNumber: employee?.employeeNumber || '-',
-                department: employee?.department || '-',
-                totalEarnings, 
-                totalDeductions,
-                netCost,
-                // Only include if employee is currently active or was terminated this month
-                isActiveOrRecent: employee ? (employee.status === 'active' || (employee.status === 'terminated' && toFirestoreDate(employee.terminationDate)?.getMonth() === parseInt(month) - 1)) : false
-            };
-        });
+        const totalSalaryAndAllowances = payslipsThisYear.reduce((sum, p) => sum + (p.earnings.basicSalary || 0) + (p.earnings.housingAllowance || 0) + (p.earnings.transportAllowance || 0), 0);
+        const totalCommissions = payslipsThisYear.reduce((sum, p) => sum + (p.earnings.commission || 0), 0);
+        const totalDeductions = payslipsThisYear.reduce((sum, p) => sum + (p.deductions.absenceDeduction || 0) + (p.deductions.otherDeductions || 0), 0);
 
-        if (!searchQuery) return data;
-        return data.filter(p => 
-            p.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (p.employeeNumber && p.employeeNumber.includes(searchQuery))
-        );
-    }, [payslips, employees, searchQuery, month]);
-    
-    const totals = useMemo(() => {
-        const netCostTotal = reportData.reduce((sum, p) => sum + p.netCost, 0);
+        const gratuityPaid = employees
+            .filter(e => e.status === 'terminated' && toFirestoreDate(e.terminationDate)?.getFullYear().toString() === year)
+            .reduce((sum, e) => sum + calculateGratuity(e, toFirestoreDate(e.terminationDate)!).total, 0);
+
+        const totalCost = totalSalaryAndAllowances + totalCommissions + gratuityPaid;
+        const avgCostPerEmployee = activeEmployees.length > 0 ? totalCost / activeEmployees.length : 0;
+
+        const chartData = [
+            { name: 'الرواتب والبدلات', value: totalSalaryAndAllowances },
+            { name: 'العمولات', value: totalCommissions },
+            { name: 'مكافآت نهاية الخدمة', value: gratuityPaid },
+        ];
+
         return {
-            earnings: reportData.reduce((sum, p) => sum + p.totalEarnings, 0),
-            deductions: reportData.reduce((sum, p) => sum + p.totalDeductions, 0),
-            netCost: netCostTotal,
+            totalSalaryAndAllowances,
+            totalCommissions,
+            totalDeductions,
+            gratuityPaid,
+            totalCost,
+            avgCostPerEmployee,
+            chartData
         };
-    }, [reportData]);
-    
-    const reportDataWithPercentage = useMemo(() => {
-        if (totals.netCost === 0) return reportData;
-        return reportData.map(p => ({
-            ...p,
-            costPercentage: (p.netCost / totals.netCost) * 100,
-        }));
-    }, [reportData, totals.netCost]);
+    }, [loading, year, employees, payslips]);
 
-
-    const handleExcelExport = () => {
-        if (!reportDataWithPercentage || reportDataWithPercentage.length === 0) { toast({ title: 'لا توجد بيانات للتصدير' }); return; }
-        const dataForSheet = reportDataWithPercentage.map(p => ({
-            'الاسم الكامل': p.employeeName,
-            'الرقم الوظيفي': p.employeeNumber,
-            'القسم': p.department,
-            'إجمالي الراتب والبدلات': p.totalEarnings,
-            'إجمالي الاستقطاعات': p.totalDeductions,
-            'صافي التكلفة على الشركة': p.netCost,
-            'نسبة التكلفة': `${p.costPercentage.toFixed(2)}%`,
-        }));
-        const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `Costs_${year}_${month}`);
-        XLSX.writeFile(workbook, `Costs_Report_${year}-${month}.xlsx`);
-    };
-    
     const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
-    const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
     return (
         <Card>
-            <CardHeader><CardTitle>تقرير التكاليف والمصروفات الشهرية</CardTitle><CardDescription>تحليل لتكلفة الموظفين الإجمالية خلال شهر محدد.</CardDescription></CardHeader>
+            <CardHeader>
+                <CardTitle>تقرير التكاليف السنوية للموظفين</CardTitle>
+                <CardDescription>تحليل شامل لجميع تكاليف الموارد البشرية خلال العام المحدد.</CardDescription>
+            </CardHeader>
             <CardContent>
-                <div className="flex flex-wrap gap-4 mb-4 p-4 bg-muted/50 rounded-lg justify-between items-end">
-                    <div className="flex flex-wrap gap-4">
-                        <div className="grid gap-2"><Label htmlFor="year-filter-costs">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger id="year-filter-costs" className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
-                        <div className="grid gap-2"><Label htmlFor="month-filter-costs">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger id="month-filter-costs" className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
-                        <div className="grid gap-2"><Label htmlFor="search">بحث بالاسم</Label><Input id="search" placeholder="ابحث..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div>
+                <div className="flex justify-start mb-6 p-4 bg-muted/50 rounded-lg">
+                    <div className="grid gap-2">
+                        <Label htmlFor="year-filter">السنة</Label>
+                        <Select value={year} onValueChange={setYear}>
+                            <SelectTrigger id="year-filter" className="w-[180px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        </Select>
                     </div>
-                    <Button variant="outline" onClick={handleExcelExport} disabled={loading || reportDataWithPercentage.length === 0}><Download className="ml-2 h-4"/> تصدير Excel</Button>
                 </div>
-                 <div className="border rounded-lg">
-                    <Table>
-                        <TableHeader><TableRow><TableHead>الاسم</TableHead><TableHead>القسم</TableHead><TableHead>إجمالي الراتب والبدلات</TableHead><TableHead>إجمالي الاستقطاعات</TableHead><TableHead>صافي التكلفة</TableHead><TableHead>% من الإجمالي</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {loading && Array.from({length:5}).map((_,i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full"/></TableCell></TableRow>)}
-                            {!loading && reportDataWithPercentage.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد بيانات رواتب لهذا الشهر.</TableCell></TableRow>}
-                            {!loading && reportDataWithPercentage.map(p => (<TableRow key={p.id}><TableCell className="font-medium"><Link href={`/dashboard/hr/employees/${p.employeeId}`} className="hover:underline">{p.employeeName}</Link></TableCell><TableCell>{p.department}</TableCell><TableCell>{formatCurrency(p.totalEarnings)}</TableCell><TableCell className="text-destructive">{p.totalDeductions > 0 ? `(${formatCurrency(p.totalDeductions)})` : '-'}</TableCell><TableCell className="font-bold">{formatCurrency(p.netCost)}</TableCell><TableCell>{p.costPercentage.toFixed(1)}%</TableCell></TableRow>))}
-                        </TableBody>
-                         <TableFooter><TableRow className="font-bold text-base bg-muted"><TableCell colSpan={2}>الإجمالي</TableCell><TableCell>{formatCurrency(totals.earnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(totals.deductions)}</TableCell><TableCell>{formatCurrency(totals.netCost)}</TableCell><TableCell>100%</TableCell></TableRow></TableFooter>
-                    </Table>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+                    <StatCard loading={loading} title="إجمالي الرواتب والبدلات" value={formatCurrency(reportData?.totalSalaryAndAllowances || 0)} icon={<Banknote />} colorClass="text-green-600" />
+                    <StatCard loading={loading} title="إجمالي العمولات" value={formatCurrency(reportData?.totalCommissions || 0)} icon={<FileText />} colorClass="text-indigo-600" />
+                    <StatCard loading={loading} title="إجمالي نهاية الخدمة" value={formatCurrency(reportData?.gratuityPaid || 0)} icon={<HandCoins />} colorClass="text-amber-600" />
+                    <StatCard loading={loading} title="متوسط التكلفة لكل موظف" value={formatCurrency(reportData?.avgCostPerEmployee || 0)} icon={<Users />} colorClass="text-blue-600" />
+                </div>
+                
+                <div className="grid gap-8 md:grid-cols-3">
+                    <Card className="md:col-span-2">
+                        <CardHeader>
+                            <CardTitle>توزيع التكاليف</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? <Skeleton className="h-[300px] w-full" /> : (
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={reportData?.chartData} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
+                                        <YAxis dataKey="name" type="category" width={150} />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Legend />
+                                        <Bar dataKey="value" name="التكلفة" fill="hsl(var(--primary))" barSize={30} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>ملخص التكلفة</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex justify-between items-baseline">
+                                <span className="text-muted-foreground">إجمالي الاستحقاقات</span>
+                                <span className="font-bold">{formatCurrency((reportData?.totalSalaryAndAllowances || 0) + (reportData?.totalCommissions || 0))}</span>
+                            </div>
+                            <div className="flex justify-between items-baseline">
+                                <span className="text-muted-foreground">إجمالي مكافآت نهاية الخدمة</span>
+                                <span className="font-bold">{formatCurrency(reportData?.gratuityPaid || 0)}</span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between items-baseline text-lg">
+                                <span className="font-extrabold">إجمالي التكلفة على الشركة</span>
+                                <span className="font-extrabold">{formatCurrency(reportData?.totalCost || 0)}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </CardContent>
         </Card>
