@@ -61,16 +61,16 @@ export const defaultTransactionTypes: (Omit<TransactionType, 'id'> & { departmen
     { name: 'تصميم ديكور داخلي', departmentNames: ['القسم المعماري'], order: 6 },
 ];
 
-export const defaultWorkStages: Record<string, Omit<WorkStage, 'id'>[]> = {
+export const defaultWorkStages: Record<string, (Omit<WorkStage, 'id'> & { nextStageNames?: string[], allowedDuringStagesNames?: string[] })[]> = {
     'القسم المعماري': [
-        { name: 'استفسارات عامة', order: 1, stageType: 'sequential', trackingType: 'none', allowedRoles: [] },
-        { name: 'توقيع العقد', order: 2, stageType: 'sequential', trackingType: 'none', allowedRoles: [] },
-        { name: 'تسليم المخططات الابتدائية', order: 3, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 10, allowedRoles: ['مهندس معماري'] },
-        { name: 'تعديلات المالك', order: 4, stageType: 'parallel', trackingType: 'occurrence', maxOccurrences: 3, allowedDuringStages: [], enableModificationTracking: true, allowedRoles: ['مهندس معماري'] },
-        { name: 'تسليم المخططات النهائية', order: 5, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 7, allowedRoles: ['مهندس معماري'] },
+        { name: 'استفسارات عامة', order: 1, stageType: 'sequential', trackingType: 'none', allowedRoles: [], nextStageNames: ['توقيع العقد'] },
+        { name: 'توقيع العقد', order: 2, stageType: 'sequential', trackingType: 'none', allowedRoles: [], nextStageNames: ['تسليم المخططات الابتدائية'] },
+        { name: 'تسليم المخططات الابتدائية', order: 3, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 10, allowedRoles: ['مهندس معماري'], nextStageNames: ['تسليم المخططات النهائية'] },
+        { name: 'تعديلات المالك', order: 4, stageType: 'parallel', trackingType: 'occurrence', maxOccurrences: 3, allowedDuringStagesNames: ['تسليم المخططات الابتدائية'], enableModificationTracking: true, allowedRoles: ['مهندس معماري'] },
+        { name: 'تسليم المخططات النهائية', order: 5, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 7, allowedRoles: ['مهندس معماري'], nextStageNames: [] },
     ],
     'القسم الإنشائي': [
-        { name: 'التصميم الإنشائي', order: 1, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 14, allowedRoles: ['مهندس مدني'] },
+        { name: 'التصميم الإنشائي', order: 1, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 14, allowedRoles: ['مهندس مدني'], nextStageNames: ['مراجعة البلدية'] },
         { name: 'مراجعة البلدية', order: 2, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 5, allowedRoles: [] },
     ],
 };

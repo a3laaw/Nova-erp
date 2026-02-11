@@ -475,27 +475,52 @@ const handleImportWorkStages = async () => {
     if (!firestore) return;
     setIsImporting(true);
     try {
-        const batch = writeBatch(firestore);
         const deptsSnapshot = await getDocs(query(collection(firestore, 'departments')));
+        const allNewStagesByName = new Map<string, { id: string, ref: any }>();
+        const allDeptsToProcess: { deptDoc: any; stages: any[] }[] = [];
 
+        // Pre-calculate all new stage IDs and references across all departments first
         for (const deptDoc of deptsSnapshot.docs) {
             const deptName = deptDoc.data().name;
             const stagesForDept = defaultWorkStages[deptName as keyof typeof defaultWorkStages];
-            
             if (stagesForDept) {
-                const existingStagesSnap = await getDocs(query(collection(firestore, `departments/${deptDoc.id}/workStages`)));
-                existingStagesSnap.forEach(doc => batch.delete(doc.ref));
-                
+                allDeptsToProcess.push({ deptDoc, stages: stagesForDept });
                 for (const stage of stagesForDept) {
                     const newStageRef = doc(collection(firestore, `departments/${deptDoc.id}/workStages`));
-                    batch.set(newStageRef, stage);
+                    allNewStagesByName.set(stage.name, { id: newStageRef.id, ref: newStageRef });
                 }
             }
         }
+        
+        const batch = writeBatch(firestore);
+        
+        // Delete all existing work stages
+        const allExistingStagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages')));
+        allExistingStagesSnap.forEach(doc => batch.delete(doc.ref));
+
+        // Create new stages with resolved links
+        for (const { stages } of allDeptsToProcess) {
+            for (const stage of stages) {
+                const { nextStageNames, allowedDuringStagesNames, ...stageData } = stage as any;
+                const newStageInfo = allNewStagesByName.get(stage.name);
+                if (newStageInfo) {
+                    const finalStageData = { ...stageData };
+                    if (nextStageNames) {
+                        finalStageData.nextStageIds = nextStageNames.map((name: string) => allNewStagesByName.get(name)?.id).filter(Boolean);
+                    }
+                    if (allowedDuringStagesNames) {
+                        finalStageData.allowedDuringStages = allowedDuringStagesNames.map((name: string) => allNewStagesByName.get(name)?.id).filter(Boolean);
+                    }
+                    batch.set(newStageInfo.ref, finalStageData);
+                }
+            }
+        }
+
         await batch.commit();
+        
         toast({ title: 'نجاح', description: 'تم استيراد/تحديث مراحل العمل الافتراضية لجميع الأقسام.' });
-        fetchSecondaryItems();
-    } catch(e) {
+        fetchSecondaryItems(); // Refresh the view
+    } catch (e) {
         console.error(e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد مراحل العمل.' });
     } finally {
