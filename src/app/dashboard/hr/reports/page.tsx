@@ -1,7 +1,7 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator, Wallet } from 'lucide-react';
+import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator, Wallet, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const reportList = [
@@ -47,13 +47,19 @@ const reportList = [
         icon: Calculator,
         color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300'
     },
-    // ADDED: The new report card
     { 
         title: 'تكاليف الموظفين الشهرية', 
         description: 'تحليل تكلفة الرواتب والبدلات لكل موظف.', 
         href: '/dashboard/hr/reports/costs',
         icon: Wallet,
         color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300'
+    },
+    { 
+        title: 'الاستقالات والانفصال', 
+        description: 'سجل تاريخي لحالات إنهاء الخدمة والاستقالات.', 
+        href: '/dashboard/hr/reports/separations',
+        icon: UserX,
+        color: 'bg-slate-100 dark:bg-slate-900/30 text-slate-600 dark:text-slate-300'
     },
 ];
 
