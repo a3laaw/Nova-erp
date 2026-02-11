@@ -76,6 +76,7 @@ const navItems = {
       ]
     },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
+    { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Building, roles: ['Admin', 'Accountant'] },
     { href: '/dashboard/contracts', label: 'العقود', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
     { 
       label: 'المحاسبة', 
@@ -84,7 +85,6 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
-        { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي' },
         {
@@ -168,6 +168,7 @@ const navItems = {
     },
     { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/purchasing/vendors', label: 'Vendors', icon: Building, roles: ['Admin', 'Accountant'] },
     { href: '/dashboard/contracts', label: 'Contracts', icon: FileText, roles: ['Admin', 'Accountant', 'Secretary'] },
     { 
       label: 'Accounting', 
@@ -176,7 +177,6 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/quotations', label: 'Quotations' },
-        { href: '/dashboard/purchasing/vendors', label: 'Vendors' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
         { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
         {
