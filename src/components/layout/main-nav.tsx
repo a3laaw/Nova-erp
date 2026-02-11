@@ -37,6 +37,7 @@ import {
   ClipboardCheck,
   Bot,
   Scale,
+  Building,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -136,13 +137,15 @@ const navItems = {
       label: 'المخازن والمشتريات',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/warehouse',
+      hrefPrefix: '/dashboard/purchasing',
       children: [
-        { href: '/dashboard/warehouse', label: 'لوحة معلومات المخازن' },
-        { href: '/dashboard/warehouse/items', label: 'الأصناف' },
+        { href: '/dashboard/purchasing', label: 'لوحة المعلومات' },
+        { href: '/dashboard/purchasing/items', label: 'الأصناف' },
+        { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير' },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
         { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
-        { href: '/dashboard/purchasing', label: 'أوامر الشراء' },
       ]
     },
     { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
@@ -226,13 +229,15 @@ const navItems = {
       label: 'Inventory & Purchasing',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/warehouse',
+      hrefPrefix: '/dashboard/purchasing',
       children: [
-        { href: '/dashboard/warehouse', label: 'Warehouse Dashboard' },
-        { href: '/dashboard/warehouse/items', label: 'Items' },
+        { href: '/dashboard/purchasing', label: 'Dashboard' },
+        { href: '/dashboard/purchasing/items', label: 'Items' },
+        { href: '/dashboard/purchasing/vendors', label: 'Vendors' },
+        { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
         { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
         { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
-        { href: '/dashboard/purchasing', label: 'Purchase Orders' },
       ]
     },
     { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },

@@ -680,7 +680,8 @@ export interface Vendor {
 }
 
 export interface PurchaseOrderItem {
-    description: string;
+    internalItemId: string;
+    itemName: string;
     quantity: number;
     unitPrice: number;
     total: number;
@@ -692,7 +693,7 @@ export interface PurchaseOrder {
     orderDate: any;
     vendorId: string;
     vendorName: string;
-    projectId?: string;
+    supplierQuotationId?: string;
     items: PurchaseOrderItem[];
     totalAmount: number;
     paymentTerms?: string;
@@ -750,6 +751,36 @@ export interface Item {
   createdAt: any;
 }
 
+export interface RfqItem {
+    id: string;
+    internalItemId: string;
+    itemName: string;
+    quantity: number;
+}
+
+export interface RequestForQuotation {
+    id?: string;
+    rfqNumber: string;
+    date: any;
+    status: 'draft' | 'sent' | 'closed' | 'cancelled';
+    vendorIds: string[];
+    items: RfqItem[];
+}
+
+export interface SupplierQuotation {
+    id?: string;
+    rfqId: string;
+    vendorId: string;
+    quotationReference: string;
+    date: any;
+    deliveryTimeDays?: number;
+    paymentTerms?: string;
+    items: {
+        rfqItemId: string;
+        unitPrice: number;
+    }[];
+}
+
 export interface StockLevel {
     itemId: string;
     warehouseId: string;
@@ -757,4 +788,3 @@ export interface StockLevel {
     lastUpdated: any;
 }
     
-```
