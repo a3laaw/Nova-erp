@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSubscription } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import type { Payslip, Employee } from '@/lib/types';
 import Link from 'next/link';
 
@@ -77,67 +77,29 @@ export function SeparationsReport() {
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>تقرير الاستقالات وإنهاء الخدمات</CardTitle>
-                <CardDescription>عرض وتحليل جميع حالات الانفصال الوظيفي خلال فترة محددة.</CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>تقرير الاستقالات وإنهاء الخدمات</CardTitle><CardDescription>عرض وتحليل جميع حالات الانفصال الوظيفي خلال فترة محددة.</CardDescription></CardHeader>
             <CardContent>
                 <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center gap-4">
                         <Label htmlFor="year-filter">السنة</Label>
-                        <Select value={yearFilter} onValueChange={setYearFilter}>
-                            <SelectTrigger id="year-filter" className="w-[180px]"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">كل السنوات</SelectItem>
-                                {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+                        <Select value={yearFilter} onValueChange={setYearFilter}><SelectTrigger id="year-filter" className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل السنوات</SelectItem>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select>
                     </div>
                     <Button variant="outline" onClick={handlePrint}><Printer className="ml-2 h-4"/> طباعة</Button>
                 </div>
                 <div className="border rounded-lg">
                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>الموظف (الرقم الوظيفي)</TableHead>
-                                <TableHead>القسم</TableHead>
-                                <TableHead>تاريخ التعيين</TableHead>
-                                <TableHead>تاريخ الإنهاء</TableHead>
-                                <TableHead>السبب</TableHead>
-                                <TableHead>المستحقات المدفوعة</TableHead>
-                                <TableHead>حالة التسوية</TableHead>
-                            </TableRow>
-                        </TableHeader>
+                        <TableHeader><TableRow><TableHead>الموظف (الرقم الوظيفي)</TableHead><TableHead>القسم</TableHead><TableHead>تاريخ التعيين</TableHead><TableHead>تاريخ الإنهاء</TableHead><TableHead>السبب</TableHead><TableHead>المستحقات المدفوعة</TableHead><TableHead>حالة التسوية</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full"/></TableCell></TableRow>)}
                             {!loading && reportData.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center">لا توجد بيانات لهذه الفترة.</TableCell></TableRow>}
-                            {!loading && reportData.map(item => (
-                                <TableRow key={item.id}>
-                                    <TableCell className="font-medium">
-                                        <Link href={`/dashboard/hr/employees/${item.id}`} className="hover:underline">{item.fullName}</Link>
-                                        <div className="text-xs text-muted-foreground font-mono">{item.employeeNumber}</div>
-                                    </TableCell>
-                                    <TableCell>{item.department}</TableCell>
-                                    <TableCell>{toFirestoreDate(item.hireDate) ? format(toFirestoreDate(item.hireDate)!, 'dd/MM/yyyy') : '-'}</TableCell>
-                                    <TableCell>{toFirestoreDate(item.terminationDate) ? format(toFirestoreDate(item.terminationDate)!, 'dd/MM/yyyy') : '-'}</TableCell>
-                                    <TableCell>{terminationReasonTranslations[item.terminationReason!] || '-'}</TableCell>
-                                    <TableCell className="font-mono">{formatCurrency(item.gratuityPaid)}</TableCell>
-                                    <TableCell>
+                            {!loading && reportData.map(item => (<TableRow key={item.id}><TableCell className="font-medium"><Link href={`/dashboard/hr/employees/${item.id}`} className="hover:underline">{item.fullName}</Link><div className="text-xs text-muted-foreground font-mono">{item.employeeNumber}</div></TableCell><TableCell>{item.department}</TableCell><TableCell>{toFirestoreDate(item.hireDate) ? format(toFirestoreDate(item.hireDate)!, 'dd/MM/yyyy') : '-'}</TableCell><TableCell>{toFirestoreDate(item.terminationDate) ? format(toFirestoreDate(item.terminationDate)!, 'dd/MM/yyyy') : '-'}</TableCell><TableCell>{terminationReasonTranslations[item.terminationReason!] || '-'}</TableCell><TableCell className="font-mono">{formatCurrency(item.gratuityPaid)}</TableCell><TableCell>
                                         {item.isSettled 
                                             ? <Badge variant="outline" className="bg-green-100 text-green-800">مدفوعة</Badge>
                                             : <Badge variant="destructive" className="bg-yellow-100 text-yellow-800">معلقة</Badge>
                                         }
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                    </TableCell></TableRow>))}
                         </TableBody>
-                        <TableFooter>
-                            <TableRow className="font-bold text-base bg-muted">
-                                <TableCell colSpan={5}>الإجمالي</TableCell>
-                                <TableCell>{formatCurrency(totals.gratuity)}</TableCell>
-                                <TableCell></TableCell>
-                            </TableRow>
-                        </TableFooter>
+                        <TableFooter><TableRow className="font-bold text-base bg-muted"><TableCell colSpan={5}>الإجمالي</TableCell><TableCell>{formatCurrency(totals.gratuity)}</TableCell><TableCell></TableCell></TableRow></TableFooter>
                     </Table>
                 </div>
             </CardContent>
