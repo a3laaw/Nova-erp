@@ -1158,6 +1158,20 @@
             "enum": ["draft", "posted"],
             "description": "The status of the journal entry."
         },
+        "reconciliationStatus": {
+            "type": "string",
+            "enum": ["unreconciled", "reconciled", "pending"],
+            "description": "The bank reconciliation status of the entry."
+        },
+        "reconciliationInfo": {
+            "type": "object",
+            "description": "Details about the reconciliation.",
+            "properties": {
+                "reconciledAt": { "type": "string", "format": "date-time" },
+                "reconciledBy": { "type": "string" },
+                "bankTransactionId": { "type": "string" }
+            }
+        },
         "lines": {
           "type": "array",
           "items": {
