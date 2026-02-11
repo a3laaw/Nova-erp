@@ -295,6 +295,7 @@ export interface LeaveRequest {
     rejectionReason?: string;
     isBackFromLeave?: boolean;
     actualReturnDate?: any;
+    passportReceived?: boolean;
     isSalaryPaid?: boolean;
 }
 

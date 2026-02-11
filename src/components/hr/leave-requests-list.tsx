@@ -1,3 +1,5 @@
+// ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
+// IMPROVED: Changed dialog to page navigation for new/edit actions.
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -19,7 +21,6 @@ import { Badge } from '@/components/ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { LeaveRequestForm } from './leave-request-form';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
@@ -28,6 +29,8 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency } from '@/lib/utils';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -46,10 +49,8 @@ export function LeaveRequestsList() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [requestToEdit, setRequestToEdit] = useState<LeaveRequest | null>(null);
-
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -64,7 +65,7 @@ export function LeaveRequestsList() {
 
   
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: leaveRequests, setData: setLeaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+  const { data: leaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
   const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
 
   const loading = loadingLeaves || loadingEmployees;
@@ -74,11 +75,6 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
-  const handleEditClick = (req: LeaveRequest) => {
-    setRequestToEdit(req);
-    setIsFormOpen(true);
-  }
-
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -111,7 +107,7 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToApprove.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const daysToDeduct = requestToApprove.days || 0;
+            const daysToDeduct = requestToApprove.workingDays || requestToApprove.days || 0;
             let employeeUpdate: Partial<Employee> = {};
             
             switch (requestToApprove.leaveType) {
@@ -194,7 +190,7 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const daysToRevert = requestToUndoApproval.days || 0;
+            const daysToRevert = requestToUndoApproval.workingDays || requestToUndoApproval.days || 0;
             let employeeUpdate: Partial<Employee> = {};
             
             switch (requestToUndoApproval.leaveType) {
@@ -300,9 +296,11 @@ export function LeaveRequestsList() {
   return (
     <>
       <div className="flex justify-end mb-4">
-        <Button onClick={() => { setRequestToEdit(null); setIsFormOpen(true); }}>
-          <PlusCircle className="ml-2 h-4 w-4" />
-          طلب إجازة جديد
+        <Button asChild>
+          <Link href="/dashboard/hr/leaves/new">
+            <PlusCircle className="ml-2 h-4 w-4" />
+            طلب إجازة جديد
+          </Link>
         </Button>
       </div>
 
@@ -326,13 +324,13 @@ export function LeaveRequestsList() {
               <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد طلبات إجازة.</TableCell></TableRow>
             )}
             {!loading && leaveRequests.map(req => (
-              <TableRow key={req.id}>
+              <TableRow key={req.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/dashboard/hr/leaves/${req.id}`)}>
                 <TableCell className="font-medium">{req.employeeName}</TableCell>
                 <TableCell>{req.leaveType}</TableCell>
                 <TableCell>{formatDate(req.startDate)} - {formatDate(req.endDate)}</TableCell>
                 <TableCell>{req.workingDays} يوم عمل</TableCell>
                 <TableCell><Badge variant="outline" className={statusColors[req.status]}>{statusTranslations[req.status]}</Badge></TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
@@ -366,7 +364,7 @@ export function LeaveRequestsList() {
                                             <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الرفض
                                         </DropdownMenuItem>
                                     )}
-                                    <DropdownMenuItem onClick={() => handleEditClick(req)}>
+                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/leaves/${req.id}/edit`)}>
                                         <Pencil className="ml-2 h-4 w-4" /> تعديل
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
@@ -384,13 +382,6 @@ export function LeaveRequestsList() {
           </TableBody>
         </Table>
       </div>
-      
-      <LeaveRequestForm 
-        isOpen={isFormOpen} 
-        onClose={() => setIsFormOpen(false)} 
-        onSaveSuccess={() => {}}
-        leaveRequestToEdit={requestToEdit}
-      />
       
       <AlertDialog open={!!requestToApprove} onOpenChange={() => setRequestToApprove(null)}>
         <AlertDialogContent dir="rtl">
