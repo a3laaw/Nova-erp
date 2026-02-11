@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, differenceInMonths } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
 
 interface DepartmentStats {
   id: string;
@@ -21,6 +22,7 @@ export function DepartmentPerformanceReport() {
   const { journalEntries, employees, accounts, departments, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
+  const [searchQuery, setSearchQuery] = useState('');
 
   const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
 
@@ -80,7 +82,7 @@ export function DepartmentPerformanceReport() {
       });
     });
     
-    const results: DepartmentStats[] = [];
+    let results: DepartmentStats[] = [];
     deptStats.forEach(stats => {
       stats.netContribution = stats.totalProfit - stats.totalSalaries;
       stats.projectCount = projectsPerDept.get(stats.id)?.size || 0;
@@ -88,9 +90,14 @@ export function DepartmentPerformanceReport() {
         results.push(stats);
       }
     });
+    
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        results = results.filter(item => item.name.toLowerCase().includes(lowerCaseQuery));
+    }
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, activeEmployees, accounts, departments, loading, dateFrom, dateTo]);
+  }, [journalEntries, activeEmployees, accounts, departments, loading, dateFrom, dateTo, searchQuery]);
 
   return (
     <div className="space-y-4">
@@ -102,6 +109,10 @@ export function DepartmentPerformanceReport() {
         <div className="grid gap-2">
           <Label htmlFor="dateTo-dept">إلى تاريخ</Label>
           <DateInput id="dateTo-dept" value={dateTo} onChange={setDateTo} />
+        </div>
+        <div className="grid gap-2">
+            <Label htmlFor="search-dept">بحث بالاسم</Label>
+            <Input id="search-dept" placeholder="اسم القسم..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
       </div>
       

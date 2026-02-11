@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Search } from 'lucide-react';
 import Link from 'next/link';
 import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ProjectPnl {
   transactionId: string;
@@ -24,9 +26,13 @@ interface ProjectPnl {
 }
 
 export function ProjectsPnlReport() {
-  const { journalEntries, clients, transactions, accounts, loading } = useAnalyticalData();
+  const { journalEntries, clients, transactions, accounts, employees, departments, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [engineerFilter, setEngineerFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
 
   const reportData = useMemo(() => {
     if (loading || !dateFrom || !dateTo) return [];
@@ -38,7 +44,7 @@ export function ProjectsPnlReport() {
     const pnlMap = new Map<string, Omit<ProjectPnl, 'transactionId' | 'clientName' | 'projectName'>>();
     
     const clientMap = new Map(clients.map(c => [c.id, c.nameAr]));
-    const transactionMap = new Map(transactions.map(t => [t.id, { name: t.transactionType, clientId: t.clientId }]));
+    const transactionMap = new Map(transactions.map(t => [t.id, { name: t.transactionType, clientId: t.clientId, assignedEngineerId: t.assignedEngineerId }]));
 
     journalEntries.forEach(entry => {
       const entryDate = entry.date?.toDate();
@@ -68,7 +74,7 @@ export function ProjectsPnlReport() {
       });
     });
 
-    const results: ProjectPnl[] = [];
+    let results: ProjectPnl[] = [];
     pnlMap.forEach((data, transactionId) => {
       if (data.revenue === 0 && data.directCosts === 0) return;
 
@@ -87,8 +93,33 @@ export function ProjectsPnlReport() {
       });
     });
 
+    if (departmentFilter !== 'all') {
+        results = results.filter(item => {
+            const tx = transactionMap.get(item.transactionId);
+            if (!tx || !tx.assignedEngineerId) return false;
+            const engineer = employees.find(e => e.id === tx.assignedEngineerId);
+            const dept = departments.find(d => d.name === engineer?.department);
+            return dept?.id === departmentFilter;
+        });
+    }
+
+    if (engineerFilter !== 'all') {
+        results = results.filter(item => {
+            const tx = transactionMap.get(item.transactionId);
+            return tx?.assignedEngineerId === engineerFilter;
+        });
+    }
+    
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        results = results.filter(item => 
+            item.projectName.toLowerCase().includes(lowerCaseQuery) || 
+            item.clientName.toLowerCase().includes(lowerCaseQuery)
+        );
+    }
+
     return results.sort((a,b) => b.profit - a.profit);
-  }, [journalEntries, clients, transactions, accounts, loading, dateFrom, dateTo]);
+  }, [journalEntries, clients, transactions, accounts, employees, departments, loading, dateFrom, dateTo, departmentFilter, engineerFilter, searchQuery]);
 
   const totals = useMemo(() => ({
     revenue: reportData.reduce((sum, item) => sum + item.revenue, 0),
@@ -98,7 +129,7 @@ export function ProjectsPnlReport() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-muted/50 p-4 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-muted/50 p-4 rounded-lg">
         <div className="grid gap-2">
           <Label htmlFor="dateFrom">من تاريخ</Label>
           <DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
@@ -106,6 +137,18 @@ export function ProjectsPnlReport() {
         <div className="grid gap-2">
           <Label htmlFor="dateTo">إلى تاريخ</Label>
           <DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
+        </div>
+        <div className="grid gap-2">
+            <Label htmlFor="search-project">بحث</Label>
+            <Input id="search-project" placeholder="اسم المشروع أو العميل..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        </div>
+        <div className="grid gap-2">
+            <Label htmlFor="dept-filter">القسم</Label>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}><SelectTrigger id="dept-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل الأقسام</SelectItem>{departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent></Select>
+        </div>
+        <div className="grid gap-2">
+            <Label htmlFor="eng-filter">المهندس</Label>
+            <Select value={engineerFilter} onValueChange={setEngineerFilter}><SelectTrigger id="eng-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل المهندسين</SelectItem>{employees.filter(e => e.jobTitle?.includes('مهندس')).map(e => <SelectItem key={e.id} value={e.id!}>{e.fullName}</SelectItem>)}</SelectContent></Select>
         </div>
       </div>
       

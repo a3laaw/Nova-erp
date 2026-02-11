@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
 
 interface OverheadItem {
   accountId: string;
@@ -20,6 +21,7 @@ export function OverheadReport() {
   const { journalEntries, accounts, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
+  const [searchQuery, setSearchQuery] = useState('');
 
   const reportData = useMemo(() => {
     if (loading || !dateFrom || !dateTo) return [];
@@ -55,10 +57,19 @@ export function OverheadReport() {
       });
     });
 
-    return Array.from(overheadMap.values())
-        .filter(item => item.totalAmount > 0)
-        .sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [journalEntries, accounts, loading, dateFrom, dateTo]);
+    let results = Array.from(overheadMap.values())
+        .filter(item => item.totalAmount > 0);
+        
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        results = results.filter(item => 
+            item.accountName.toLowerCase().includes(lowerCaseQuery) ||
+            item.accountCode.toLowerCase().includes(lowerCaseQuery)
+        );
+    }
+
+    return results.sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [journalEntries, accounts, loading, dateFrom, dateTo, searchQuery]);
   
   const totalOverhead = useMemo(() => reportData.reduce((sum, item) => sum + item.totalAmount, 0), [reportData]);
 
@@ -72,6 +83,10 @@ export function OverheadReport() {
         <div className="grid gap-2">
           <Label htmlFor="dateTo-ov">إلى تاريخ</Label>
           <DateInput id="dateTo-ov" value={dateTo} onChange={setDateTo} />
+        </div>
+        <div className="grid gap-2">
+            <Label htmlFor="search-overhead">بحث</Label>
+            <Input id="search-overhead" placeholder="اسم الحساب أو الكود..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
       </div>
       

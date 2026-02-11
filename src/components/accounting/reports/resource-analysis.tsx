@@ -7,6 +7,9 @@ import { formatCurrency } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, differenceInMonths } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 interface ResourceStats {
   id: string;
@@ -18,11 +21,12 @@ interface ResourceStats {
 }
 
 export function ResourceAnalysisReport() {
-  const { journalEntries, employees, accounts, transactions, loading } = useAnalyticalData();
+  const { journalEntries, employees, accounts, departments, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // IMPROVED: Filter for active employees to avoid including terminated ones in calculations.
   const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
 
   const reportData = useMemo(() => {
@@ -82,7 +86,7 @@ export function ResourceAnalysisReport() {
       });
     });
 
-    const results: ResourceStats[] = [];
+    let results: ResourceStats[] = [];
     engineerStats.forEach(stats => {
       stats.netContribution = stats.totalProfit - stats.totalSalary;
       stats.projectCount = projectsPerEngineer.get(stats.id)?.size || 0;
@@ -91,12 +95,26 @@ export function ResourceAnalysisReport() {
       }
     });
 
+    if (departmentFilter !== 'all') {
+        results = results.filter(item => {
+            const emp = activeEmployees.find(e => e.id === item.id);
+            const dept = departments.find(d => d.name === emp?.department);
+            return dept?.id === departmentFilter;
+        });
+    }
+
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        results = results.filter(item => item.name.toLowerCase().includes(lowerCaseQuery));
+    }
+
+
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, activeEmployees, accounts, loading, dateFrom, dateTo]);
+  }, [journalEntries, activeEmployees, accounts, loading, dateFrom, dateTo, departmentFilter, searchQuery, departments]);
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-muted/50 p-4 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end bg-muted/50 p-4 rounded-lg">
         <div className="grid gap-2">
           <Label htmlFor="dateFrom-res">من تاريخ</Label>
           <DateInput id="dateFrom-res" value={dateFrom} onChange={setDateFrom} />
@@ -104,6 +122,22 @@ export function ResourceAnalysisReport() {
         <div className="grid gap-2">
           <Label htmlFor="dateTo-res">إلى تاريخ</Label>
           <DateInput id="dateTo-res" value={dateTo} onChange={setDateTo} />
+        </div>
+         <div className="grid gap-2">
+            <Label htmlFor="search-eng">بحث بالاسم</Label>
+            <Input id="search-eng" placeholder="اسم المهندس..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        </div>
+        <div className="grid gap-2">
+            <Label htmlFor="dept-filter-eng">القسم</Label>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger id="dept-filter-eng">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">كل الأقسام</SelectItem>
+                    {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
         </div>
       </div>
       
