@@ -97,6 +97,7 @@ const navItems = {
         {
           label: 'التقارير المالية',
           children: [
+            { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير المالي اليومي' },
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
@@ -182,6 +183,7 @@ const navItems = {
         {
           label: 'Financial Reports',
           children: [
+            { href: '/dashboard/accounting/reports/daily-summary', label: 'Daily Financial Report' },
             { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
             { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
             { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
