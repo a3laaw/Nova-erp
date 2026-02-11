@@ -7,12 +7,13 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, ShieldExclamation } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import { Input } from '../ui/input';
 
 function TerminatedEmployeesManager() {
   const { firestore } = useFirebase();
@@ -114,6 +115,103 @@ function TerminatedEmployeesManager() {
   );
 }
 
+function SystemWipeManager() {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const CONFIRMATION_PHRASE = 'مسح كل شيء';
+
+    const collectionsToDelete = [
+        'company_settings', 'users', 'clients', 'transaction_assignments', 
+        'counters', 'employees', 'leaveRequests', 'permissionRequests', 'holidays', 
+        'attendance', 'payroll', 'notifications', 'departments', 'governorates', 
+        'transactionTypes', 'appointments', 'work_stages_progress', 'contracts', 
+        'contractTemplates', 'chartOfAccounts', 'journalEntries', 
+        'paymentVouchers', 'cashReceipts', 'quotations', 'vendors', 
+        'purchaseOrders', 'residencyRenewals'
+    ];
+    
+    const handleWipeData = async () => {
+        if (!firestore) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم تهيئة قاعدة البيانات.' });
+            return;
+        }
+        setIsProcessing(true);
+        try {
+            let deletedDocsCount = 0;
+            for (const collectionName of collectionsToDelete) {
+                const snapshot = await getDocs(query(collection(firestore, collectionName)));
+                if (snapshot.empty) continue;
+                
+                const batch = writeBatch(firestore);
+                snapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                deletedDocsCount += snapshot.size;
+            }
+            toast({ title: 'نجاح', description: `تم مسح ${deletedDocsCount} مستنداً من النظام. يفضل إعادة تحميل الصفحة.` });
+        } catch (error) {
+            console.error("Error wiping data:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح البيانات.' });
+        } finally {
+            setIsProcessing(false);
+            setIsConfirmOpen(false);
+            setConfirmText('');
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <h3 className="font-semibold text-destructive">إجراءات خطيرة</h3>
+            <p className="text-sm text-muted-foreground">
+                الإجراءات في هذا القسم تقوم بحذف البيانات بشكل نهائي ولا يمكن التراجع عنها. استخدمها بحذر شديد.
+            </p>
+            <div className="border border-destructive/50 rounded-lg p-4 flex justify-between items-center bg-destructive/5">
+                <div>
+                    <h4 className="font-semibold text-destructive">مسح جميع بيانات النظام</h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        سيقوم هذا الإجراء بحذف جميع العملاء، الموظفين، المعاملات، القيود المحاسبية، وجميع البيانات الأخرى المدخلة.
+                    </p>
+                </div>
+                <Button variant="destructive" onClick={() => setIsConfirmOpen(true)}>
+                    مسح البيانات
+                </Button>
+            </div>
+
+            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تحذير: هل أنت متأكد تماماً؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <div className="space-y-4">
+                                <p>أنت على وشك حذف **جميع البيانات** في هذا النظام. سيتم مسح كل شيء أدخلته: العملاء، الموظفين، المعاملات، القيود المحاسبية، الإعدادات، وكل شيء آخر.</p>
+                                <p className="font-bold text-destructive">هذا الإجراء لا يمكن التراجع عنه نهائياً.</p>
+                                <p>للتأكيد، يرجى كتابة العبارة التالية في المربع أدناه:</p>
+                                <p className="font-mono font-bold text-center bg-muted p-2 rounded-md">{CONFIRMATION_PHRASE}</p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Input
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        placeholder="اكتب العبارة التأكيدية هنا..."
+                    />
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isProcessing}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleWipeData} disabled={confirmText !== CONFIRMATION_PHRASE || isProcessing} className="bg-destructive hover:bg-destructive/90">
+                            {isProcessing ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري المسح...</> : 'أفهم العواقب، قم بالمسح النهائي'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+}
+
+
 // Main Component
 export function DataIntegrityManager() {
     return (
@@ -126,6 +224,8 @@ export function DataIntegrityManager() {
             </CardHeader>
             <CardContent className="space-y-8">
                 <TerminatedEmployeesManager />
+                <Separator />
+                <SystemWipeManager />
             </CardContent>
         </Card>
     );
