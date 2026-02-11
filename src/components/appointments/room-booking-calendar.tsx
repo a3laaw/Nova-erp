@@ -42,6 +42,7 @@ import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
+import { Textarea } from '@/components/ui/textarea';
 
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -54,8 +55,9 @@ const departmentStyles: Record<string, React.CSSProperties> = {
 };
 const departmentOptions = ['الكهرباء', 'الصحي', 'الإنشائي', 'المعماري', 'أخرى'];
 
-const parseTime = (timeStr: string): { hours: number, minutes: number } => {
+const parseTime = (timeStr: string): { hours: number, minutes: number } | null => {
   const [hours, minutes] = timeStr.split(':').map(Number);
+  if (isNaN(hours) || isNaN(minutes)) return null;
   return { hours, minutes };
 };
 
@@ -302,7 +304,16 @@ export function RoomBookingCalendar() {
                 appointmentDate: toFirestoreDate(data.appointmentDate)
             });
         } else { // Creating new
-            const { hours, minutes } = parseTime(data.time!);
+            const parsedTime = parseTime(data.time!);
+            if (!parsedTime) {
+                toast({
+                    title: 'وقت غير صالح',
+                    description: 'تنسيق الوقت المحدد غير صحيح.',
+                    variant: 'destructive',
+                });
+                return;
+            }
+            const { hours, minutes } = parsedTime;
             const startTime = setMinutes(setHours(date, hours), minutes);
             
             if (isPast(startTime)) {
@@ -714,3 +725,5 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         </Dialog>
     );
 }
+
+    
