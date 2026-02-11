@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -57,6 +56,3 @@ export default function SettingsPage() {
     </Tabs>
   );
 }
-
-
-    
