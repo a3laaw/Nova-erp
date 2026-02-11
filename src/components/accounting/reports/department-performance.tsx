@@ -18,11 +18,10 @@ interface DepartmentStats {
 }
 
 export function DepartmentPerformanceReport() {
-  const { journalEntries, employees, accounts, departments, transactions, loading } = useAnalyticalData();
+  const { journalEntries, employees, accounts, departments, loading } = useAnalyticalData();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
-  // IMPROVED: Filter for active employees to avoid including terminated ones in calculations.
   const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
 
   const reportData = useMemo(() => {
@@ -36,9 +35,6 @@ export function DepartmentPerformanceReport() {
     const deptStats = new Map<string, DepartmentStats>();
     const projectsPerDept = new Map<string, Set<string>>();
     
-    const transactionMap = new Map(transactions.map(t => [t.id, t]));
-    const employeeMap = new Map(activeEmployees.map(e => [e.id, e]));
-
     departments.forEach(dept => {
       deptStats.set(dept.id, { id: dept.id, name: dept.name, totalProfit: 0, totalSalaries: 0, netContribution: 0, projectCount: 0 });
       projectsPerDept.set(dept.id, new Set());
@@ -57,21 +53,12 @@ export function DepartmentPerformanceReport() {
       const entryDate = entry.date?.toDate();
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
 
-      const transactionId = entry.transactionId;
-      if (!transactionId) return;
-
-      const transaction = transactionMap.get(transactionId);
-      if (!transaction) return;
-
-      const engineer = employeeMap.get(transaction.assignedEngineerId || '');
-      if (!engineer || !engineer.department) return;
-      
-      const department = departments.find(d => d.name === engineer.department);
-      if (!department || !deptStats.has(department.id)) return;
-
-      const stats = deptStats.get(department.id)!;
-
       entry.lines.forEach(line => {
+        const deptId = line.auto_dept_id;
+        if (!deptId || !deptStats.has(deptId)) return;
+
+        const stats = deptStats.get(deptId)!;
+
         const account = accounts.find(a => a.id === line.accountId);
         if(!account) return;
 
@@ -85,8 +72,12 @@ export function DepartmentPerformanceReport() {
         if (profitChange !== 0) {
             stats.totalProfit += profitChange;
         }
+
+        const profitCenterId = line.auto_profit_center;
+        if (profitCenterId) {
+            projectsPerDept.get(deptId)?.add(profitCenterId);
+        }
       });
-      projectsPerDept.get(department.id)?.add(transactionId);
     });
     
     const results: DepartmentStats[] = [];
@@ -99,7 +90,7 @@ export function DepartmentPerformanceReport() {
     });
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, activeEmployees, accounts, departments, transactions, loading, dateFrom, dateTo]);
+  }, [journalEntries, activeEmployees, accounts, departments, loading, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4">

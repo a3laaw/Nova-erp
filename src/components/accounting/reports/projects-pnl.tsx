@@ -44,17 +44,17 @@ export function ProjectsPnlReport() {
       const entryDate = entry.date?.toDate();
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
 
-      const profitCenterId = entry.transactionId;
-      if (!profitCenterId) return;
-
-      const pnl = pnlMap.get(profitCenterId) || { revenue: 0, directCosts: 0, profit: 0, margin: 0, clientId: '' };
-        
-      if (!pnl.clientId) {
-          const txInfo = transactionMap.get(profitCenterId);
-          if(txInfo) pnl.clientId = txInfo.clientId;
-      }
-
       entry.lines.forEach(line => {
+        const profitCenterId = line.auto_profit_center;
+        if (!profitCenterId) return;
+
+        const pnl = pnlMap.get(profitCenterId) || { revenue: 0, directCosts: 0, profit: 0, margin: 0, clientId: '' };
+        
+        if (!pnl.clientId) {
+            const txInfo = transactionMap.get(profitCenterId);
+            if(txInfo) pnl.clientId = txInfo.clientId;
+        }
+        
         const account = accounts.find(a => a.id === line.accountId);
         if(!account) return;
 
@@ -63,9 +63,9 @@ export function ProjectsPnlReport() {
         } else if (account.code.startsWith('51')) { // Direct Cost accounts
           pnl.directCosts += (line.debit || 0) - (line.credit || 0);
         }
-      });
         
-      pnlMap.set(profitCenterId, pnl);
+        pnlMap.set(profitCenterId, pnl);
+      });
     });
 
     const results: ProjectPnl[] = [];

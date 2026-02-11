@@ -33,7 +33,6 @@ export function ResourceAnalysisReport() {
     endDate.setHours(23, 59, 59, 999);
     const monthsInPeriod = Math.max(1, differenceInMonths(endDate, startDate) + 1);
 
-    const transactionMap = new Map(transactions.map(t => [t.id, t]));
     const engineerStats = new Map<string, ResourceStats>();
     const projectsPerEngineer = new Map<string, Set<string>>();
 
@@ -55,45 +54,45 @@ export function ResourceAnalysisReport() {
     journalEntries.forEach(entry => {
       const entryDate = entry.date?.toDate();
       if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
-
-      const transactionId = entry.transactionId;
-      if (!transactionId) return;
-
-      const transaction = transactionMap.get(transactionId);
-      const resourceId = transaction?.assignedEngineerId;
-      if (!resourceId || !engineerStats.has(resourceId)) return;
-
-      const stats = engineerStats.get(resourceId)!;
-
+      
       entry.lines.forEach(line => {
+        const resourceId = line.auto_resource_id;
+        if (!resourceId || !engineerStats.has(resourceId)) return;
+
+        const stats = engineerStats.get(resourceId)!;
+        
         const account = accounts.find(a => a.id === line.accountId);
         if(!account) return;
 
         let profitChange = 0;
-        if (account.code.startsWith('4')) { // Revenue
+        if (account.code.startsWith('4')) {
           profitChange = (line.credit || 0) - (line.debit || 0);
-        } else if (account.code.startsWith('51')) { // Direct Costs
+        } else if (account.code.startsWith('51')) {
           profitChange = -((line.debit || 0) - (line.credit || 0));
         }
         
         if (profitChange !== 0) {
             stats.totalProfit += profitChange;
         }
+
+        const profitCenterId = line.auto_profit_center;
+        if (profitCenterId) {
+            projectsPerEngineer.get(resourceId)?.add(profitCenterId);
+        }
       });
-      projectsPerEngineer.get(resourceId)?.add(transactionId);
     });
 
     const results: ResourceStats[] = [];
     engineerStats.forEach(stats => {
       stats.netContribution = stats.totalProfit - stats.totalSalary;
       stats.projectCount = projectsPerEngineer.get(stats.id)?.size || 0;
-      if (stats.projectCount > 0) {
+      if (stats.projectCount > 0 || stats.totalSalary > 0) {
         results.push(stats);
       }
     });
 
     return results.sort((a,b) => b.netContribution - a.netContribution);
-  }, [journalEntries, activeEmployees, accounts, transactions, loading, dateFrom, dateTo]);
+  }, [journalEntries, activeEmployees, accounts, loading, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4">
