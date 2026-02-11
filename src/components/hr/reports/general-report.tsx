@@ -1,6 +1,6 @@
 'use client';
-
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
