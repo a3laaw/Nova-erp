@@ -28,6 +28,7 @@ import { Label } from '../ui/label';
 import { searchQuotations } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DateInput } from '../ui/date-input';
+import { Input } from '@/components/ui/input';
 
 const statusTranslations: Record<Quotation['status'], string> = {
     draft: 'مسودة',
@@ -88,7 +89,6 @@ export function QuotationsList() {
         await deleteDoc(doc(firestore, 'quotations', itemToDelete.id!));
         toast({ title: 'نجاح', description: 'تم حذف عرض السعر بنجاح.' });
     } catch (error) {
-        console.error('Error deleting quotation:', error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف عرض السعر.' });
     } finally {
         setIsDeleting(false);
@@ -251,4 +251,3 @@ export function QuotationsList() {
     </>
   );
 }
-    
