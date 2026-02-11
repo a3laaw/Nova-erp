@@ -99,6 +99,7 @@ const navItems = {
           children: [
             { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير المالي اليومي' },
             { href: '/dashboard/accounting/bank-reconciliation', label: 'التسوية البنكية' },
+            { href: '/dashboard/accounting/intermediary-reconciliation', label: 'تسوية شركات الوساطة' },
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
             { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
@@ -186,6 +187,7 @@ const navItems = {
           children: [
             { href: '/dashboard/accounting/reports/daily-summary', label: 'Daily Financial Report' },
             { href: '/dashboard/accounting/bank-reconciliation', label: 'Bank Reconciliation' },
+            { href: '/dashboard/accounting/intermediary-reconciliation', label: 'Intermediary Reconciliation' },
             { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
             { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
             { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
@@ -198,7 +200,7 @@ const navItems = {
             { href: '/dashboard/accounting/income-statement', label: 'Income Statement' },
             { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet' },
             { href: '/dashboard/accounting/cash-flow', label: 'Cash Flow Statement' },
-            { href: '/dashboard/accounting/equity-statement', label: 'Statement of Changes in Equity' },
+            { href: '/dashboard/accounting/equity-statement', label: 'Statement of Equity' },
             { href: '/dashboard/accounting/financial-statement-notes', label: 'Notes to Financial Statements' },
             { href: '/dashboard/accounting/financial-forecast', label: 'Financial Forecast' },
           ]
