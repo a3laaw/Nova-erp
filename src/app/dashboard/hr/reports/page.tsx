@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, LeaveRequest } from '@/lib/types';
+import type { Employee, MonthlyAttendance, LeaveRequest, Payslip } from '@/lib/types';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInYears, startOfMonth, endOfMonth } from 'date-fns';
-import { Printer, UserCheck, UserX, CalendarIcon, Wallet, FileWarning, Search, Download } from 'lucide-react';
+import { Printer, UserCheck, UserX, CalendarIcon, Wallet, FileWarning, Search, Download, FileSpreadsheet } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -24,15 +24,21 @@ import { formatCurrency } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 // --- Status Translations & Colors ---
-const statusTranslations: Record<Employee['status'], string> = {
+const statusTranslations: Record<string, string> = {
   active: 'نشط',
   'on-leave': 'في إجازة',
   terminated: 'منتهية خدماته',
+  draft: 'مسودة',
+  processed: 'تمت المعالجة',
+  paid: 'مدفوع',
 };
-const statusColors: Record<Employee['status'], string> = {
+const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800 border-green-200',
   'on-leave': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   terminated: 'bg-red-100 text-red-800 border-red-200',
+  draft: 'bg-yellow-100 text-yellow-800',
+  processed: 'bg-blue-100 text-blue-800',
+  paid: 'bg-green-100 text-green-800',
 };
 const contractTypeTranslations: Record<string, string> = {
     permanent: 'دائم',
@@ -95,7 +101,7 @@ function GeneralEmployeeReport() {
                             <SelectTrigger id="status-filter" className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">الكل</SelectItem>
-                                {Object.entries(statusTranslations).map(([key, value]) => (
+                                {Object.entries(statusTranslations).filter(([k]) => ['active', 'on-leave', 'terminated'].includes(k)).map(([key, value]) => (
                                     <SelectItem key={key} value={key}>{value}</SelectItem>
                                 ))}
                             </SelectContent>
@@ -379,20 +385,138 @@ function MonthlyAttendanceReport() {
     );
 }
 
+// ADDED: تبويب الرواتب والمستحقات الشهرية مع فلتر الشهر + إجماليات + تنبيه للمتأخر
+function MonthlyPayrollReport() {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [year, setYear] = useState(new Date().getFullYear().toString());
+    const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+    
+    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+    const payslipsQuery = useMemo(() => {
+        if (!firestore) return null;
+        return [where('year', '==', parseInt(year)), where('month', '==', parseInt(month))];
+    }, [firestore, year, month]);
+    const { data: payslips, loading: payslipsLoading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
+
+    const loading = employeesLoading || payslipsLoading;
+    
+    const reportData = useMemo(() => {
+        if (!payslips || !employees) return [];
+        return payslips.map(p => {
+            const employee = employees.find(e => e.id === p.employeeId);
+            const totalEarnings = (p.earnings?.basicSalary || 0) + (p.earnings?.housingAllowance || 0) + (p.earnings?.transportAllowance || 0) + (p.earnings?.commission || 0);
+            const totalDeductions = (p.deductions?.absenceDeduction || 0) + (p.deductions?.otherDeductions || 0);
+            return {
+                ...p,
+                employeeName: employee?.fullName || p.employeeName,
+                employeeNumber: employee?.employeeNumber || '-',
+                department: employee?.department || '-',
+                totalEarnings,
+                totalDeductions,
+            };
+        }).sort((a,b) => a.employeeName.localeCompare(b.employeeName, 'ar'));
+    }, [payslips, employees]);
+
+    const totals = useMemo(() => ({
+        earnings: reportData.reduce((sum, p) => sum + p.totalEarnings, 0),
+        deductions: reportData.reduce((sum, p) => sum + p.totalDeductions, 0),
+        net: reportData.reduce((sum, p) => sum + p.netSalary, 0),
+    }), [reportData]);
+
+    const handleExcelExport = () => {
+        const dataForSheet = reportData.map(p => ({
+            'اسم الموظف': p.employeeName,
+            'الرقم الوظيفي': p.employeeNumber,
+            'الراتب الأساسي': p.earnings.basicSalary,
+            'البدلات': p.totalEarnings - p.earnings.basicSalary,
+            'الخصومات': p.totalDeductions,
+            'صافي الراتب': p.netSalary,
+            'الحالة': statusTranslations[p.status] || p.status,
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'الرواتب');
+        XLSX.writeFile(workbook, `Payroll_${year}-${month}.xlsx`);
+    };
+
+    const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+    return (
+        <Card>
+            <CardHeader className="flex-row items-center justify-between">
+                <div>
+                    <CardTitle>تقرير الرواتب الشهري</CardTitle>
+                    <CardDescription>ملخص لجميع كشوفات الرواتب التي تم إنشاؤها للشهر المحدد.</CardDescription>
+                </div>
+                <Button variant="outline" onClick={handleExcelExport} disabled={loading || reportData.length === 0}><Download className="ml-2 h-4"/> تصدير Excel</Button>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-wrap gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
+                    <div className="grid gap-2">
+                        <Label htmlFor="year-filter-payroll">السنة</Label>
+                        <Select value={year} onValueChange={setYear}>
+                            <SelectTrigger id="year-filter-payroll" className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="month-filter-payroll">الشهر</Label>
+                        <Select value={month} onValueChange={setMonth}>
+                            <SelectTrigger id="month-filter-payroll" className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="border rounded-lg">
+                    <Table>
+                        <TableHeader><TableRow><TableHead>الاسم</TableHead><TableHead>الأساسي</TableHead><TableHead>البدلات</TableHead><TableHead>الخصومات</TableHead><TableHead>الصافي</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {loading && Array.from({length:5}).map((_,i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full"/></TableCell></TableRow>)}
+                            {!loading && reportData.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد بيانات رواتب لهذا الشهر.</TableCell></TableRow>}
+                            {!loading && reportData.map(p => (
+                                <TableRow key={p.id}>
+                                    <TableCell className="font-medium">{p.employeeName}</TableCell>
+                                    <TableCell>{formatCurrency(p.earnings.basicSalary)}</TableCell>
+                                    <TableCell>{formatCurrency(p.totalEarnings - p.earnings.basicSalary)}</TableCell>
+                                    <TableCell className="text-destructive">{formatCurrency(p.totalDeductions)}</TableCell>
+                                    <TableCell className="font-bold">{formatCurrency(p.netSalary)}</TableCell>
+                                    <TableCell><Badge variant="outline" className={statusColors[p.status]}>{statusTranslations[p.status]}</Badge></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow className="font-bold text-base bg-muted">
+                                <TableCell colSpan={2}>الإجمالي</TableCell>
+                                <TableCell className="text-left">{formatCurrency(totals.earnings - totals.deductions)}</TableCell>
+                                <TableCell className="text-left text-destructive">{formatCurrency(totals.deductions)}</TableCell>
+                                <TableCell className="text-left">{formatCurrency(totals.net)}</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 // Main Page Component
 export default function HrReportsPage() {
     return (
         <Card dir="rtl">
             <CardHeader>
                 <CardTitle>تقارير الموارد البشرية</CardTitle>
-                <CardDescription>عرض تحليلات وتقارير خاصة بالموظفين والإجازات.</CardDescription>
+                <CardDescription>عرض تحليلات وتقارير خاصة بالموظفين والإجازات والرواتب.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="general" dir="rtl">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="general">تقرير الموظفين العام</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="general">الموظفين العام</TabsTrigger>
                         <TabsTrigger value="leave-balance">أرصدة الإجازات</TabsTrigger>
-                        <TabsTrigger value="attendance">الحضور والغياب الشهري</TabsTrigger>
+                        <TabsTrigger value="attendance">الحضور والغياب</TabsTrigger>
+                        <TabsTrigger value="payroll">الرواتب والمستحقات</TabsTrigger>
                     </TabsList>
                     <TabsContent value="general" className="mt-4">
                         <GeneralEmployeeReport />
@@ -402,6 +526,9 @@ export default function HrReportsPage() {
                     </TabsContent>
                     <TabsContent value="attendance" className="mt-4">
                         <MonthlyAttendanceReport />
+                    </TabsContent>
+                    <TabsContent value="payroll" className="mt-4">
+                        <MonthlyPayrollReport />
                     </TabsContent>
                 </Tabs>
             </CardContent>
