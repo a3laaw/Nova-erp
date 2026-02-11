@@ -133,13 +133,16 @@ const navItems = {
       ]
     },
     { 
-      label: 'المخازن',
+      label: 'المخازن والمشتريات',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard/warehouse',
       children: [
-        { href: '/dashboard/warehouse', label: 'عرض المخزون' },
-        { href: '/dashboard/purchasing', label: 'المشتريات' },
+        { href: '/dashboard/warehouse', label: 'لوحة معلومات المخازن' },
+        { href: '/dashboard/warehouse/items', label: 'الأصناف' },
+        { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
+        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
+        { href: '/dashboard/purchasing', label: 'أوامر الشراء' },
       ]
     },
     { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },
@@ -220,13 +223,16 @@ const navItems = {
       ]
     },
     { 
-      label: 'Warehouse',
+      label: 'Inventory & Purchasing',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard/warehouse',
       children: [
-        { href: '/dashboard/warehouse', label: 'Inventory View' },
-        { href: '/dashboard/purchasing', label: 'Purchasing' },
+        { href: '/dashboard/warehouse', label: 'Warehouse Dashboard' },
+        { href: '/dashboard/warehouse/items', label: 'Items' },
+        { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
+        { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
+        { href: '/dashboard/purchasing', label: 'Purchase Orders' },
       ]
     },
     { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar, roles: ['Admin', 'Engineer', 'Secretary'] },

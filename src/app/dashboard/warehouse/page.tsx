@@ -1,87 +1,69 @@
-
 'use client';
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
-import { inventory } from '@/lib/data';
-import { Progress } from '@/components/ui/progress';
-import { useLanguage } from '@/context/language-context';
+import { Package, Truck, BarChart3, ShoppingCart } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export default function WarehousePage() {
-  const { language } = useLanguage();
-  const t = (language === 'ar') ?
-    { title: 'المستودع والمخزون', description: 'تتبع مستويات مخزون جميع مواد البناء.', add: 'إضافة مادة', material: 'المادة', supplier: 'المورد', stock: 'مستوى المخزون', quantity: 'الكمية', lowStock: 'مخزون منخفض' } :
-    { title: 'Warehouse & Inventory', description: 'Track stock levels of all construction materials.', add: 'Add Material', material: 'Material', supplier: 'Supplier', stock: 'Stock Level', quantity: 'Quantity', lowStock: 'Low Stock' };
+const warehouseFeatures = [
+    {
+        title: 'إدارة الأصناف',
+        description: 'إضافة وتعديل ومتابعة جميع الأصناف في المخزون.',
+        href: '/dashboard/warehouse/items',
+        icon: Package,
+        color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+    },
+    {
+        title: 'التحويلات المخزنية',
+        description: 'تحويل الأصناف بين المخازن المختلفة وتتبع الكميات.',
+        href: '/dashboard/warehouse/transfers',
+        icon: Truck,
+        color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300'
+    },
+    {
+        title: 'تقارير المخزون',
+        description: 'مجموعة شاملة من التقارير لتحليل المخزون.',
+        href: '/dashboard/warehouse/reports',
+        icon: BarChart3,
+        color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
+    },
+    {
+        title: 'أوامر الشراء',
+        description: 'إدارة عمليات الشراء وتوريد الأصناف للمخازن.',
+        href: '/dashboard/purchasing',
+        icon: ShoppingCart,
+        color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
+    },
+];
 
+export default function WarehouseDashboardPage() {
   return (
-    <Card dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-            <div>
-                <CardTitle>{t.title}</CardTitle>
-                <CardDescription>
-                    {t.description}
-                </CardDescription>
-            </div>
-            <Button asChild size="sm" className="gap-1">
-                <Link href="#">
-                    <PlusCircle className="h-4 w-4" />
-                    {t.add}
-                </Link>
-            </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t.material}</TableHead>
-              <TableHead>{t.supplier}</TableHead>
-              <TableHead className="w-[300px]">{t.stock}</TableHead>
-              <TableHead className="text-right">{t.quantity}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {inventory.map((item) => {
-              const stockPercentage = (item.quantity / (item.lowStockThreshold * 2)) * 100;
-              const isLowStock = item.quantity <= item.lowStockThreshold;
-
-              return (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name[language]}</TableCell>
-                  <TableCell>{item.supplier[language]}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                        <Progress value={stockPercentage} className="h-2" />
-                        {isLowStock && <Badge variant="destructive">{t.lowStock}</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {item.quantity} {item.unit[language]}
-                  </TableCell>
-                </TableRow>
-              )
+    <Card dir="rtl">
+        <CardHeader>
+            <CardTitle>لوحة معلومات المخازن والمشتريات</CardTitle>
+            <CardDescription>نظرة عامة على إدارة المخزون وعمليات الشراء.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {warehouseFeatures.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                    <Link href={feature.href} key={feature.href} className="group block [perspective:1000px]">
+                        <Card className="h-full transition-all duration-300 ease-out [transform-style:preserve-3d] group-hover:shadow-2xl group-hover:[transform:rotateY(-10deg)_rotateX(2deg)]">
+                            <CardHeader>
+                                <div className="flex items-center gap-4">
+                                    <div className={cn("flex-shrink-0 p-3 rounded-lg", feature.color)}>
+                                        <Icon className="h-7 w-7" />
+                                    </div>
+                                    <CardTitle className="text-base font-bold">{feature.title}</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <CardDescription>{feature.description}</CardDescription>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                );
             })}
-          </TableBody>
-        </Table>
-      </CardContent>
+        </CardContent>
     </Card>
   );
 }
