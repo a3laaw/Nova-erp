@@ -67,8 +67,8 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // ADDED: فلاتر حالة + قسم + مدة خدمة
-    const [statusFilter, setStatusFilter] = useState('all');
+    // CHANGED: Default filter is now 'active'
+    const [statusFilter, setStatusFilter] = useState('active');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [serviceDurationFilter, setServiceDurationFilter] = useState('all');
     
@@ -83,7 +83,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     const [isTerminating, setIsTerminating] = useState(false);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
 
-    // IMPROVED: جمع الأقسام تلقائيًا من البيانات
     const departmentOptions = useMemo(() => {
         if (!employees) return [];
         const depts = new Set(employees.map(emp => emp.department).filter(Boolean));
@@ -91,7 +90,6 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
     }, [employees]);
 
 
-    // CHANGED: فلتر تاريخ التعيين تحول إلى مدة الخدمة
     const filteredEmployees = useMemo(() => {
         const today = new Date();
         let filtered = employees;

@@ -5,9 +5,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, collectionGroup, getDocs, query, writeBatch, doc, serverTimestamp, where } from 'firebase/firestore';
-import type { Employee, PaymentVoucher, ClientTransaction, TransactionStage } from '@/lib/types';
-import { Loader2, ShieldCheck, Microscope, AlertTriangle, Trash2 } from 'lucide-react';
+import { collection, collectionGroup, getDocs, query, writeBatch, doc } from 'firebase/firestore';
+import type { Employee } from '@/lib/types';
+import { Loader2, ShieldCheck, Microscope, AlertTriangle } from 'lucide-react';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
@@ -155,12 +155,6 @@ export function DataIntegrityManager() {
     const [deptCorrections, setDeptCorrections] = useState<Record<string, string>>({});
     const [allDeptsOptions, setAllDeptsOptions] = useState<any[]>([]);
 
-    // State for Unlinked Employees Analysis
-    const [unlinkedEmployees, setUnlinkedEmployees] = useState<Employee[] | null>(null);
-    const [loadingUnlinked, setLoadingUnlinked] = useState(false);
-    const [isDeletingUnlinked, setIsDeletingUnlinked] = useState(false);
-    const [isDeleteUnlinkedOpen, setIsDeleteUnlinkedOpen] = useState(false);
-
     const handleAnalyzeGeneric = async (
         setIsLoading: (loading: boolean) => void,
         setResults: (results: Discrepancy[] | null) => void,
@@ -266,52 +260,6 @@ export function DataIntegrityManager() {
     const handleAnalyzeDepartments = () => handleAnalyzeGeneric(setIsLoadingDepts, setDeptAnalysisResults, setDeptCorrections, 'departments', 'employees', 'department', false);
     const handleApplyDepartmentCorrections = () => handleApplyCorrectionsGeneric(deptCorrections, deptAnalysisResults, 'employees', 'department');
     
-    // --- Handlers for Unlinked Employees ---
-    const handleAnalyzeUnlinkedEmployees = async () => {
-        if (!firestore) return;
-        setLoadingUnlinked(true);
-        setUnlinkedEmployees(null);
-        try {
-            const [usersSnap, employeesSnap] = await Promise.all([
-                getDocs(collection(firestore, 'users')),
-                getDocs(collection(firestore, 'employees'))
-            ]);
-            const linkedEmployeeIds = new Set(usersSnap.docs.map(doc => doc.data().employeeId));
-            const allEmployees = employeesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-            const unlinked = allEmployees.filter(emp => !linkedEmployeeIds.has(emp.id!));
-            setUnlinkedEmployees(unlinked);
-    
-            if (unlinked.length === 0) {
-                toast({ title: 'فحص مكتمل', description: 'جميع الموظفين مرتبطون بحسابات مستخدمين.' });
-            }
-        } catch (error) {
-            console.error("Error analyzing unlinked employees:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل فحص الموظفين غير المرتبطين.' });
-        } finally {
-            setLoadingUnlinked(false);
-        }
-    };
-    
-    const handleDeleteUnlinked = async () => {
-        if (!firestore || !unlinkedEmployees || unlinkedEmployees.length === 0) return;
-        setIsDeletingUnlinked(true);
-        try {
-            const batch = writeBatch(firestore);
-            unlinkedEmployees.forEach(emp => {
-                batch.delete(doc(firestore, 'employees', emp.id!));
-            });
-            await batch.commit();
-            toast({ title: 'نجاح', description: `تم حذف ${unlinkedEmployees.length} موظفين غير مرتبطين بنجاح.` });
-            setUnlinkedEmployees([]); 
-        } catch (error) {
-            console.error("Error deleting unlinked employees:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الموظفين.' });
-        } finally {
-            setIsDeletingUnlinked(false);
-            setIsDeleteUnlinkedOpen(false);
-        }
-    };
-
     // Fetch options for dropdowns
     useEffect(() => {
         if(!firestore) return;
@@ -366,79 +314,8 @@ export function DataIntegrityManager() {
                     onApplyCorrections={handleApplyDepartmentCorrections}
                     itemCountLabel="موظفين"
                 />
-                
-                <Separator />
-                
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="font-semibold text-destructive">تنظيف بيانات الموظفين القديمة</h3>
-                            <p className="text-sm text-muted-foreground">البحث عن سجلات الموظفين التي ليس لها حساب مستخدم فعال في النظام وحذفها.</p>
-                        </div>
-                        <Button onClick={handleAnalyzeUnlinkedEmployees} disabled={loadingUnlinked} variant="outline" size="sm">
-                            {loadingUnlinked ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Microscope className="ml-2 h-4 w-4" />}
-                            فحص الموظفين غير المرتبطين
-                        </Button>
-                    </div>
-                    {loadingUnlinked && (
-                        <div className="text-center p-8 text-muted-foreground">
-                            <Loader2 className="mx-auto h-8 w-8 animate-spin" />
-                            <p className="mt-2">جاري الفحص...</p>
-                        </div>
-                    )}
-                    {unlinkedEmployees && !loadingUnlinked && (
-                        <div>
-                            {unlinkedEmployees.length === 0 ? (
-                                <div className="text-center p-8 text-green-600 bg-green-50 rounded-lg border border-green-200">
-                                    <ShieldCheck className="mx-auto h-12 w-12" />
-                                    <h3 className="mt-4 text-lg font-semibold">لا يوجد موظفون غير مرتبطين</h3>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                        <h3 className="font-semibold text-yellow-800 flex items-center gap-2">
-                                            <AlertTriangle />
-                                            تم العثور على {unlinkedEmployees.length} موظفين غير مرتبطين بحسابات
-                                        </h3>
-                                    </div>
-                                    <ul className="list-disc list-inside text-sm text-muted-foreground max-h-40 overflow-y-auto border p-2 rounded-md">
-                                        {unlinkedEmployees.map(emp => (
-                                            <li key={emp.id}>{emp.fullName} (الرقم الوظيفي: {emp.employeeNumber || 'لا يوجد'})</li>
-                                        ))}
-                                    </ul>
-                                    <div className="flex justify-end pt-4">
-                                        <Button variant="destructive" onClick={() => setIsDeleteUnlinkedOpen(true)}>
-                                            <Trash2 className="ml-2 h-4 w-4"/> حذف الموظفين المحددين ({unlinkedEmployees.length})
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
 
             </CardContent>
-
-             <AlertDialog open={isDeleteUnlinkedOpen} onOpenChange={setIsDeleteUnlinkedOpen}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد حذف الموظفين غير المرتبطين؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيتم حذف الموظفين الذين تم العثور عليهم بشكل نهائي. هذا الإجراء لا يمكن التراجع عنه.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeletingUnlinked}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDeleteUnlinked}
-                            disabled={isDeletingUnlinked}
-                            className="bg-destructive hover:bg-destructive/90"
-                        >
-                            {isDeletingUnlinked ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'نعم، قم بالحذف'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </Card>
     );
 }

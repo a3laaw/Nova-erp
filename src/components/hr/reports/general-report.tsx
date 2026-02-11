@@ -13,11 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Printer } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInYears } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import { formatCurrency } from '@/lib/utils';
 import { searchEmployees } from '@/lib/cache/fuse-search';
-import { differenceInYears } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 const statusTranslations: Record<string, string> = {
@@ -46,7 +45,8 @@ export function GeneralEmployeeReport() {
     const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees');
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+    // IMPROVED: Default to 'active' to hide terminated employees initially.
+    const [statusFilter, setStatusFilter] = useState('active');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [contractTypeFilter, setContractTypeFilter] = useState('all');
     const [serviceDurationFilter, setServiceDurationFilter] = useState('all');
