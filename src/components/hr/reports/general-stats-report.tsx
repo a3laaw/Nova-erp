@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 import { format, differenceInYears, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { Users, UserPlus, Star, CalendarX, Percent, Wallet, UserX as UserXIcon, Briefcase, Loader2 } from 'lucide-react';
+import { where } from 'firebase/firestore';
 
 const StatCard = ({ title, value, icon, description, loading, colorClass }: { title: string, value: string | number, icon: React.ReactNode, description?: string, loading: boolean, colorClass?: string }) => (
     <Card>
