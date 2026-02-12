@@ -1321,19 +1321,18 @@
         "orderDate": { "type": "string", "format": "date-time" },
         "vendorId": { "type": "string" },
         "vendorName": { "type": "string" },
-        "supplierQuotationId": { "type": "string" },
+        "projectId": { "type": "string", "description": "Optional link to a project." },
         "items": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "internalItemId": { "type": "string" },
-              "itemName": { "type": "string" },
+              "description": { "type": "string" },
               "quantity": { "type": "number" },
               "unitPrice": { "type": "number" },
               "total": { "type": "number" }
             },
-            "required": ["internalItemId", "itemName", "quantity", "unitPrice", "total"]
+            "required": ["description", "quantity", "unitPrice", "total"]
           }
         },
         "totalAmount": { "type": "number" },
@@ -1342,7 +1341,8 @@
         "status": {
           "type": "string",
           "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
-        }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
     },
@@ -1499,6 +1499,220 @@
             }
         },
         "required": ["grnNumber", "purchaseOrderId", "warehouseId", "date", "itemsReceived"]
+    },
+    "InventoryAdjustment": {
+      "title": "Inventory Adjustment",
+      "description": "Represents stock adjustments like opening balances, damages, etc.",
+      "type": "object",
+      "properties": {
+        "adjustmentNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "other"] },
+        "notes": { "type": "string" },
+        "journalEntryId": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemId": { "type": "string" },
+              "itemName": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitCost": { "type": "number" },
+              "totalCost": { "type": "number" },
+              "expiryDate": { "type": "string", "format": "date" }
+            },
+            "required": ["itemId", "itemName", "quantity", "unitCost", "totalCost"]
+          }
+        }
+      },
+      "required": ["adjustmentNumber", "date", "type", "items"]
+    },
+    "ConstructionProject": {
+      "title": "Construction Project",
+      "description": "Represents a construction/execution project.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "clientId": { "type": "string" },
+        "projectType": { "type": "string", "enum": ["استشاري", "تنفيذي", "مختلط"] },
+        "contractValue": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["مخطط", "قيد التنفيذ", "مكتمل", "معلق"] },
+        "budget": { "$ref": "#/entities/ProjectCosts" },
+        "actualCosts": { "$ref": "#/entities/ProjectCosts" },
+        "progressPercentage": { "type": "number" },
+        "mainEngineerId": { "type": "string" },
+        "linkedTransactionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "projectName", "clientId", "projectType", "startDate"]
+    },
+    "ProjectCosts": {
+        "title": "Project Costs",
+        "type": "object",
+        "properties": {
+            "materials": { "type": "number" },
+            "subcontractors": { "type": "number" },
+            "labor": { "type": "number" },
+            "equipment": { "type": "number" },
+            "overhead": { "type": "number" }
+        }
+    },
+    "Subcontractor": {
+        "title": "Subcontractor",
+        "description": "Represents a subcontractor company or individual.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "type": { "type": "string", "enum": ["كهرباء", "إنشائي", "تشطيبات", "سباكة", "تكييف", "أخرى"] },
+            "contactPerson": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
+            "taxNumber": { "type": "string" },
+            "bankAccount": {
+                "type": "object",
+                "properties": {
+                    "bankName": { "type": "string" },
+                    "accountNumber": { "type": "string" },
+                    "iban": { "type": "string" }
+                }
+            },
+            "performanceRating": { "type": "number" },
+            "isActive": { "type": "boolean" }
+        },
+        "required": ["name", "type", "isActive"]
+    },
+    "WorkOrder": {
+        "title": "Work Order",
+        "description": "An order for a subcontractor to perform work on a project.",
+        "type": "object",
+        "properties": {
+            "projectId": { "type": "string" },
+            "subcontractorId": { "type": "string" },
+            "scopeOfWork": { "type": "string" },
+            "amount": { "type": "number" },
+            "paymentSchedule": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "milestone": { "type": "string" },
+                        "percentage": { "type": "number" },
+                        "amount": { "type": "number" },
+                        "status": { "type": "string", "enum": ["معلق", "مستحق", "مدفوع"] }
+                    }
+                }
+            },
+            "startDate": { "type": "string", "format": "date-time" },
+            "endDate": { "type": "string", "format": "date-time" },
+            "status": { "type": "string", "enum": ["معلق", "قيد التنفيذ", "مكتمل", "مرفوض"] },
+            "completionDate": { "type": "string", "format": "date-time" },
+            "qualityCheckPassed": { "type": "boolean" },
+            "notes": { "type": "string" }
+        },
+        "required": ["projectId", "subcontractorId", "scopeOfWork", "amount", "startDate"]
+    },
+    "InventoryTransaction": {
+        "title": "Inventory Transaction",
+        "description": "A record of material movement in inventory.",
+        "type": "object",
+        "properties": {
+            "projectId": { "type": "string" },
+            "materialId": { "type": "string" },
+            "type": { "type": "string", "enum": ["استلام", "صرف", "إرجاع", "جرد"] },
+            "quantity": { "type": "number" },
+            "unitPriceAtTime": { "type": "number" },
+            "totalCost": { "type": "number" },
+            "date": { "type": "string", "format": "date-time" },
+            "notes": { "type": "string" },
+            "relatedDocumentId": { "type": "string" },
+            "relatedDocumentType": { "type": "string", "enum": ["purchaseOrder", "workOrder", "manual"] }
+        },
+        "required": ["materialId", "type", "quantity", "date"]
+    },
+    "SiteVisit": {
+        "title": "Site Visit",
+        "description": "A report from a site visit.",
+        "type": "object",
+        "properties": {
+            "projectId": { "type": "string" },
+            "visitDate": { "type": "string", "format": "date-time" },
+            "engineerId": { "type": "string" },
+            "progressUpdate": { "type": "number" },
+            "issues": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "description": { "type": "string" },
+                        "severity": { "type": "string", "enum": ["منخفض", "متوسط", "عالي"] },
+                        "assignedTo": { "type": "string" }
+                    }
+                }
+            },
+            "photos": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "url": { "type": "string", "format": "uri" },
+                        "caption": { "type": "string" }
+                    }
+                }
+            },
+            "nextActions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "action": { "type": "string" },
+                        "assignedTo": { "type": "string" },
+                        "dueDate": { "type": "string", "format": "date-time" }
+                    }
+                }
+            },
+            "weatherConditions": { "type": "string" },
+            "attendance": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "employeeId": { "type": "string" },
+                        "role": { "type": "string" }
+                    }
+                }
+            }
+        },
+        "required": ["projectId", "visitDate", "engineerId"]
+    },
+    "QualityTest": {
+        "title": "Quality Test",
+        "description": "A record of a quality test performed for a project.",
+        "type": "object",
+        "properties": {
+            "projectId": { "type": "string" },
+            "testType": { "type": "string", "enum": ["خرسانة", "حديد", "عزل مائي", "عزل حراري", "كهرباء", "أخرى"] },
+            "testDate": { "type": "string", "format": "date-time" },
+            "labName": { "type": "string" },
+            "result": { "type": "string", "enum": ["ناجح", "فاشل", "تحت المراجعة"] },
+            "labReportUrl": { "type": "string", "format": "uri" },
+            "correctiveActions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "description": { "type": "string" },
+                        "deadline": { "type": "string", "format": "date-time" },
+                        "status": { "type": "string", "enum": ["معلق", "قيد التنفيذ", "مكتمل"] }
+                    }
+                }
+            },
+            "relatedWorkOrderId": { "type": "string" }
+        },
+        "required": ["projectId", "testType", "testDate", "result"]
     }
   },
   "auth": {
@@ -1706,8 +1920,34 @@
     "/grns/{grnId}": {
         "schema": { "$ref": "#/entities/GoodsReceiptNote" },
         "description": "Stores all Goods Receipt Notes for incoming inventory."
+    },
+    "/inventoryAdjustments/{adjustmentId}": {
+      "schema": { "$ref": "#/entities/InventoryAdjustment" },
+      "description": "Stores stock adjustments like opening balances, damages, etc."
+    },
+    "/projects/{projectId}": {
+        "schema": { "$ref": "#/entities/ConstructionProject" },
+        "description": "Stores construction projects."
+    },
+    "/subcontractors/{subcontractorId}": {
+        "schema": { "$ref": "#/entities/Subcontractor" },
+        "description": "Stores subcontractor information."
+    },
+    "/projects/{projectId}/workOrders/{workOrderId}": {
+        "schema": { "$ref": "#/entities/WorkOrder" },
+        "description": "Stores work orders for subcontractors on a project."
+    },
+    "/projects/{projectId}/siteVisits/{siteVisitId}": {
+        "schema": { "$ref": "#/entities/SiteVisit" },
+        "description": "Stores site visit reports for a project."
+    },
+    "/projects/{projectId}/qualityTests/{qualityTestId}": {
+        "schema": { "$ref": "#/entities/QualityTest" },
+        "description": "Stores quality test results for a project."
+    },
+    "/projects/{projectId}/inventoryTransactions/{transactionId}": {
+        "schema": { "$ref": "#/entities/InventoryTransaction" },
+        "description": "Stores material movements for a project."
     }
   }
 }
-
-  
