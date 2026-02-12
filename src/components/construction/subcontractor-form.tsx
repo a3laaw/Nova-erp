@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -12,6 +13,7 @@ import type { Subcontractor } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
+import { Separator } from '../ui/separator';
 
 interface SubcontractorFormProps {
     isOpen: boolean;
@@ -27,15 +29,22 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
 
     const [formData, setFormData] = useState({
         name: '',
-        type: 'إنشائي',
+        type: 'إنشائي' as Subcontractor['type'],
+        specialization: '',
         contactPerson: '',
         phone: '',
+        mobile: '',
         email: '',
+        address: '',
         taxNumber: '',
+        commercialLicense: '',
         bankName: '',
         accountNumber: '',
         iban: '',
+        swiftCode: '',
         isActive: true,
+        blacklisted: false,
+        blacklistedReason: '',
     });
 
     useEffect(() => {
@@ -43,21 +52,33 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
             setFormData({
                 name: subcontractor.name,
                 type: subcontractor.type,
+                specialization: subcontractor.specialization || '',
                 contactPerson: subcontractor.contactPerson || '',
                 phone: subcontractor.phone || '',
+                mobile: subcontractor.mobile || '',
                 email: subcontractor.email || '',
+                address: subcontractor.address || '',
                 taxNumber: subcontractor.taxNumber || '',
+                commercialLicense: subcontractor.commercialLicense || '',
                 bankName: subcontractor.bankAccount?.bankName || '',
                 accountNumber: subcontractor.bankAccount?.accountNumber || '',
                 iban: subcontractor.bankAccount?.iban || '',
+                swiftCode: subcontractor.bankAccount?.swiftCode || '',
                 isActive: subcontractor.isActive ?? true,
+                blacklisted: subcontractor.blacklisted ?? false,
+                blacklistedReason: subcontractor.blacklistedReason || '',
             });
         } else {
-            setFormData({ name: '', type: 'إنشائي', contactPerson: '', phone: '', email: '', taxNumber: '', bankName: '', accountNumber: '', iban: '', isActive: true });
+            setFormData({
+                name: '', type: 'إنشائي', specialization: '', contactPerson: '', phone: '',
+                mobile: '', email: '', address: '', taxNumber: '', commercialLicense: '',
+                bankName: '', accountNumber: '', iban: '', swiftCode: '',
+                isActive: true, blacklisted: false, blacklistedReason: '',
+            });
         }
     }, [subcontractor, isOpen]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
     };
     
@@ -78,7 +99,8 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                 bankAccount: {
                     bankName: formData.bankName,
                     accountNumber: formData.accountNumber,
-                    iban: formData.iban
+                    iban: formData.iban,
+                    swiftCode: formData.swiftCode
                 }
             };
             
@@ -86,7 +108,7 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                 await updateDoc(doc(firestore, 'subcontractors', subcontractor!.id!), cleanFirestoreData(dataToSave));
                 toast({ title: 'نجاح', description: 'تم تحديث بيانات المقاول.' });
             } else {
-                await addDoc(collection(firestore, 'subcontractors'), cleanFirestoreData({ ...dataToSave, performanceRating: 3, createdAt: serverTimestamp() }));
+                await addDoc(collection(firestore, 'subcontractors'), cleanFirestoreData({ ...dataToSave, rating: 3, createdAt: serverTimestamp() }));
                 toast({ title: 'نجاح', description: 'تمت إضافة المقاول بنجاح.' });
             }
             onClose();
@@ -110,7 +132,7 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                             <Input id="name" value={formData.name} onChange={handleChange} required />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="type">النوع/التخصص</Label>
+                            <Label htmlFor="type">النوع/التخصص الرئيسي</Label>
                             <Select value={formData.type} onValueChange={(v) => handleSelectChange('type', v)}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>
@@ -124,6 +146,10 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                             </Select>
                         </div>
                         <div className="grid gap-2">
+                            <Label htmlFor="specialization">التخصص الدقيق</Label>
+                            <Input id="specialization" value={formData.specialization} onChange={handleChange} placeholder="مثال: أعمال خرسانية" />
+                        </div>
+                        <div className="grid gap-2">
                             <Label htmlFor="contactPerson">جهة الاتصال</Label>
                             <Input id="contactPerson" value={formData.contactPerson} onChange={handleChange} />
                         </div>
@@ -132,12 +158,29 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                             <Input id="phone" value={formData.phone} onChange={handleChange} dir="ltr" />
                         </div>
                         <div className="grid gap-2">
+                            <Label htmlFor="mobile">الجوال</Label>
+                            <Input id="mobile" value={formData.mobile} onChange={handleChange} dir="ltr" />
+                        </div>
+                        <div className="grid gap-2">
                             <Label htmlFor="email">البريد الإلكتروني</Label>
                             <Input id="email" type="email" value={formData.email} onChange={handleChange} dir="ltr" />
                         </div>
+                         <div className="col-span-2 grid gap-2">
+                            <Label htmlFor="address">العنوان</Label>
+                            <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="commercialLicense">رقم السجل التجاري</Label>
+                            <Input id="commercialLicense" value={formData.commercialLicense} onChange={handleChange} dir="ltr" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="taxNumber">الرقم الضريبي</Label>
+                            <Input id="taxNumber" value={formData.taxNumber} onChange={handleChange} dir="ltr" />
+                        </div>
+
                         <div className="col-span-2 border-t pt-4 space-y-4">
                              <Label className="font-semibold">المعلومات البنكية</Label>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="bankName">اسم البنك</Label>
                                     <Input id="bankName" value={formData.bankName} onChange={handleChange} />
@@ -150,12 +193,30 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                                     <Label htmlFor="iban">IBAN</Label>
                                     <Input id="iban" value={formData.iban} onChange={handleChange} dir="ltr"/>
                                 </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="swiftCode">SWIFT</Label>
+                                    <Input id="swiftCode" value={formData.swiftCode} onChange={handleChange} dir="ltr"/>
+                                </div>
                             </div>
                         </div>
-                        <div className="col-span-2 flex items-center space-x-2 rtl:space-x-reverse pt-4">
-                           <Switch id="isActive" checked={formData.isActive} onCheckedChange={(c) => setFormData(p => ({...p, isActive: c}))} />
-                           <Label htmlFor="isActive">حالة المقاول نشطة</Label>
-                        </div>
+
+                         <div className="col-span-2 border-t pt-4 space-y-4">
+                            <Label className="font-semibold">الحالة</Label>
+                             <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                               <Switch id="isActive" checked={formData.isActive} onCheckedChange={(c) => setFormData(p => ({...p, isActive: c}))} />
+                               <Label htmlFor="isActive">حالة المقاول نشطة</Label>
+                            </div>
+                             <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                               <Switch id="blacklisted" checked={formData.blacklisted} onCheckedChange={(c) => setFormData(p => ({...p, blacklisted: c}))} />
+                               <Label htmlFor="blacklisted">إضافة إلى القائمة السوداء</Label>
+                            </div>
+                            {formData.blacklisted && (
+                                 <div className="grid gap-2">
+                                    <Label htmlFor="blacklistedReason">سبب الحظر</Label>
+                                    <Textarea id="blacklistedReason" value={formData.blacklistedReason} onChange={handleChange} rows={2} />
+                                </div>
+                            )}
+                         </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
