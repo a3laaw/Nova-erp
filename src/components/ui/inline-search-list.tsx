@@ -30,42 +30,56 @@ export function InlineSearchList({
   const [search, setSearch] = React.useState('');
   const [showOptions, setShowOptions] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  
-  // Effect to set the initial search text when a value is provided
+
+  // Sync the input text when the external `value` prop changes.
+  // This happens when the form is first loaded or reset.
   React.useEffect(() => {
     const selectedLabel = options.find(opt => opt.value === value)?.label || '';
     setSearch(selectedLabel);
   }, [value, options]);
 
+  // Handle user typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSearch = e.target.value;
+    setSearch(newSearch);
+    // If user clears the input, we should also clear the underlying value
+    if (newSearch === '') {
+      onSelect('');
+    }
+    setShowOptions(true);
+  };
 
-  // Close dropdown if clicked outside
+  // Handle selecting an option from the list
+  const handleSelectOption = (option: SearchOption) => {
+    setSearch(option.label);
+    onSelect(option.value);
+    setShowOptions(false);
+  };
+  
+  // Handle clicking outside the component
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowOptions(false);
-        // If user clicks away without selecting, revert to the selected value's label or clear if no value
-        const selectedLabel = options.find(opt => opt.value === value)?.label || '';
-        setSearch(selectedLabel);
+        // On blur, if the text doesn't match a valid option, revert to the last valid selection.
+        const currentSelectionLabel = options.find(opt => opt.value === value)?.label || '';
+        setSearch(currentSelectionLabel);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [value, options]);
 
-  const filteredOptions = React.useMemo(() => {
-    // If the search text exactly matches the label of the selected value, don't show options.
-    const selectedLabel = options.find(opt => opt.value === value)?.label;
-    if (search === selectedLabel && value) {
-        return [];
-    }
 
+  const filteredOptions = React.useMemo(() => {
+    if (!search) {
+      return options; // Show all options if search is empty
+    }
     return options.filter(opt =>
       opt.label.toLowerCase().includes(search.toLowerCase()) ||
       (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [options, search, value]);
+  }, [options, search]);
 
   const MAX_DISPLAY_ITEMS = 50;
   const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
@@ -76,41 +90,22 @@ export function InlineSearchList({
         value={search}
         placeholder={placeholder}
         onFocus={() => !disabled && setShowOptions(true)}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setShowOptions(true);
-        }}
-        onBlur={() => {
-            // A short delay to allow click events on options to register
-            setTimeout(() => {
-                // If options are still showing (meaning no selection was made)
-                // revert the input to the last known good state
-                if (showOptions) {
-                    const selectedLabel = options.find(opt => opt.value === value)?.label || '';
-                    setSearch(selectedLabel);
-                    setShowOptions(false);
-                }
-            }, 150);
-        }}
+        onChange={handleInputChange}
         disabled={disabled}
         autoComplete="off"
       />
       {showOptions && !disabled && (
         <div data-inline-search-list-options className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
           <ul className="max-h-60 overflow-y-auto p-1">
-            {filteredOptions.length === 0 && search.trim() !== '' ? (
-              <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
-            ) : (
+            {displayOptions.length > 0 ? (
               <>
                 {displayOptions.map(opt => (
                   <li
                     key={opt.value}
                     className="cursor-pointer p-2 text-sm rounded-md hover:bg-accent"
-                    onMouseDown={(e) => {
+                    onMouseDown={(e) => { // Use onMouseDown to fire before blur
                       e.preventDefault();
-                      onSelect(opt.value);
-                      setSearch(opt.label);
-                      setShowOptions(false);
+                      handleSelectOption(opt);
                     }}
                   >
                     <div className="flex justify-between items-center">
@@ -125,6 +120,8 @@ export function InlineSearchList({
                   </li>
                 )}
               </>
+            ) : (
+              <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
             )}
           </ul>
         </div>
