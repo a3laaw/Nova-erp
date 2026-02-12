@@ -1169,7 +1169,8 @@
             "properties": {
                 "reconciledAt": { "type": "string", "format": "date-time" },
                 "reconciledBy": { "type": "string" },
-                "bankTransactionId": { "type": "string" }
+                "bankTransactionId": { "type": "string" },
+                "reconciliationEntryId": { "type": "string" }
             }
         },
         "lines": {
@@ -1951,3 +1952,5 @@
     }
   }
 }
+
+    

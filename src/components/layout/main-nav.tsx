@@ -1,3 +1,4 @@
+
 'use client';
 import React from 'react';
 import Link from 'next/link';
@@ -40,6 +41,7 @@ import {
   Building,
   Package,
   Boxes,
+  Construction
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -77,6 +79,18 @@ const navItems = {
       ]
     },
     { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
+    { 
+      label: 'المقاولات',
+      icon: Construction,
+      roles: ['Admin', 'Engineer'],
+      hrefPrefix: '/dashboard/construction',
+      children: [
+        { href: '/dashboard/construction/projects', label: 'لوحة المشاريع' },
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين' },
+        { href: '/dashboard/construction/inventory', label: 'إدارة المخزون' },
+        { href: '/dashboard/construction/reports', label: 'تقارير المقاولات' },
+      ]
+    },
     { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Building, roles: ['Admin', 'Accountant'] },
     { 
       label: 'المحاسبة', 
@@ -185,6 +199,18 @@ const navItems = {
     },
     { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+    { 
+      label: 'Construction',
+      icon: Construction,
+      roles: ['Admin', 'Engineer'],
+      hrefPrefix: '/dashboard/construction',
+      children: [
+        { href: '/dashboard/construction/projects', label: 'Projects Dashboard' },
+        { href: '/dashboard/construction/subcontractors', label: 'Subcontractors' },
+        { href: '/dashboard/construction/inventory', label: 'Inventory' },
+        { href: '/dashboard/construction/reports', label: 'Construction Reports' },
+      ]
+    },
     { href: '/dashboard/purchasing/vendors', label: 'Vendors', icon: Building, roles: ['Admin', 'Accountant'] },
     { 
       label: 'Accounting', 
@@ -448,3 +474,5 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     </>
   );
 }
+
+    
