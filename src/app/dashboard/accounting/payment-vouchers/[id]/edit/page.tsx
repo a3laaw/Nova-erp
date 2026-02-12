@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -180,7 +179,7 @@ export default function EditPaymentVoucherPage() {
                 updatePayload.transactionId = null;
             }
            
-           transaction_fs.update(voucherRefDoc, cleanFirestoreData(updatePayload));
+           transaction_fs.update(voucherRefDoc, updatePayload);
            
            const debitLine: any = { accountId: data.debitAccountId, accountName: debitAccount.name, debit: data.amount, credit: 0 };
             
@@ -271,7 +270,7 @@ export default function EditPaymentVoucherPage() {
 
   return (
     <Card className="max-w-4xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>

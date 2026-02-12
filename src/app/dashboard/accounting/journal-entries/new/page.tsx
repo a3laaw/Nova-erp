@@ -210,7 +210,7 @@ export default function NewJournalEntryPage() {
                 return newLine;
             });
 
-            transaction.set(newEntryRef, cleanFirestoreData({
+            transaction.set(newEntryRef, {
                 date: new Date(data.date),
                 narration: data.narration,
                 reference: data.reference,
@@ -223,7 +223,7 @@ export default function NewJournalEntryPage() {
                 createdBy: currentUser.id,
                 clientId: data.lines.some(l => l.projectLink) ? data.lines.find(l => l.projectLink)!.projectLink!.split('/')[0] : undefined,
                 transactionId: data.lines.some(l => l.projectLink) ? data.lines.find(l => l.projectLink)!.projectLink!.split('/')[1] : undefined,
-            }));
+            });
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ قيد اليومية كمسودة.' });

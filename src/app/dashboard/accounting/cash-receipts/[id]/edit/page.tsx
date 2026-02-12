@@ -346,7 +346,7 @@ export default function EditCashReceiptPage() {
                 paymentMethod: paymentMethod,
                 reference: reference,
             };
-            transaction_fs.update(receiptRefDoc, cleanFirestoreData(receiptUpdatePayload));
+            transaction_fs.update(receiptRefDoc, receiptUpdatePayload);
             
             let autoTags = {};
             if (projectId && transactionDataForCheck?.assignedEngineerId) {

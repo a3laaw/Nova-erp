@@ -39,8 +39,8 @@ import { DateInput } from '@/components/ui/date-input';
 
 const itemSchema = z.object({
   description: z.string().min(1, "الوصف مطلوب"),
-  quantity: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
-  unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0, "السعر مطلوب")),
+  quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
+  unitPrice: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0, "السعر مطلوب")),
 });
 
 const purchaseOrderSchema = z.object({
@@ -152,12 +152,12 @@ export default function NewPurchaseOrderPage() {
                     createdAt: serverTimestamp(),
                 };
 
-                transaction.set(newPoRef, cleanFirestoreData(poData));
+                transaction.set(newPoRef, poData);
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
             
             toast({ title: 'نجاح', description: 'تم إنشاء أمر الشراء كمسودة.' });
-            router.push('/dashboard/purchasing');
+            router.push('/dashboard/purchasing/purchase-orders');
 
         } catch (error) {
             console.error("Error creating purchase order:", error);
@@ -169,7 +169,7 @@ export default function NewPurchaseOrderPage() {
 
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
@@ -259,7 +259,7 @@ export default function NewPurchaseOrderPage() {
                             </Button>
                         </div>
                     </div>
-                    {errors.items && <p className="text-xs text-destructive">{errors.items.message || errors.items.root?.message}</p>}
+                    {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">
@@ -283,4 +283,3 @@ export default function NewPurchaseOrderPage() {
         </Card>
     );
 }
-    
