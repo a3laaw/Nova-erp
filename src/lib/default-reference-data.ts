@@ -1,4 +1,4 @@
-import type { Department, Job, Governorate, Area, TransactionType, WorkStage } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType, WorkStage, ItemCategory } from '@/lib/types';
 
 export const defaultDepartments: Omit<Department, 'id'>[] = [
   { name: 'القسم المعماري', order: 1 },
@@ -74,3 +74,11 @@ export const defaultWorkStages: Record<string, (Omit<WorkStage, 'id'> & { nextSt
         { name: 'مراجعة البلدية', order: 2, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 5, allowedRoles: [] },
     ],
 };
+
+export const defaultItemCategories: Omit<ItemCategory, 'id'>[] = [
+    { name: 'مواد غذائية', parentCategoryId: null, order: 1 },
+    { name: 'مواد استهلاكية', parentCategoryId: null, order: 2 },
+    { name: 'خدمات', parentCategoryId: null, order: 3 },
+    { name: 'مواد بناء', parentCategoryId: null, order: 4 },
+    { name: 'مواد تشطيبات', parentCategoryId: null, order: 5 },
+];
