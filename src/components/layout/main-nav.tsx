@@ -133,15 +133,23 @@ const navItems = {
       ]
     },
     { 
-      label: 'المخازن والمشتريات',
-      icon: Warehouse,
+      label: 'المشتريات',
+      icon: ShoppingCart,
       roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
         { href: '/dashboard/purchasing', label: 'لوحة المعلومات' },
-        { href: '/dashboard/purchasing/items', label: 'الأصناف' },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
+      ]
+    },
+    { 
+      label: 'المخازن',
+      icon: Warehouse,
+      roles: ['Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse/items', label: 'الأصناف' },
         { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
       ]
@@ -231,15 +239,23 @@ const navItems = {
       ]
     },
     { 
-      label: 'Inventory & Purchasing',
-      icon: Warehouse,
+      label: 'Purchasing',
+      icon: ShoppingCart,
       roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
         { href: '/dashboard/purchasing', label: 'Dashboard' },
-        { href: '/dashboard/purchasing/items', label: 'Items' },
         { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
+      ]
+    },
+    { 
+      label: 'Inventory',
+      icon: Warehouse,
+      roles: ['Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse/items', label: 'Items' },
         { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
         { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
       ]

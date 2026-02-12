@@ -1,25 +1,18 @@
 'use client';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { ItemsList } from '@/components/purchasing/items-list';
 
-export default function ItemsPage() {
-    return (
-        <Card dir="rtl">
-            <CardHeader>
-                <CardTitle>إدارة الأصناف</CardTitle>
-                <CardDescription>
-                    إضافة وتعديل جميع أصناف المنتجات والخدمات والمواد الخام في النظام.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ItemsList />
-            </CardContent>
-        </Card>
-    )
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader } from 'lucide-react';
+
+export default function RedirectPage() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/dashboard/warehouse/items');
+  }, [router]);
+  return (
+    <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
+    </div>
+  );
 }
