@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -117,7 +117,18 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     }
   }
 
-  const categoryOptions = categories.map(cat => ({ value: cat.id!, label: cat.name }));
+  const categoryOptions = useMemo(() => {
+    if (!categories) return [];
+    
+    // Create a Set of all category IDs that are used as a parent
+    const parentIds = new Set(categories.map(cat => cat.parentCategoryId).filter(Boolean));
+    
+    // Filter out categories that are parents, leaving only leaf nodes
+    const leafCategories = categories.filter(cat => !parentIds.has(cat.id!));
+    
+    return leafCategories.map(cat => ({ value: cat.id!, label: cat.name, searchKey: cat.name }));
+  }, [categories]);
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -148,7 +159,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
                 value={formData.categoryId}
                 onSelect={(v) => setFormData(p => ({ ...p, categoryId: v }))}
                 options={categoryOptions}
-                placeholder="اختر تصنيف..."
+                placeholder="اختر التصنيف النهائي..."
               />
             </div>
             <div className="md:col-span-2 grid gap-2">
