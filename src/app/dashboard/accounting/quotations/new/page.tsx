@@ -38,7 +38,7 @@ import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
 import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, Department, TransactionType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,7 +50,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const itemSchema = z.object({
   id: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب"),
-  quantity: z.preprocess(v => parseFloat(String(v)), z.number().min(0.01, "الكمية يجب أن تكون أكبر من صفر")),
+  quantity: z.preprocess(v => (String(v || '').trim() === '' ? 0 : parseFloat(String(v))), z.number().min(0.01, "الكمية يجب أن تكون أكبر من صفر")),
   unitPrice: z.preprocess(v => (String(v || '').trim() === '' ? 0 : parseFloat(String(v))), z.number().min(0, "السعر يجب أن لا يكون سالبًا")),
   condition: z.string().optional(),
 });
@@ -134,6 +134,7 @@ export default function NewQuotationPage() {
   // Control flow for template selection
   const [step, setStep] = useState<'form' | 'select'>('form');
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
+  const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
 
 
   const { register, handleSubmit, control, formState: { errors }, watch, setValue } = useForm<QuotationFormValues>({
@@ -171,7 +172,7 @@ export default function NewQuotationPage() {
       setRefDataLoading(true);
       try {
         const [clientsSnapshot, departmentsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
-          getDocs(query(collection(firestore, 'clients'))),
+          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
           getDocs(query(collection(firestore, 'departments'))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')))
@@ -470,10 +471,10 @@ export default function NewQuotationPage() {
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" />
+                                        <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
+                                        <Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
                                     </TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
                                     <TableCell>

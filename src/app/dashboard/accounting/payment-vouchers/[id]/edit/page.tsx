@@ -87,7 +87,7 @@ export default function EditPaymentVoucherPage() {
         reset({
             payeeName: data.payeeName,
             payeeType: data.payeeType,
-            amount: data.amount || '',
+            amount: data.amount || 0,
             paymentDate: data.paymentDate?.toDate ? formatDateFns(data.paymentDate.toDate(), 'yyyy-MM-dd') : '',
             paymentMethod: data.paymentMethod,
             description: data.description,
@@ -447,5 +447,3 @@ export default function EditPaymentVoucherPage() {
     </Card>
   );
 }
-
-  

@@ -580,7 +580,7 @@ export default function EditCashReceiptPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
                     <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>

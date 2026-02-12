@@ -37,8 +37,8 @@ import { DateInput } from '@/components/ui/date-input';
 
 const openingBalanceItemSchema = z.object({
   itemId: z.string().min(1, "الصنف مطلوب."),
-  quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
-  unitCost: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0, "التكلفة مطلوبة")),
+  quantity: z.preprocess((v) => parseFloat(String(v || '0')) || 0, z.number().positive("الكمية يجب أن تكون أكبر من صفر")),
+  unitCost: z.preprocess((v) => parseFloat(String(v || '0')) || 0, z.number().positive("التكلفة يجب أن تكون أكبر من صفر")),
   expiryDate: z.date().optional(),
 });
 
@@ -203,8 +203,8 @@ export default function OpeningBalancesPage() {
                                     return (
                                     <TableRow key={field.id}>
                                         <TableCell><Controller name={`items.${index}.itemId`} control={control} render={({ field }) => (<InlineSearchList value={field.value} onSelect={field.onChange} options={itemOptions} placeholder="اختر صنفًا..." />)} /></TableCell>
-                                        <TableCell><Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" /></TableCell>
-                                        <TableCell><Input type="number" {...register(`items.${index}.unitCost`)} step="any" className="dir-ltr" /></TableCell>
+                                        <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" /></TableCell>
+                                        <TableCell><Input type="number" step="0.001" {...register(`items.${index}.unitCost`)} className="dir-ltr" /></TableCell>
                                         <TableCell>
                                             {showExpiry ? <Controller name={`items.${index}.expiryDate`} control={control} render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} /> : <span className="text-xs text-muted-foreground">لا يتطلب</span>}
                                         </TableCell>
@@ -225,7 +225,7 @@ export default function OpeningBalancesPage() {
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => router.back()}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading}>
+                    <Button type="submit" disabled={isSaving || itemsLoading}>
                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
                         حفظ الأرصدة الافتتاحية
                     </Button>

@@ -453,11 +453,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <div className="space-y-4 pt-2">
                                     <div className="grid gap-1.5 max-w-sm">
                                         <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                                        <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
+                                        <Input id="basicSalary" type="number" step="0.001" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
                                     </div>
                                     <div className="grid gap-1.5">
                                         <Label htmlFor="targetDescription">العدد المستهدف (تارجت) <span className="text-destructive">*</span></Label>
-                                        <Input id="targetDescription" type="number" value={formData.targetDescription} onChange={handleInputChange} placeholder="مثال: 10" required dir="ltr"/>
+                                        <Input id="targetDescription" type="number" step="any" value={formData.targetDescription} onChange={handleInputChange} placeholder="مثال: 10" required dir="ltr"/>
                                     </div>
                                 </div>
                             )}
@@ -468,7 +468,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                     <Input
                                         id="pieceRate"
                                         type="number"
-                                        step="any"
+                                        step="0.001"
                                         value={formData.pieceRate}
                                         onChange={handleInputChange}
                                         dir="ltr"
@@ -483,7 +483,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label>
-                                <Input id="basicSalary" type="number" step="any" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
+                                <Input id="basicSalary" type="number" step="0.001" value={formData.basicSalary} onChange={handleInputChange} dir="ltr" required/>
                             </div>
                             <div className="grid gap-2">
                                 <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
@@ -499,7 +499,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </div>
                                 {showHousingAllowance && (
                                     <div className="grid gap-1.5 mt-2">
-                                        <Input id="housingAllowance" type="number" step="any" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr" placeholder="0.00"/>
+                                        <Input id="housingAllowance" type="number" step="0.001" value={formData.housingAllowance} onChange={handleInputChange} dir="ltr" placeholder="0.000"/>
                                     </div>
                                 )}
                             </div>
@@ -517,7 +517,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </div>
                                 {showTransportAllowance && (
                                     <div className="grid gap-1.5 mt-2">
-                                        <Input id="transportAllowance" type="number" step="any" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr" placeholder="0.00"/>
+                                        <Input id="transportAllowance" type="number" step="0.001" value={formData.transportAllowance} onChange={handleInputChange} dir="ltr" placeholder="0.000"/>
                                     </div>
                                 )}
                             </div>
@@ -565,5 +565,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-
-    

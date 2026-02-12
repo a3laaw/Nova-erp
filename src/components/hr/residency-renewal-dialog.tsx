@@ -48,66 +48,20 @@ export function ResidencyRenewalDialog({ isOpen, onClose, employee }: ResidencyR
     setIsSaving(true);
     
     try {
-        await runTransaction(firestore, async (transaction) => {
-            // 1. Get required accounts
-            const expenseAccountQuery = query(collection(firestore, 'chartOfAccounts'), where('code', '==', '110301'), limit(1)); // مصروفات مدفوعة مقدماً
-            const expenseAccountSnap = await transaction.get(expenseAccountQuery);
-            if(expenseAccountSnap.empty) throw new Error("حساب المصروفات المقدمة غير موجود.");
-            const debitAccount = { id: expenseAccountSnap.docs[0].id, ...expenseAccountSnap.docs[0].data() as Account };
-
-            // 2. Get next voucher number
-            const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'paymentVouchers');
-            const counterDoc = await transaction.get(counterRef);
-            let nextNumber = 1;
-            if (counterDoc.exists()) {
-                const counts = counterDoc.data()?.counts || {};
-                nextNumber = (counts[currentYear] || 0) + 1;
-            }
-            const newVoucherNumber = `PV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-            transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-
-            // 3. Create Draft Payment Voucher
-            const renewalCost = parseFloat(cost);
-            const newVoucherRef = doc(collection(firestore, 'paymentVouchers'));
-            const voucherData = {
-                voucherNumber: newVoucherNumber, voucherSequence: nextNumber, voucherYear: currentYear,
-                payeeName: 'وزارة الداخلية - شؤون الإقامة',
-                payeeType: 'vendor' as const,
-                employeeId: employee.id,
-                renewalExpiryDate: newExpiryDate,
-                amount: renewalCost,
-                amountInWords: '', // This will be filled by accountant
-                paymentDate: new Date(),
-                paymentMethod: 'Cash' as const,
-                description: `رسوم تجديد إقامة الموظف: ${employee.fullName}`,
-                debitAccountId: debitAccount.id,
-                debitAccountName: debitAccount.name,
-                creditAccountId: '', // To be filled by accountant
-                creditAccountName: '', // To be filled by accountant
-                status: 'draft' as const,
-                createdAt: serverTimestamp(),
-            };
-            transaction.set(newVoucherRef, voucherData);
-            
-            // 4. Optionally, create a draft journal entry if needed (or let the accountant do it)
-            // For now, we will let the accountant handle the JE upon payment.
+        const queryParams = new URLSearchParams({
+            payeeType: 'vendor',
+            payeeName: 'وزارة الداخلية - شؤون الإقامة',
+            amount: cost,
+            description: `رسوم تجديد إقامة للموظف: ${employee.fullName}`,
+            debitAccountCode: '110301', // مصروفات مدفوعة مقدماً
+            employeeId: employee.id!,
+            newExpiryDate: newExpiryDate.toISOString(),
+            source: 'residency_renewal'
         });
 
-        // 5. Send notification to accountants
-        const accountantsQuery = query(collection(firestore, 'users'), where('role', '==', 'Accountant'));
-        const accountantsSnap = await getDocs(accountantsQuery);
-        for (const userDoc of accountantsSnap.docs) {
-             await createNotification(firestore, {
-                userId: userDoc.id,
-                title: 'مطلوب مراجعة سند صرف',
-                body: `قام ${currentUser?.fullName} بطلب صرف رسوم تجديد إقامة لـ ${employee.fullName}. السند في انتظار اختيار حساب الدفع.`,
-                link: '/dashboard/accounting/payment-vouchers'
-            });
-        }
-        
-        toast({ title: 'تم إرسال الطلب', description: 'تم إنشاء سند صرف مسودة وإرسال إشعار للمحاسبة.' });
+        router.push(`/dashboard/accounting/payment-vouchers/new?${queryParams.toString()}`);
         onClose();
+
     } catch(error) {
         const message = error instanceof Error ? error.message : 'فشل إرسال طلب تجديد الإقامة.';
         toast({ variant: 'destructive', title: 'خطأ', description: message });
@@ -135,6 +89,7 @@ export function ResidencyRenewalDialog({ isOpen, onClose, employee }: ResidencyR
             <Input
               id="renewal-cost"
               type="number"
+              step="0.001"
               value={cost}
               onChange={(e) => setCost(e.target.value)}
               placeholder="0.000"
@@ -154,5 +109,3 @@ export function ResidencyRenewalDialog({ isOpen, onClose, employee }: ResidencyR
     </Dialog>
   );
 }
-
-  
