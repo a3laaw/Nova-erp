@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, Sparkles } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, Item, RequestForQuotation } from '@/lib/types';
@@ -101,11 +101,12 @@ export default function NewRfqPage() {
 
     const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
     const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
+    
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-    useEffect(() => {
-      if (typeof window !== 'undefined') {
-        setPortalTarget(document.body);
-      }
+      useEffect(() => {
+        if (typeof window !== 'undefined') {
+          setPortalTarget(document.body);
+        }
     }, []);
 
     const onSubmit = async (data: RfqFormValues) => {
@@ -162,7 +163,7 @@ export default function NewRfqPage() {
 
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
@@ -270,3 +271,4 @@ export default function NewRfqPage() {
         </Card>
     );
 }
+
