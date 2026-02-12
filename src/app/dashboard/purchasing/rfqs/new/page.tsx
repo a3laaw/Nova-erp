@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, serverTimestamp, orderBy, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, Item, RequestForQuotation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -119,6 +120,7 @@ export default function NewRfqPage() {
                     const selectedItem = items.find(i => i.id === item.internalItemId);
                     return {
                         ...item,
+                        id: generateId(),
                         itemName: selectedItem?.name || 'Unknown',
                         quantity: Number(item.quantity)
                     };
@@ -224,7 +226,7 @@ export default function NewRfqPage() {
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" />
+                                                <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" />
                                             </TableCell>
                                             <TableCell>
                                                 <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
@@ -243,7 +245,7 @@ export default function NewRfqPage() {
                             </Button>
                          </div>
                     </div>
-                    {errors.items && <p className="text-xs text-destructive mt-2">{errors.items.message || errors.items.root?.message}</p>}
+                    {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
