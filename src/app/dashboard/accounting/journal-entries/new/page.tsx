@@ -239,7 +239,7 @@ export default function NewJournalEntryPage() {
 
   return (
     <Card className="max-w-5xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
