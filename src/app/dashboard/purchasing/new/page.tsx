@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -152,7 +153,7 @@ export default function NewPurchaseOrderPage() {
                     createdAt: serverTimestamp(),
                 };
 
-                transaction.set(newPoRef, poData);
+                transaction.set(newPoRef, cleanFirestoreData(poData));
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
             
@@ -169,7 +170,7 @@ export default function NewPurchaseOrderPage() {
 
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={handleSubmit}>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>

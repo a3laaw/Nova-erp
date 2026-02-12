@@ -101,6 +101,12 @@ export default function NewRfqPage() {
 
     const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
     const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+      if (typeof window !== 'undefined') {
+        setPortalTarget(document.body);
+      }
+    }, []);
 
     const onSubmit = async (data: RfqFormValues) => {
         if (!firestore || !currentUser || loading) return;
@@ -194,6 +200,7 @@ export default function NewRfqPage() {
                                         onChange={field.onChange}
                                         placeholder={loading ? 'تحميل...' : 'اختر موردًا أو أكثر...'}
                                         disabled={loading}
+                                        menuPortalTarget={portalTarget}
                                     />
                                 )}
                             />
