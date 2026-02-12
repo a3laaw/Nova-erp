@@ -38,6 +38,7 @@ import { cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 
 const itemSchema = z.object({
+  id: z.string().optional(),
   internalItemId: z.string().min(1, 'الصنف مطلوب.'),
   itemName: z.string().optional(),
   quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
@@ -50,6 +51,8 @@ const rfqSchema = z.object({
 });
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
+
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 export default function NewRfqPage() {
     const router = useRouter();
@@ -68,7 +71,7 @@ export default function NewRfqPage() {
         defaultValues: {
             date: new Date(),
             vendorIds: [],
-            items: [{ internalItemId: '', quantity: 1 }],
+            items: [{ id: generateId(), internalItemId: '', quantity: 1 }],
         },
     });
 
@@ -96,12 +99,13 @@ export default function NewRfqPage() {
         generateRfqNumber();
     }, [firestore, toast]);
 
-    const vendorOptions: MultiSelectOption[] = useMemo(() => vendors.map(v => ({ value: v.id!, label: v.name })), [vendors]);
-    const itemOptions = useMemo(() => items.map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
+    const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
+    const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
 
     const onSubmit = async (data: RfqFormValues) => {
         if (!firestore || !currentUser || loading) return;
         setIsSaving(true);
+        let newRfqId = '';
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
@@ -115,12 +119,13 @@ export default function NewRfqPage() {
                 const newRfqNumber = `RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
                 
                 const newRfqRef = doc(collection(firestore, 'rfqs'));
+                newRfqId = newRfqRef.id;
                 
                 const processedItems = data.items.map(item => {
                     const selectedItem = items.find(i => i.id === item.internalItemId);
                     return {
-                        ...item,
                         id: generateId(),
+                        internalItemId: item.internalItemId,
                         itemName: selectedItem?.name || 'Unknown',
                         quantity: Number(item.quantity)
                     };
@@ -239,7 +244,7 @@ export default function NewRfqPage() {
                             </Table>
                          </div>
                          <div className="flex justify-start mt-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ internalItemId: '', quantity: 1 })}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), internalItemId: '', quantity: 1 })}>
                                 <PlusCircle className="ml-2 h-4 w-4" />
                                 إضافة صنف
                             </Button>

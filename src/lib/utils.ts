@@ -103,30 +103,22 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 
-export function cleanFirestoreData(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
+export function cleanFirestoreData(data: any): any {
+  if (Array.isArray(data)) {
+    return data.map(item => cleanFirestoreData(item));
   }
-  
-  // Convert Firestore Timestamps to JS Date objects for serialization
-  if (obj && typeof obj.toDate === 'function') {
-    return obj.toDate();
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(v => cleanFirestoreData(v));
-  }
-
-  if (typeof obj !== 'object' || obj instanceof Date) {
-    return obj;
-  }
-
-  const cleaned: { [key: string]: any } = {};
-  for (const key of Object.keys(obj)) {
-    if (obj[key] !== undefined) {
-      cleaned[key] = cleanFirestoreData(obj[key]);
+  if (data && typeof data === 'object' && !(data instanceof Date) && typeof data.toDate !== 'function') {
+    // This is a plain object, not a Date or Timestamp
+    const cleanedData: { [key: string]: any } = {};
+    for (const key in data) {
+      if (data[key] !== undefined) {
+        // Recurse for nested objects
+        cleanedData[key] = cleanFirestoreData(data[key]);
+      }
     }
+    return cleanedData;
   }
-  
-  return cleaned;
+  // Return primitives, Dates, Timestamps, and serverTimestamp() sentinels as is
+  // `undefined` values will be skipped by the loop above.
+  return data;
 }
