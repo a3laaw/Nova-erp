@@ -27,7 +27,7 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, PurchaseOrder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -169,7 +169,7 @@ export default function NewPurchaseOrderPage() {
 
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={handleSubmit}>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
@@ -233,8 +233,8 @@ export default function NewPurchaseOrderPage() {
                                     return (
                                     <TableRow key={field.id}>
                                         <TableCell><Input {...register(`items.${index}.description`)} placeholder="وصف البند..."/></TableCell>
-                                        <TableCell><Input type="number" {...register(`items.${index}.quantity`)} className="dir-ltr" /></TableCell>
-                                        <TableCell><Input type="number" {...register(`items.${index}.unitPrice`)} className="dir-ltr" /></TableCell>
+                                        <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" /></TableCell>
+                                        <TableCell><Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr" /></TableCell>
                                         <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
                                         <TableCell>
                                             <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
