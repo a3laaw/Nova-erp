@@ -11,7 +11,7 @@ import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { PlusCircle, Pencil, Trash2, Loader2, Save, Folder, FolderOpen, DownloadCloud } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, Loader2, Save, Plus, Minus, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,7 @@ function CategoryItem({
         <div className="flex items-center gap-2 cursor-pointer" onClick={toggleOpen}>
           {node.children.length > 0 && (
             <Button variant="ghost" size="icon" className="h-6 w-6">
-              {isOpen ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+              {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             </Button>
           )}
           <span className={cn("font-medium", node.children.length === 0 && "ml-10")}>{node.name}</span>
