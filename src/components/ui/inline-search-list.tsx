@@ -61,14 +61,26 @@ export function InlineSearchList({
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowOptions(false);
-        // On blur, if the text doesn't match a valid option, revert to the last valid selection.
-        const currentSelectionLabel = options.find(opt => opt.value === value)?.label || '';
-        setSearch(currentSelectionLabel);
+        // Find if the current text in the search input matches any option label
+        const match = options.find(opt => opt.label.toLowerCase() === search.toLowerCase());
+
+        if (match) {
+          // The user typed a full, valid option. Let's select it for them.
+          if (match.value !== value) {
+            onSelect(match.value);
+          }
+          // And make sure the input casing is correct
+          setSearch(match.label);
+        } else {
+          // The user typed something invalid or partial. Revert to the last valid selection's label.
+          const selectedLabel = options.find(opt => opt.value === value)?.label || '';
+          setSearch(selectedLabel);
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [value, options]);
+  }, [value, options, search, onSelect]);
 
 
   const filteredOptions = React.useMemo(() => {
