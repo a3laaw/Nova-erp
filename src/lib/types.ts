@@ -3,7 +3,6 @@
 
 
 
-
 export interface Company {
     id?: string;
     name: string;
@@ -50,7 +49,6 @@ export type Client = {
     governorate: string;
     area: string;
     block: string;
-    street: string;
     houseNumber: string;
   };
   fileId: string;
@@ -771,6 +769,7 @@ export interface ItemCategory {
   id?: string;
   name: string;
   parentCategoryId?: string | null;
+  order?: number;
 }
 
 export interface Item {
