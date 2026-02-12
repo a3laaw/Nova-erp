@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -252,13 +252,15 @@ export function ItemCategoriesManager() {
                     ))}
                 </div>
             </CardContent>
-             <CategoryForm
-                isOpen={isFormOpen}
-                onClose={() => setIsFormOpen(false)}
-                onSave={handleSave}
-                category={editingCategory}
-                allCategories={categories}
-            />
+            {isFormOpen && (
+                <CategoryForm
+                    isOpen={isFormOpen}
+                    onClose={() => setIsFormOpen(false)}
+                    onSave={handleSave}
+                    category={editingCategory}
+                    allCategories={categories}
+                />
+            )}
             <AlertDialog open={!!categoryToDelete} onOpenChange={() => setCategoryToDelete(null)}>
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف</AlertDialogTitle><AlertDialogDescription>هل أنت متأكد من حذف الفئة "{categoryToDelete?.name}"؟ سيتم حذف جميع الفئات الفرعية التابعة لها.</AlertDialogDescription></AlertDialogHeader>
@@ -268,5 +270,3 @@ export function ItemCategoriesManager() {
         </Card>
     );
 }
-
-    
