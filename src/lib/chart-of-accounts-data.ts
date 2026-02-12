@@ -13,6 +13,7 @@ export const hardcodedChartOfAccounts: Omit<Account, 'id'>[] = [
   { code: '110301', name: 'مصروفات مدفوعة مقدماً', type: 'asset', level: 3, parentCode: '1103', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit' },
   { code: '110302', name: 'سلف الموظفين', type: 'asset', level: 3, parentCode: '1103', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit' },
   { code: '110303', name: 'إيرادات مستحقة القبض', type: 'asset', level: 3, parentCode: '1103', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit' },
+  { code: '1104', name: 'المخزون', type: 'asset', level: 2, parentCode: '11', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit' },
   { code: '12', name: 'الأصول غير المتداولة', type: 'asset', level: 1, parentCode: '1', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' },
   { code: '1201', name: 'الأصول الثابتة', type: 'asset', level: 2, parentCode: '12', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' },
   { code: '120101', name: 'أراضي', type: 'asset', level: 3, parentCode: '1201', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' },
@@ -36,8 +37,9 @@ export const hardcodedChartOfAccounts: Omit<Account, 'id'>[] = [
   // Equity
   { code: '3', name: 'حقوق الملكية', type: 'equity', level: 0, parentCode: null, isPayable: false, statement: 'Balance Sheet', balanceType: 'Credit' },
   { code: '31', name: 'رأس المال', type: 'equity', level: 1, parentCode: '3', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' },
-  { code: '32', name: 'الأرباح المبقاة', type: 'equity', level: 1, parentCode: '3', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '32', name: 'الأرباح المبقاة والخسائر المرحلة', type: 'equity', level: 1, parentCode: '3', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' },
   { code: '33', name: 'جاري الشركاء', type: 'equity', level: 1, parentCode: '3', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' },
+  { code: '34', name: 'أرصدة افتتاحية', type: 'equity', level: 1, parentCode: '3', isPayable: false, statement: 'Balance Sheet', balanceType: 'Credit' },
   // Income
   { code: '4', name: 'الإيرادات', type: 'income', level: 0, parentCode: null, isPayable: false, statement: 'Income Statement', balanceType: 'Credit' },
   { code: '41', name: 'إيرادات النشاط الرئيسي', type: 'income', level: 1, parentCode: '4', isPayable: false, statement: 'Income Statement', balanceType: 'Credit' },

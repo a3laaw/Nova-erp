@@ -811,4 +811,19 @@ export interface GoodsReceiptNote {
     }[];
 }
 
-  
+export interface InventoryAdjustment {
+    id?: string;
+    adjustmentNumber: string;
+    date: any;
+    type: 'opening_balance' | 'damage' | 'theft' | 'other';
+    notes?: string;
+    journalEntryId?: string;
+    items: {
+        itemId: string;
+        itemName: string;
+        quantity: number;
+        unitCost: number;
+        totalCost: number;
+        expiryDate?: any;
+    }[];
+}

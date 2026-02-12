@@ -115,6 +115,22 @@
                     }
                 }
             }
+        },
+        "payment_methods": {
+            "type": "array",
+            "description": "Configurable payment methods and their associated fees.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "type": { "type": "string", "enum": ["percentage", "fixed"] },
+                    "value": { "type": "number" },
+                    "expenseAccountId": { "type": "string" },
+                    "expenseAccountName": { "type": "string" }
+                },
+                "required": ["id", "name", "type", "value", "expenseAccountId"]
+            }
         }
       },
       "required": ["company_name"]
@@ -511,9 +527,22 @@
         "hireDate": { "type": "string", "format": "date-time" },
         "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
-        "terminationReason": { "type": "string", "enum": ["resignation", "termination", null] },
-        "contractType": { "type": "string", "enum": ["permanent", "temporary", "subcontractor", "percentage", "part-time"] },
+        "terminationReason": { "type": "string", "enum": ["resignation", "termination", "probation", null] },
+        "contractType": { "type": "string", "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special"] },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
+        "pieceRateMode": {
+          "type": "string",
+          "enum": ["salary_with_target", "per_piece"],
+          "description": "For piece-rate contracts, defines if it's a fixed salary with a target, or purely per piece."
+        },
+        "targetDescription": {
+            "type": "number",
+            "description": "For salary-with-target contracts, this defines the numerical monthly/weekly target."
+        },
+        "pieceRate": {
+            "type": "number",
+            "description": "The price per piece for 'per_piece' contract types."
+        },
         "department": { "type": "string" },
         "basicSalary": { "type": "number" },
         "housingAllowance": { "type": "number" },
@@ -564,9 +593,29 @@
             "approvedAt": { "type": "string", "format": "date-time" },
             "rejectionReason": { "type": "string", "description": "Reason for rejecting the leave request." },
             "isBackFromLeave": { "type": "boolean", "description": "Indicates if the employee has returned from this specific leave." },
-            "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." }
+            "actualReturnDate": { "type": "string", "format": "date-time", "description": "The actual date the employee returned to work." },
+            "passportReceived": { "type": "boolean", "description": "Indicates if the employee's passport has been received for the leave." },
+            "isSalaryPaid": { "type": "boolean", "description": "Indicates if the salary for this leave has been processed." }
         },
         "required": ["employeeId", "employeeName", "leaveType", "startDate", "endDate", "days", "status", "createdAt"]
+    },
+    "PermissionRequest": {
+      "title": "Permission Request",
+      "description": "Represents a permission request from an employee for late arrival or early departure.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string", "description": "ID of the employee requesting permission." },
+        "employeeName": { "type": "string", "description": "Full name of the employee." },
+        "date": { "type": "string", "format": "date-time", "description": "The date for which the permission is requested." },
+        "type": { "type": "string", "enum": ["late_arrival", "early_departure"], "description": "The type of permission request." },
+        "reason": { "type": "string", "description": "The reason for the request." },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The current status of the request." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "approvedBy": { "type": "string", "description": "UID of the user who approved/rejected the request." },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "rejectionReason": { "type": "string", "description": "Reason for rejecting the request." }
+      },
+      "required": ["employeeId", "employeeName", "date", "type", "reason", "status", "createdAt"]
     },
     "Holiday": {
         "title": "Holiday",
@@ -607,8 +656,11 @@
             "type": "object",
             "properties": {
               "date": { "type": "string", "format": "date" },
-              "checkIn": { "type": "string" },
-              "checkOut": { "type": "string" },
+              "checkIn1": { "type": ["string", "null"] },
+              "checkOut1": { "type": ["string", "null"] },
+              "checkIn2": { "type": ["string", "null"] },
+              "checkOut2": { "type": ["string", "null"] },
+              "totalHours": { "type": ["number", "null"] },
               "status": { "type": "string", "enum": ["present", "absent", "late", "leave"] }
             },
             "required": ["date", "status"]
@@ -638,6 +690,8 @@
         "year": { "type": "number" },
         "month": { "type": "number" },
         "attendanceId": { "type": "string", "description": "Reference to the attendance document ID." },
+        "type": { "type": "string", "enum": ["Monthly", "Leave"], "description": "The type of payslip, either a regular monthly salary or a leave salary payout." },
+        "leaveRequestId": { "type": "string", "description": "If type is 'Leave', this links to the LeaveRequest document." },
         "salaryPaymentType": { "type": "string", "enum": ["cash", "cheque", "transfer"] },
         "earnings": {
           "type": "object",
@@ -658,7 +712,8 @@
         },
         "netSalary": { "type": "number" },
         "status": { "type": "string", "enum": ["draft", "processed", "paid"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string", "description": "Auto-generated notes, e.g., regarding leave." }
       },
       "required": ["employeeId", "year", "month", "earnings", "netSalary", "status", "createdAt"]
     },
@@ -1103,6 +1158,20 @@
             "enum": ["draft", "posted"],
             "description": "The status of the journal entry."
         },
+        "reconciliationStatus": {
+            "type": "string",
+            "enum": ["unreconciled", "reconciled", "pending"],
+            "description": "The bank reconciliation status of the entry."
+        },
+        "reconciliationInfo": {
+            "type": "object",
+            "description": "Details about the reconciliation.",
+            "properties": {
+                "reconciledAt": { "type": "string", "format": "date-time" },
+                "reconciledBy": { "type": "string" },
+                "bankTransactionId": { "type": "string" }
+            }
+        },
         "lines": {
           "type": "array",
           "items": {
@@ -1174,7 +1243,9 @@
         "amount": { "type": "number" },
         "amountInWords": { "type": "string" },
         "receiptDate": { "type": "string", "format": "date-time" },
-        "paymentMethod": { "type": "string", "enum": ["Cash", "Cheque", "Bank Transfer", "K-Net"] },
+        "paymentMethod": { "type": "string", "description": "The name of the payment method used, from settings." },
+        "bankFeeAmount": { "type": "number", "description": "The calculated bank fee for this transaction, if any." },
+        "netAmount": { "type": "number", "description": "The net amount received after deducting bank fees (amount - bankFeeAmount)." },
         "description": { "type": "string" },
         "reference": { "type": "string" },
         "journalEntryId": {
@@ -1290,6 +1361,172 @@
         "lastAmortizationDate": { "type": "string", "format": "date-time" }
       },
       "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId"]
+    },
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Represents a storage location for inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["name"]
+    },
+    "ItemCategory": {
+      "title": "Item Category",
+      "description": "A category for inventory items.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "parentCategoryId": { "type": "string", "description": "The ID of the parent category, null for root categories." },
+        "order": { "type": "number", "description": "The display order." }
+      },
+      "required": ["name"]
+    },
+    "Item": {
+      "title": "Inventory Item",
+      "description": "An item in the inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "sku": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "itemType": { 
+          "type": "string", 
+          "enum": ["product", "service"], 
+          "description": "'product' for physical goods (storable or consumable), 'service' for non-physical items." 
+        },
+        "inventoryTracked": {
+            "type": "boolean",
+            "description": "If true, the quantity of this product will be tracked (storable). If false, it's a consumable."
+        },
+        "unitOfMeasure": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "expiryTracked": { "type": "boolean", "description": "If true, this item requires expiry date tracking." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku", "categoryId", "itemType", "unitOfMeasure"]
+    },
+    "SupplierItem": {
+        "title": "Supplier Item",
+        "description": "Maps a supplier's specific item code and name to an internal inventory item.",
+        "type": "object",
+        "properties": {
+            "supplierId": { "type": "string" },
+            "internalItemId": { "type": "string" },
+            "supplierSku": { "type": "string", "description": "The SKU or item code used by the supplier." },
+            "supplierItemName": { "type": "string", "description": "The name of the item as it appears on the supplier's documents." }
+        },
+        "required": ["supplierId", "internalItemId", "supplierSku"]
+    },
+    "RequestForQuotation": {
+        "title": "Request for Quotation",
+        "description": "A request sent to vendors for pricing on specific items.",
+        "type": "object",
+        "properties": {
+            "rfqNumber": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "status": { "type": "string", "enum": ["draft", "sent", "closed", "cancelled"] },
+            "vendorIds": { "type": "array", "items": { "type": "string" } },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string" },
+                        "internalItemId": { "type": "string" },
+                        "itemName": { "type": "string" },
+                        "quantity": { "type": "number" }
+                    },
+                    "required": ["internalItemId", "itemName", "quantity"]
+                }
+            },
+            "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["rfqNumber", "date", "status", "items"]
+    },
+    "SupplierQuotation": {
+        "title": "Supplier Quotation",
+        "description": "A quotation received from a supplier in response to an RFQ.",
+        "type": "object",
+        "properties": {
+            "rfqId": { "type": "string" },
+            "vendorId": { "type": "string" },
+            "quotationReference": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "deliveryTimeDays": { "type": "number" },
+            "paymentTerms": { "type": "string" },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "rfqItemId": { "type": "string" },
+                        "unitPrice": { "type": "number" }
+                    },
+                    "required": ["rfqItemId", "unitPrice"]
+                }
+            },
+             "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["rfqId", "vendorId", "date"]
+    },
+    "GoodsReceiptNote": {
+        "title": "Goods Receipt Note",
+        "description": "A document to record the receipt of items into a warehouse.",
+        "type": "object",
+        "properties": {
+            "grnNumber": { "type": "string" },
+            "purchaseOrderId": { "type": "string" },
+            "warehouseId": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "itemsReceived": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "internalItemId": { "type": "string" },
+                        "quantityReceived": { "type": "number" },
+                        "batchNumber": { "type": "string" },
+                        "expiryDate": { "type": "string", "format": "date" }
+                    },
+                    "required": ["internalItemId", "quantityReceived"]
+                }
+            }
+        },
+        "required": ["grnNumber", "purchaseOrderId", "warehouseId", "date", "itemsReceived"]
+    },
+    "InventoryAdjustment": {
+        "title": "Inventory Adjustment",
+        "description": "Represents stock adjustments like opening balances, damages, etc.",
+        "type": "object",
+        "properties": {
+            "adjustmentNumber": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "other"] },
+            "notes": { "type": "string" },
+            "journalEntryId": { "type": "string" },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "itemId": { "type": "string" },
+                        "itemName": { "type": "string" },
+                        "quantity": { "type": "number" },
+                        "unitCost": { "type": "number" },
+                        "totalCost": { "type": "number" },
+                        "expiryDate": { "type": "string", "format": "date" }
+                    },
+                    "required": ["itemId", "itemName", "quantity", "unitCost", "totalCost"]
+                }
+            }
+        },
+        "required": ["adjustmentNumber", "date", "type", "items"]
     }
   },
   "auth": {
@@ -1355,6 +1592,10 @@
     "/leaveRequests/{leaveRequestId}": {
         "schema": { "$ref": "#/entities/LeaveRequest" },
         "description": "Stores all employee leave requests."
+    },
+    "/permissionRequests/{permissionId}": {
+        "schema": { "$ref": "#/entities/PermissionRequest" },
+        "description": "Stores all employee permission requests for late arrival or early departure."
     },
     "/holidays/{holidayId}": {
         "schema": { "$ref": "#/entities/Holiday" },
@@ -1465,6 +1706,38 @@
             "$ref": "#/entities/ResidencyRenewal"
         },
         "description": "Stores financial records for employee residency renewals."
+    },
+    "/items/{itemId}": {
+        "schema": { "$ref": "#/entities/Item" },
+        "description": "Stores all inventory items."
+    },
+    "/warehouses/{warehouseId}": {
+        "schema": { "$ref": "#/entities/Warehouse" },
+        "description": "Stores all warehouses and storage locations."
+    },
+    "/itemCategories/{categoryId}": {
+        "schema": { "$ref": "#/entities/ItemCategory" },
+        "description": "Stores inventory item categories in a hierarchical structure."
+    },
+    "/supplierItems/{supplierItemId}": {
+        "schema": { "$ref": "#/entities/SupplierItem" },
+        "description": "Maps supplier-specific item codes to internal item codes."
+    },
+    "/rfqs/{rfqId}": {
+      "schema": { "$ref": "#/entities/RequestForQuotation" },
+      "description": "Stores all Requests for Quotation sent to vendors."
+    },
+    "/supplierQuotations/{quotationId}": {
+        "schema": { "$ref": "#/entities/SupplierQuotation" },
+        "description": "Stores quotations received from suppliers."
+    },
+    "/grns/{grnId}": {
+        "schema": { "$ref": "#/entities/GoodsReceiptNote" },
+        "description": "Stores all Goods Receipt Notes for incoming inventory."
+    },
+    "/inventoryAdjustments/{adjustmentId}": {
+      "schema": { "$ref": "#/entities/InventoryAdjustment" },
+      "description": "Stores stock adjustments like opening balances, damages, etc."
     }
   }
 }

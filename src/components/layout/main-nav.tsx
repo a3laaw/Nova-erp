@@ -39,6 +39,7 @@ import {
   Scale,
   Building,
   Package,
+  Boxes,
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -151,6 +152,7 @@ const navItems = {
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'الأصناف' },
+        { href: '/dashboard/warehouse/opening-balances', label: 'أرصدة افتتاحية' },
         { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
       ]
@@ -258,6 +260,7 @@ const navItems = {
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'Items' },
+        { href: '/dashboard/warehouse/opening-balances', label: 'Opening Balances' },
         { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
         { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
       ]
