@@ -1,7 +1,7 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, Truck, BarChart3, ShoppingCart } from 'lucide-react';
+import { Package, Truck, BarChart3, ShoppingCart, Users, FileText as RfqIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const warehouseFeatures = [
@@ -11,6 +11,13 @@ const warehouseFeatures = [
         href: '/dashboard/warehouse/items',
         icon: Package,
         color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+    },
+    {
+        title: 'فئات الأصناف',
+        description: 'تنظيم الأصناف في هيكل شجري متعدد المستويات.',
+        href: '/dashboard/warehouse/categories',
+        icon: Package,
+        color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
     },
     {
         title: 'التحويلات المخزنية',
@@ -25,13 +32,6 @@ const warehouseFeatures = [
         href: '/dashboard/warehouse/reports',
         icon: BarChart3,
         color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
-    },
-    {
-        title: 'أوامر الشراء',
-        description: 'إدارة عمليات الشراء وتوريد الأصناف للمخازن.',
-        href: '/dashboard/purchasing',
-        icon: ShoppingCart,
-        color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
     },
 ];
 
@@ -67,3 +67,5 @@ export default function WarehouseDashboardPage() {
     </Card>
   );
 }
+
+    

@@ -1379,7 +1379,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "parentCategoryId": { "type": "string" },
+        "parentCategoryId": { "type": "string", "description": "The ID of the parent category, null for root categories." },
         "order": { "type": "number", "description": "The display order." }
       },
       "required": ["name"]
@@ -1693,3 +1693,5 @@
     }
   }
 }
+
+    

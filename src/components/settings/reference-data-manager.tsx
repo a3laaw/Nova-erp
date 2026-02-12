@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -57,7 +57,6 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
         cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300',
         red: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
         purple: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
-        orange: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300',
     }
 
     return (
@@ -120,9 +119,9 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [itemDuration, setItemDuration] = useState<number | ''>('');
   const [itemMaxOccurrences, setItemMaxOccurrences] = useState<number | ''>('');
   const [itemAllowManualCompletion, setItemAllowManualCompletion] = useState(false);
+  const [itemEnableModificationTracking, setItemEnableModificationTracking] = useState(false);
   const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
   const [itemAllowedDuringStages, setItemAllowedDuringStages] = useState<string[]>([]);
-  const [itemEnableModificationTracking, setItemEnableModificationTracking] = useState(false);
 
   // States for numerical ordering
   const [primaryOrderValues, setPrimaryOrderValues] = useState<Record<string, string>>({});
@@ -1170,9 +1169,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages' | 'itemCategories'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0, itemCategories: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1184,7 +1183,7 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, companiesSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, itemCategoriesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, companiesSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
                     getDocs(query(collection(firestore, 'companies'))),
@@ -1192,7 +1191,6 @@ export function ReferenceDataManager() {
                     getDocs(query(collectionGroup(firestore, 'areas'))),
                     getDocs(query(collection(firestore, 'transactionTypes'))),
                     getDocs(query(collectionGroup(firestore, 'workStages'))),
-                    getDocs(query(collection(firestore, 'itemCategories'))),
                 ]);
 
                 setCounts({
@@ -1203,7 +1201,6 @@ export function ReferenceDataManager() {
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
                     workStages: workStagesSnap.size,
-                    itemCategories: itemCategoriesSnap.size,
                 });
 
             } catch (error) {
@@ -1265,16 +1262,6 @@ export function ReferenceDataManager() {
     if (view === 'companies') {
         return <CompanyManager onBack={() => setView('dashboard')} />
     }
-    
-    if (view === 'itemCategories') {
-        return <ManagerView
-            primaryTitle="فئات الأصناف"
-            primarySingularTitle="فئة"
-            primaryCollectionName="itemCategories"
-            icon={<Package className="h-full w-full" />}
-            onBack={() => setView('dashboard')}
-        />
-    }
 
     return (
         <Card>
@@ -1325,15 +1312,9 @@ export function ReferenceDataManager() {
                     color="purple" 
                     loading={loadingCounts} 
                 />
-                 <StatCard 
-                    title="فئات الأصناف" 
-                    count={counts.itemCategories} 
-                    icon={<Package className="h-full w-full" />} 
-                    onNavigate={() => setView('itemCategories')} 
-                    color="orange" 
-                    loading={loadingCounts} 
-                />
             </CardContent>
         </Card>
     );
 }
+
+    
