@@ -25,12 +25,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Sparkles } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, Item, RequestForQuotation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
@@ -39,7 +39,7 @@ import { useAuth } from '@/context/auth-context';
 
 const itemSchema = z.object({
   id: z.string().optional(),
-  internalItemId: z.string().min(1, 'الصنف مطلوب.'),
+  internalItemId: z.string().min(1, "الصنف مطلوب."),
   itemName: z.string().optional(),
   quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
 });
@@ -66,7 +66,7 @@ export default function NewRfqPage() {
     const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
     const { data: items, loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
 
-    const { register, handleSubmit, control, formState: { errors }, watch } = useForm<RfqFormValues>({
+    const { register, handleSubmit, control, formState: { errors } } = useForm<RfqFormValues>({
         resolver: zodResolver(rfqSchema),
         defaultValues: {
             date: new Date(),
@@ -271,4 +271,3 @@ export default function NewRfqPage() {
         </Card>
     );
 }
-
