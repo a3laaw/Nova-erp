@@ -30,34 +30,42 @@ export function InlineSearchList({
   const [search, setSearch] = React.useState('');
   const [showOptions, setShowOptions] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-
-  const selectedLabel = React.useMemo(() => {
-    return options.find(opt => opt.value === value)?.label || '';
-  }, [options, value]);
-
+  
+  // Effect to set the initial search text when a value is provided
   React.useEffect(() => {
+    const selectedLabel = options.find(opt => opt.value === value)?.label || '';
     setSearch(selectedLabel);
-  }, [selectedLabel]);
+  }, [value, options]);
+
 
   // Close dropdown if clicked outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowOptions(false);
+        // If user clicks away without selecting, revert to the selected value's label or clear if no value
+        const selectedLabel = options.find(opt => opt.value === value)?.label || '';
+        setSearch(selectedLabel);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [value, options]);
 
-  const filteredOptions = React.useMemo(() =>
-    options.filter(opt =>
+  const filteredOptions = React.useMemo(() => {
+    // If the search text exactly matches the label of the selected value, don't show options.
+    const selectedLabel = options.find(opt => opt.value === value)?.label;
+    if (search === selectedLabel && value) {
+        return [];
+    }
+
+    return options.filter(opt =>
       opt.label.toLowerCase().includes(search.toLowerCase()) ||
       (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
-    ),
-  [options, search]);
+    );
+  }, [options, search, value]);
 
   const MAX_DISPLAY_ITEMS = 50;
   const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
@@ -71,14 +79,26 @@ export function InlineSearchList({
         onChange={(e) => {
           setSearch(e.target.value);
           setShowOptions(true);
-          if (value) onSelect(''); // Clear selection on new typing
+        }}
+        onBlur={() => {
+            // A short delay to allow click events on options to register
+            setTimeout(() => {
+                // If options are still showing (meaning no selection was made)
+                // revert the input to the last known good state
+                if (showOptions) {
+                    const selectedLabel = options.find(opt => opt.value === value)?.label || '';
+                    setSearch(selectedLabel);
+                    setShowOptions(false);
+                }
+            }, 150);
         }}
         disabled={disabled}
+        autoComplete="off"
       />
       {showOptions && !disabled && (
         <div data-inline-search-list-options className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
           <ul className="max-h-60 overflow-y-auto p-1">
-            {filteredOptions.length === 0 ? (
+            {filteredOptions.length === 0 && search.trim() !== '' ? (
               <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
             ) : (
               <>
