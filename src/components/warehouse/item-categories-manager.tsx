@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import type { ItemCategory } from '@/lib/types';
-import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronLeft, Save } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronLeft, Save, PlusCircle } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -23,7 +23,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "../ui/alert-dialog";
 
 interface CategoryNodeProps {
   category: ItemCategory & { children: any[] };
