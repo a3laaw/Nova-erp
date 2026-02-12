@@ -182,10 +182,15 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
                             <Label htmlFor="reorderLevel">حد إعادة الطلب</Label>
                             <Input id="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleChange} dir="ltr" placeholder="مثال: 10"/>
                           </div>
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse self-end pb-2">
-                            <Checkbox id="expiryTracked" checked={formData.expiryTracked} onCheckedChange={(c) => handleCheckboxChange('expiryTracked', !!c)} />
-                            <Label htmlFor="expiryTracked">يتطلب تتبع تاريخ الصلاحية</Label>
-                         </div>
+                          <div className="grid gap-2">
+                              <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                                  <Checkbox id="expiryTracked" checked={formData.expiryTracked} onCheckedChange={(c) => handleCheckboxChange('expiryTracked', !!c)} />
+                                  <Label htmlFor="expiryTracked">تتبع تاريخ الصلاحية</Label>
+                              </div>
+                              <p className="text-xs text-muted-foreground pr-6">
+                                  عند تفعيله، سيطلب منك النظام إدخال تاريخ صلاحية عند استلام كميات جديدة من هذا الصنف في المخزن.
+                              </p>
+                          </div>
                       </div>
                   )}
               </div>
