@@ -143,12 +143,12 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
               </Select>
             </div>
              <div className="grid gap-2">
-              <Label htmlFor="categoryId">فئة الصنف <span className="text-destructive">*</span></Label>
+              <Label htmlFor="categoryId">التصنيف <span className="text-destructive">*</span></Label>
               <InlineSearchList
                 value={formData.categoryId}
                 onSelect={(v) => setFormData(p => ({ ...p, categoryId: v }))}
                 options={categoryOptions}
-                placeholder="اختر فئة..."
+                placeholder="اختر تصنيف..."
               />
             </div>
             <div className="md:col-span-2 grid gap-2">
@@ -213,5 +213,3 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     </Dialog>
   );
 }
-
-  

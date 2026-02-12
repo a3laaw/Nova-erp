@@ -18,14 +18,16 @@ import { BrandingManager } from '@/components/settings/branding-manager';
 import { DataIntegrityManager } from '@/components/settings/data-integrity-manager';
 import { WorkHoursManager } from '@/components/settings/work-hours-manager';
 import { PaymentMethodsManager } from '@/components/settings/payment-methods-manager';
+import { ClassificationsManager } from '@/components/settings/classifications-manager';
 
 export default function SettingsPage() {
   return (
     <Tabs defaultValue="users" dir="rtl">
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-7">
         <TabsTrigger value="users">إدارة المستخدمين</TabsTrigger>
         <TabsTrigger value="branding">العلامة التجارية</TabsTrigger>
         <TabsTrigger value="reference-data">البيانات المرجعية</TabsTrigger>
+        <TabsTrigger value="classifications">التصنيفات</TabsTrigger>
         <TabsTrigger value="work-hours">الدوام والمواعيد</TabsTrigger>
         <TabsTrigger value="payment-methods">طرق الدفع</TabsTrigger>
         <TabsTrigger value="data-integrity">سلامة البيانات</TabsTrigger>
@@ -49,6 +51,9 @@ export default function SettingsPage() {
       <TabsContent value="reference-data">
         <ReferenceDataManager />
       </TabsContent>
+       <TabsContent value="classifications">
+        <ClassificationsManager />
+      </TabsContent>
       <TabsContent value="work-hours">
         <WorkHoursManager />
       </TabsContent>
@@ -61,5 +66,3 @@ export default function SettingsPage() {
     </Tabs>
   );
 }
-
-    

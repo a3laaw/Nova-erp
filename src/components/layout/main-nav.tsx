@@ -151,7 +151,6 @@ const navItems = {
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'الأصناف' },
-        { href: '/dashboard/warehouse/categories', label: 'فئات الأصناف' },
         { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
       ]
@@ -258,7 +257,6 @@ const navItems = {
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'Items' },
-        { href: '/dashboard/warehouse/categories', label: 'Item Categories' },
         { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
         { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
       ]
@@ -445,5 +443,3 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     </>
   );
 }
-
-    

@@ -118,7 +118,7 @@ export function ItemsList() {
                 <TableHead>الاسم</TableHead>
                 <TableHead>الكود (SKU)</TableHead>
                 <TableHead>النوع</TableHead>
-                <TableHead>الفئة</TableHead>
+                <TableHead>التصنيف</TableHead>
                 <TableHead className="text-left">سعر البيع</TableHead>
                 <TableHead className="text-left">الإجراءات</TableHead>
               </TableRow>
@@ -191,5 +191,3 @@ export function ItemsList() {
     </>
   );
 }
-
-  
