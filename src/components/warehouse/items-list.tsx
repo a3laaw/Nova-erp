@@ -12,7 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, where } from 'firebase/firestore';
 import type { Item, ItemCategory } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Package, MoreHorizontal, Pencil, Trash2, Search, PlusCircle } from 'lucide-react';
@@ -23,9 +23,12 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { searchItems } from '@/lib/cache/fuse-search';
 import { ItemForm } from './item-form';
+
+interface ItemsListProps {
+  selectedCategoryId: string | null;
+}
 
 const getItemTypeDisplay = (item: Item): { label: string; color: string } => {
     if (item.itemType === 'service') {
@@ -38,9 +41,8 @@ const getItemTypeDisplay = (item: Item): { label: string; color: string } => {
 };
 
 
-export function ItemsList() {
+export function ItemsList({ selectedCategoryId }: ItemsListProps) {
   const { firestore } = useFirebase();
-  const router = useRouter();
   const { toast } = useToast();
   
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
@@ -50,7 +52,16 @@ export function ItemsList() {
   
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: items, loading: itemsLoading, error: itemsError } = useSubscription<Item>(firestore, 'items');
+  const itemsQueryConstraints = useMemo(() => {
+    const constraints = [];
+    if (selectedCategoryId) {
+      constraints.push(where('categoryId', '==', selectedCategoryId));
+    }
+    // No need to order here, will sort client-side after augmenting.
+    return constraints;
+  }, [selectedCategoryId]);
+
+  const { data: items, loading: itemsLoading, error: itemsError } = useSubscription<Item>(firestore, 'items', itemsQueryConstraints);
   const { data: categories, loading: categoriesLoading, error: categoriesError } = useSubscription<ItemCategory>(firestore, 'itemCategories');
 
   const loading = itemsLoading || categoriesLoading;
@@ -64,7 +75,8 @@ export function ItemsList() {
     const augmentedItems = (items || []).map(item => ({
         ...item,
         categoryName: categoryMap.get(item.categoryId) || 'غير مصنف'
-    }));
+    })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+
     return searchItems(augmentedItems, searchQuery);
   }, [items, searchQuery, categoryMap]);
   

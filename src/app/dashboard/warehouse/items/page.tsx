@@ -1,4 +1,5 @@
 'use client';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -6,19 +7,41 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ItemsList } from '@/components/purchasing/items-list';
+import { ItemsList } from '@/components/warehouse/items-list';
+import { useFirebase, useSubscription } from '@/firebase';
+import type { ItemCategory } from '@/lib/types';
+import { ItemCategoryTree } from '@/components/warehouse/item-category-tree';
+
 
 export default function ItemsPage() {
+    const { firestore } = useFirebase();
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+    const { data: categories, loading: categoriesLoading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
+
     return (
         <Card dir="rtl">
             <CardHeader>
                 <CardTitle>إدارة الأصناف</CardTitle>
                 <CardDescription>
-                    إضافة وتعديل جميع أصناف المنتجات والخدمات والمواد الخام في النظام.
+                    تصفح الأصناف حسب التصنيف، أو أضف وعدّل الأصناف الموجودة.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ItemsList />
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div className="lg:col-span-1">
+                        <h3 className="font-semibold mb-2">التصنيفات</h3>
+                        <ItemCategoryTree 
+                            categories={categories || []}
+                            loading={categoriesLoading}
+                            selectedCategoryId={selectedCategoryId}
+                            onSelectCategory={setSelectedCategoryId}
+                        />
+                    </div>
+                    <div className="lg:col-span-3">
+                         <ItemsList selectedCategoryId={selectedCategoryId} />
+                    </div>
+                </div>
             </CardContent>
         </Card>
     )
