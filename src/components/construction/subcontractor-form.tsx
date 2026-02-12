@@ -36,12 +36,9 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
         mobile: '',
         email: '',
         address: '',
-        taxNumber: '',
-        commercialLicense: '',
         bankName: '',
         accountNumber: '',
         iban: '',
-        swiftCode: '',
         isActive: true,
         blacklisted: false,
         blacklistedReason: '',
@@ -58,12 +55,9 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                 mobile: subcontractor.mobile || '',
                 email: subcontractor.email || '',
                 address: subcontractor.address || '',
-                taxNumber: subcontractor.taxNumber || '',
-                commercialLicense: subcontractor.commercialLicense || '',
                 bankName: subcontractor.bankAccount?.bankName || '',
                 accountNumber: subcontractor.bankAccount?.accountNumber || '',
                 iban: subcontractor.bankAccount?.iban || '',
-                swiftCode: subcontractor.bankAccount?.swiftCode || '',
                 isActive: subcontractor.isActive ?? true,
                 blacklisted: subcontractor.blacklisted ?? false,
                 blacklistedReason: subcontractor.blacklistedReason || '',
@@ -71,8 +65,8 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
         } else {
             setFormData({
                 name: '', type: 'إنشائي', specialization: '', contactPerson: '', phone: '',
-                mobile: '', email: '', address: '', taxNumber: '', commercialLicense: '',
-                bankName: '', accountNumber: '', iban: '', swiftCode: '',
+                mobile: '', email: '', address: '',
+                bankName: '', accountNumber: '', iban: '',
                 isActive: true, blacklisted: false, blacklistedReason: '',
             });
         }
@@ -100,7 +94,6 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                     bankName: formData.bankName,
                     accountNumber: formData.accountNumber,
                     iban: formData.iban,
-                    swiftCode: formData.swiftCode
                 }
             };
             
@@ -169,18 +162,10 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                             <Label htmlFor="address">العنوان</Label>
                             <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
                         </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="commercialLicense">رقم السجل التجاري</Label>
-                            <Input id="commercialLicense" value={formData.commercialLicense} onChange={handleChange} dir="ltr" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="taxNumber">الرقم الضريبي</Label>
-                            <Input id="taxNumber" value={formData.taxNumber} onChange={handleChange} dir="ltr" />
-                        </div>
 
                         <div className="col-span-2 border-t pt-4 space-y-4">
                              <Label className="font-semibold">المعلومات البنكية</Label>
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="bankName">اسم البنك</Label>
                                     <Input id="bankName" value={formData.bankName} onChange={handleChange} />
@@ -192,10 +177,6 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                                 <div className="grid gap-2">
                                     <Label htmlFor="iban">IBAN</Label>
                                     <Input id="iban" value={formData.iban} onChange={handleChange} dir="ltr"/>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="swiftCode">SWIFT</Label>
-                                    <Input id="swiftCode" value={formData.swiftCode} onChange={handleChange} dir="ltr"/>
                                 </div>
                             </div>
                         </div>

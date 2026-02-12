@@ -3,6 +3,7 @@
 
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -618,7 +619,6 @@ export interface JournalEntry {
     reconciledAt: any;
     reconciledBy: string;
     bankTransactionId: string;
-    reconciliationEntryId?: string;
   };
   lines: JournalEntryLine[];
   clientId?: string;
@@ -729,12 +729,13 @@ export interface PurchaseOrder {
     orderDate: any;
     vendorId: string;
     vendorName: string;
-    supplierQuotationId?: string;
+    projectId?: string;
     items: PurchaseOrderItem[];
     totalAmount: number;
     paymentTerms?: string;
     notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
+    createdAt: any;
 }
 
 export interface ResidencyRenewal {
@@ -747,15 +748,6 @@ export interface ResidencyRenewal {
     monthlyAmortizationAmount: number;
     amortizationStatus: 'in-progress' | 'completed';
     lastAmortizationDate?: any;
-}
-
-export interface PaymentMethod {
-    id: string;
-    name: string;
-    type: 'fixed' | 'percentage';
-    value: number;
-    expenseAccountId: string;
-    expenseAccountName: string;
 }
 
 // INVENTORY TYPES
@@ -826,4 +818,123 @@ export interface InventoryAdjustment {
         totalCost: number;
         expiryDate?: any;
     }[];
+}
+
+// CONSTRUCTION MODULE TYPES
+export interface ProjectCosts {
+  materials?: number;
+  subcontractors?: number;
+  labor?: number;
+  equipment?: number;
+  overhead?: number;
+  total?: number;
+}
+
+export interface ConstructionProject {
+  id?: string;
+  projectId: string;
+  projectName: string;
+  clientId: string;
+  clientName?: string;
+  projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
+  contractValue: number;
+  currency?: string;
+  startDate: any;
+  plannedEndDate: any;
+  actualEndDate?: any;
+  status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى';
+  progressPercentage: number;
+  budget?: ProjectCosts;
+  actualCosts?: ProjectCosts;
+  mainEngineerId: string;
+  mainEngineerName?: string;
+  projectManagerId?: string;
+  siteEngineers?: string[];
+  linkedTransactionId?: string;
+  createdAt?: any;
+  createdBy?: string;
+  updatedAt?: any;
+  updatedBy?: string;
+  companyId?: string;
+  isActive?: boolean;
+}
+
+export interface Subcontractor {
+  id?: string;
+  name: string;
+  type: 'كهرباء' | 'إنشائي' | 'تشطيبات' | 'سباكة' | 'تكييف' | 'أخرى';
+  specialization?: string;
+  rating?: number;
+  contactPerson?: string;
+  phone?: string;
+  mobile?: string;
+  email?: string;
+  address?: string;
+  bankAccount?: {
+    bankName?: string;
+    accountNumber?: string;
+    iban?: string;
+  };
+  performanceHistory?: any[];
+  isActive: boolean;
+  blacklisted?: boolean;
+  blacklistedReason?: string;
+  createdAt?: any;
+  createdBy?: string;
+  updatedAt?: any;
+  updatedBy?: string;
+  companyId?: string;
+}
+
+export interface WorkOrder {
+    id?: string;
+    projectId: string;
+    subcontractorId: string;
+    scopeOfWork: string;
+    amount: number;
+    paymentSchedule: {
+        milestone: string;
+        percentage: number;
+        amount: number;
+        status: 'معلق' | 'مستحق' | 'مدفوع';
+    }[];
+    startDate: any;
+    endDate: any;
+    status: 'معلق' | 'قيد التنفيذ' | 'مكتمل' | 'مرفوض';
+    completionDate?: any;
+    qualityCheckPassed?: boolean;
+    notes?: string;
+}
+
+export interface SiteVisit {
+    id?: string;
+    projectId: string;
+    visitDate: any;
+    engineerId: string;
+    progressUpdate: number;
+    issues?: {
+        description: string;
+        severity: 'منخفض' | 'متوسط' | 'عالي';
+        assignedTo?: string;
+    }[];
+    photos?: { url: string, caption: string }[];
+    nextActions?: { action: string, assignedTo: string, dueDate: any }[];
+    weatherConditions?: string;
+    attendance?: { employeeId: string, role: string }[];
+}
+
+export interface QualityTest {
+    id?: string;
+    projectId: string;
+    testType: 'خرسانة' | 'حديد' | 'عزل مائي' | 'عزل حراري' | 'كهرباء' | 'أخرى';
+    testDate: any;
+    labName?: string;
+    result: 'ناجح' | 'فاشل' | 'تحت المراجعة';
+    labReportUrl?: string;
+    correctiveActions?: {
+        description: string;
+        deadline: any;
+        status: 'معلق' | 'قيد التنفيذ' | 'مكتمل';
+    }[];
+    relatedWorkOrderId?: string;
 }

@@ -1169,8 +1169,7 @@
             "properties": {
                 "reconciledAt": { "type": "string", "format": "date-time" },
                 "reconciledBy": { "type": "string" },
-                "bankTransactionId": { "type": "string" },
-                "reconciliationEntryId": { "type": "string" }
+                "bankTransactionId": { "type": "string" }
             }
         },
         "lines": {
@@ -1569,10 +1568,13 @@
         "properties": {
             "name": { "type": "string" },
             "type": { "type": "string", "enum": ["كهرباء", "إنشائي", "تشطيبات", "سباكة", "تكييف", "أخرى"] },
+            "specialization": { "type": "string" },
+            "rating": { "type": "number" },
             "contactPerson": { "type": "string" },
             "phone": { "type": "string" },
+            "mobile": { "type": "string" },
             "email": { "type": "string", "format": "email" },
-            "taxNumber": { "type": "string" },
+            "address": { "type": "string" },
             "bankAccount": {
                 "type": "object",
                 "properties": {
@@ -1581,8 +1583,28 @@
                     "iban": { "type": "string" }
                 }
             },
-            "performanceRating": { "type": "number" },
-            "isActive": { "type": "boolean" }
+            "performanceHistory": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "projectName": { "type": "string" },
+                  "startDate": { "type": "string", "format": "date-time" },
+                  "endDate": { "type": "string", "format": "date-time" },
+                  "totalValue": { "type": "number" },
+                  "paidAmount": { "type": "number" },
+                  "remainingAmount": { "type": "number" },
+                  "qualityRating": { "type": "number" },
+                  "timelinessRating": { "type": "number" },
+                  "overallRating": { "type": "number" },
+                  "notes": { "type": "string" }
+                }
+              }
+            },
+            "isActive": { "type": "boolean" },
+            "blacklisted": { "type": "boolean" },
+            "blacklistedReason": { "type": "string" }
         },
         "required": ["name", "type", "isActive"]
     },
@@ -1952,5 +1974,3 @@
     }
   }
 }
-
-    
