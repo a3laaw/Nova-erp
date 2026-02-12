@@ -270,6 +270,9 @@ export function ClassificationsManager() {
                                 options={categoryOptions}
                                 placeholder="اتركه فارغًا ليكون تصنيفًا رئيسيًا"
                             />
+                             <p className="text-xs text-muted-foreground">
+                                ابدأ بالكتابة للبحث عن فئة أب، أو استخدم زر (+) في القائمة الرئيسية للإضافة السريعة.
+                            </p>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="item-name">اسم التصنيف <span className="text-destructive">*</span></Label>
