@@ -138,5 +138,4 @@ WHERE ri.RFQ_ID = [Your_RFQ_ID];
 *   `RFQs` to `RFQ_Items` (One-to-Many)
 *   `RFQs` to `RFQ_Suppliers` (Many-to-Many through linking table)
 *   `RFQs` to `SupplierQuotations` (One-to-Many)
-*   `Suppliers` to `SupplierQuotations` (One-to-Many)
-*   `SupplierQuotations` to `Quotation_Items` (One-to-Many)
+*   `Supp

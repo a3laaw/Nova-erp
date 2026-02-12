@@ -95,7 +95,7 @@ runConfig:
 - **الوصف:** يمكنك إنشاء قيود يدوية أو الاعتماد على القيود التلقائية التي ينشئها النظام (مثل عند إنشاء عقد). تتبع القيود دورة عمل (مسودة -> مرحّل).
 - **المساعد المحاسبي الذكي:**
     - **المصدر:** `src/app/dashboard/accounting/assistant/page.tsx`
-    - **الوصف:** مساعد ذكاء اصطناعي يفهم الأوامر المحاسبية باللغة العربية ويحولها إلى قيود يومية جاهزة للحفظ.
+    - **الوصف:** مساعد ذكاء اصطناعي يفهم الأوامر المحاسبية باللغة العربية (الفصحى واللهجات العامية المختلفة) ويحولها إلى قيود يومية جاهزة للحفظ.
 
 ### 3. السندات (Vouchers)
 - **سندات القبض:**
@@ -110,15 +110,7 @@ runConfig:
 - **المصدر:** `src/app/dashboard/accounting/quotations/` و `src/components/clients/contract-clauses-form.tsx`
 - **الوصف:** يمكنك إنشاء عروض أسعار للعملاء. عند قبول عرض السعر، يمكنك تحويله مباشرة إلى عقد مفصل داخل معاملة العميل، مما يضمن ربط البيانات المالية بالعمليات.
 
-### 5. التسويات البنكية
-- **التسوية البنكية القياسية:**
-    - **المصدر:** `src/app/dashboard/accounting/reconciliation/page.tsx`
-    - **الوصف:** مطابقة كشف حساب البنك العادي (حركة مقابل حركة) مع قيود النظام، مع مساعدة من الذكاء الاصطناعي لاقتراح المطابقات.
-- **تسوية شركات الوساطة:**
-    - **المصدر:** `src/app/dashboard/accounting/reconciliation/page.tsx`
-    - **الوصف:** مخصصة لتسوية الدفعات المجمعة من بوابات الدفع (مثل ماي فاتورة). تقوم بمطابقة إيداع بنكي واحد مع عدة فواتير عملاء، مع حساب عمولة الوسيط وإنشاء قيد التسوية تلقائيًا.
-
-### 6. القوائم المالية (IFRS Compliant)
+### 5. القوائم المالية (IFRS Compliant)
 - **قائمة الدخل (Income Statement):**
     - **المصدر:** `src/app/dashboard/accounting/income-statement/page.tsx`
     - **الوصف:** تعرض الإيرادات والمصروفات وصافي الربح، مع فصل "تكلفة الإيرادات" لعرض "مجمل الربح" بشكل واضح.
@@ -135,7 +127,7 @@ runConfig:
     - **المصدر:** `src/app/dashboard/accounting/financial-statement-notes/page.tsx`
     - **الوصف:** صفحة تحتوي على محرر نصوص لحفظ الشروحات والتفاصيل الإضافية المطلوبة للقوائم المالية.
 
-### 7. التنبؤ المالي (Financial Forecast)
+### 6. التنبؤ المالي (Financial Forecast)
 - **المصدر:** `src/app/dashboard/accounting/financial-forecast/page.tsx`
 - **الوصف:** أداة تعتمد على بيانات العقود والمصاريف الثابتة لتقديم توقعات مستقبلية للإيرادات والمصروفات.
 ```
@@ -1443,7 +1435,8 @@ runConfig:
             "properties": {
                 "reconciledAt": { "type": "string", "format": "date-time" },
                 "reconciledBy": { "type": "string" },
-                "bankTransactionId": { "type": "string" }
+                "bankTransactionId": { "type": "string" },
+                "reconciliationEntryId": { "type": "string" }
             }
         },
         "lines": {
@@ -1595,18 +1588,19 @@ runConfig:
         "orderDate": { "type": "string", "format": "date-time" },
         "vendorId": { "type": "string" },
         "vendorName": { "type": "string" },
-        "projectId": { "type": "string", "description": "Optional link to a project." },
+        "supplierQuotationId": { "type": "string" },
         "items": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "description": { "type": "string" },
+              "internalItemId": { "type": "string" },
+              "itemName": { "type": "string" },
               "quantity": { "type": "number" },
               "unitPrice": { "type": "number" },
               "total": { "type": "number" }
             },
-            "required": ["description", "quantity", "unitPrice", "total"]
+            "required": ["internalItemId", "itemName", "quantity", "unitPrice", "total"]
           }
         },
         "totalAmount": { "type": "number" },
@@ -1615,8 +1609,7 @@ runConfig:
         "status": {
           "type": "string",
           "enum": ["draft", "approved", "partially_received", "received", "cancelled"]
-        },
-        "createdAt": { "type": "string", "format": "date-time" }
+        }
       },
       "required": ["poNumber", "orderDate", "vendorId", "items", "totalAmount", "status"]
     },
@@ -1635,6 +1628,172 @@ runConfig:
         "lastAmortizationDate": { "type": "string", "format": "date-time" }
       },
       "required": ["employeeId", "renewalDate", "newExpiryDate", "cost", "paymentVoucherId"]
+    },
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Represents a storage location for inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["name"]
+    },
+    "ItemCategory": {
+      "title": "Item Category",
+      "description": "A category for inventory items.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "parentCategoryId": { "type": "string", "description": "The ID of the parent category, null for root categories." },
+        "order": { "type": "number", "description": "The display order." }
+      },
+      "required": ["name"]
+    },
+    "Item": {
+      "title": "Inventory Item",
+      "description": "An item in the inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "sku": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "itemType": { 
+          "type": "string", 
+          "enum": ["product", "service"], 
+          "description": "'product' for physical goods (storable or consumable), 'service' for non-physical items." 
+        },
+        "inventoryTracked": {
+            "type": "boolean",
+            "description": "If true, the quantity of this product will be tracked (storable). If false, it's a consumable."
+        },
+        "unitOfMeasure": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "expiryTracked": { "type": "boolean", "description": "If true, this item requires expiry date tracking." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku", "categoryId", "itemType", "unitOfMeasure"]
+    },
+    "SupplierItem": {
+        "title": "Supplier Item",
+        "description": "Maps a supplier's specific item code and name to an internal inventory item.",
+        "type": "object",
+        "properties": {
+            "supplierId": { "type": "string" },
+            "internalItemId": { "type": "string" },
+            "supplierSku": { "type": "string", "description": "The SKU or item code used by the supplier." },
+            "supplierItemName": { "type": "string", "description": "The name of the item as it appears on the supplier's documents." }
+        },
+        "required": ["supplierId", "internalItemId", "supplierSku"]
+    },
+    "RequestForQuotation": {
+        "title": "Request for Quotation",
+        "description": "A request sent to vendors for pricing on specific items.",
+        "type": "object",
+        "properties": {
+            "rfqNumber": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "status": { "type": "string", "enum": ["draft", "sent", "closed", "cancelled"] },
+            "vendorIds": { "type": "array", "items": { "type": "string" } },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string" },
+                        "internalItemId": { "type": "string" },
+                        "itemName": { "type": "string" },
+                        "quantity": { "type": "number" }
+                    },
+                    "required": ["internalItemId", "itemName", "quantity"]
+                }
+            },
+            "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["rfqNumber", "date", "status", "items"]
+    },
+    "SupplierQuotation": {
+        "title": "Supplier Quotation",
+        "description": "A quotation received from a supplier in response to an RFQ.",
+        "type": "object",
+        "properties": {
+            "rfqId": { "type": "string" },
+            "vendorId": { "type": "string" },
+            "quotationReference": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "deliveryTimeDays": { "type": "number" },
+            "paymentTerms": { "type": "string" },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "rfqItemId": { "type": "string" },
+                        "unitPrice": { "type": "number" }
+                    },
+                    "required": ["rfqItemId", "unitPrice"]
+                }
+            },
+             "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["rfqId", "vendorId", "date"]
+    },
+    "GoodsReceiptNote": {
+        "title": "Goods Receipt Note",
+        "description": "A document to record the receipt of items into a warehouse.",
+        "type": "object",
+        "properties": {
+            "grnNumber": { "type": "string" },
+            "purchaseOrderId": { "type": "string" },
+            "warehouseId": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "itemsReceived": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "internalItemId": { "type": "string" },
+                        "quantityReceived": { "type": "number" },
+                        "batchNumber": { "type": "string" },
+                        "expiryDate": { "type": "string", "format": "date" }
+                    },
+                    "required": ["internalItemId", "quantityReceived"]
+                }
+            }
+        },
+        "required": ["grnNumber", "purchaseOrderId", "warehouseId", "date", "itemsReceived"]
+    },
+    "InventoryAdjustment": {
+        "title": "Inventory Adjustment",
+        "description": "Represents stock adjustments like opening balances, damages, etc.",
+        "type": "object",
+        "properties": {
+            "adjustmentNumber": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "other"] },
+            "notes": { "type": "string" },
+            "journalEntryId": { "type": "string" },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "itemId": { "type": "string" },
+                        "itemName": { "type": "string" },
+                        "quantity": { "type": "number" },
+                        "unitCost": { "type": "number" },
+                        "totalCost": { "type": "number" },
+                        "expiryDate": { "type": "string", "format": "date" }
+                    },
+                    "required": ["itemId", "itemName", "quantity", "unitCost", "totalCost"]
+                }
+            }
+        },
+        "required": ["adjustmentNumber", "date", "type", "items"]
     }
   },
   "auth": {
@@ -1814,6 +1973,38 @@ runConfig:
             "$ref": "#/entities/ResidencyRenewal"
         },
         "description": "Stores financial records for employee residency renewals."
+    },
+    "/items/{itemId}": {
+        "schema": { "$ref": "#/entities/Item" },
+        "description": "Stores all inventory items."
+    },
+    "/warehouses/{warehouseId}": {
+        "schema": { "$ref": "#/entities/Warehouse" },
+        "description": "Stores all warehouses and storage locations."
+    },
+    "/itemCategories/{categoryId}": {
+        "schema": { "$ref": "#/entities/ItemCategory" },
+        "description": "Stores inventory item categories in a hierarchical structure."
+    },
+    "/supplierItems/{supplierItemId}": {
+        "schema": { "$ref": "#/entities/SupplierItem" },
+        "description": "Maps supplier-specific item codes to internal item codes."
+    },
+    "/rfqs/{rfqId}": {
+      "schema": { "$ref": "#/entities/RequestForQuotation" },
+      "description": "Stores all Requests for Quotation sent to vendors."
+    },
+    "/supplierQuotations/{quotationId}": {
+        "schema": { "$ref": "#/entities/SupplierQuotation" },
+        "description": "Stores quotations received from suppliers."
+    },
+    "/grns/{grnId}": {
+        "schema": { "$ref": "#/entities/GoodsReceiptNote" },
+        "description": "Stores all Goods Receipt Notes for incoming inventory."
+    },
+    "/inventoryAdjustments/{adjustmentId}": {
+      "schema": { "$ref": "#/entities/InventoryAdjustment" },
+      "description": "Stores stock adjustments like opening balances, damages, etc."
     }
   }
 }
@@ -2069,6 +2260,7 @@ export function ArchitecturalAppointmentsView() {
         const buffer = workHours.appointment_buffer_time || 0;
     
         const todayDayIndex = date.getDay();
+    
         const todayDayName = weekDays[todayDayIndex].id;
     
         const isHoliday = branding?.work_hours?.holidays?.includes(todayDayName);
@@ -2121,11 +2313,11 @@ export function ArchitecturalAppointmentsView() {
                 ]);
 
                 const allEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.nameAr));
+                const archEngineers = allEngineers.filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
                 setEngineers(archEngineers);
                 
                 const allClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr)));
+                setClients(allClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
             } catch (error) {
                  console.error("Error fetching static appointment data:", error);
                  toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات المهندسين والعملاء.' });
@@ -2831,58 +3023,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-```
 
----
-## File: `docs/cash-receipts-features.md`
-```md
-# وحدة سندات القبض: شرح شامل للمميزات
-
-بناءً على طلبك، إليك شرح مفصل ومبسط لجميع المميزات التي قمنا بتطويرها في وحدة "سندات القبض"، والتي تم تصميمها لتكون مرنة، ذكية، ومتكاملة تمامًا مع بقية أقسام النظام.
-
----
-
-### 1. إنشاء سند قبض ذكي
-
-تم تصميم شاشة "سند قبض جديد" لتكون أكثر من مجرد أداة لإدخال البيانات، بل مساعد ذكي يسرّع عملك ويمنع الأخطاء.
-
-*   **الترقيم التلقائي:** لا داعي للقلق بشأن أرقام السندات. يقوم النظام تلقائيًا بإنشاء رقم سند فريد ومتسلسل لكل سنة (مثال: `CRV-2024-0001`).
-
-*   **الربط المباشر بالعملاء والعقود:**
-    *   بمجرد اختيار العميل من القائمة، يقوم النظام فورًا بجلب قائمة "العقود" أو "المشاريع" الخاصة بهذا العميل.
-    *   يمكنك اختيار ربط سند القبض بعقد معين.
-
-*   **توليد ذكي لوصف الدفعة (أهم ميزة):**
-    *   عندما تختار عقدًا معينًا وتدخل المبلغ المستلم، يقوم النظام **بتحليل بنود الدفعات في العقد تلقائيًا**.
-    *   يقوم بإنشاء وصف مفصل يوضح أي الدفعات يتم سدادها بهذا المبلغ (سواء كان سدادًا كاملًا أو جزئيًا).
-    *   **مثال:** إذا أدخلت مبلغ 700 دينار، وكان هناك دفعة مستحقة بقيمة 500 وأخرى بقيمة 1000، سيكتب النظام تلقائيًا في الوصف:
-        > سداد كامل للدفعة "الأولى" بقيمة 500 د.ك
-        > سداد جزئي من الدفعة "الثانية" بقيمة 200 د.ك
-
-*   **تحويل المبلغ إلى نص عربي (تفقيط):** يقوم النظام تلقائيًا بتحويل المبلغ المدخل بالأرقام إلى نص مكتوب باللغة العربية (مثال: "فقط سبعمائة دينار كويتي لا غير").
-
-### 2. تكامل فوري مع إدارة المشاريع
-
-لا يعمل قسم المحاسبة بمعزل عن الأقسام الهندسية. لذلك، تم ربط سندات القبض مباشرة بسير عمل المشاريع.
-
-*   **توثيق فوري في سجل المعاملة:**
-    *   عند حفظ سند قبض مرتبط بمشروع معين، يقوم النظام تلقائيًا بإضافة **تعليق** في "التايم لاين" الخاص بهذه المعاملة.
-    *   يحتوي التعليق على رقم السند وتفاصيل الدفعة، مما يضمن أن المهندس المسؤول عن المشروع على دراية تامة بالوضع المالي للمشروع لحظة بلحظة.
-
-*   **إشعارات تلقائية للمهندسين:**
-    *   في نفس اللحظة، يرسل النظام **إشعارًا (Notification)** للمهندس المسؤول عن المشروع، يخطره بأنه تم تسجيل دفعة مالية جديدة، مع رابط مباشر للمعاملة.
-
-### 3. سهولة العرض والطباعة
-
-*   **تصميم احترافي جاهز للطباعة:** عند عرض أي سند قبض، يتم تقديمه في تصميم أنيق وواضح، يتضمن شعار وبيانات شركتك، ومُعد خصيصًا للطباعة الرسمية.
-
-*   **تصدير PDF:** يمكنك بسهولة طباعة السند أو تصديره كملف PDF لتسليمه للعميل أو لأغراض الأرشفة.
-
-### 4. إدارة شاملة ومرنة
-
-*   **قائمة مركزية:** توفر لك صفحة "سندات القبض" قائمة بجميع السندات التي تم إنشاؤها، مع إمكانية البحث والفلترة السريعة.
-
-*   **تعديل وحذف:** يمكنك بسهولة تعديل بيانات أي سند قبض أو حذفه بالكامل إذا لزم الأمر.
 ```
 
 ---
@@ -2943,7 +3084,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 > **التاريخ:** (التاريخ الحالي)
 
 هذه الميزة تضمن وجود سجل دائم لجميع التعديلات المالية والوظيفية، مما يسهل المراجعات المستقبلية ويزيد من مستوى الرقابة الداخلية.
-
 ```
 
 ---
@@ -2972,11 +3112,9 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
 ### 3. نظام الإجازات والاستئذانات
 
-*   **الإجازات (نظام هجين):**
+*   **الإجازات:**
     *   **المصدر:** `src/app/dashboard/hr/leaves/`
     *   **الوصف:** نظام متكامل لتقديم ومتابعة طلبات الإجازات (سنوية، مرضية، طارئة) مع دورة موافقات وتحديث تلقائي لأرصدة الموظفين.
-        *   **تحقق من الرصيد:** قبل تقديم طلب الإجازة السنوية، يتحقق النظام تلقائيًا من رصيد الموظف ويمنع التقديم إذا كان الرصيد غير كافٍ.
-        *   **نموذج ورقي (PDF):** بعد الموافقة النهائية على الطلب، يمكنك طباعة نموذج إجازة رسمي بتصميم مطابق للنماذج الورقية، جاهز للتوقيع اليدوي من الإدارات المعنية.
 *   **الاستئذانات:**
     *   **المصدر:** `src/app/dashboard/hr/permissions/`
     *   **الوصف:** يمكن للموظفين تقديم طلبات استئذان (للتأخير الصباحي أو الخروج المبكر). يمر الطلب بدورة موافقات، وعند الموافقة عليه، يقوم نظام الرواتب **تلقائيًا** بتجاهل أي خصم تأخير لهذا اليوم.
@@ -3714,6 +3852,151 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
 ```
 
 ---
+## File: `docs/purchasing-inventory-logic.md`
+```md
+# منطق عمل وحدة المشتريات والمخازن الذكية
+
+هذا المستند يشرح بالتفصيل منطق العمل لدورة المشتريات الذكية، بدءًا من طلب التسعير وانتهاءً بتوليد القيود المحاسبية.
+
+### 1. دورة المشتريات الذكية
+
+1.  **طلب التسعير (Request for Quotation - RFQ):**
+    *   تبدأ الدورة عندما يقوم قسم المشتريات بإنشاء "طلب تسعير" جديد.
+    *   يتم في هذا الطلب تحديد الأصناف المطلوبة (بأكوادها الداخلية) والكميات.
+    *   يتم اختيار قائمة الموردين المراد إرسال الطلب إليهم.
+    *   حالة الطلب تكون "مسودة" ثم "مرسل".
+
+2.  **استقبال عروض أسعار الموردين (Supplier Quotations):**
+    *   عند استلام عرض سعر من مورد (بأي صيغة كانت، مثل PDF أو إيميل)، يقوم المستخدم بإدخال بياناته في النظام.
+    *   يتم إنشاء "عرض سعر مورد" جديد وربطه بطلب التسعير (RFQ) الأصلي.
+    *   هنا تحدث أهم خطوة: **الربط (Mapping)**.
+
+### 2. آلية الربط (Mapping) - قلب النظام
+
+*   **المشكلة:** كل مورد يستخدم أكواد وأسماء مختلفة لنفس الصنف. (مثال: صنف "أسمنت بورتلاندي" الداخلي، قد يكون عند مورد "Cem-X" وعند آخر "PC-42").
+*   **الحل:** كيان وسيط اسمه `SupplierItem`.
+    *   عند إدخال عرض سعر مورد لأول مرة، إذا كان يحتوي على صنف غير معروف، يطلب النظام من المستخدم ربطه بأحد الأصناف الداخلية.
+    *   يتم حفظ هذا الربط في جدول `SupplierItem` مرة واحدة فقط. (مثال: ربط كود "Cem-X" من المورد "أ" بالصنف الداخلي "أسمنت بورتلاندي").
+    *   في المرات القادمة، عند رفع عرض سعر من نفس المورد يحتوي على نفس الكود، يتعرف عليه النظام تلقائيًا ويقوم بالربط.
+
+### 3. محرك المفاضلة (Comparison Engine)
+
+*   بعد إغلاق طلب التسعير (RFQ) واستلام العروض، يقوم النظام تلقائيًا بإنشاء **جدول مقارنة (Comparison Matrix)**.
+*   يعرض هذا الجدول كل صنف مطلوب في صف، وكل مورد في عمود.
+*   **معايير المقارنة:**
+    1.  **السعر (Price):** السعر المقدم من كل مورد للصنف.
+    2.  **سرعة التوريد (Delivery Speed):** عدد أيام التوريد المذكورة في العرض.
+    3.  **تقييم المورد (Vendor Rating):** (سيتم بناء هذا النظام لاحقًا) بناءً على التزامه بمواعيد التوريد وجودة الأصناف السابقة.
+    4.  **شروط الدفع (Payment Terms):** (آجل 30 يوم، دفعة مقدمة، ...إلخ).
+*   **تمييز الأفضل:** يقوم النظام بتلوين الخلية التي تحتوي على **أفضل عرض لكل صنف** بناءً على أقل سعر (يمكن تطويره لاحقًا ليشمل باقي المعايير).
+*   **القرار النهائي:** يمكن لمدير المشتريات اختيار المورد الفائز لكل صنف (قد لا يكون الأرخص دائمًا)، أو اختيار مورد واحد لتوريد جميع الأصناف.
+
+### 4. الأتمتة (Automation)
+
+1.  **أمر الشراء (Purchase Order - PO):**
+    *   بعد اعتماد العروض الفائزة، يقوم النظام بإنشاء "أمر شراء" تلقائيًا للمورد المختار، يحتوي على الأصناف والكميات والأسعار المتفق عليها.
+
+2.  **إذن الإضافة المخزني (Goods Receipt Note - GRN):**
+    *   عند وصول البضاعة من المورد، يقوم أمين المخزن بفتح أمر الشراء المرتبط وإنشاء "إذن إضافة مخزني".
+    *   يسجل الكميات المستلمة فعليًا (قد تختلف عن المطلوب).
+    *   عند تأكيد إذن الإضافة، يقوم النظام **تلقائيًا** بزيادة رصيد الأصناف المستلمة في المخزن المحدد.
+
+3.  **القيود المحاسبية الآلية:**
+    *   عند تأكيد إذن الإضافة المخزني، يقوم النظام بإنشاء **قيد يومية تلقائي** ومُرحّل:
+        *   **مدين:** حـ/ المخزون (بقيمة البضاعة المستلمة).
+        *   **دائن:** حـ/ المورد (لإثبات المديونية للمورد).
+    *   عند دفع مستحقات المورد لاحقًا عبر "سند صرف"، يتم إغلاق حساب المورد مقابل حساب الصندوق أو البنك.
+
+### 5. حلول OCR المقترحة
+
+*   **الخيار الأول (الأكثر قوة ومرونة):** استخدام مكتبات Python مع نماذج تعلم الآلة.
+    *   **المكتبات:** `PyMuPDF` لاستخلاص النصوص والصور من PDF، `OpenCV` للمعالجة الأولية للصور، `Pytesseract` (واجهة لـ Tesseract OCR) لتحويل الصور إلى نص.
+    *   **المنطق:** يتم بناء Flow في Genkit يستدعي دالة Python عبر API. هذه الدالة تقوم بقراءة الـ PDF، استخلاص جداول البيانات، ثم استخدام نموذج لغة كبير (مثل Gemini) لفهم سياق الجدول (أين عمود الصنف، الكمية، السعر) وتحويله إلى JSON منظم، مع محاولة ربط الأصناف المستخرجة بجدول `SupplierItem` أو `Items`.
+*   **الخيار الثاني (الأسرع للتنفيذ الأولي):** استخدام واجهات برمجة تطبيقات (APIs) جاهزة.
+    *   **الخدمات:** Google Cloud Vision AI (Document AI) أو خدمات مشابهة من AWS أو Azure.
+    *   **المنطق:** يتم إرسال ملف الـ PDF مباشرة إلى الـ API، والتي تقوم بتحليل المستند وإرجاع بيانات مهيكلة جاهزة. هذا الخيار أسرع في التنفيذ ولكنه قد يكون أعلى تكلفة على المدى الطويل.
+
+**الاقتراح:** البدء بالخيار الثاني (API جاهز) لتقديم الميزة بسرعة، مع التخطيط لبناء الحل المخصص (الخيار الأول) في المستقبل لزيادة الدقة وتقليل التكاليف.
+```
+
+---
+## File: `docs/purchasing-workflow.md`
+```md
+# دليل المستخدم: دورة عمل المشتريات من الألف إلى الياء
+
+هذا المستند يشرح بالتفصيل خطوات دورة الشراء الكاملة في النظام، بدءًا من طلب الأسعار وحتى اتخاذ قرار الشراء.
+
+---
+
+### الخطوة 1: إنشاء طلب تسعير (Request for Quotation - RFQ)
+
+هذه هي نقطة البداية لعملية الشراء.
+
+1.  اذهب إلى **المشتريات** من القائمة الجانبية، ثم اختر **طلبات التسعير**.
+2.  اضغط على زر **"طلب تسعير جديد"**.
+3.  املأ النموذج بالبيانات التالية:
+    *   **التاريخ:** تاريخ إنشاء الطلب.
+    *   **الموردون:** اختر جميع الموردين الذين ترغب في إرسال الطلب إليهم من القائمة.
+    *   **الأصناف المطلوبة:** قم بإضافة الأصناف التي تريد الحصول على أسعار لها، وحدد الكمية المطلوبة لكل صنف.
+4.  اضغط على **"حفظ كمسودة"**.
+
+![إنشاء طلب تسعير](https://i.postimg.cc/pX4G7vjQ/step1-rfq-form.png)
+
+---
+
+### الخطوة 2: إدخال عروض أسعار الموردين
+
+بعد أن تستلم عروض الأسعار من الموردين (عبر الإيميل، واتساب، إلخ)، حان وقت إدخالها في النظام.
+
+1.  من قائمة طلبات التسعير، اضغط على رقم الطلب الذي أنشأته. ستنتقل إلى **صفحة تفاصيل طلب التسعير**.
+2.  ستجد بطاقة خاصة لكل مورد قمت باختياره. اضغط على زر **"إضافة عرض سعر"** للمورد الذي تريد إدخال عرضه.
+
+![بطاقات الموردين](https://i.postimg.cc/8z0bJp3B/step2-supplier-cards.png)
+
+3.  ستظهر لك نافذة جديدة. قم بتعبئة البيانات:
+    *   **مرجع المورد:** رقم عرض السعر الذي أرسله المورد.
+    *   **تاريخ العرض:** تاريخ عرض سعر المورد.
+    *   **أسعار الأصناف:** أدخل **سعر الوحدة** لكل صنف كما هو مذكور في عرض المورد.
+    *   **(اختياري) رفع الملف:** يمكنك رفع ملف الـ PDF الخاص بعرض السعر للتوثيق. (مستقبلاً، سيقوم النظام بقراءته تلقائيًا).
+4.  اضغط على **"حفظ عرض السعر"**. كرر هذه العملية لكل الموردين.
+
+![إدخال عرض سعر المورد](https://i.postimg.cc/k4GzZ2gm/step2-5-supplier-quote-form.png)
+
+---
+
+### الخطوة 3: إغلاق الطلب وبدء المقارنة
+
+عندما تنتهي من إدخال جميع العروض، يجب إغلاق الطلب لمنع أي تعديلات إضافية.
+
+1.  في صفحة تفاصيل طلب التسعير، اضغط على زر **"إغلاق الطلب وبدء المقارنة"**.
+2.  ستتغير حالة الطلب إلى "مغلق"، وسيظهر زر جديد.
+
+![إغلاق الطلب](https://i.postimg.cc/L51JqYjG/step3-close-rfq.png)
+
+---
+
+### الخطوة 4: المفاضلة واتخاذ القرار
+
+هذه هي الشاشة التي تظهر فيها قوة النظام.
+
+1.  اضغط على زر **"عرض جدول المقارنة"**.
+2.  سينقلك النظام إلى جدول يعرض جميع الأصناف في صفوف، وجميع الموردين في أعمدة.
+3.  **لاحظ الآتي:**
+    *   يعرض الجدول **سعر الوحدة** الذي قدمه كل مورد.
+    *   **يتم تظليل أقل سعر لكل صنف تلقائيًا باللون الأخضر.**
+    *   في الأسفل، يتم حساب **الإجمالي لكل عرض سعر** لمساعدتك على رؤية الصورة الكاملة.
+4.  بناءً على هذه المقارنة، يمكنك اتخاذ قرار الشراء الأفضل.
+
+![جدول المقارنة](https://i.postimg.cc/mD7tBzwG/step4-comparison-table.png)
+
+---
+
+### الخطوة التالية (قيد التنفيذ)
+
+بعد اتخاذ قرارك، ستتمكن مستقبلاً من اختيار العروض الفائزة من جدول المقارنة، وبضغطة زر، سيقوم النظام **تلقائيًا بإنشاء أوامر الشراء (POs)** اللازمة.
+```
+
+---
 ## File: `docs/reference_data_schema.md`
 ```md
 # مخطط علاقات البيانات المرجعية
@@ -3950,3610 +4233,16 @@ erDiagram
 *   **الإشعارات التلقائية:** يقوم النظام بإبقاء الجميع على اطلاع بالأحداث الهامة المتعلقة بعملهم.
 ```
 
----
-## File: `firestore.rules`
-```rules
-rules_version = '2';
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // WARNING: Rules are completely open for development purposes.
-    // Any user can read, write, and delete any data.
-    // This should be secured before going to production.
-    match /{document=**} {
-      allow read, write: if true;
-    }
-
-    // TODO: Secure collections based on roles
-    // match /users/{userId} {
-    //   allow read: if request.auth != null;
-    //   allow write: if request.auth.token.role == 'Admin';
-    // }
-    // match /employees/{employeeId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
-    // }
-    // match /leaveRequests/{leaveRequestId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
-    // }
-    // match /attendance/{attendanceId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
-    // }
-    // match /payroll/{payslipId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'Accountant';
-    // }
-  }
-}
 ```
-
----
-## File: `next.config.js`
-```js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'i.postimg.cc',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
-        port: '',
-        pathname: '/**',
-      }
-    ],
-  },
-};
-
-module.exports = nextConfig;
-```
-
----
-## File: `package.json`
-```json
-{
-  "name": "nextn",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "build": "NODE_ENV=production next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "fix-deps": "echo 'triggering dependency reinstall'"
-  },
-  "dependencies": {
-    "@genkit-ai/google-genai": "^1.20.0",
-    "@genkit-ai/next": "^1.20.0",
-    "@hookform/resolvers": "^3.9.0",
-    "@radix-ui/react-accordion": "1.2.0",
-    "@radix-ui/react-alert-dialog": "1.1.1",
-    "@radix-ui/react-avatar": "1.1.0",
-    "@radix-ui/react-checkbox": "1.1.1",
-    "@radix-ui/react-collapsible": "1.1.0",
-    "@radix-ui/react-dialog": "1.1.1",
-    "@radix-ui/react-dropdown-menu": "2.1.1",
-    "@radix-ui/react-label": "2.1.0",
-    "@radix-ui/react-menubar": "1.1.1",
-    "@radix-ui/react-popover": "1.1.1",
-    "@radix-ui/react-progress": "1.1.0",
-    "@radix-ui/react-radio-group": "1.2.0",
-    "@radix-ui/react-scroll-area": "1.1.0",
-    "@radix-ui/react-select": "2.1.1",
-    "@radix-ui/react-separator": "1.1.0",
-    "@radix-ui/react-slider": "1.2.0",
-    "@radix-ui/react-slot": "1.1.0",
-    "@radix-ui/react-switch": "1.1.0",
-    "@radix-ui/react-tabs": "1.1.0",
-    "@radix-ui/react-toast": "1.2.1",
-    "@radix-ui/react-tooltip": "1.1.2",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.0.0",
-    "date-fns": "^3.6.0",
-    "dotenv": "^16.4.5",
-    "embla-carousel-react": "^8.1.5",
-    "firebase": "^11.9.1",
-    "firebase-admin": "^12.1.0",
-    "fuse.js": "^7.0.0",
-    "html2pdf.js": "^0.10.1",
-    "localforage": "^1.10.0",
-    "lucide-react": "^0.407.0",
-    "next": "^15.0.0",
-    "react": "18.2.0",
-    "react-day-picker": "^8.10.1",
-    "react-dom": "18.2.0",
-    "react-hook-form": "^7.52.1",
-    "react-markdown": "^9.0.1",
-    "react-select": "^5.8.0",
-    "recharts": "^2.12.7",
-    "remark-gfm": "^4.0.0",
-    "tailwind-merge": "^2.3.0",
-    "tailwindcss-animate": "^1.0.7",
-    "xlsx": "^0.18.5",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "@types/react-select": "^5.0.1",
-    "genkit-cli": "^1.20.0",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  },
-  "overrides": {
-    "react": "18.2.0"
-  }
-}
-```
-
----
-## File: `src/lib/hooks/use-realtime.ts`
-```ts
-// This file is deprecated. Please use useSubscription instead.
-export function useRealtime() {
-    console.error('useRealtime is deprecated. Please use `useSubscription` for real-time collection data.');
-    return { data: [], loading: true, error: new Error('useRealtime is deprecated.') };
-}
-```
-
----
-## File: `src/ai/dev.ts`
-```ts
-import { config } from 'dotenv';
-config();
-
-import '@/ai/flows/generate-delay-reports.ts';
-import '@/ai/flows/suggest-task-prioritization.ts';
-import '@/ai/flows/accounting-assistant.ts';
-import '@/ai/flows/cash-flow-projection.ts';
-import '@/ai/flows/ask-system-expert.ts';
-import '@/ai/tools/find-navigation';
-import '@/ai/flows/reconcile-bank-statement.ts';
-
-```
-
----
-## File: `src/ai/flows/accounting-assistant.ts`
-```ts
-'use server';
-
-/**
- * @fileOverview An intelligent accounting assistant that understands Arabic commands and translates them into structured JSON for an ERP system.
- *
- * - runAccountingAssistant - A function to process a natural language accounting command.
- * - AccountingAssistantInput - The input type for the runAccountingAssistant function.
- * - AccountingAssistantOutput - The return type for the runAccountingAssistant function.
- */
-
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const AccountingAssistantInputSchema = z.object({
-  command: z.string().describe('The user\'s natural language command related to accounting.'),
-  currentDate: z.string().describe('The current date in YYYY-MM-DD format to be used as "today".')
-});
-export type AccountingAssistantInput = z.infer<typeof AccountingAssistantInputSchema>;
-
-// The output can be any of the specified command structures, so we use a general object schema.
-const AccountingAssistantOutputSchema = z.object({
-  command: z.string().describe("The structured command name for the system to execute."),
-  payload: z.any().describe("A structured object containing all the necessary data for the command."),
-  explanation: z.string().describe("A brief explanation in Arabic of what will be executed or the result of the query."),
-  warnings: z.array(z.string()).describe("A list of warnings or assumptions made.")
-}).describe("The structured JSON output representing the user's accounting command.");
-
-export type AccountingAssistantOutput = z.infer<typeof AccountingAssistantOutputSchema>;
-
-
-export async function runAccountingAssistant(input: AccountingAssistantInput): Promise<AccountingAssistantOutput> {
-  return accountingAssistantFlow(input);
-}
-
-const systemPrompt = `أنت مساعد محاسبي احترافي يعمل داخل نظام ERP يشبه Odoo (أودوو) في منطق الحسابات، القيود اليومية، والسندات والتقارير.
-
-دورك الأساسي:
-
-1) فهم أوامر وأسئلة المستخدمين المحاسبية والمالية المكتوبة باللغة العربية (فصحى أو لهجات عامية متنوعة مثل المصرية، السعودية، الكويتية، العراقية) والإنجليزية.
-2) تحويل هذه الأوامر إلى أوامر منظمة (Structured JSON) يمكن للنظام تنفيذها آليًا.
-3) الالتزام بالقيد المزدوج Double-Entry والمعايير المحاسبية الأساسية.
-4) التفكير كما لو أنك جزء من نظام محاسبي مثل Odoo: تستخدم دليل الحسابات، الشركاء (عملاء/موردين)، اليوميات (Journals)، الضرائب، والعملات المتعددة إن توفرت.
-
-────────────────────────────────
-أولاً: طريقة تزويدك بالبيانات (Context)
-────────────────────────────────
-
-قد يتم تزويدك في رسائل سابقة أو إضافية داخل نفس المحادثة بكائن JSON يحتوي على السياق، مثلاً:
-
-{
-  "context": {
-    "company": {
-      "name": "شركة المثال",
-      "base_currency": "SAR"
-    },
-    "chart_of_accounts": [
-      {
-        "account_code": "110101",
-        "account_name": "الصندوق",
-        "account_type": "asset"
-      },
-      {
-        "account_code": "110201",
-        "account_name": "البنك الرئيسي",
-        "account_type": "asset"
-      },
-      {
-        "account_code": "120101",
-        "account_name": "العملاء",
-        "account_type": "asset"
-      },
-      {
-        "account_code": "210101",
-        "account_name": "الموردون",
-        "account_type": "liability"
-      },
-      {
-        "account_code": "410101",
-        "account_name": "مبيعات محلية",
-        "account_type": "income"
-      },
-      {
-        "account_code": "510101",
-        "account_name": "مصروف إيجار",
-        "account_type": "expense"
-      },
-      {
-        "account_code": "220301",
-        "account_name": "ضريبة قيمة مضافة مستحقة",
-        "account_type": "liability"
-      }
-    ],
-    "partners": [
-      { "name": "أحمد علي", "type": "customer" },
-      { "name": "شركة XYZ", "type": "vendor" },
-      { "name": "خالد محمد", "type": "employee" }
-    ],
-    "journals": [
-      { "code": "SALES", "name": "يومية المبيعات" },
-      { "code": "PURCHASE", "name": "يومية المشتريات" },
-      { "code": "BANK", "name": "يومية البنك" },
-      { "code": "CASH", "name": "يومية الصندوق" },
-      { "code": "MISC", "name": "قيود متنوعة" }
-    ],
-    "taxes": [
-      {
-        "name": "ضريبة قيمة مضافة 15%",
-        "rate": 15,
-        "account_code": "220301",
-        "account_name": "ضريبة قيمة مضافة مستحقة"
-      }
-    ]
-  }
-}
-
-التعليمات:
-
-- استخدم هذه البيانات (chart_of_accounts, partners, journals, taxes, company) عند اختيار الحسابات، الشركاء، اليوميات، والضرائب.
-- عند اختيار حساب:
-  - حاول مطابقة account_name أو account_code مع أقرب قيمة في chart_of_accounts.
-  - لا تخترع حسابات غير موجودة إن كان هناك تطابق واضح.
-- عند اختيار شريك (عميل/مورد):
-  - حاول مطابقة partner_name مع قيمة من partners.
-- لا تُرجِع هذا الـ context في المخرجات؛ فقط استخدمه لاتخاذ القرار.
-
-إذا لم يتم تزويدك بأي context، يمكنك استخدام أسماء حسابات عامة، لكن:
-- يجب عليك إضافة تحذير في "warnings" أن أسماء الحسابات يجب مطابقتها على دليل الحسابات الفعلي في النظام.
-
-────────────────────────────────
-ثانياً: شكل الإخراج الإلزامي (Always JSON)
-────────────────────────────────
-
-استجابتك دائماً كائن JSON واحد فقط، بدون أي نص خارج JSON، بالشكل:
-
-{
-  "command": "string",
-  "payload": { ... },
-  "explanation": "string",
-  "warnings": [ "string", ... ]
-}
-
-شرح الحقول:
-
-- "command": اسم العملية المطلوب تنفيذها (مثل "create_journal_entry", "create_receipt_voucher", "generate_trial_balance", "ask_clarification", ...).
-- "payload": كائن يحتوي على كل البيانات المنظمة اللازمة لتنفيذ العملية.
-- "explanation": شرح موجز بالعربية يصف:
-  - ما الذي سيتم إنشاؤه/تنفيذه (قيد، سند، تقرير، إلخ)،
-  - أو ما الذي يعنيه التقرير المطلوب.
-- "warnings": قائمة تحذيرات (يمكن أن تكون فارغة [])، مثل:
-  - نقص بيانات،
-  - افتراضات تم اتخاذها،
-  - حسابات أو عملة يجب التأكد منها.
-
-ممنوع:
-- أي نص خارج كائن JSON.
-- استخدام Markdown أو تنسيق آخر.
-- إرجاع أكثر من كائن JSON واحد.
-
-────────────────────────────────
-ثالثاً: قواعد محاسبية عامة (هامة جداً)
-────────────────────────────────
-
-1. القيد المزدوج:
-   - في أي قيد أو سند يحتوي على أسطر (lines)، يجب أن يكون:
-     مجموع debit لكل الأسطر = مجموع credit لكل الأسطر.
-   - لا تستخدم أبدًا قيمًا سالبة في حقول "debit" أو "credit".
-
-2. الحسابات:
-   - إن توفرت قائمة chart_of_accounts في السياق:
-     - اختر الحسابات منها فقط قدر الإمكان.
-     - حاول مطابقة الحساب بالاسم أو بالكود.
-   - إن لم تتوفر القائمة:
-     - استخدم أسماء حسابات واضحة عامة (مثل "الصندوق", "البنك", "العملاء", "الموردون", "مبيعات", "مشتريات", "مصروف إيجار"...).
-     - أضف تحذير في "warnings" أن الحسابات يجب تخصيصها طبقاً لدليل الحسابات الفعلي.
-
-3. الشركاء (partners):
-   - إن وُجدت قائمة partners:
-     - استخدمها عند تعيين partner_name و partner_type (customer/vendor/employee/other).
-   - إن لم توجد:
-     - استخدم الاسم المذكور في كلام المستخدم كما هو، مع type منطقي (customer/vendor/other).
-
-4. التواريخ:
-   - لا تفترض تاريخًا من عندك.
-   - إن لم يذكر المستخدم تاريخًا، وبدون سياسة واضحة في السياق:
-     - استخدم command = "ask_clarification" واطلب منه تحديد التاريخ.
-   - إن ذُكر تعبير غامض مثل "اليوم" أو "أمس":
-     - يمكنك استخدامه نصيًا في explanation، لكن في payload يجب أن يكون تاريخًا حقيقيًا بصيغة "YYYY-MM-DD" إذا تم تزويدك به من النظام أو المستخدم.
-
-5. الضرائب (مثل ضريبة القيمة المضافة):
-   - إن تم تزويدك بقائمة taxes في السياق (مثال: "ضريبة قيمة مضافة 15%"):
-     - عند ذكر ضريبة في نص المستخدم ("شامل ضريبة 15%" أو "+ ضريبة 15%"):
-       • إذا قال "شامل ضريبة 15%":
-         - اعتبر المبلغ الكلي = صافي + ضريبة.
-         - الضريبة = المبلغ الكلي × (نسبة الضريبة / (100 + نسبة الضريبة)).
-         - الصافي = المبلغ الكلي - الضريبة.
-       • إذا قال "المبلغ + ضريبة 15%":
-         - اعتبر المبلغ المذكور هو الأساس (قبل الضريبة).
-         - الضريبة = المبلغ × نسبة الضريبة / 100.
-         - الإجمالي = المبلغ + الضريبة.
-     - استخدم حساب الضريبة المعرَّف في taxes كحساب مستقل في القيد.
-   - إن لم يتم تزويدك بمعلومات ضريبة:
-     - لا تفترض وجود ضريبة من نفسك.
-     - إن ذكر المستخدم ضريبة بدون تفاصيل حسابها، استخدم "ask_clarification" لطلب النسبة وطريقة الاحتساب.
-
-6. الواقعية وعدم الاختلاق:
-   - لا تخترع أرقام فواتير، أو سندات، أو IDs، أو أكواد حسابات غير مذكورة أو غير منطقية.
-   - يمكنك استخدام أرقام مرجعية نصية عامة في "reference" (مثل "مرجع يحدد لاحقًا") مع إضافة تحذير في "warnings".
-
-7. اللغة:
-   - "explanation" و "warnings" تكون دائماً بالعربية الفصحى المبسطة.
-   - يمكنك استخدام المصطلحات المحاسبية الشائعة: مدين، دائن، ميزان المراجعة، قائمة الدخل، إلخ.
-
-────────────────────────────────
-رابعاً: الكيانات المحاسبية (على نمط أودوو)
-────────────────────────────────
-
-اعتبر الكيانات التالية منطقية في خلفية عملك (حتى لو لم تُخزن نفس الأسماء في قاعدة البيانات):
-
-1) دليل الحسابات (chart_of_accounts)
-   - كل حساب له:
-     - account_code (مثل "110101")
-     - account_name (مثل "الصندوق")
-     - account_type: asset, liability, equity, income, expense, off_balance
-
-2) الشركاء (partners)
-   - name: "اسم الشريك"
-   - type: "customer" | "vendor" | "employee" | "other"
-
-3) اليوميات (journals)
-   - code: "SALES" | "PURCHASE" | "BANK" | "CASH" | "MISC"
-   - name: اسم اليوميّة
-
-4) قيود اليومية (journal_entry ≈ account.move)
-   - date
-   - journal_code
-   - reference
-   - narration
-   - currency
-   - lines[]
-
-5) أسطر القيد (journal_entry_line ≈ account.move.line)
-   - account_code
-   - account_name
-   - partner_type
-   - partner_name
-   - debit
-   - credit
-   - analytic_account (اختياري)
-   - notes (اختياري)
-   - (اختياري لمعاملات متعددة العملات) amount_currency, line_currency
-
-────────────────────────────────
-خامساً: الأوامر المدعومة (Commands) وأشكال الـ Payload
-────────────────────────────────
-
-استخدم قيمة "command" من القائمة التالية وفقاً لطلب المستخدم:
-
-------------------------------------------------
-(1) إنشاء قيد يومية عام (Manual Journal Entry)
-------------------------------------------------
-command = "create_journal_entry"
-
-payload:
-
-{
-  "date": "YYYY-MM-DD",
-  "journal_code": "MISC | SALES | PURCHASE | BANK | CASH",
-  "reference": "مرجع القيد أو null",
-  "narration": "وصف عام للقيد",
-  "currency": "رمز عملة الدفاتر مثل SAR, EGP, USD أو null",
-  "lines": [
-    {
-      "account_code": "كود الحساب أو null",
-      "account_name": "اسم الحساب (إجباري إذا لم يوجد كود)",
-      "partner_type": "customer | vendor | employee | other | null",
-      "partner_name": "اسم الشريك أو null",
-      "debit": 0,
-      "credit": 0,
-      "analytic_account": "اسم مركز التكلفة أو null",
-      "notes": "ملاحظات سطر القيد أو null",
-      "amount_currency": 0,
-      "line_currency": "رمز العملة أو null"
-    }
-  ]
-}
-
-ملاحظات:
-- "amount_currency" و "line_currency" اختيارية، تُستخدم فقط إن كان هناك عملة مختلفة عن عملة الدفاتر.
-- إذا لم يكن هناك عملات متعددة، اجعل amount_currency = 0 و line_currency = null أو لا تذكرهما.
-
-------------------------------------------------
-(2) سند قبض (Receipt Voucher)
-------------------------------------------------
-command = "create_receipt_voucher"
-
-payload:
-
-{
-  "date": "YYYY-MM-DD",
-  "journal_code": "BANK | CASH",
-  "payer_type": "customer | other",
-  "payer_name": "اسم العميل أو الجهة الدافعة",
-  "description": "وصف العملية",
-  "amount": "رقم",
-  "currency": "رمز العملة",
-  "payment_method": "cash | bank_transfer | check | other",
-  "related_invoice_number": "رقم الفاتورة إن وجد أو null",
-
-  "debit_account": {
-    "account_code": "كود حساب الصندوق/البنك أو null",
-    "account_name": "اسم حساب الصندوق أو البنك"
-  },
-  "credit_account": {
-    "account_code": "كود حساب العميل/الإيراد أو null",
-    "account_name": "اسم حساب العميل أو الإيراد"
-  },
-
-  "journal_entry": {
-    "narration": "وصف قيد اليومية الناتج",
-    "lines": [
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": null,
-        "partner_name": null,
-        "debit": "رقم",
-        "credit": 0,
-        "analytic_account": null
-      },
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": "customer | other",
-        "partner_name": "...",
-        "debit": 0,
-        "credit": "رقم",
-        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
-      }
-    ]
-  }
-}
-
-منطق القيد:
-- مدين: الصندوق أو البنك.
-- دائن: العميل أو حساب الإيراد، حسب وصف العملية.
-
-------------------------------------------------
-(3) سند صرف (Payment Voucher)
-------------------------------------------------
-command = "create_payment_voucher"
-
-payload:
-
-{
-  "date": "YYYY-MM-DD",
-  "journal_code": "BANK | CASH",
-  "payee_type": "vendor | employee | other",
-  "payee_name": "اسم المورد أو الموظف أو الجهة",
-  "description": "وصف العملية",
-  "amount": "رقم",
-  "currency": "رمز العملة",
-  "payment_method": "cash | bank_transfer | check | other",
-  "related_invoice_number": "رقم فاتورة الشراء إن وجدت أو null",
-
-  "debit_account": {
-    "account_code": "كود حساب المصروف/المورد أو null",
-    "account_name": "اسم حساب المصروف أو المورد"
-  },
-  "credit_account": {
-    "account_code": "كود حساب الصندوق/البنك أو null",
-    "account_name": "اسم حساب الصندوق أو البنك"
-  },
-
-  "journal_entry": {
-    "narration": "وصف قيد اليومية الناتج",
-    "lines": [
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": "vendor | employee | other",
-        "partner_name": "...",
-        "debit": "رقم",
-        "credit": 0,
-        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
-      },
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": null,
-        "partner_name": null,
-        "debit": 0,
-        "credit": "رقم",
-        "analytic_account": null
-      }
-    ]
-  }
-}
-
-منطق القيد:
-- مدين: حساب المورد أو حساب المصروف.
-- دائن: حساب الصندوق أو البنك.
-
-------------------------------------------------
-(4) صرف نقدي (Cash Payment / Cash Expense)
-------------------------------------------------
-command = "create_cash_payment"
-
-payload:
-
-{
-  "date": "YYYY-MM-DD",
-  "journal_code": "CASH",
-  "payee_type": "vendor | employee | other",
-  "payee_name": "اسم الجهة أو null",
-  "description": "وصف العملية",
-  "amount": "رقم",
-  "currency": "رمز العملة",
-
-  "expense_or_payable_account": {
-    "account_code": "كود حساب المصروف/المورد أو null",
-    "account_name": "اسم حساب المصروف أو المورد"
-  },
-  "cash_account": {
-    "account_code": "كود حساب الصندوق أو null",
-    "account_name": "اسم حساب الصندوق"
-  },
-
-  "journal_entry": {
-    "narration": "وصف قيد اليومية الناتج",
-    "lines": [
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": "vendor | employee | other | null",
-        "partner_name": "... أو null",
-        "debit": "رقم",
-        "credit": 0,
-        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
-      },
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": null,
-        "partner_name": null,
-        "debit": 0,
-        "credit": "رقم",
-        "analytic_account": null
-      }
-    ]
-  }
-}
-
-------------------------------------------------
-(5) صرف شيكات (Check Payment)
-------------------------------------------------
-command = "create_check_payment"
-
-payload:
-
-{
-  "date": "YYYY-MM-DD",
-  "journal_code": "BANK",
-  "payee_type": "vendor | employee | other",
-  "payee_name": "اسم المستفيد",
-  "description": "وصف العملية",
-  "amount": "رقم",
-  "currency": "رمز العملة",
-
-  "bank_account": {
-    "account_code": "كود حساب البنك أو null",
-    "account_name": "اسم حساب البنك"
-  },
-  "expense_or_payable_account": {
-    "account_code": "كود الحساب المدين أو null",
-    "account_name": "اسم الحساب المدين (مصروف/مورد/التزام)"
-  },
-  "check_number": "رقم الشيك أو null",
-  "due_date": "YYYY-MM-DD أو null",
-
-  "journal_entry": {
-    "narration": "وصف قيد اليومية الناتج",
-    "lines": [
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": "vendor | employee | other | null",
-        "partner_name": "... أو null",
-        "debit": "رقم",
-        "credit": 0,
-        "analytic_account": "اسم مركز التكلفة إن وجد أو null"
-      },
-      {
-        "account_code": "...",
-        "account_name": "...",
-        "partner_type": null,
-        "partner_name": null,
-        "debit": 0,
-        "credit": "رقم",
-        "analytic_account": null
-      }
-    ]
-  }
-}
-
-ملاحظة:
-- لو سياسة المنشأة تستخدم حساب وسيط مثل "شيكات تحت الصرف":
-  - يمكنك استخدامه بدل حساب البنك مباشرة، مع ذكر ذلك في "explanation" و "warnings".
-
-────────────────────────────────
-سادساً: التقارير والقوائم المالية
-────────────────────────────────
-
-لا تحسب الأرقام النهائية بنفسك، بل جهّز أمر تقرير منظم:
-- النظام الفعلي سيستخدم الـ payload لتجميع الأرقام من قاعدة البيانات.
-
-----------------------------------------
-(6) ميزان المراجعة (Trial Balance)
-----------------------------------------
-command = "generate_trial_balance"
-
-payload:
-
-{
-  "from_date": "YYYY-MM-DD أو null",
-  "to_date": "YYYY-MM-DD",
-  "level": "summary | detailed",
-  "include_zero_balances": "true أو false",
-  "currency": "رمز العملة أو null"
-}
-
-explanation:
-- صف باختصار أن التقرير سيعرض أرصدة الحسابات (مدين/دائن) عن الفترة المحددة.
-
-----------------------------------------
-(7) قائمة الدخل (Income Statement)
-----------------------------------------
-command = "generate_income_statement"
-
-payload:
-
-{
-  "from_date": "YYYY-MM-DD أو null",
-  "to_date": "YYYY-MM-DD",
-  "currency": "رمز العملة أو null",
-  "by_cost_center": "true أو false"
-}
-
-يركّز على:
-- الإيرادات،
-- تكلفة البضاعة المباعة،
-- مجمل الربح،
-- المصاريف التشغيلية،
-- صافي الربح أو الخسارة.
-
-----------------------------------------
-(8) الميزانية العمومية (Balance Sheet)
-----------------------------------------
-command = "generate_balance_sheet"
-
-payload:
-
-{
-  "as_of_date": "YYYY-MM-DD",
-  "currency": "رمز العملة أو null",
-  "by_cost_center": "true أو false"
-}
-
-يركّز على:
-- الأصول (متداولة وغير متداولة إن أمكن)،
-- الخصوم (متداولة وطويلة الأجل)،
-- حقوق الملكية،
-- مع ملاحظة التوازن: الأصول = الخصوم + حقوق الملكية.
-
-----------------------------------------
-(9) قائمة التدفقات النقدية (Cash Flow Statement)
-----------------------------------------
-command = "generate_cash_flow_statement"
-
-payload:
-
-{
-  "from_date": "YYYY-MM-DD",
-  "to_date": "YYYY-MM-DD",
-  "currency": "رمز العملة أو null",
-  "method": "indirect"
-}
-
-يقسّم التدفقات إلى:
-- تشغيلية،
-- استثمارية،
-- تمويلية.
-
-----------------------------------------
-(10) قائمة التغيرات في حقوق الملكية (Equity Statement)
-----------------------------------------
-command = "generate_equity_statement"
-
-payload:
-
-{
-  "from_date": "YYYY-MM-DD",
-  "to_date": "YYYY-MM-DD",
-  "currency": "رمز العملة أو null"
-}
-
-----------------------------------------
-(11) دفتر الأستاذ العام (General Ledger)
-----------------------------------------
-command = "generate_general_ledger"
-
-payload:
-
-{
-  "account_code": "كود الحساب أو null",
-  "account_name": "اسم الحساب إن لم يتوفر الكود أو null",
-  "from_date": "YYYY-MM-DD أو null",
-  "to_date": "YYYY-MM-DD",
-  "currency": "رمز العملة أو null"
-}
-
-────────────────────────────────
-سابعاً: طلب توضيح (Ask Clarification)
-────────────────────────────────
-
-عندما لا تتوفر بيانات كافية لإنشاء قيد أو تقرير صحيح، أو يوجد غموض كبير (نوع الحساب، التاريخ، العملة، الجهة، نسبة الضريبة، ...)، استخدم:
-
-command = "ask_clarification"
-
-payload:
-
-{
-  "missing_fields": [
-    "قائمة بالحقول أو المعلومات الناقصة أو الغامضة، مثل: تاريخ العملية، نوع الحساب، نسبة الضريبة، اسم العميل..."
-  ],
-  "suggested_questions": [
-    "أسئلة محددة بالعربية يمكن عرضها للمستخدم لطلب التوضيح"
-  ]
-}
-
-explanation:
-- اشرح للمستخدم لماذا تحتاج هذه المعلومات الإضافية قبل إنشاء القيد أو التقرير.
-
-warnings:
-- يمكن أن تحتوي على تنبيهات مثل:
-  - "لا يمكن إنشاء قيد محاسبي صحيح بدون تاريخ محدد."
-  - "لم يتم تحديد نوع الحساب (مصروف أم أصل)، ويرجى التوضيح."
-
-────────────────────────────────
-ثامناً: قواعد نهائية صارمة
-────────────────────────────────
-
-1. يجب دائماً أن يكون مجموع "debit" = مجموع "credit" في أي قيد أو سند.
-2. لا تستخدم قيم سالبة في "debit" أو "credit".
-3. لا تخترع عملاء، موردين، حسابات، أو ضرائب غير مذكورة بوضوح أو غير متوفرة في الـ context.
-4. عند الشك وعدم كفاية المعلومات، استخدم دائماً "ask_clarification".
-5. لا تخرج عن هيكل JSON المحدد: { "command", "payload", "explanation", "warnings" }.
-6. لا تضع أي تعليق أو شرح خارج كائن JSON.
-`;
-
-const prompt = ai.definePrompt({
-  name: 'accountingAssistantPrompt',
-  system: systemPrompt,
-  input: { schema: AccountingAssistantInputSchema },
-  output: { schema: AccountingAssistantOutputSchema, format: 'json' },
-  prompt: 'User command: {{{command}}}. For context, today\'s date is {{currentDate}}.',
-});
-
-const accountingAssistantFlow = ai.defineFlow(
-  {
-    name: 'accountingAssistantFlow',
-    inputSchema: AccountingAssistantInputSchema,
-    outputSchema: AccountingAssistantOutputSchema,
-  },
-  async (input) => {
-    const { output } = await prompt(input);
-    if (!output) {
-      throw new Error('The AI model did not return a valid response.');
-    }
-    return output;
-  }
-);
-```
-
----
-## File: `src/ai/flows/ask-system-expert.ts`
-```ts
-'use server';
-/**
- * @fileOverview A system expert AI that answers questions based on provided documentation and can perform actions.
- */
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import { findNavigationTool } from '@/ai/tools/find-navigation';
-import { firestore } from '@/firebase/server-init';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-
-const SystemExpertInputSchema = z.object({
-  question: z.string().describe("The user's question about the system."),
-  history: z.array(z.object({
-    role: z.enum(['user', 'model']),
-    content: z.string(),
-  })).optional().describe('The previous conversation history.'),
-});
-export type SystemExpertInput = z.infer<typeof SystemExpertInputSchema>;
-
-const SystemExpertOutputSchema = z.object({
-  answer: z.string().describe("The AI's answer to the user's question."),
-});
-export type SystemExpertOutput = z.infer<typeof SystemExpertOutputSchema>;
-
-// Define the new tool
-const getClientDebt = ai.defineTool(
-  {
-    name: 'getClientDebt',
-    description: 'Gets the total outstanding debt for a specific client by their name or file number.',
-    inputSchema: z.object({
-      clientNameOrNumber: z.string().describe('The name or file number of the client to look up.'),
-    }),
-    outputSchema: z.object({
-      debt: z.number().optional(),
-      clientName: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  async ({ clientNameOrNumber }) => {
-    if (!firestore) {
-      return { error: 'Firestore not initialized.' };
-    }
-
-    try {
-      const nameQuery = query(collection(firestore, 'clients'), where('nameAr', '==', clientNameOrNumber));
-      const fileIdQuery = query(collection(firestore, 'clients'), where('fileId', '==', clientNameOrNumber));
-
-      const [nameSnap, fileIdSnap] = await Promise.all([
-        getDocs(nameQuery),
-        getDocs(fileIdQuery),
-      ]);
-
-      const clientDoc = nameSnap.docs[0] || fileIdSnap.docs[0];
-
-      if (clientDoc) {
-        const clientData = clientDoc.data();
-        
-        // Per the prompt's assumption, we are looking for a 'totalDue' or 'outstandingBalance' field.
-        // Since the schema doesn't have it, we'll calculate it based on contract clauses.
-        const transactionsQuery = query(collection(firestore, `clients/${clientDoc.id}/transactions`));
-        const transactionsSnap = await getDocs(transactionsQuery);
-
-        let totalDue = 0;
-        transactionsSnap.forEach(txDoc => {
-            const txData = txDoc.data();
-            if (txData.contract && Array.isArray(txData.contract.clauses)) {
-                txData.contract.clauses.forEach((clause: any) => {
-                    if (clause.status === 'مستحقة') {
-                        totalDue += clause.amount || 0;
-                    }
-                });
-            }
-        });
-
-        return { debt: totalDue, clientName: clientData.nameAr };
-      }
-
-      return { error: `لم يتم العثور على عميل بالاسم أو رقم الملف: ${clientNameOrNumber}` };
-    } catch (e) {
-      console.error(e);
-      return { error: 'حدث خطأ أثناء البحث في قاعدة البيانات.' };
-    }
-  }
-);
-
-
-const systemDocumentation = `
-# System Documentation Overview
-
-## Main Features:
-- **Accounting**: Chart of Accounts, Journal Entries (with AI assistant), Vouchers (Receipts, Payments), Quotations & Contracts, Financial Statements (IFRS Compliant), Financial Forecast.
-- **Appointments**: Dual calendar (Architectural vs. General), smart conflict detection, dynamic color-coding for visits, auto-reconciliation on cancellation, customizable work hours.
-- **Appointment Procedures**: Link visits to transactions, update workflow stages, trigger payments, record modifications, write meeting minutes.
-- **Human Resources (HR)**: Employee profiles, termination management, audit logs, leave and permission requests, payroll processing, gratuity calculator.
-- **Reports**: Delayed tasks, stalled stages, prospective clients (no-shows, follow-ups), upsell opportunities.
-- **General System**: User & role management, reference data configuration, notifications.
-
-## Key System Concepts:
-- **Clients & Transactions**: Clients have files, and each service for a client is a 'Transaction' (e.g., 'Municipality Design'). Each transaction has its own workflow stages and contract.
-- **Smart Calendar**: The system prevents booking conflicts for engineers, clients, and meeting rooms. Architectural appointments have special color-coding and visit counting.
-- **Data Integrity**: The system automatically updates related data. E.g., cancelling an appointment re-numbers and re-colors other visits for that client. Completing a work stage can make a contract payment 'due'.
-- **AI Assistants**:
-    - **Accounting Assistant**: Converts Arabic accounting commands into journal entries.
-    - **System Expert (this chatbot)**: Answers questions about system functionality and provides navigation links.
-`;
-
-const systemPrompt = `You are a helpful and friendly system expert for an ERP system. Your capabilities are:
-1.  **Answering Questions**: Answer user questions about how to use the system. Use the provided "System Documentation" as your primary source of truth. You can understand and respond in both formal and colloquial Arabic (like Egyptian, Gulf dialects), as well as English. Always respond in the same language as the user's question.
-2.  **Performing Actions**: If the user expresses an intent to navigate to a page or perform an action (e.g., "create a new invoice", "I want to see the appointments", "أريد إضافة عميل جديد", "أحجز موعد", "أضيف موظف", "أصدر سند قبض"), you MUST use the 'findNavigation' tool to get the correct link.
-3.  **Fetching Live Data**: If the user asks for specific data from the system, like a client's debt (e.g., "كم مديونية العميل محمد؟", "check client balance"), you MUST use the appropriate tool like 'getClientDebt'.
-
-**Behavioral Guidelines:**
-- When using tools, present the result clearly and naturally.
-- For \`findNavigation\`: present the result as a helpful, clickable link in Markdown format. For example: "بالتأكيد, يمكنك [إضافة عميل جديد من هنا](/dashboard/clients/new)."
-- For \`getClientDebt\`: state the debt clearly, e.g., "مديونية العميل محمد علي هي 1,250 د.ك."
-- If a tool returns an error (e.g., client not found), inform the user gracefully. For example: "لم أتمكن من العثور على العميل بهذا الاسم. هل يمكنك التحقق من الاسم أو رقم الملف؟"
-- If the user's intent is ambiguous, ask for clarification before using a tool or answering.
-- Do not invent features, links, or data.
-- Always respond in the same language as the user's question.
-
-System Documentation:
----
-${systemDocumentation}
----
-`;
-
-export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
-    const { question, history } = input;
-    const llmHistory = history?.map(msg => ({
-      role: msg.role,
-      content: [{ text: msg.content }],
-    })) || [];
-    
-    const response = await ai.generate({
-      history: llmHistory,
-      prompt: `Question: "${question}"\n\nAnswer:`,
-      tools: [findNavigationTool, getClientDebt]
-    });
-    
-    return { answer: response.text };
-}
-
-export const systemExpertFlow = ai.defineFlow(
-  {
-    name: 'systemExpertFlow',
-    inputSchema: SystemExpertInputSchema,
-    outputSchema: SystemExpertOutputSchema,
-    system: systemPrompt,
-  },
-  askSystemExpert
-);
-```
-
----
-## File: `src/ai/flows/cash-flow-projection.ts`
-```ts
-'use server';
-
-/**
- * @fileOverview A data-driven cash flow projection engine.
- *
- * - runCashFlowProjection - A function to project cash flow for future months.
- * - CashFlowProjectionInput - The input type for the function.
- * - CashFlowProjectionOutput - The return type for the function.
- */
-
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { firestore } from '@/firebase/server-init';
-import { addMonths, format, startOfMonth } from 'date-fns';
-import type { Client, ClientTransaction, Employee } from '@/lib/types';
-
-
-const CashFlowProjectionInputSchema = z.object({
-  months: z.number().int().positive().describe('The number of future months to project.'),
-});
-export type CashFlowProjectionInput = z.infer<typeof CashFlowProjectionInputSchema>;
-
-const MonthlyProjectionSchema = z.object({
-  month: z.string().describe('The month in YYYY-MM format.'),
-  monthName: z.string().describe('The formatted month name (e.g., July 2024).'),
-  expectedRevenue: z.number().describe('Total expected revenue from contract milestones.'),
-  fixedExpenses: z.number().describe('Total fixed monthly expenses (salaries, rent, etc.).'),
-  netCashFlow: z.number().describe('The net cash flow for the month (revenue - expenses).'),
-});
-export type MonthlyProjection = z.infer<typeof MonthlyProjectionSchema>;
-
-
-const CashFlowProjectionOutputSchema = z.object({
-  projections: z.array(MonthlyProjectionSchema),
-  assumptions: z.object({
-    fixedRent: z.number(),
-    totalSalaries: z.number(),
-    employeeCount: z.number(),
-  }),
-});
-export type CashFlowProjectionOutput = z.infer<typeof CashFlowProjectionOutputSchema>;
-
-
-export async function runCashFlowProjection(input: CashFlowProjectionInput): Promise<CashFlowProjectionOutput> {
-  if (!firestore) {
-    throw new Error('Firebase is not initialized.');
-  }
-
-  // 1. Prepare date ranges
-  const today = new Date();
-  const projectionMonths: { year: number, month: number, key: string, name: string }[] = [];
-  for (let i = 0; i < input.months; i++) {
-    const targetDate = addMonths(today, i);
-    projectionMonths.push({
-        year: targetDate.getFullYear(),
-        month: targetDate.getMonth() + 1,
-        key: format(targetDate, 'yyyy-MM'),
-        name: format(targetDate, 'MMMM yyyy'),
-    });
-  }
-
-  // 2. Fetch all active contracts
-  const clientsWithContracts: { client: Client, transactions: ClientTransaction[] }[] = [];
-  const clientsSnap = await getDocs(query(collection(firestore, 'clients'), where('status', 'in', ['contracted', 'reContracted'])));
-  
-  for (const clientDoc of clientsSnap.docs) {
-      const clientData = { id: clientDoc.id, ...clientDoc.data() } as Client;
-      const transactionsSnap = await getDocs(query(collection(firestore, `clients/${clientDoc.id}/transactions`), where('contract', '!=', null)));
-      if (!transactionsSnap.empty) {
-          clientsWithContracts.push({
-              client: clientData,
-              transactions: transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction)),
-          });
-      }
-  }
-
-  // 3. Initialize projection data structure
-  const monthlyProjections: Record<string, { expectedRevenue: number, fixedExpenses: number, netCashFlow: number }> = {};
-  projectionMonths.forEach(m => {
-    monthlyProjections[m.key] = { expectedRevenue: 0, fixedExpenses: 0, netCashFlow: 0 };
-  });
-
-  // 4. Aggregate future revenues from contract milestones
-  clientsWithContracts.forEach(({ transactions }) => {
-      transactions.forEach(tx => {
-          tx.contract?.clauses?.forEach(clause => {
-              // We only consider milestones that are due but not yet paid
-              if (clause.status === 'مستحقة' || clause.status === 'غير مستحقة') {
-                   // Find the stage linked to the payment condition
-                   const stage = tx.stages?.find(s => s.name === clause.condition);
-                   let dueDate: Date | null = null;
-                   
-                   if (stage?.expectedEndDate) {
-                       dueDate = (stage.expectedEndDate as any).toDate();
-                   } else if (stage?.startDate) {
-                       // If no end date, estimate it to be 30 days after the start date as a fallback.
-                       dueDate = new Date((stage.startDate as any).toDate());
-                       dueDate.setDate(dueDate.getDate() + 30);
-                   }
-
-                   if(dueDate) {
-                       const monthKey = format(dueDate, 'yyyy-MM');
-                       if (monthlyProjections[monthKey]) {
-                           monthlyProjections[monthKey].expectedRevenue += clause.amount;
-                       }
-                   }
-              }
-          });
-      });
-  });
-  
-  // 5. Calculate fixed expenses
-  const employeesSnap = await getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active')));
-  const totalSalaries = employeesSnap.docs.reduce((sum, doc) => {
-      const emp = doc.data() as Employee;
-      return sum + (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-  }, 0);
-  const fixedRent = 1500; // Hardcoded for now. Should be fetched from chart of accounts in a future update.
-  const totalFixedExpenses = totalSalaries + fixedRent;
-
-  // 6. Finalize projections
-  const finalProjections = projectionMonths.map(m => {
-    const projection = monthlyProjections[m.key];
-    projection.fixedExpenses = totalFixedExpenses;
-    projection.netCashFlow = projection.expectedRevenue - projection.fixedExpenses;
-    return {
-      month: m.key,
-      monthName: m.name,
-      ...projection
-    };
-  });
-  
-  return {
-      projections: finalProjections,
-      assumptions: {
-          fixedRent,
-          totalSalaries,
-          employeeCount: employeesSnap.size,
-      },
-  };
-}
-```
-
----
-## File: `src/ai/flows/financial-forecast-flow.ts`
-```ts
-// This AI-based flow has been deprecated and replaced by the more accurate
-// data-driven engine in `cash-flow-projection.ts`.
-// This file can be removed in a future cleanup.
-
-```
-
----
-## File: `src/ai/flows/generate-delay-reports.ts`
-```ts
-'use server';
-
-/**
- * @fileOverview AI flow to analyze project timelines and generate delay reports if project phases exceed deadlines.
- *
- * - generateDelayReport - A function that handles the generation of delay reports.
- * - GenerateDelayReportInput - The input type for the generateDelayReport function.
- * - GenerateDelayReportOutput - The return type for the generateDelayReport function.
- */
-
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const GenerateDelayReportInputSchema = z.object({
-  projectTimelineData: z
-    .string()
-    .describe('A stringified JSON representing the project timeline data, including phases, start dates, end dates, and assigned engineers.'),
-  currentDate: z.string().describe('The current date to compare against deadlines, in ISO format (YYYY-MM-DD).'),
-});
-export type GenerateDelayReportInput = z.infer<typeof GenerateDelayReportInputSchema>;
-
-const GenerateDelayReportOutputSchema = z.object({
-  delayReport: z.string().describe('A comprehensive delay report, highlighting phases exceeding deadlines, reasons for delays, and suggested corrective actions.'),
-});
-export type GenerateDelayReportOutput = z.infer<typeof GenerateDelayReportOutputSchema>;
-
-export async function generateDelayReport(input: GenerateDelayReportInput): Promise<GenerateDelayReportOutput> {
-  return generateDelayReportFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'generateDelayReportPrompt',
-  input: {schema: GenerateDelayReportInputSchema},
-  output: {schema: GenerateDelayReportOutputSchema},
-  prompt: `You are an AI assistant specializing in project management and risk assessment. Your task is to analyze project timelines and generate delay reports, identifying phases that have exceeded their deadlines. Provide potential reasons for the delays and suggest corrective actions.
-
-Project Timeline Data: {{{projectTimelineData}}}
-Current Date: {{{currentDate}}}
-
-Based on the provided project timeline data and the current date, generate a delay report that includes:
-- A list of phases exceeding their deadlines.
-- The duration of the delay for each phase.
-- Potential reasons for the delays (e.g., resource constraints, unforeseen circumstances, scope changes).
-- Suggested corrective actions to mitigate further delays and get the project back on track.
-
-Ensure the report is clear, concise, and actionable, providing project managers with the information they need to address project delays effectively. Focus on providing as much value as possible.
-`,
-});
-
-const generateDelayReportFlow = ai.defineFlow(
-  {
-    name: 'generateDelayReportFlow',
-    inputSchema: GenerateDelayReportInputSchema,
-    outputSchema: GenerateDelayReportOutputSchema,
-  },
-  async input => {
-    try {
-      JSON.parse(input.projectTimelineData);
-    } catch (e) {
-      throw new Error('Invalid JSON format for projectTimelineData: ' + e);
-    }
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
-```
-
----
-## File: `src/ai/flows/reconcile-bank-statement.ts`
-```ts
-'use server';
-/**
- * @fileOverview An AI-powered bank reconciliation flow.
- */
-
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
-
-const BankTransactionSchema = z.object({
-    id: z.string(),
-    date: z.string(),
-    description: z.string(),
-    amount: z.number(),
-});
-
-const SystemTransactionSchema = z.object({
-    id: z.string(),
-    date: z.string(),
-    description: z.string(),
-    amount: z.number(),
-});
-
-export const ReconciliationInputSchema = z.object({
-    bankTransactions: z.array(BankTransactionSchema),
-    systemTransactions: z.array(SystemTransactionSchema),
-});
-export type ReconciliationInput = z.infer<typeof ReconciliationInputSchema>;
-
-const MatchedPairSchema = z.object({
-    bankTransactionId: z.string(),
-    systemTransactionId: z.string(),
-    confidence: z.number().describe('A confidence score from 0 to 1 on how certain the match is.'),
-});
-
-export const ReconciliationOutputSchema = z.object({
-    matchedPairs: z.array(MatchedPairSchema),
-    unmatchedBankIds: z.array(z.string()),
-    unmatchedSystemIds: z.array(z.string()),
-    explanation: z.string().describe("A brief summary of the reconciliation process and any notable findings."),
-});
-export type ReconciliationOutput = z.infer<typeof ReconciliationOutputSchema>;
-
-const systemPrompt = `You are an expert financial auditor AI. Your task is to perform a bank reconciliation by matching transactions from a bank statement with transactions from an internal accounting system.
-
-You will be given two lists of transactions:
-1.  \`bankTransactions\`: A list of transactions from the bank statement.
-2.  \`systemTransactions\`: A list of transactions from the company's journal entries affecting the bank account.
-
-**Matching Logic:**
-
-1.  **Primary Matching Criterion (Amount):** The most important factor is the amount. Transactions must have the exact same amount to be considered a potential match. A positive amount in one list must match a negative amount in the other (e.g., a bank credit of +100 KWD matches a system debit of -100 KWD, which represents cash coming into the bank).
-2.  **Secondary Matching Criterion (Date):** The dates should be very close, ideally within a 3-day window.
-3.  **Tertiary Matching Criterion (Description):** Use keywords in the description to confirm a match. For example, a bank transaction with "Cheque #1234" should match a system transaction with "Payment via Cheque 1234". Look for names, invoice numbers, or other references.
-
-**Your Goal:**
-
-Your goal is to produce a list of matched pairs. Each pair should link a \`bankTransactionId\` to a \`systemTransactionId\`. For each match, provide a confidence score from 0 (uncertain) to 1 (very certain).
-
-- A score of **1.0** should be reserved for perfect matches (exact amount, same day, clear reference like a cheque number).
-- A score between **0.8 and 0.9** can be used for matches with the same amount and very close dates (1-2 days apart).
-- A score between **0.6 and 0.7** can be used for matches with the same amount but a slightly larger date difference or a less clear description link.
-- Do not create matches with a confidence score below 0.6.
-
-**Output Structure:**
-
-Your final output must be a single JSON object with three keys:
-1.  \`matchedPairs\`: An array of objects, each containing \`bankTransactionId\`, \`systemTransactionId\`, and \`confidence\`.
-2.  \`unmatchedBankIds\`: An array of IDs for bank transactions that you could not match.
-3.  \`unmatchedSystemIds\`: An array of IDs for system transactions that you could not match.
-4.  \`explanation\`: A brief summary in Arabic explaining the results.
-
-**IMPORTANT:**
-- A single transaction can only be part of ONE match. Do not reuse transactions.
-- Prioritize high-confidence matches first.
-`;
-
-const reconcileBankStatementPrompt = ai.definePrompt({
-    name: 'reconcileBankStatementPrompt',
-    system: systemPrompt,
-    input: { schema: ReconciliationInputSchema },
-    output: { schema: ReconciliationOutputSchema, format: 'json' },
-    prompt: `
-        Bank Transactions: {{{json bankTransactions}}}
-        System Transactions: {{{json systemTransactions}}}
-    `,
-});
-
-export const reconcileBankStatementFlow = ai.defineFlow(
-    {
-        name: 'reconcileBankStatementFlow',
-        inputSchema: ReconciliationInputSchema,
-        outputSchema: ReconciliationOutputSchema,
-    },
-    async (input) => {
-        const { output } = await reconcileBankStatementPrompt(input);
-        if (!output) {
-            throw new Error("The AI model did not return a valid reconciliation response.");
-        }
-        return output;
-    }
-);
-```
-
----
-## File: `src/ai/flows/suggest-task-prioritization.ts`
-```ts
-'use server';
-/**
- * @fileOverview AI-powered task prioritization suggestion flow.
- *
- * - suggestTaskPrioritization - A function that suggests task prioritization based on project timeline, dependencies, and resource availability.
- * - SuggestTaskPrioritizationInput - The input type for the suggestTaskPrioritization function.
- * - SuggestTaskPrioritizationOutput - The return type for the suggestTaskPrioritization function.
- */
-
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const SuggestTaskPrioritizationInputSchema = z.object({
-  projectTimeline: z.string().describe('The project timeline in a textual format.'),
-  dependencies: z.string().describe('The task dependencies in a textual format.'),
-  resourceAvailability: z.string().describe('The resource availability in a textual format.'),
-});
-export type SuggestTaskPrioritizationInput = z.infer<typeof SuggestTaskPrioritizationInputSchema>;
-
-const SuggestTaskPrioritizationOutputSchema = z.object({
-  prioritizedTasks: z.string().describe('A list of tasks prioritized with explanations.'),
-});
-export type SuggestTaskPrioritizationOutput = z.infer<typeof SuggestTaskPrioritizationOutputSchema>;
-
-export async function suggestTaskPrioritization(input: SuggestTaskPrioritizationInput): Promise<SuggestTaskPrioritizationOutput> {
-  return suggestTaskPrioritizationFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'suggestTaskPrioritizationPrompt',
-  input: {schema: SuggestTaskPrioritizationInputSchema},
-  output: {schema: SuggestTaskPrioritizationOutputSchema},
-  prompt: `You are an AI assistant helping engineers prioritize tasks based on project timeline, dependencies, and resource availability.
-
-  Analyze the following information:
-
-  Project Timeline: {{{projectTimeline}}}
-  Dependencies: {{{dependencies}}}
-  Resource Availability: {{{resourceAvailability}}}
-
-  Suggest a prioritized list of tasks with clear explanations for the prioritization.`,
-});
-
-const suggestTaskPrioritizationFlow = ai.defineFlow(
-  {
-    name: 'suggestTaskPrioritizationFlow',
-    inputSchema: SuggestTaskPrioritizationInputSchema,
-    outputSchema: SuggestTaskPrioritizationOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
-```
-
----
-## File: `src/ai/genkit.ts`
-```ts
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/google-genai';
-
-export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.5-flash',
-});
-```
-
----
-## File: `src/ai/tools/find-navigation.ts`
-```ts
-'use server';
-
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import Fuse from 'fuse.js';
-
-const navLinks = [
-  { name: 'Dashboard', path: '/dashboard', keywords: ['home', 'main', 'dashboard', 'الرئيسية'] },
-  { name: 'Notifications', path: '/dashboard/notifications', keywords: ['notifications', 'alerts', 'تنبيهات', 'إشعارات'] },
-  { name: 'Delayed Stages Report', path: '/dashboard/reports/delayed-stages', keywords: ['reports', 'delayed', 'late', 'تقارير', 'متأخر'] },
-  { name: 'Stalled Stages Report', path: '/dashboard/reports/stalled-stages', keywords: ['reports', 'stalled', 'idle', 'خامل', 'متوقف'] },
-  { name: 'Prospective Clients Report', path: '/dashboard/reports/prospective-clients', keywords: ['reports', 'prospective', 'leads', 'عملاء محتملون'] },
-  { name: 'Upsell Opportunities Report', path: '/dashboard/reports/upsell-opportunities', keywords: ['reports', 'upsell', 'opportunities', 'فرص بيع'] },
-  { name: 'Projects', path: '/dashboard/projects', keywords: ['projects', 'مشاريع'] },
-  { name: 'Clients', path: '/dashboard/clients', keywords: ['clients', 'customers', 'عملاء'] },
-  { name: 'New Client', path: '/dashboard/clients/new', keywords: ['new client', 'add client', 'عميل جديد', 'إضافة عميل'] },
-  { name: 'Contracts', path: '/dashboard/contracts', keywords: ['contracts', 'عقود'] },
-  { name: 'Accounting', path: '/dashboard/accounting', keywords: ['accounting', 'finance', 'محاسبة', 'مالية'] },
-  { name: 'Quotations', path: '/dashboard/accounting/quotations', keywords: ['quotations', 'quotes', 'عروض أسعار'] },
-  { name: 'New Quotation', path: '/dashboard/accounting/quotations/new', keywords: ['new quote', 'create quotation', 'عرض سعر جديد'] },
-  { name: 'Chart of Accounts', path: '/dashboard/accounting/chart-of-accounts', keywords: ['chart of accounts', 'coa', 'شجرة الحسابات'] },
-  { name: 'Accounting Assistant', path: '/dashboard/accounting/assistant', keywords: ['ai assistant', 'accounting ai', 'مساعد محاسبي'] },
-  { name: 'Journal Entries', path: '/dashboard/accounting/journal-entries', keywords: ['journal entries', 'jv', 'قيود اليومية'] },
-  { name: 'New Journal Entry', path: '/dashboard/accounting/journal-entries/new', keywords: ['new journal entry', 'create jv', 'قيد جديد'] },
-  { name: 'Cash Receipts', path: '/dashboard/accounting/cash-receipts', keywords: ['cash receipts', 'receipts', 'سندات قبض'] },
-  { name: 'Payment Vouchers', path: '/dashboard/accounting/payment-vouchers', keywords: ['payment vouchers', 'payments', 'سندات صرف'] },
-  { name: 'Financial Statements', path: '/dashboard/accounting/income-statement', keywords: ['financial statements', 'p&l', 'balance sheet', 'قوائم مالية'] },
-  { name: 'Human Resources', path: '/dashboard/hr', keywords: ['hr', 'human resources', 'موارد بشرية'] },
-  { name: 'Employees', path: '/dashboard/hr/employees', keywords: ['employees', 'staff', 'موظفين'] },
-  { name: 'New Employee', path: '/dashboard/hr/employees/new', keywords: ['new employee', 'add employee', 'إضافة موظف'] },
-  { name: 'Leave Requests', path: '/dashboard/hr/leaves', keywords: ['leave', 'vacation', 'إجازات'] },
-  { name: 'Payroll', path: '/dashboard/hr/payroll', keywords: ['payroll', 'salaries', 'رواتب'] },
-  { name: 'Purchasing', path: '/dashboard/purchasing', keywords: ['purchasing', 'purchase orders', 'مشتريات'] },
-  { name: 'Appointments', path: '/dashboard/appointments', keywords: ['appointments', 'calendar', 'مواعيد', 'تقويم'] },
-  { name: 'New Appointment', path: '/dashboard/appointments/new', keywords: ['new appointment', 'book meeting', 'حجز موعد'] },
-  { name: 'Settings', path: '/dashboard/settings', keywords: ['settings', 'configuration', 'إعدادات'] },
-];
-
-const fuse = new Fuse(navLinks, {
-  keys: ['name', 'keywords'],
-  includeScore: true,
-  threshold: 0.4,
-});
-
-export const findNavigationTool = ai.defineTool(
-  {
-    name: 'findNavigation',
-    description: 'Finds the most relevant navigation link within the ERP system based on a user\'s query or intent.',
-    inputSchema: z.object({
-      query: z.string().describe('The user\'s request, like "create a new invoice" or "show me the dashboard".'),
-    }),
-    outputSchema: z.object({
-      path: z.string().optional(),
-      name: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  async ({ query }) => {
-    const results = fuse.search(query);
-    if (results.length > 0) {
-      return {
-        path: results[0].item.path,
-        name: results[0].item.name,
-      };
-    }
-    return {
-        error: 'No relevant navigation link found for the query.'
-    };
-  }
-);
-```
-
----
-## File: `src/firebase/admin.ts`
-```ts
-// This file is deprecated and its contents have been moved into the
-// specific server actions that require Firebase Admin.
-// Using firebase-admin in a separate file can cause issues with
-// Next.js server/client component bundling.
-
-```
-
----
-## File: `src/firebase/auth/use-user.tsx`
-```tsx
-'use client';
-
-import { useState, useEffect } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { useAuth as useFirebaseAuthService } from '../provider';
-
-export function useUser() {
-  const auth = useFirebaseAuthService();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | undefined>(undefined);
-
-  useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (user) => {
-        setUser(user);
-        setLoading(false);
-      },
-      (error) => {
-        setError(error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [auth]);
-
-  return { user, loading, error };
-}
-```
-
----
-## File: `src/firebase/firestore/use-collection.tsx`
-```tsx
-
-'use client';
-// This hook is deprecated. Please use `useSubscription` from `@/firebase` instead.
-export function useCollection() {
-    console.error('useCollection is deprecated. Please use `useSubscription` for real-time collection data.');
-    return [null, true, new Error('useCollection is deprecated. Use useSubscription.')] as const;
-}
-```
-
----
-## File: `src/firebase/firestore/use-doc.tsx`
-```tsx
-
-'use client';
-// This hook is deprecated. Please use `useDocument` from `@/firebase` instead.
-export function useDoc() {
-    console.error('useDoc is deprecated. Please use `useDocument` for real-time document data.');
-    return [null, true, new Error('useDoc is deprecated. Use useDocument.')] as const;
-}
-```
-
----
-## File: `src/firebase/firestore/use-document.tsx`
-```tsx
-'use client';
-// This hook is deprecated. Please use `useDocument` from `@/hooks/use-document` instead.
-export function useDocument() {
-    console.error('useDocument is deprecated. Please use the hook from `@/hooks/use-document`.');
-    return { data: null, loading: true, error: new Error('useDocument is deprecated.') };
-}
-```
-
----
-## File: `src/firebase/firestore/use-subscription.tsx`
-```tsx
-'use client';
-// This hook is deprecated. Please use `useSubscription` from `@/hooks/use-subscription` instead.
-export function useSubscription() {
-    console.error('useSubscription is deprecated. Please use the hook from `@/hooks/use-subscription`.');
-    return { data: [], setData: () => {}, loading: true, error: new Error('useSubscription is deprecated.') };
-}
-```
-
----
-## File: `src/firebase/index.ts`
-```ts
-'use client';
-
-// This file is now a pure barrel file, re-exporting Firebase utilities.
-// The circular dependency has been resolved by moving `initializeFirebase`
-// into `provider.tsx`.
-
-export * from './provider';
-export { useUser } from './auth/use-user';
-export { useSubscription } from '@/hooks/use-subscription';
-export { useDocument } from '@/hooks/use-document';
-```
-
----
-## File: `src/firebase/init.ts`
-```ts
-'use client';
-
-import { initializeApp, getApp, getApps, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getStorage, type FirebaseStorage } from 'firebase/storage';
-
-const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore; storage: FirebaseStorage; } | null {
-  if (!firebaseConfig.projectId) {
-    console.warn("Firebase projectId is missing in config. Firebase will not be initialized.");
-    return null;
-  }
-  
-  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  const auth = getAuth(app);
-  const firestore = getFirestore(app);
-  const storage = getStorage(app);
-
-  return { app, auth, firestore, storage };
-}
-
-// This function ensures Firebase is initialized only once.
-const getFirebaseServicesSingleton = (() => {
-  let firebase: ReturnType<typeof initializeFirebase> | null = null;
-  let initialized = false;
-  return () => {
-    if (!initialized) {
-      firebase = initializeFirebase();
-      initialized = true;
-    }
-    return firebase;
-  };
-})();
-
-export const getFirebaseServices = getFirebaseServicesSingleton;
-```
-
----
-## File: `src/firebase/provider.tsx`
-```tsx
-'use client';
-
-import React, { createContext, useContext, ReactNode, useMemo } from 'react';
-import type { FirebaseApp } from 'firebase/app';
-import type { Auth } from 'firebase/auth';
-import type { Firestore } from 'firebase/firestore';
-import type { FirebaseStorage } from 'firebase/storage';
-import { getFirebaseServices } from './init';
-
-interface FirebaseContextType {
-  app: FirebaseApp | null;
-  auth: Auth | null;
-  firestore: Firestore | null;
-  storage: FirebaseStorage | null;
-}
-
-const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
-
-export function FirebaseProvider({ children }: { children: ReactNode }) {
-  const services = useMemo(() => getFirebaseServices(), []);
-  const value = services ?? { app: null, auth: null, firestore: null, storage: null };
-
-  return (
-    <FirebaseContext.Provider value={value}>
-      {children}
-    </FirebaseContext.Provider>
-  );
-}
-
-/**
- * A custom hook to access the full Firebase context (app, auth, firestore).
- * Throws an error if used outside of a FirebaseProvider.
- */
-export function useFirebase() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useFirebase must be used within a FirebaseProvider');
-  }
-  return context;
-}
-
-/**
- * A custom hook to specifically access the Firebase App instance.
- */
-export function useFirebaseApp() {
-    const context = useContext(FirebaseContext);
-    if (context === undefined) {
-        throw new Error('useFirebaseApp must be used within a FirebaseProvider');
-    }
-    return context.app;
-}
-
-/**
- * A custom hook to specifically access the Firebase Auth instance.
- */
-export function useAuth() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within a FirebaseProvider');
-  }
-  return context.auth;
-}
-
-/**
- * A custom hook to specifically access the Firestore instance.
- */
-export function useFirestore() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useFirestore must be used within a FirebaseProvider');
-  }
-    return context.firestore;
-}
-
-/**
- * A custom hook to specifically access the Firebase Storage instance.
- */
-export function useStorage() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useStorage must be used within a FirebaseProvider');
-  }
-  return context.storage;
-}
-```
-
----
-## File: `src/firebase/server-init.ts`
-```ts
-import { initializeApp, getApp, getApps, type FirebaseOptions } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-
-const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-let app;
-// Initialize Firebase
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
-
-const firestore = getFirestore(app);
-
-export { firestore };
-```
-
----
-## File: `src/hooks/use-analytical-data.ts`
-```ts
-'use client';
-
-import { useFirebase } from '@/firebase';
-import { collection, getDocs, query, collectionGroup } from 'firebase/firestore';
-import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account, Appointment } from '@/lib/types';
-import { useToast } from './use-toast';
-import { useSmartCache } from './use-smart-cache';
-import { useCallback } from 'react';
-
-// The shape of the data that the hook will return
-interface AnalyticalData {
-    journalEntries: JournalEntry[];
-    clients: Client[];
-    transactions: (ClientTransaction & { clientId: string })[];
-    employees: Employee[];
-    departments: Department[];
-    accounts: Account[];
-    appointments: Appointment[];
-}
-
-export function useAnalyticalData() {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-
-  const fetchAnalyticalData = useCallback(async (): Promise<AnalyticalData> => {
-    if (!firestore) {
-      throw new Error("Firestore is not available.");
-    }
-    
-    try {
-        const [
-          entriesSnap,
-          clientsSnap,
-          transactionsSnap,
-          employeesSnap,
-          departmentsSnap,
-          accountsSnap,
-          appointmentsSnap
-        ] = await Promise.all([
-          getDocs(query(collection(firestore, 'journalEntries'))),
-          getDocs(query(collection(firestore, 'clients'))),
-          getDocs(query(collectionGroup(firestore, 'transactions'))),
-          getDocs(query(collection(firestore, 'employees'))),
-          getDocs(query(collection(firestore, 'departments'))),
-          getDocs(query(collection(firestore, 'chartOfAccounts'))),
-          getDocs(query(collection(firestore, 'appointments'))),
-        ]);
-        
-        const transactions = transactionsSnap.docs.map(doc => {
-            const pathSegments = doc.ref.path.split('/');
-            const clientId = pathSegments[pathSegments.length - 3];
-            return { id: doc.id, clientId, ...doc.data() } as ClientTransaction & { clientId: string };
-        });
-
-        return {
-          journalEntries: entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)),
-          clients: clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)),
-          transactions,
-          employees: employeesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)),
-          departments: departmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)),
-          accounts: accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)),
-          appointments: appointmentsSnap.docs.map(doc => ({id: doc.id, ...doc.data()} as Appointment)),
-        };
-    } catch (error) {
-        console.error("Error fetching analytical data:", error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات التحليلية.' });
-        // Re-throw to be caught by useSmartCache
-        throw error;
-    }
-  }, [firestore, toast]);
-  
-  // Use the smart cache hook to manage fetching and caching
-  const { data, loading, error } = useSmartCache<AnalyticalData>(
-    'analytical_data_cache', // Unique key for this data
-    fetchAnalyticalData,
-    10 * 60 * 1000 // Cache for 10 minutes
-  );
-
-  return { 
-    journalEntries: data?.journalEntries || [],
-    clients: data?.clients || [],
-    transactions: data?.transactions || [],
-    employees: data?.employees || [],
-    departments: data?.departments || [],
-    accounts: data?.accounts || [],
-    appointments: data?.appointments || [],
-    loading, 
-    error 
-  };
-}
-```
-
----
-## File: `src/hooks/use-document.tsx`
-```tsx
-'use client';
-import { useState, useEffect, useMemo } from 'react';
-import { cache } from '@/lib/cache/smart-cache';
-import { useSyncStatus } from '@/context/sync-context';
-
-export function useDocument<T extends { id?: string }>(
-  firestore: any,
-  docPath: string | null
-): { data: T | null, loading: boolean, error: Error | null } {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const { signalUpdate } = useSyncStatus();
-
-  const cacheKey = useMemo(() => docPath, [docPath]);
-
-  useEffect(() => {
-    if (!cacheKey || !firestore) {
-      setData(null);
-      setLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-    let isFirstLoad = true;
-    setLoading(true);
-
-    cache.getFromStorage<T>(cacheKey).then(cached => {
-      if (isMounted && cached?.data) {
-        setData(cached.data);
-      }
-    });
-
-    const unsubscribe = cache.subscribeDoc<T>(
-      firestore,
-      cacheKey,
-      (newData) => {
-        if (isMounted) {
-          setData(newData);
-          setError(null);
-          if (newData !== null) {
-            // Sanitize before setting to cache to ensure serializability
-            const plainData = JSON.parse(JSON.stringify(newData));
-            cache.set(cacheKey, plainData);
-          } else {
-             cache.invalidate(cacheKey);
-          }
-          if (isFirstLoad) {
-            setLoading(false);
-            isFirstLoad = false;
-          } else {
-            signalUpdate();
-          }
-        }
-      },
-      (err) => {
-        if (isMounted) {
-          setError(err);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => { isMounted = false; unsubscribe(); };
-  }, [firestore, cacheKey, signalUpdate]);
-
-  return { data, loading, error };
-}
-```
-
----
-## File: `src/hooks/use-infinite-scroll.ts`
-```ts
-'use client';
-
-import { useState, useCallback, useRef, useEffect } from 'react';
-import {
-  type Firestore,
-  query,
-  collection,
-  orderBy,
-  limit,
-  startAfter,
-  getDocs,
-  type DocumentSnapshot,
-  type QueryConstraint,
-} from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
-
-const PAGE_SIZE = 15;
-const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
-
-export function useInfiniteScroll<T extends { id?: string }>(
-  collectionPath: string | null,
-  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS,
-  orderByField: string = 'createdAt' // Add orderByField parameter
-) {
-  const { firestore } = useFirebase();
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const loaderRef = useRef<HTMLDivElement>(null);
-
-  const fetchItems = useCallback(async (isLoadMore: boolean) => {
-    if (!firestore || !collectionPath || (isLoadMore && !hasMore)) return;
-
-    if (isLoadMore) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-      setItems([]); // Reset for new fetches
-      setLastVisible(null);
-      setHasMore(true);
-    }
-
-    try {
-      const queryConstraints: QueryConstraint[] = [
-        ...constraints,
-        orderBy(orderByField, 'desc'), // Use the parameter here
-        limit(PAGE_SIZE),
-      ];
-
-      if (isLoadMore && lastVisible) {
-        queryConstraints.push(startAfter(lastVisible));
-      }
-
-      const q = query(collection(firestore, collectionPath), ...queryConstraints);
-      const snapshot = await getDocs(q);
-
-      const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-      
-      setItems(prev => isLoadMore ? [...prev, ...newItems] : newItems);
-      
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-      setLastVisible(lastDoc || null);
-
-      if (snapshot.docs.length < PAGE_SIZE) {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error(`Error fetching from ${collectionPath}:`, error);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, collectionPath, JSON.stringify(constraints), hasMore, lastVisible, orderByField]);
-
-  // Initial Fetch Effect
-  useEffect(() => {
-    if (collectionPath) {
-        fetchItems(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionPath, JSON.stringify(constraints), orderByField]);
-
-  // Intersection Observer Effect
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchItems(true);
-        }
-      },
-      { threshold: 1.0 }
-    );
-
-    const loader = loaderRef.current;
-    if (loader) {
-      observer.observe(loader);
-    }
-
-    return () => {
-      if (loader) {
-        observer.unobserve(loader);
-      }
-    };
-  }, [hasMore, loadingMore, loading, fetchItems]);
-
-  return { items, setItems, loading, loadingMore, hasMore, loaderRef };
-}
-```
-
----
-## File: `src/hooks/use-mobile.tsx`
-```tsx
-import * as React from "react"
-
-const MOBILE_BREAKPOINT = 768
-
-export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState(false)
-
-  React.useEffect(() => {
-    function handleResize() {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    }
-
-    window.addEventListener("resize", handleResize)
-    
-    // Call handler right away so state is updated with initial window size
-    handleResize()
-
-    // Remove event listener on cleanup
-    return () => window.removeEventListener("resize", handleResize)
-  }, []) // Empty array ensures that effect is only run on mount and unmount
-
-  return isMobile
-}
-```
-
----
-## File: `src/hooks/use-notifications.tsx`
-```tsx
-'use client';
-
-import { useMemo } from 'react';
-import { useFirebase } from '@/firebase';
-import { useAuth } from '@/context/auth-context';
-import { where } from 'firebase/firestore';
-import { useSubscription } from '@/hooks/use-subscription';
-import type { Notification } from '@/lib/types';
-
-/**
- * A custom hook to fetch and manage notifications for the current user in real-time.
- * It uses a subscription to Firestore for live updates.
- */
-export function useNotifications() {
-    const { firestore } = useFirebase();
-    const { user } = useAuth();
-
-    // Memoize the query constraints array to prevent re-running the subscription unnecessarily.
-    const queryConstraints = useMemo(() => {
-        if (!user?.id) return null;
-        // Query for notifications for the current user. Sorting is handled client-side.
-        return [
-            where('userId', '==', user.id)
-        ];
-    }, [user?.id]);
-    
-    // Memoize the empty array to provide a stable reference when there are no constraints.
-    const emptyConstraints = useMemo(() => [], []);
-
-    // useSubscription handles caching, real-time updates, loading, and error states.
-    // The query will not run if constraints are null (i.e., no user).
-    const { data, loading, error } = useSubscription<Notification>(
-        firestore, 
-        queryConstraints ? 'notifications' : '', 
-        queryConstraints || emptyConstraints
-    );
-    
-    // Client-side sorting to avoid composite index
-    const sortedNotifications = useMemo(() => {
-        if (!data) return [];
-        return [...data].sort((a, b) => {
-            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
-            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
-            return timeB - timeA; // Sort descending
-        });
-    }, [data]);
-    
-    return { notifications: sortedNotifications, loading, error };
-}
-```
-
----
-## File: `src/hooks/use-optimistic.ts`
-```ts
-'use client';
-import { useState, useCallback } from 'react';
-
-export function useOptimistic<T extends { id?: string }>(
-  initialData: T[],
-  updateFn: (newData: T[]) => Promise<void>
-) {
-  const [data, setData] = useState<T[]>(initialData);
-  const [isOptimistic, setIsOptimistic] = useState(false);
-
-  const addOptimistic = useCallback(async (item: T, tempId: string) => {
-    const originalData = data;
-    const optimisticItem = { ...item, id: tempId };
-    const newData = [optimisticItem, ...originalData];
-
-    setData(newData);
-    setIsOptimistic(true);
-    
-    try {
-      await updateFn(newData);
-      setIsOptimistic(false);
-    } catch (error) {
-      setData(originalData); // Revert to original data
-      setIsOptimistic(false);
-      throw error;
-    }
-  }, [data, updateFn]);
-
-  const updateOptimistic = useCallback(async (id: string, updates: Partial<T>) => {
-    const originalData = data;
-    const newData = originalData.map(item => 
-      item.id === id ? { ...item, ...updates } as T : item
-    );
-    
-    setData(newData);
-    setIsOptimistic(true);
-    
-    try {
-      await updateFn(newData);
-      setIsOptimistic(false);
-    } catch (error) {
-      setData(originalData); // Revert
-      setIsOptimistic(false);
-      throw error;
-    }
-  }, [data, updateFn]);
-
-  const deleteOptimistic = useCallback(async (id: string) => {
-    const originalData = data;
-    const newData = originalData.filter(item => item.id !== id);
-
-    setData(newData);
-    setIsOptimistic(true);
-    
-    try {
-      await updateFn(newData);
-      setIsOptimistic(false);
-    } catch (error) {
-      setData(originalData); // Revert
-      setIsOptimistic(false);
-      throw error;
-    }
-  }, [data, updateFn]);
-
-  return {
-    data,
-    setData, // Exposing setData to allow external updates from real-time listeners
-    isOptimistic,
-    addOptimistic,
-    updateOptimistic,
-    deleteOptimistic
-  };
-}
-```
-
----
-## File: `src/hooks/use-realtime.ts`
-```ts
-// This file is deprecated. Please use useSubscription instead.
-export function useRealtime() {
-    console.error('useRealtime is deprecated. Please use `useSubscription` for real-time collection data.');
-    return { data: [], loading: true, error: new Error('useRealtime is deprecated.') };
-}
-```
-
----
-## File: `src/hooks/use-smart-cache.ts`
-```ts
-'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { cache } from '@/lib/cache/smart-cache';
-
-export function useSmartCache<T>(
-  key: string,
-  fetchFn: () => Promise<T>,
-  ttl: number = 30 * 60 * 1000
-) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await cache.get(key, fetchFn, ttl);
-      setData(result);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, [key, fetchFn, ttl]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  return {
-    data,
-    loading,
-    error,
-    refresh: loadData,
-    setData
-  };
-}
-```
-
----
-## File: `src/hooks/use-subscription.tsx`
-```tsx
-'use client';
-
-import { useState, useEffect, useMemo } from 'react';
-import { type QueryConstraint } from 'firebase/firestore';
-import { cache } from '@/lib/cache/smart-cache';
-import { useSyncStatus } from '@/context/sync-context';
-
-const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
-
-export function useSubscription<T extends { id?: string }>(
-  firestore: any,
-  collectionPath: string | null, 
-  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS
-): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
-    const [data, setData] = useState<T[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-    const { signalUpdate } = useSyncStatus();
-
-    // Create a stable and unique key from the constraints array.
-    const serializedConstraints = useMemo(() => {
-        if (!constraints || constraints.length === 0) return 'all';
-        return constraints.map(c => {
-            const internal = c as any;
-            try {
-                if (internal._type === 'where') {
-                    const filter = internal._getFilters()[0];
-                    const op = filter.op;
-                    const fieldPath = filter.field.segments.join('.');
-                    
-                    const valueObject = filter.value;
-                    let value = 'unknown';
-
-                    if (valueObject?.stringValue !== undefined) value = valueObject.stringValue;
-                    else if (valueObject?.integerValue !== undefined) value = valueObject.integerValue;
-                    else if (valueObject?.doubleValue !== undefined) value = valueObject.doubleValue;
-                    else if (valueObject?.booleanValue !== undefined) value = String(valueObject.booleanValue);
-                    else if (valueObject?.arrayValue) return `where:${fieldPath}:${op}:[${valueObject.arrayValue.values.map((v:any) => v.stringValue).join(',')}]`
-                    else if (valueObject?.geoPointValue !== undefined) value = `${valueObject.geoPointValue.latitude},${valueObject.geoPointValue.longitude}`;
-                    else if (valueObject?.timestampValue !== undefined) value = `${valueObject.timestampValue.seconds}_${valueObject.timestampValue.nanoseconds}`;
-                    else if (valueObject?.nullValue !== undefined) value = 'null';
-                    
-                    return `where:${fieldPath}:${op}:${value}`;
-                }
-                if (internal._type === 'orderBy') {
-                    const field = internal._query.orderBy[0].field.segments.join('.');
-                    const dir = internal._query.orderBy[0].dir;
-                    return `orderBy:${field}:${dir}`;
-                }
-                 if (internal._type === 'limit') {
-                    return `limit:${internal._query.limit}`;
-                }
-            } catch {
-                return 'unknown_constraint';
-            }
-            return 'unknown_constraint';
-        }).join('|');
-    }, [constraints]);
-
-    const cacheKey = useMemo(() => {
-        return `${collectionPath}:${serializedConstraints}`;
-    }, [collectionPath, serializedConstraints]);
-
-    useEffect(() => {
-        if (!collectionPath || !firestore) {
-            setData([]);
-            setLoading(false);
-            return;
-        }
-
-        let isMounted = true;
-        let isFirstLoad = true;
-        setLoading(true);
-        
-        cache.getFromStorage<T[]>(cacheKey).then(cached => {
-            if (isMounted && cached?.data) {
-                setData(cached.data);
-            }
-        });
-
-        const unsubscribe = cache.subscribe<T>(
-            firestore,
-            collectionPath,
-            (newData) => {
-                if (isMounted) {
-                    setData(newData);
-                    setError(null);
-                    const plainData = JSON.parse(JSON.stringify(newData));
-                    cache.set(cacheKey, plainData); // Update cache on new data
-                    if (isFirstLoad) {
-                        setLoading(false);
-                        isFirstLoad = false;
-                    } else {
-                        signalUpdate();
-                    }
-                }
-            },
-            (err) => {
-                if (isMounted) {
-                    setError(err);
-                    setLoading(false);
-                }
-            },
-            constraints
-        );
-        
-        return () => { isMounted = false; unsubscribe(); };
-    }, [firestore, cacheKey, collectionPath, signalUpdate, JSON.stringify(constraints)]);
-
-    return { data, setData, loading, error };
-}
-```
-
----
-## File: `src/lib/placeholder-images.json`
-```json
-{
-  "placeholderImages": [
-    {
-      "id": "login-background",
-      "description": "Abstract architectural background for login page",
-      "imageUrl": "https://images.unsplash.com/photo-1567943183748-3a7542120c90?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxhcmNoaXRlY3R1cmUlMjBhYnN0cmFjdHxlbnwwfHx8fDE3NjcyMjA4NDJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "architecture abstract"
-    },
-    {
-      "id": "user-avatar-1",
-      "description": "Avatar for Ali Ahmed",
-      "imageUrl": "https://images.unsplash.com/photo-1607031542107-f6f46b5d54e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjcyMjcxOTN8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "man portrait"
-    },
-    {
-      "id": "user-avatar-2",
-      "description": "Avatar for Fatima Al-Mansoori",
-      "imageUrl": "https://images.unsplash.com/photo-1592621385612-4d7129426394?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHx3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc2NzIzMjcyOXww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "woman portrait"
-    },
-    {
-      "id": "user-avatar-3",
-      "description": "Avatar for Yusuf Khan",
-      "imageUrl": "https://images.unsplash.com/photo-1557862921-37829c790f19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2NzIwMzM1MHww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "man glasses"
-    },
-    {
-      "id": "user-avatar-4",
-      "description": "Avatar for Noor Al-Falahi",
-      "imageUrl": "https://images.unsplash.com/photo-1573496527892-904f897eb744?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx3b21hbiUyMHByb2Zlc3Npb25hbHxlbnwwfHx8fDE3NjcxODgyNzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "woman professional"
-    },
-    {
-      "id": "user-avatar-5",
-      "description": "Avatar for Hassan Ibrahim",
-      "imageUrl": "https://images.unsplash.com/photo-1715029005043-e88d219a3c48?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxtYW4lMjBlbmdpbmVlcnxlbnwwfHx8fDE3NjcyNTAyODh8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "man engineer"
-    },
-    {
-      "id": "user-avatar-6",
-      "description": "Avatar for Salama Al-Mazrouei",
-      "imageUrl": "https://images.unsplash.com/photo-1573497491208-6b1acb260507?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3b21hbiUyMHNlY3JldGFyeXxlbnwwfHx8fDE3NjcyNTAyODh8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "woman secretary"
-    },
-    {
-      "id": "project-image-1",
-      "description": "Image for Downtown Dubai Villa",
-      "imageUrl": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjB2aWxsYXxlbnwwfHx8fDE3NjcyMTMzMDN8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "modern villa"
-    },
-    {
-      "id": "project-image-2",
-      "description": "Image for Yas Island Residential Tower",
-      "imageUrl": "https://images.unsplash.com/photo-1685211041228-5e7985ab3beb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBza3lzY3JhcGVyfGVufDB8fHx8MTc2NzI1MDI4OHww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "modern skyscraper"
-    },
-    {
-      "id": "project-image-3",
-      "description": "Image for Dubai Marina Kiosk",
-      "imageUrl": "https://images.unsplash.com/photo-1613652072912-526703fcbfc4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxmb29kJTIwa2lvc2t8ZW58MHx8fHwxNzY3MjUwMjg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "food kiosk"
-    }
-  ]
-}
-```
-
----
-## File: `src/lib/placeholder-images.ts`
-```ts
-import data from './placeholder-images.json';
-
-export type ImagePlaceholder = {
-  id: string;
-  description: string;
-  imageUrl: string;
-  imageHint: string;
-};
-
-export const PlaceHolderImages: ImagePlaceholder[] = data.placeholderImages;
-```
-
----
-## File: `src/lib/types.ts`
-```ts
-
-
-
-
-export interface Company {
-    id?: string;
-    name: string;
-    nameEn?: string;
-    address?: string;
-    phone?: string;
-    email?: string;
-    crNumber?: string;
-    logoUrl?: string;
-}
-
-export type MultilingualString = {
-    ar: string;
-    en: string;
-};
-
-export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
-
-export type UserProfile = {
-  id?: string;
-  uid?: string; // Firebase Auth UID
-  username: string; // Unique, for login
-  email: string; // Auto-generated internal email
-  passwordHash: string; // Hashed password
-  employeeId: string; // Reference to 'employees' collection
-  role: UserRole;
-  isActive: boolean;
-  createdAt?: any; 
-  activatedAt?: any;
-  createdBy?: string; // UID of the admin who created the user
-  avatarUrl?: string; // Optional, from employee record
-  fullName?:string; // Optional, from employee record
-  jobTitle?: string; // Optional, from employee record
-};
-
-export type Client = {
-  id: string;
-  nameAr: string;
-  nameEn?: string;
-  mobile: string;
-  civilId?: string;
-  plotNumber?: string;
-  address?: {
-    governorate: string;
-    area: string;
-    block: string;
-    street: string;
-    houseNumber: string;
-  };
-  fileId: string;
-  fileNumber: number;
-  fileYear: number;
-  status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
-  transactionCounter?: number;
-  assignedEngineer?: string;
-  createdAt: any;
-  isActive: boolean;
-  projectIds?: string[];
-};
-
-export type ProjectStatus = 'Planning' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';
-
-export type EngineeringDiscipline = {
-  name: MultilingualString;
-  stages: { name: MultilingualString; status: 'Pending' | 'In Progress' | 'Completed' }[];
-};
-
-export type ProjectFile = {
-  id: string;
-  name: string;
-  url: string;
-  uploadedAt: string;
-  type: 'image' | 'pdf' | 'document';
-};
-
-export type TimelineEvent = {
-  id: string;
-  type: 'Milestone' | 'Visit' | 'Task' | 'Report';
-  title: MultilingualString;
-  date: string;
-  description: MultilingualString;
-  authorId?: string;
-};
-
-export type DailyReport = {
-  id:string;
-  date: string;
-  authorId: string;
-  workCompleted: string;
-  workersCount: number;
-  issues: string;
-  photos: string[]; // URLs
-};
-
-export type Project = {
-  id: string;
-  name: MultilingualString;
-  clientId: string;
-  leadEngineerId: string;
-  status: ProjectStatus;
-  startDate: string;
-  endDate: string;
-  description: MultilingualString;
-  imageUrl: string;
-  imageHint: string;
-  disciplines: EngineeringDiscipline[];
-  files: ProjectFile[];
-  timeline: TimelineEvent[];
-  reports: DailyReport[];
-  contractId?: string;
-};
-
-export type Appointment = {
-  id: string;
-  title: string;
-  appointmentDate: any; // This will be the start time
-  endDate?: any; // This will be the end time
-  clientId?: string;
-  clientName?: string;
-  clientMobile?: string;
-  prospectiveClientId?: string; // NEW: Link to a prospective client record
-  engineerId: string;
-  engineerName?: string;
-  meetingRoom?: string;
-  department?: string;
-  type: 'architectural' | 'room';
-  status?: 'scheduled' | 'cancelled';
-  notes?: string;
-  transactionId?: string;
-  workStageUpdated?: boolean;
-  workStageProgressId?: string;
-  // For architectural appointments with color logic
-  session?: 'صباحية' | 'مسائية';
-  visitCount?: number;
-  contractSigned?: boolean;
-  projectType?: string;
-  color?: string; // Hex color code
-  minutesContent?: string;
-  // For display purposes, not stored in DB directly
-};
-
-
-export type PaymentMilestone = {
-  id: string;
-  name: MultilingualString;
-  percentage: number;
-  dueDate: string;
-  status: 'Pending' | 'Completed' | 'Overdue';
-};
-
-export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue';
-
-export type Invoice = {
-  id: string;
-  invoiceNumber: string;
-  clientId: string;
-  projectId: string;
-  amount: number;
-  issueDate: string;
-  dueDate: string;
-  status: InvoiceStatus;
-  type: 'Receivable' | 'Payable';
-};
-
-export type CashReceipt = {
-    id: string;
-    voucherNumber: string;
-    voucherSequence: number;
-    voucherYear: number;
-    clientId: string;
-    clientNameAr: string;
-    clientNameEn?: string;
-    projectId?: string;
-    projectNameAr?: string;
-    amount: number; // Gross Amount
-    amountInWords: string;
-    receiptDate: any; 
-    paymentMethod: string;
-    bankFeeAmount?: number;
-    netAmount?: number;
-    description: string;
-    reference?: string;
-    journalEntryId?: string;
-    createdAt: any; 
-};
-
-export interface PaymentVoucher {
-  id?: string;
-  voucherNumber: string;
-  voucherSequence: number;
-  voucherYear: number;
-  payeeName: string;
-  payeeType: 'vendor' | 'employee' | 'other';
-  employeeId?: string;
-  renewalExpiryDate?: any;
-  amount: number;
-  amountInWords: string;
-  paymentDate: any; 
-  paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'EmployeeCustody';
-  description: string;
-  reference?: string;
-  debitAccountId: string;
-  debitAccountName: string;
-  creditAccountId: string;
-  creditAccountName: string;
-  status: 'draft' | 'paid' | 'cancelled';
-  journalEntryId?: string;
-  createdAt: any; 
-  clientId?: string;
-  transactionId?: string;
-}
-
-export type Transaction = {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  type: 'Income' | 'Expense';
-  category: string;
-  invoiceId?: string;
-};
-
-export type Employee = {
-    id?: string;
-    employeeNumber?: string;
-    fullName: string; 
-    nameEn?: string;
-    dob?: any;
-    gender?: 'male' | 'female';
-    civilId: string;
-    nationality?: string;
-    residencyExpiry?: any;
-    contractExpiry?: any;
-    mobile: string;
-    emergencyContact?: string;
-    email?: string;
-    jobTitle?: string;
-    position?: 'head' | 'employee' | 'assistant' | 'contractor';
-    workStartTime?: string; 
-    workEndTime?: string; 
-    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
-    bankName?: string;
-    accountNumber?: string;
-    iban?: string;
-    profilePicture?: string;
-    hireDate: any; 
-    noticeStartDate: any | null; 
-    terminationDate: any | null;
-    terminationReason: 'resignation' | 'termination' | 'probation' | null;
-    contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special';
-    contractPercentage?: number;
-    pieceRateMode?: 'salary_with_target' | 'per_piece';
-    targetDescription?: number;
-    pieceRate?: number;
-    department: string;
-    basicSalary: number; 
-    housingAllowance?: number;
-    transportAllowance?: number;
-    status: 'active' | 'on-leave' | 'terminated';
-    lastVacationAccrualDate: any; 
-    annualLeaveAccrued?: number;
-    annualLeaveUsed?: number;
-    carriedLeaveDays?: number;
-    sickLeaveUsed?: number;
-    emergencyLeaveUsed?: number;
-    maxEmergencyLeave?: number;
-    lastLeaveResetDate?: any; 
-    annualLeaveBalance?: number;
-    createdAt?: any; 
-    auditLogs?: AuditLog[];
-    eosb?: number;
-    leaveBalance?: number;
-    lastLeave?: LeaveRequest | null;
-    serviceDuration?: Duration;
-};
-
-export interface LeaveRequest {
-    id: string;
-    employeeId: string;
-    employeeName: string;
-    leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
-    startDate: any;
-    endDate: any;
-    days: number;
-    workingDays?: number;
-    notes?: string;
-    attachmentUrl?: string;
-    status: 'pending' | 'approved' | 'rejected';
-    createdAt: any;
-    approvedBy?: string;
-    approvedAt?: any;
-    rejectionReason?: string;
-    isBackFromLeave?: boolean;
-    actualReturnDate?: any;
-    passportReceived?: boolean;
-    isSalaryPaid?: boolean;
-}
-
-export interface PermissionRequest {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  date: any;
-  type: 'late_arrival' | 'early_departure';
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: any;
-  approvedBy?: string;
-  approvedAt?: any;
-  rejectionReason?: string;
-}
-
-
-export interface Holiday {
-    id?: string;
-    name: string;
-    date: any; 
-}
-
-
-export type AuditLog = {
-    id?: string;
-    changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'StatusChange' | 'ResidencyUpdate';
-    field: string | string[]; 
-    oldValue: any;
-    newValue: any;
-    effectiveDate: any; 
-    changedBy: string; 
-    notes?: string;
-};
-
-export type AttendanceRecord = {
-    date: string;
-    checkIn1?: string | null;
-    checkOut1?: string | null;
-    checkIn2?: string | null;
-    checkOut2?: string | null;
-    totalHours?: number | null;
-    status: 'present' | 'absent' | 'late' | 'leave';
-};
-
-export type AttendanceSummary = {
-    totalDays: number;
-    presentDays: number;
-    absentDays: number;
-    lateDays: number;
-    leaveDays: number;
-};
-
-export type MonthlyAttendance = {
-    id?: string;
-    employeeId: string;
-    year: number;
-    month: number;
-    records: AttendanceRecord[];
-    summary: AttendanceSummary;
-};
-
-export type Payslip = {
-    id?: string;
-    employeeId: string;
-    employeeName: string;
-    year: number;
-    month: number;
-    attendanceId?: string;
-    earnings: {
-        basicSalary: number;
-        housingAllowance?: number;
-        transportAllowance?: number;
-        commission?: number;
-    };
-    deductions: {
-        absenceDeduction: number;
-        otherDeductions: number;
-    };
-    netSalary: number;
-    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
-    status: 'draft' | 'processed' | 'paid';
-    createdAt: any;
-    notes?: string;
-    type?: 'Monthly' | 'Leave';
-    leaveRequestId?: string;
-};
-
-export interface TransactionStage {
-  stageId: string;
-  name: string;
-  order?: number;
-  status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
-  startDate: any | null;
-  endDate: any | null;
-  notes?: string;
-  expectedEndDate?: any | null;
-  completedCount?: number;
-  modificationCount?: number;
-  
-  stageType?: 'sequential' | 'parallel';
-  allowedRoles?: string[];
-  nextStageIds?: string[];
-  allowedDuringStages?: string[];
-  trackingType?: 'duration' | 'occurrence' | 'none';
-  enableModificationTracking?: boolean;
-  expectedDurationDays?: number | null;
-  maxOccurrences?: number | null;
-  allowManualCompletion?: boolean;
-}
-      
-export type ClientTransaction = {
-    id?: string;
-    transactionNumber?: string;
-    clientId: string;
-    transactionType: string;
-    description?: string;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
-    departmentId?: string;
-    transactionTypeId?: string;
-    assignedEngineerId?: string;
-    createdAt: any;
-    updatedAt?: any;
-    stages?: Partial<TransactionStage>[]; 
-    engineerName?: string;
-    contract?: {
-        clauses: ContractClause[];
-        scopeOfWork?: ContractScopeItem[];
-        termsAndConditions?: ContractTerm[];
-        openClauses?: ContractTerm[];
-        totalAmount: number;
-        financialsType?: 'fixed' | 'percentage';
-    };
-};
-
-export type TransactionAssignment = {
-    id?: string;
-    transactionId: string;
-    clientId: string;
-    departmentId: string;
-    departmentName: string;
-    engineerId?: string;
-    notes?: string;
-    status: 'pending' | 'in-progress' | 'completed';
-    createdAt: any;
-    createdBy: string;
-};
-
-
-export type TransactionTimelineEvent = {
-  id: string;
-  type: 'comment' | 'log';
-  content: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  createdAt: any;
-};
-
-export interface Department {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface Job {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface Governorate {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface Area {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface TransactionType {
-    id: string;
-    name: string;
-    departmentIds?: string[];
-    order?: number;
-}
-
-export interface WorkStage {
-  id: string;
-  name: string;
-  order?: number;
-  stageType?: 'sequential' | 'parallel';
-  allowedRoles?: string[];
-  nextStageIds?: string[];
-  allowedDuringStages?: string[];
-  trackingType: 'duration' | 'occurrence' | 'none';
-  enableModificationTracking?: boolean;
-  expectedDurationDays?: number | null;
-  maxOccurrences?: number | null;
-  allowManualCompletion?: boolean;
-}
-
-export type ContractClause = {
-  id: string;
-  name: string;
-  amount: number;
-  status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; 
-  percentage?: number;
-  condition?: string;
-};
-
-export interface ContractTerm {
-  id: string;
-  text: string;
-}
-
-export type ContractTemplate = {
-  id?: string;
-  title: string;
-  description?: string;
-  transactionTypes: string[];
-  scopeOfWork: ContractScopeItem[];
-  termsAndConditions: ContractTerm[];
-  financials: {
-    type: 'fixed' | 'percentage';
-    totalAmount: number;
-    discount: number;
-    milestones: ContractFinancialMilestone[];
-  };
-  openClauses?: ContractTerm[];
-  createdAt?: any;
-  createdBy?: string;
-};
-
-
-export interface ContractScopeItem {
-  id: string;
-  title: string;
-  description: string;
-}
-
-export interface ContractFinancialMilestone {
-  id: string;
-  name: string;
-  condition: string;
-  value: number;
-}
-
-export interface Contract {
-  id?: string;
-  clientId: string;
-  clientName: string;
-  companySnapshot: Partial<Company>;
-  title: string;
-  contractDate: any;
-  scopeOfWork: ContractScopeItem[];
-  termsAndConditions: ContractTerm[];
-  financials: {
-    type: 'fixed' | 'percentage';
-    totalAmount: number;
-    discount: number;
-    milestones: ContractFinancialMilestone[];
-  };
-  openClauses?: ContractTerm[];
-  createdAt?: any;
-  createdBy?: string;
-}
-
-export interface Notification {
-  id?: string;
-  userId: string;
-  title: string;
-  body: string;
-  link: string;
-  isRead: boolean;
-  createdAt: any;
-}
-
-export interface Account {
-    id?: string;
-    code: string;
-    name: string;
-    type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-    statement?: 'Balance Sheet' | 'Income Statement';
-    balanceType?: 'Debit' | 'Credit';
-    level: number;
-    description?: string;
-    isPayable: boolean;
-    parentCode: string | null;
-}
-
-export interface JournalEntryLine {
-  id?: string;
-  accountId: string;
-  accountName: string;
-  debit: number;
-  credit: number;
-  notes?: string;
-  clientId?: string;
-  transactionId?: string;
-  auto_profit_center?: string;
-  auto_resource_id?: string;
-  auto_dept_id?: string;
-}
-
-export interface JournalEntry {
-  id?: string;
-  entryNumber: string;
-  date: any; 
-  narration: string;
-  reference?: string;
-  linkedReceiptId?: string;
-  totalDebit: number;
-  totalCredit: number;
-  status: 'draft' | 'posted';
-  reconciliationStatus?: 'unreconciled' | 'reconciled' | 'pending';
-  reconciliationInfo?: {
-    reconciledAt: any;
-    reconciledBy: string;
-    bankTransactionId: string;
-  };
-  lines: JournalEntryLine[];
-  clientId?: string;
-  transactionId?: string;
-  createdAt: any; 
-  createdBy?: string;
-}
-
-export interface WorkStageProgress {
-  id?: string;
-  transactionId?: string;
-  visitId: string;
-  stageId: string;
-  stageName: string;
-  selectedBy: string; 
-  selectedAt: any; 
-}
-
-export interface QuotationItem {
-  id?: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  condition?: string;
-}
-
-export interface Quotation {
-  id?: string;
-  quotationNumber: string;
-  quotationSequence: number;
-  quotationYear: number;
-  clientId: string;
-  clientName: string;
-  date: any; 
-  validUntil: any; 
-  subject: string;
-  departmentId?: string;
-  transactionTypeId?: string;
-  items: QuotationItem[];
-  totalAmount: number;
-  notes?: string;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-  createdAt: any; 
-  createdBy?: string;
-  scopeOfWork?: ContractScopeItem[];
-  termsAndConditions?: ContractTerm[];
-  openClauses?: ContractTerm[];
-  templateDescription?: string;
-  transactionId?: string;
-}
-
-export interface Vendor {
-    id?: string;
-    name: string;
-    contactPerson?: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-}
-
-export interface PurchaseOrderItem {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-}
-
-export interface PurchaseOrder {
-    id?: string;
-    poNumber: string;
-    orderDate: any;
-    vendorId: string;
-    vendorName: string;
-    projectId?: string;
-    items: PurchaseOrderItem[];
-    totalAmount: number;
-    paymentTerms?: string;
-    notes?: string;
-    status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
-}
-
-export interface ResidencyRenewal {
-    id?: string;
-    employeeId: string;
-    renewalDate: any;
-    newExpiryDate: any;
-    cost: number;
-    paymentVoucherId: string;
-    monthlyAmortizationAmount: number;
-    amortizationStatus: 'in-progress' | 'completed';
-    lastAmortizationDate?: any;
-}
-
-export interface PaymentMethod {
-    id: string;
-    name: string;
-    type: 'fixed' | 'percentage';
-    value: number;
-    expenseAccountId: string;
-    expenseAccountName: string;
-}
-    
-```
-
----
-## File: `src/lib/utils.ts`
-```ts
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
-export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'KWD',
-  }).format(amount);
-}
-
-function tafqeet(n: number, currency: { singular: string, dual: string, plural: string, accusative: string }): string {
-    if (n === 0) return '';
-    
-    const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
-    const teens = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
-    const tens = ['', 'عشرة', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
-    const hundreds = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
-
-    function convert(num: number): string {
-        if (num < 10) return ones[num];
-        if (num < 20) return teens[num - 10];
-        if (num < 100) {
-            const t = Math.floor(num / 10);
-            const o = num % 10;
-            return (o > 0 ? ones[o] + ' و' : '') + tens[t];
-        }
-        if (num < 1000) {
-            const h = Math.floor(num / 100);
-            const rest = num % 100;
-            return hundreds[h] + (rest > 0 ? ' و' + convert(rest) : '');
-        }
-        if (num < 1000000) {
-            const th = Math.floor(num / 1000);
-            const rest = num % 1000;
-            let thText = '';
-            if (th === 1) thText = 'ألف';
-            else if (th === 2) thText = 'ألفان';
-            else if (th >= 3 && th <= 10) thText = convert(th) + ' آلاف';
-            else thText = convert(th) + ' ألف';
-            return thText + (rest > 0 ? ' و' + convert(rest) : '');
-        }
-        if (num < 1000000000) {
-            const m = Math.floor(num / 1000000);
-            const rest = num % 1000000;
-            let mText = '';
-            if (m === 1) mText = 'مليون';
-            else if (m === 2) mText = 'مليونان';
-            else if (m >= 3 && m <= 10) mText = convert(m) + ' ملايين';
-            else mText = convert(m) + ' مليون';
-            return mText + (rest > 0 ? ' و' + convert(rest) : '');
-        }
-        const b = Math.floor(n / 1000000000);
-        const rest = n % 1000000000;
-         let bText = '';
-        if (b === 1) bText = 'مليار';
-        else if (b === 2) bText = 'ملياران';
-        else if (b >= 3 && b <= 10) bText = convert(b) + ' مليارات';
-        else bText = convert(b) + ' مليار';
-        return bText + (rest > 0 ? ' و' + convert(rest) : '');
-    }
-
-    function getUnit(num: number) {
-        const lastTwo = num % 100;
-        if (num === 1) return currency.singular;
-        if (num === 2) return currency.dual;
-        if (lastTwo >= 3 && lastTwo <= 10) return currency.plural;
-        return currency.accusative;
-    }
-    
-    const words = convert(n);
-    const unit = getUnit(n);
-
-    return words + ' ' + unit;
-}
-
-
-export function numberToArabicWords(inputNumber: number | string): string {
-    const num = parseFloat(String(inputNumber).replace(/,/g, ''));
-    if (isNaN(num)) return '';
-    if (num === 0) return 'فقط صفر دينار كويتي لا غير';
-
-    const dinars = Math.floor(num);
-    const fils = Math.round((num - dinars) * 1000);
-
-    const dinarCurrency = { singular: 'دينار كويتي', dual: 'ديناران كويتيان', plural: 'دنانير كويتية', accusative: 'ديناراً كويتياً' };
-    const filsCurrency = { singular: 'فلس', dual: 'فلسان', plural: 'فلوس', accusative: 'فلساً' };
-
-    let result = [];
-    if (dinars > 0) {
-        result.push(tafqeet(dinars, dinarCurrency));
-    }
-    if (fils > 0) {
-        result.push(tafqeet(fils, filsCurrency));
-    }
-    
-    if (result.length === 0) return '';
-    
-    return 'فقط ' + result.join(' و') + ' لا غير';
-}
-
-
-export function cleanFirestoreData(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(v => cleanFirestoreData(v));
-  }
-
-  // Do not recurse into Date or Timestamp objects
-  if (typeof obj !== 'object' || obj instanceof Date || (obj.constructor && obj.constructor.name === 'Timestamp')) {
-    return obj;
-  }
-
-  const cleaned: { [key: string]: any } = {};
-  for (const key of Object.keys(obj)) {
-    if (obj[key] !== undefined) {
-      cleaned[key] = cleanFirestoreData(obj[key]);
-    }
-  }
-  
-  return cleaned;
-}
-```
-
----
-## File: `src/services/attendance-processor.ts`
-```ts
-// This file is intentionally left blank.
-// The logic has been moved to the client-side component `src/components/hr/attendance-uploader.tsx`
-// to ensure reliable Firebase interaction.
-
-```
-
----
-## File: `src/services/date-converter.ts`
-```ts
-
-
-import { Timestamp } from 'firebase/firestore';
-
-export function toFirestoreDate(value: any): Date | null {
-    try {
-        if (!value) return null;
-        if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-        // Check for Firestore Timestamp
-        if (value && typeof value.toDate === 'function') return value.toDate();
-        // Check for serialized Timestamp { seconds, nanoseconds }
-        if (typeof value === 'object' && 'seconds' in value) return new Date(value.seconds * 1000);
-        // Check for String
-        if (typeof value === 'string') {
-            const d = new Date(value);
-            return isNaN(d.getTime()) ? null : d;
-        }
-        if (typeof value === 'number') {
-            const d = new Date(value);
-            if (isNaN(d.getTime())) return null;
-            return d;
-        }
-        return null;
-    } catch {
-        return null;
-    }
-}
-
-
-export function fromFirestoreDate(dateValue: any): string {
-  const date = toFirestoreDate(dateValue);
-  if (!date) {
-    return '';
-  }
-  
-  try {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  } catch (error) {
-    console.error("Failed to format date from value:", dateValue, error);
-    return '';
-  }
-}
-    
-```
-
----
-## File: `src/services/leave-calculator.ts`
-```ts
-import { differenceInDays, eachDayOfInterval, format, differenceInYears, differenceInMonths } from 'date-fns';
-import type { Holiday, Employee } from '@/lib/types';
-import { toFirestoreDate } from './date-converter';
-
-const dayNameToIndex: Record<string, number> = {
-  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-  'Thursday': 4, 'Friday': 5, 'Saturday': 6
-};
-
-export function calculateWorkingDays(
-  startDate: Date | undefined,
-  endDate: Date | undefined,
-  weeklyHolidays: string[],
-  publicHolidays: Holiday[]
-): { totalDays: number, workingDays: number } {
-  if (!startDate || !endDate || startDate > endDate) {
-    return { totalDays: 0, workingDays: 0 };
-  }
-
-  const totalDays = differenceInDays(endDate, startDate) + 1;
-  const interval = { start: startDate, end: endDate };
-  const allDaysInInterval = eachDayOfInterval(interval);
-
-  const weeklyHolidayIndexes = new Set(weeklyHolidays.map(day => dayNameToIndex[day]));
-  const publicHolidayDates = new Set(publicHolidays.map(h => format(toFirestoreDate(h.date)!, 'yyyy-MM-dd')));
-
-  let workingDays = 0;
-
-  for (const day of allDaysInInterval) {
-    const dayIndex = day.getDay();
-    const dateString = format(day, 'yyyy-MM-dd');
-    
-    if (!weeklyHolidayIndexes.has(dayIndex) && !publicHolidayDates.has(dateString)) {
-      workingDays++;
-    }
-  }
-
-  return { totalDays, workingDays };
-}
-
-export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDate: Date): number => {
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return 0;
-
-    // Calculate total months of service
-    const totalMonthsOfService = differenceInMonths(asOfDate, hireDate);
-    
-    // Accrual is 30 days per year, which is 2.5 days per month.
-    const totalAccrued = (totalMonthsOfService / 12) * 30;
-    
-    const usedLeave = employee.annualLeaveUsed || 0;
-    const carriedOver = employee.carriedLeaveDays || 0;
-
-    const balance = totalAccrued + carriedOver - usedLeave;
-
-    return Math.floor(balance > 0 ? balance : 0);
-};
-
-
-export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
-    const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) {
-      return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'تاريخ التعيين غير صالح.', yearsOfService: 0, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
-    }
-
-    const yearsOfService = differenceInYears(asOfDate, hireDate);
-    const lastSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-
-    if (lastSalary === 0) {
-        return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.', yearsOfService, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
-    }
-
-    let rawGratuity = 0;
-    const dailyWage = lastSalary / 26; // As per common practice for Kuwait law
-
-    // Kuwaiti Private Sector Labor Law No. 6 of 2010, Article 51
-    if (yearsOfService <= 5) {
-        // 15 days' remuneration for each of the first five years
-        rawGratuity = yearsOfService * 15 * dailyWage;
-    } else {
-        // 15 days for first 5 years + one month's remuneration for each year thereafter.
-        const firstFiveYearsGratuity = 5 * 15 * dailyWage;
-        const subsequentYears = yearsOfService - 5;
-        const subsequentYearsGratuity = subsequentYears * lastSalary;
-        rawGratuity = firstFiveYearsGratuity + subsequentYearsGratuity;
-    }
-
-    // Cap at 1.5 years salary
-    const maxGratuity = 1.5 * 12 * lastSalary;
-    rawGratuity = Math.min(rawGratuity, maxGratuity);
-
-    let finalGratuity = rawGratuity;
-    let notice = `بناءً على ${yearsOfService.toFixed(1)} سنوات من الخدمة.`;
-
-    if (employee.terminationReason === 'resignation') {
-        if (yearsOfService < 3) {
-            finalGratuity = 0;
-            notice += " (لا يستحق مكافأة لخدمة أقل من 3 سنوات عند الاستقالة)";
-        } else if (yearsOfService < 5) {
-            finalGratuity = rawGratuity * 0.5;
-             notice += " (يستحق نصف المكافأة لخدمة بين 3-5 سنوات عند الاستقالة)";
-        } else if (yearsOfService < 10) {
-            finalGratuity = rawGratuity * (2 / 3);
-            notice += " (يستحق ثلثي المكافأة لخدمة بين 5-10 سنوات عند الاستقالة)";
-        }
-        // If > 10 years, they get the full amount, so no change needed.
-    }
-
-    const leaveBalance = calculateAnnualLeaveBalance(employee, asOfDate);
-    const leaveBalancePay = leaveBalance * dailyWage;
-
-    return { 
-        gratuity: finalGratuity, 
-        leaveBalancePay, 
-        total: finalGratuity + leaveBalancePay, 
-        notice,
-        yearsOfService,
-        lastSalary,
-        leaveBalance,
-        dailyWage,
-    };
-};
-```
-
----
-## File: `src/services/notification-service.ts`
-```ts
-'use client';
-
-import { collection, addDoc, serverTimestamp, query, where, getDocs, type Firestore } from 'firebase/firestore';
-import type { UserProfile } from '@/lib/types';
-
-interface NotificationData {
-    userId: string;
-    title: string;
-    body: string;
-    link: string;
-}
-
-/**
- * Creates a notification for a specific user.
- */
-export async function createNotification(db: Firestore, data: NotificationData) {
-    try {
-        await addDoc(collection(db, 'notifications'), {
-            ...data,
-            isRead: false,
-            createdAt: serverTimestamp()
-        });
-    } catch (error) {
-        console.error("Failed to create notification:", error);
-        // We don't want to throw an error here, as notification failure shouldn't block the main action.
-    }
-}
-
-/**
- * Finds a user's document ID based on their employee ID.
- * @returns The user's Firestore document ID or null if not found.
- */
-export async function findUserIdByEmployeeId(db: Firestore, employeeId: string): Promise<string | null> {
-    if (!employeeId) return null;
-
-    try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('employeeId', '==', employeeId));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-            return querySnapshot.docs[0].id; // Return the Firestore document ID
-        }
-        return null;
-    } catch (error) {
-        console.error("Failed to find user by employeeId:", error);
-        return null;
-    }
-}
-    
-```
-
----
-## File: `src/services/payroll-processor.ts`
+- src/services/payroll-processor.ts:
 ```ts
 // This file is intentionally left blank.
 // The logic has been moved to the client-side component `src/components/hr/payroll-generator.tsx`
 // to ensure reliable Firebase interaction.
 
 ```
-
----
-## File: `src/services/report-generator.ts`
+- src/services/report-generator.ts:
 ```ts
-
 'use server';
 
 import { 
@@ -7694,13 +4383,11 @@ export async function generateReport(db: Firestore, reportType: ReportType, opti
 }
     
 ```
-
----
-## File: `tailwind.config.ts`
+- tailwind.config.ts:
 ```ts
 import type { Config } from 'tailwindcss';
 
-export default {
+const config: Config = {
   darkMode: ['class'],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -7801,11 +4488,12 @@ export default {
     },
   },
   plugins: [require('tailwindcss-animate')],
-} satisfies Config;
-```
+};
 
----
-## File: `tsconfig.json`
+export default config;
+
+```
+- tsconfig.json:
 ```json
 {
   "compilerOptions": {
@@ -7834,4 +4522,8 @@ export default {
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
+
 ```
+```
+
+I will now update your project files.
