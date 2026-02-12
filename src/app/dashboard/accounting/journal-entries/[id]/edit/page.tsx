@@ -312,13 +312,13 @@ export default function EditJournalEntryPage() {
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                                <Input type="number" step="0.001" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                                <Input type="number" step="0.001" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
                                     </TableCell>

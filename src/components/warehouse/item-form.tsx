@@ -209,11 +209,11 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="costPrice">سعر التكلفة</Label>
-              <Input id="costPrice" type="number" step="any" value={formData.costPrice} onChange={handleChange} dir="ltr" />
+              <Input id="costPrice" type="number" step="0.001" value={formData.costPrice} onChange={handleChange} dir="ltr" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="sellingPrice">سعر البيع</Label>
-              <Input id="sellingPrice" type="number" step="any" value={formData.sellingPrice} onChange={handleChange} dir="ltr" />
+              <Input id="sellingPrice" type="number" step="0.001" value={formData.sellingPrice} onChange={handleChange} dir="ltr" />
             </div>
 
           </div>

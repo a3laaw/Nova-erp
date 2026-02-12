@@ -239,7 +239,7 @@ export default function NewJournalEntryPage() {
 
   return (
     <Card className="max-w-5xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
@@ -306,13 +306,13 @@ export default function NewJournalEntryPage() {
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                                <Input type="number" step="0.001" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="any" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                                <Input type="number" step="0.001" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
                                             )}
                                         />
                                     </TableCell>
