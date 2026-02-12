@@ -49,6 +49,7 @@ export type Client = {
     governorate: string;
     area: string;
     block: string;
+    street: string;
     houseNumber: string;
   };
   fileId: string;
@@ -778,7 +779,8 @@ export interface Item {
   description?: string;
   sku: string; // Stock Keeping Unit
   categoryId: string;
-  itemType: 'storable' | 'consumable' | 'service';
+  itemType: 'product' | 'service';
+  inventoryTracked?: boolean;
   unitOfMeasure: string; // e.g., 'piece', 'kg', 'box'
   costPrice?: number;
   sellingPrice?: number;
@@ -808,4 +810,5 @@ export interface GoodsReceiptNote {
         expiryDate?: any;
     }[];
 }
-    
+
+  

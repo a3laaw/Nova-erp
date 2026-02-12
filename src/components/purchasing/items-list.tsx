@@ -27,17 +27,16 @@ import { Label } from '../ui/label';
 import { searchItems } from '@/lib/cache/fuse-search';
 import { ItemForm } from './item-form';
 
-const itemTypeTranslations: Record<Item['itemType'], string> = {
-    storable: 'مخزني',
-    consumable: 'مستهلك',
-    service: 'خدمة',
+const getItemTypeDisplay = (item: Item): { label: string; color: string } => {
+    if (item.itemType === 'service') {
+        return { label: 'خدمة', color: 'bg-purple-100 text-purple-800' };
+    }
+    if (item.inventoryTracked) {
+        return { label: 'منتج مخزني', color: 'bg-blue-100 text-blue-800' };
+    }
+    return { label: 'منتج استهلاكي', color: 'bg-orange-100 text-orange-800' };
 };
 
-const itemTypeColors: Record<Item['itemType'], string> = {
-    storable: 'bg-blue-100 text-blue-800',
-    consumable: 'bg-orange-100 text-orange-800',
-    service: 'bg-purple-100 text-purple-800',
-};
 
 export function ItemsList() {
   const { firestore } = useFirebase();
@@ -135,30 +134,33 @@ export function ItemsList() {
                         </TableCell>
                     </TableRow>
                 )}
-                {!loading && filteredItems.map((item) => (
-                    <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell className="font-mono">{item.sku}</TableCell>
-                        <TableCell>
-                            <Badge variant="outline" className={itemTypeColors[item.itemType]}>
-                                {itemTypeTranslations[item.itemType]}
-                            </Badge>
-                        </TableCell>
-                        <TableCell>{item.categoryName as string}</TableCell>
-                        <TableCell className="text-left font-mono">{formatCurrency(item.sellingPrice || 0)}</TableCell>
-                        <TableCell className="text-left">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" dir="rtl">
-                                    <DropdownMenuItem onClick={() => handleEdit(item)}><Pencil className="ml-2 h-4"/> تعديل</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4"/> حذف</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </TableCell>
-                    </TableRow>
-                ))}
+                {!loading && filteredItems.map((item) => {
+                    const typeDisplay = getItemTypeDisplay(item);
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell className="font-mono">{item.sku}</TableCell>
+                            <TableCell>
+                                <Badge variant="outline" className={typeDisplay.color}>
+                                    {typeDisplay.label}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>{item.categoryName as string}</TableCell>
+                            <TableCell className="text-left font-mono">{formatCurrency(item.sellingPrice || 0)}</TableCell>
+                            <TableCell className="text-left">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" dir="rtl">
+                                        <DropdownMenuItem onClick={() => handleEdit(item)}><Pencil className="ml-2 h-4"/> تعديل</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive focus:text-destructive"><Trash2 className="ml-2 h-4"/> حذف</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
+                        </TableRow>
+                    );
+                })}
             </TableBody>
           </Table>
         </div>
@@ -189,3 +191,5 @@ export function ItemsList() {
     </>
   );
 }
+
+  

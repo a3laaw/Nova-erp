@@ -42,7 +42,8 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     description: '',
     sku: '',
     categoryId: '',
-    itemType: 'storable' as Item['itemType'],
+    itemType: 'product' as Item['itemType'],
+    inventoryTracked: true,
     unitOfMeasure: '',
     costPrice: '',
     sellingPrice: '',
@@ -58,6 +59,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
         sku: item.sku,
         categoryId: item.categoryId,
         itemType: item.itemType,
+        inventoryTracked: item.inventoryTracked ?? (item.itemType === 'product'), // Default to true for existing products if undefined
         unitOfMeasure: item.unitOfMeasure,
         costPrice: String(item.costPrice || ''),
         sellingPrice: String(item.sellingPrice || ''),
@@ -67,8 +69,8 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     } else {
         setFormData({
             name: '', description: '', sku: '', categoryId: '',
-            itemType: 'storable', unitOfMeasure: '', costPrice: '',
-            sellingPrice: '', reorderLevel: '', expiryTracked: false,
+            itemType: 'product', inventoryTracked: true, unitOfMeasure: '',
+            costPrice: '', sellingPrice: '', reorderLevel: '', expiryTracked: false,
         });
     }
   }, [item, isOpen]);
@@ -76,6 +78,10 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
+  };
+  
+  const handleCheckboxChange = (id: keyof typeof formData, checked: boolean) => {
+      setFormData(prev => ({...prev, [id]: checked}));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,7 +97,8 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
             costPrice: Number(formData.costPrice) || 0,
             sellingPrice: Number(formData.sellingPrice) || 0,
             reorderLevel: Number(formData.reorderLevel) || 0,
-            expiryTracked: formData.expiryTracked,
+            inventoryTracked: formData.itemType === 'product' ? formData.inventoryTracked : false,
+            expiryTracked: formData.itemType === 'product' && formData.inventoryTracked ? formData.expiryTracked : false,
         };
         
         if (isEditing) {
@@ -120,19 +127,22 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
             <DialogTitle>{isEditing ? `تعديل الصنف: ${item?.name}` : 'إضافة صنف جديد'}</DialogTitle>
           </DialogHeader>
           <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto px-2">
-            <div className="grid gap-2">
+            <div className="md:col-span-2 grid gap-2">
               <Label htmlFor="name">اسم الصنف <span className="text-destructive">*</span></Label>
               <Input id="name" value={formData.name} onChange={handleChange} required />
             </div>
+            
             <div className="grid gap-2">
-              <Label htmlFor="sku">الرمز (SKU) <span className="text-destructive">*</span></Label>
-              <Input id="sku" value={formData.sku} onChange={handleChange} required dir="ltr" />
+              <Label htmlFor="itemType">نوع الصنف <span className="text-destructive">*</span></Label>
+              <Select value={formData.itemType} onValueChange={(v: Item['itemType']) => setFormData(p => ({ ...p, itemType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="product">منتج (سلعة مادية)</SelectItem>
+                  <SelectItem value="service">خدمة (غير ملموس)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="md:col-span-2 grid gap-2">
-              <Label htmlFor="description">الوصف</Label>
-              <Textarea id="description" value={formData.description} onChange={handleChange} rows={2} />
-            </div>
-            <div className="grid gap-2">
+             <div className="grid gap-2">
               <Label htmlFor="categoryId">فئة الصنف <span className="text-destructive">*</span></Label>
               <InlineSearchList
                 value={formData.categoryId}
@@ -141,27 +151,45 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
                 placeholder="اختر فئة..."
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="itemType">نوع الصنف <span className="text-destructive">*</span></Label>
-              <Select value={formData.itemType} onValueChange={(v: Item['itemType']) => setFormData(p => ({ ...p, itemType: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="storable">مخزني (يتم تتبع كميته)</SelectItem>
-                  <SelectItem value="consumable">مستهلك (لا يتم تتبع كميته)</SelectItem>
-                  <SelectItem value="service">خدمة (غير ملموس)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="md:col-span-2 grid gap-2">
+              <Label htmlFor="description">الوصف</Label>
+              <Textarea id="description" value={formData.description} onChange={handleChange} rows={2} />
             </div>
             
+            {formData.itemType === 'product' && (
+              <div className="md:col-span-2 p-4 border rounded-md space-y-4 bg-muted/30">
+                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <Checkbox id="inventoryTracked" checked={formData.inventoryTracked} onCheckedChange={(c) => handleCheckboxChange('inventoryTracked', !!c)} />
+                    <Label htmlFor="inventoryTracked" className="font-semibold">تتبع المخزون</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground -mt-2">
+                      عند تفعيله، سيتم تتبع كميات هذا المنتج في المخزن (منتج مخزني). عند تعطيله، سيفترض النظام توفره دائمًا (منتج استهلاكي).
+                  </p>
+                  {formData.inventoryTracked && (
+                      <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                          <div className="grid gap-2">
+                            <Label htmlFor="reorderLevel">حد إعادة الطلب</Label>
+                            <Input id="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleChange} dir="ltr" placeholder="مثال: 10"/>
+                          </div>
+                          <div className="flex items-center space-x-2 rtl:space-x-reverse self-end pb-2">
+                            <Checkbox id="expiryTracked" checked={formData.expiryTracked} onCheckedChange={(c) => handleCheckboxChange('expiryTracked', !!c)} />
+                            <Label htmlFor="expiryTracked">يتطلب تتبع تاريخ الصلاحية</Label>
+                         </div>
+                      </div>
+                  )}
+              </div>
+            )}
+            
             <Separator className="md:col-span-2 my-4" />
+            
+            <div className="grid gap-2">
+              <Label htmlFor="sku">الرمز (SKU) <span className="text-destructive">*</span></Label>
+              <Input id="sku" value={formData.sku} onChange={handleChange} required dir="ltr" />
+            </div>
 
             <div className="grid gap-2">
               <Label htmlFor="unitOfMeasure">وحدة القياس <span className="text-destructive">*</span></Label>
               <Input id="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleChange} required placeholder="مثال: قطعة، كرتون، كيلو" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="reorderLevel">حد إعادة الطلب</Label>
-              <Input id="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleChange} dir="ltr" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="costPrice">سعر التكلفة</Label>
@@ -171,10 +199,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
               <Label htmlFor="sellingPrice">سعر البيع</Label>
               <Input id="sellingPrice" type="number" step="any" value={formData.sellingPrice} onChange={handleChange} dir="ltr" />
             </div>
-            <div className="flex items-center space-x-2 rtl:space-x-reverse self-center pt-4">
-              <Checkbox id="expiryTracked" checked={formData.expiryTracked} onCheckedChange={(c) => setFormData(p => ({ ...p, expiryTracked: !!c }))} />
-              <Label htmlFor="expiryTracked">يتطلب تتبع تاريخ الصلاحية</Label>
-            </div>
+
           </div>
           <DialogFooter className="mt-4 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
@@ -188,3 +213,5 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     </Dialog>
   );
 }
+
+  
