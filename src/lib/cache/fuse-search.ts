@@ -33,8 +33,8 @@ export const searchPurchaseOrders = (items: PurchaseOrder[], query: string) => {
     return cache.search(items, query, ['poNumber', 'vendorName'], 0.4);
 };
 
-export const searchItems = (items: Item[], query: string) => {
-    return cache.search(items, query, ['name', 'sku', 'description'], 0.4);
+export const searchItems = (items: (Item & { categoryName?: string })[], query: string) => {
+    return cache.search(items, query, ['name', 'sku', 'description', 'categoryName'], 0.4);
 };
 
 export const searchVendors = (items: Vendor[], query: string) => {
