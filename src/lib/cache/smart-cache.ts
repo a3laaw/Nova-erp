@@ -1,3 +1,4 @@
+
 'use client';
 
 import { getFirebaseServices } from '@/firebase/init';
@@ -19,22 +20,25 @@ interface CacheEntry<T> {
   ttl: number;
 }
 
-// FIXED: Added a safe replacer for JSON.stringify to handle Firestore Timestamps.
-// This prevents serialization errors when caching data that contains date objects.
+// This replacer is used to safely convert Firestore Timestamps to ISO strings
+// before storing data in a JSON-based format like localforage.
 function safeJsonReplacer(key: string, value: any) {
     if (value && typeof value === 'object' && typeof value.toDate === 'function') {
-        // This is a Firestore Timestamp object. Convert it to a serializable ISO string.
         return value.toDate().toISOString();
     }
-    // For all other values, return them as is.
     return value;
 }
 
 class SmartCache {
   async getFromStorage<T>(key: string): Promise<CacheEntry<T> | null> {
     try {
-      const cached = await localforage.getItem<CacheEntry<T>>(key);
-      return cached;
+      const cached = await localforage.getItem<string>(key);
+      if (cached) {
+          // Since we store as a string, we need to parse it.
+          // Note: This will not revive Date objects from ISO strings automatically.
+          return JSON.parse(cached) as CacheEntry<T>;
+      }
+      return null;
     } catch (error) {
       console.error('Error reading from cache:', error);
       return null;
@@ -44,9 +48,9 @@ class SmartCache {
   async set<T>(key: string, data: T, ttl: number = 30 * 60 * 1000): Promise<void> {
     try {
       const entry: CacheEntry<T> = { data, timestamp: Date.now(), ttl };
-      // IMPROVED: Use the safe replacer before setting data to localforage.
-      const plainData = JSON.parse(JSON.stringify(entry, safeJsonReplacer));
-      await localforage.setItem(key, plainData);
+      // Use the replacer to handle non-serializable types like Timestamps
+      const stringifiedData = JSON.stringify(entry, safeJsonReplacer);
+      await localforage.setItem(key, stringifiedData);
     } catch (error) {
       console.error('Error saving to cache:', error);
     }
@@ -91,11 +95,8 @@ class SmartCache {
 
     return onSnapshot(q,
       (snapshot) => {
-        const data = snapshot.docs.map(doc => {
-            // FIXED: Use the safe replacer here as well to ensure data passed to `onUpdate` is clean.
-            const plainData = JSON.parse(JSON.stringify(doc.data(), safeJsonReplacer));
-            return { id: doc.id, ...plainData } as T;
-        });
+        // SIMPLIFIED: Pass Firestore data directly, with Timestamps intact.
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
         onUpdate(data);
       },
       (err) => {
@@ -120,9 +121,8 @@ class SmartCache {
     return onSnapshot(doc(db, docPath),
       (snapshot) => {
         if(snapshot.exists()) {
-            // FIXED: Use the safe replacer for single documents.
-            const plainData = JSON.parse(JSON.stringify(snapshot.data(), safeJsonReplacer));
-            const data = { id: snapshot.id, ...plainData } as T;
+            // SIMPLIFIED: Pass Firestore data directly.
+            const data = { id: snapshot.id, ...snapshot.data() } as T;
             onUpdate(data);
         } else {
             onUpdate(null);
@@ -139,14 +139,14 @@ class SmartCache {
     const cached = await this.getFromStorage<T>(key);
     const now = Date.now();
     if (cached && now - cached.timestamp < cached.ttl) {
+      // Data from storage will have date strings, not Date objects.
+      // This is a limitation of this caching strategy. The app logic needs to handle it.
       return cached.data;
     }
 
     const freshData = await fetchFn();
-    // FIXED: Use the safe replacer before caching the fetched data.
-    const plainData = JSON.parse(JSON.stringify(freshData, safeJsonReplacer));
-    await this.set(key, plainData, ttl);
-    return plainData;
+    await this.set(key, freshData, ttl);
+    return freshData;
   }
 }
 
