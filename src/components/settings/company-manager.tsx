@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { MoreHorizontal, PlusCircle, ArrowRight, Building } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ArrowRight, Building, Copy } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +67,11 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
     useEffect(() => {
         fetchCompanies();
     }, [fetchCompanies]);
+    
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast({ title: 'تم النسخ', description: 'تم نسخ ID الشركة إلى الحافظة.' });
+    };
 
     const handleAdd = () => {
         setSelectedCompany(null);
@@ -126,10 +132,9 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>اسم الشركة (العربية)</TableHead>
-                                    <TableHead>الاسم (الإنجليزية)</TableHead>
-                                    <TableHead>الهاتف</TableHead>
-                                    <TableHead>العنوان</TableHead>
+                                    <TableHead>اسم الشركة</TableHead>
+                                    <TableHead>ID الشركة</TableHead>
+                                    <TableHead>ID الشركة الأم</TableHead>
                                     <TableHead><span className="sr-only">الإجراءات</span></TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -137,20 +142,32 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
                                 {loading ? (
                                     Array.from({ length: 2 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
+                                            <TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : companies.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center h-24">لا توجد شركات</TableCell>
+                                        <TableCell colSpan={4} className="text-center h-24">لا توجد شركات</TableCell>
                                     </TableRow>
                                 ) : (
                                     companies.map(company => (
                                         <TableRow key={company.id}>
                                             <TableCell className="font-medium">{company.name}</TableCell>
-                                            <TableCell>{company.nameEn || '-'}</TableCell>
-                                            <TableCell>{company.phone || '-'}</TableCell>
-                                            <TableCell className="text-xs">{company.address || '-'}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-xs">{company.id}</span>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(company.id!)}>
+                                                        <Copy className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {company.parentCompanyId ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono text-xs">{company.parentCompanyId}</span>
+                                                    </div>
+                                                ) : '-'}
+                                            </TableCell>
                                             <TableCell>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
@@ -196,3 +213,5 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
         </>
     );
 }
+
+    

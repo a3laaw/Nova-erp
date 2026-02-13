@@ -9,6 +9,7 @@ export interface Company {
     email?: string;
     crNumber?: string;
     logoUrl?: string;
+    parentCompanyId?: string;
 }
 
 export type MultilingualString = {
@@ -41,7 +42,6 @@ export type Client = {
   nameEn?: string;
   mobile: string;
   civilId?: string;
-  plotNumber?: string;
   address?: {
     governorate: string;
     area: string;
@@ -52,8 +52,7 @@ export type Client = {
   fileId: string;
   fileNumber: number;
   fileYear: number;
-  status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
-  transactionCounter?: number;
+  status: 'new' | 'contracted' | 'cancelled';
   assignedEngineer?: string;
   createdAt: any;
   isActive: boolean;
@@ -119,22 +118,15 @@ export type Appointment = {
   endDate?: any; // This will be the end time
   clientId?: string;
   clientName?: string;
-  clientMobile?: string;
   prospectiveClientId?: string; // NEW: Link to a prospective client record
   engineerId: string;
   engineerName?: string;
   meetingRoom?: string;
   department?: string;
-  type: 'architectural' | 'room';
-  status?: 'scheduled' | 'cancelled';
   notes?: string;
-  transactionId?: string;
-  workStageUpdated?: boolean;
-  workStageProgressId?: string;
   // For architectural appointments with color logic
   session?: 'صباحية' | 'مسائية';
   visitCount?: number;
-  contractSigned?: boolean;
   projectType?: string;
   color?: string; // Hex color code
   minutesContent?: string;
@@ -167,50 +159,18 @@ export type Invoice = {
 export type CashReceipt = {
     id: string;
     voucherNumber: string;
-    voucherSequence: number;
-    voucherYear: number;
     clientId: string;
-    clientNameAr: string;
-    clientNameEn?: string;
+    clientName: string;
     projectId?: string;
-    projectNameAr?: string;
-    amount: number; // Gross Amount
+    projectName?: string;
+    amount: number;
     amountInWords: string;
-    receiptDate: any; 
-    paymentMethod: string;
-    bankFeeAmount?: number;
-    netAmount?: number;
+    date: any; 
+    paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer';
     description: string;
     reference?: string;
-    journalEntryId?: string;
     createdAt: any; 
 };
-
-export interface PaymentVoucher {
-  id?: string;
-  voucherNumber: string;
-  voucherSequence: number;
-  voucherYear: number;
-  payeeName: string;
-  payeeType: 'vendor' | 'employee' | 'other';
-  employeeId?: string;
-  renewalExpiryDate?: any;
-  amount: number;
-  amountInWords: string;
-  paymentDate: any; 
-  paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'EmployeeCustody';
-  description: string;
-  reference?: string;
-  debitAccountId: string;
-  debitAccountName: string;
-  creditAccountId: string;
-  creditAccountName: string;
-  status: 'draft' | 'paid' | 'cancelled';
-  journalEntryId?: string;
-  createdAt: any; 
-  clientId?: string;
-  transactionId?: string;
-}
 
 export type Transaction = {
   id: string;
@@ -226,188 +186,47 @@ export type Employee = {
     id?: string;
     employeeNumber?: string;
     fullName: string; 
-    nameEn?: string;
-    dob?: any;
-    gender?: 'male' | 'female';
     civilId: string;
-    nationality?: string;
-    residencyExpiry?: any;
-    contractExpiry?: any;
     mobile: string;
-    emergencyContact?: string;
-    email?: string;
-    jobTitle?: string;
-    position?: 'head' | 'employee' | 'assistant' | 'contractor';
-    workStartTime?: string; 
-    workEndTime?: string; 
-    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
-    bankName?: string;
-    accountNumber?: string;
-    iban?: string;
-    profilePicture?: string;
-    hireDate: any; 
-    noticeStartDate: any | null; 
-    terminationDate: any | null;
-    terminationReason: 'resignation' | 'termination' | 'probation' | null;
-    contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special' | 'day_laborer' | 'subcontractor';
-    dailyRate?: number;
-    contractPercentage?: number;
-    pieceRateMode?: 'salary_with_target' | 'per_piece';
-    targetDescription?: number;
-    pieceRate?: number;
     department: string;
+    jobTitle: string;
+    hireDate: any; 
     basicSalary: number; 
-    housingAllowance?: number;
-    transportAllowance?: number;
     status: 'active' | 'on-leave' | 'terminated';
-    lastVacationAccrualDate: any; 
-    annualLeaveAccrued?: number;
-    annualLeaveUsed?: number;
-    carriedLeaveDays?: number;
-    sickLeaveUsed?: number;
-    emergencyLeaveUsed?: number;
-    maxEmergencyLeave?: number;
-    lastLeaveResetDate?: any; 
-    annualLeaveBalance?: number;
-    createdAt?: any; 
-    auditLogs?: AuditLog[];
-    eosb?: number;
-    leaveBalance?: number;
-    lastLeave?: LeaveRequest | null;
-    serviceDuration?: Duration;
 };
 
-export interface LeaveRequest {
-    id: string;
-    employeeId: string;
-    employeeName: string;
-    leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
-    startDate: any;
-    endDate: any;
-    days: number;
-    workingDays?: number;
-    notes?: string;
-    attachmentUrl?: string;
-    status: 'pending' | 'approved' | 'rejected';
-    createdAt: any;
-    approvedBy?: string;
-    approvedAt?: any;
-    rejectionReason?: string;
-    isBackFromLeave?: boolean;
-    actualReturnDate?: any;
-    passportReceived?: boolean;
-    isSalaryPaid?: boolean;
-}
+export type Contract = {
+  id?: string;
+  title: MultilingualString;
+  clientId: string;
+  projectId: string;
+  totalAmount: number;
+  startDate: string;
+  endDate: string;
+  clauses: string;
+  milestones: PaymentMilestone[];
+};
 
-export interface PermissionRequest {
+export type InventoryItem = {
   id: string;
-  employeeId: string;
-  employeeName: string;
-  date: any;
-  type: 'late_arrival' | 'early_departure';
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  name: MultilingualString;
+  quantity: number;
+  unit: MultilingualString;
+  supplier: MultilingualString;
+  lowStockThreshold: number;
+};
+
+
+export type Notification = {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  link: string;
+  isRead: boolean;
   createdAt: any;
-  approvedBy?: string;
-  approvedAt?: any;
-  rejectionReason?: string;
-}
-
-
-export interface Holiday {
-    id?: string;
-    name: string;
-    date: any; 
-}
-
-
-export type AuditLog = {
-    id?: string;
-    changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'StatusChange' | 'ResidencyUpdate';
-    field: string | string[]; 
-    oldValue: any;
-    newValue: any;
-    effectiveDate: any; 
-    changedBy: string; 
-    notes?: string;
 };
 
-export type AttendanceRecord = {
-    date: string;
-    checkIn1?: string | null;
-    checkOut1?: string | null;
-    checkIn2?: string | null;
-    checkOut2?: string | null;
-    totalHours?: number | null;
-    status: 'present' | 'absent' | 'late' | 'leave';
-};
-
-export type AttendanceSummary = {
-    totalDays: number;
-    presentDays: number;
-    absentDays: number;
-    lateDays: number;
-    leaveDays: number;
-};
-
-export type MonthlyAttendance = {
-    id?: string;
-    employeeId: string;
-    year: number;
-    month: number;
-    records: AttendanceRecord[];
-    summary: AttendanceSummary;
-};
-
-export type Payslip = {
-    id?: string;
-    employeeId: string;
-    employeeName: string;
-    year: number;
-    month: number;
-    attendanceId?: string;
-    earnings: {
-        basicSalary: number;
-        housingAllowance?: number;
-        transportAllowance?: number;
-        commission?: number;
-    };
-    deductions: {
-        absenceDeduction: number;
-        otherDeductions: number;
-    };
-    netSalary: number;
-    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
-    status: 'draft' | 'processed' | 'paid';
-    createdAt: any;
-    notes?: string;
-    type?: 'Monthly' | 'Leave';
-    leaveRequestId?: string;
-};
-
-export interface TransactionStage {
-  stageId: string;
-  name: string;
-  order?: number;
-  status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
-  startDate: any | null;
-  endDate: any | null;
-  notes?: string;
-  expectedEndDate?: any | null;
-  completedCount?: number;
-  modificationCount?: number;
-  
-  stageType?: 'sequential' | 'parallel';
-  allowedRoles?: string[];
-  nextStageIds?: string[];
-  allowedDuringStages?: string[];
-  trackingType?: 'duration' | 'occurrence' | 'none';
-  enableModificationTracking?: boolean;
-  expectedDurationDays?: number | null;
-  maxOccurrences?: number | null;
-  allowManualCompletion?: boolean;
-}
-      
 export type ClientTransaction = {
     id?: string;
     transactionNumber?: string;
@@ -415,36 +234,15 @@ export type ClientTransaction = {
     transactionType: string;
     description?: string;
     status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
-    departmentId?: string;
-    transactionTypeId?: string;
     assignedEngineerId?: string;
     createdAt: any;
     updatedAt?: any;
-    stages?: Partial<TransactionStage>[]; 
     engineerName?: string;
     contract?: {
-        clauses: ContractClause[];
-        scopeOfWork?: ContractScopeItem[];
-        termsAndConditions?: ContractTerm[];
-        openClauses?: ContractTerm[];
+        clauses: { id: string; name: string; amount: number; status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة' }[];
         totalAmount: number;
-        financialsType?: 'fixed' | 'percentage';
     };
 };
-
-export type TransactionAssignment = {
-    id?: string;
-    transactionId: string;
-    clientId: string;
-    departmentId: string;
-    departmentName: string;
-    engineerId?: string;
-    notes?: string;
-    status: 'pending' | 'in-progress' | 'completed';
-    createdAt: any;
-    createdBy: string;
-};
-
 
 export type TransactionTimelineEvent = {
   id: string;
@@ -456,362 +254,4 @@ export type TransactionTimelineEvent = {
   createdAt: any;
 };
 
-export interface Department {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface Job {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface Governorate {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface Area {
-    id: string;
-    name: string;
-    order?: number;
-}
-export interface TransactionType {
-    id: string;
-    name: string;
-    departmentIds?: string[];
-    order?: number;
-}
-
-export interface WorkStage {
-  id: string;
-  name: string;
-  order?: number;
-  stageType?: 'sequential' | 'parallel';
-  allowedRoles?: string[];
-  nextStageIds?: string[];
-  allowedDuringStages?: string[];
-  trackingType: 'duration' | 'occurrence' | 'none';
-  enableModificationTracking?: boolean;
-  expectedDurationDays?: number | null;
-  maxOccurrences?: number | null;
-  allowManualCompletion?: boolean;
-}
-
-export type ContractClause = {
-  id: string;
-  name: string;
-  amount: number;
-  status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; 
-  percentage?: number;
-  condition?: string;
-};
-
-export interface ContractTerm {
-  id: string;
-  text: string;
-}
-
-export type ContractTemplate = {
-  id?: string;
-  title: string;
-  description?: string;
-  transactionTypes: string[];
-  scopeOfWork: ContractScopeItem[];
-  termsAndConditions: ContractTerm[];
-  financials: {
-    type: 'fixed' | 'percentage';
-    totalAmount: number;
-    discount: number;
-    milestones: ContractFinancialMilestone[];
-  };
-  openClauses?: ContractTerm[];
-  createdAt?: any;
-  createdBy?: string;
-};
-
-
-export interface ContractScopeItem {
-  id: string;
-  title: string;
-  description: string;
-}
-
-export interface ContractFinancialMilestone {
-  id: string;
-  name: string;
-  condition: string;
-  value: number;
-}
-
-export interface Contract {
-  id?: string;
-  clientId: string;
-  clientName: string;
-  companySnapshot: Partial<Company>;
-  title: string;
-  contractDate: any;
-  scopeOfWork: ContractScopeItem[];
-  termsAndConditions: ContractTerm[];
-  financials: {
-    type: 'fixed' | 'percentage';
-    totalAmount: number;
-    discount: number;
-    milestones: ContractFinancialMilestone[];
-  };
-  openClauses?: ContractTerm[];
-  createdAt?: any;
-  createdBy?: string;
-}
-
-export interface Notification {
-  id?: string;
-  userId: string;
-  title: string;
-  body: string;
-  link: string;
-  isRead: boolean;
-  createdAt: any;
-}
-
-export interface Account {
-    id?: string;
-    code: string;
-    name: string;
-    type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-    statement?: 'Balance Sheet' | 'Income Statement';
-    balanceType?: 'Debit' | 'Credit';
-    level: number;
-    description?: string;
-    isPayable: boolean;
-    parentCode: string | null;
-}
-
-export interface JournalEntryLine {
-  id?: string;
-  accountId: string;
-  accountName: string;
-  debit: number;
-  credit: number;
-  notes?: string;
-  clientId?: string;
-  transactionId?: string;
-  auto_profit_center?: string;
-  auto_resource_id?: string;
-  auto_dept_id?: string;
-}
-
-export interface JournalEntry {
-  id?: string;
-  entryNumber: string;
-  date: any; 
-  narration: string;
-  reference?: string;
-  linkedReceiptId?: string;
-  totalDebit: number;
-  totalCredit: number;
-  status: 'draft' | 'posted';
-  reconciliationStatus?: 'unreconciled' | 'reconciled' | 'pending';
-  reconciliationInfo?: {
-    reconciledAt: any;
-    reconciledBy: string;
-    bankTransactionId: string;
-  };
-  lines: JournalEntryLine[];
-  clientId?: string;
-  transactionId?: string;
-  createdAt: any; 
-  createdBy?: string;
-}
-
-export interface WorkStageProgress {
-  id?: string;
-  transactionId?: string;
-  visitId: string;
-  stageId: string;
-  stageName: string;
-  selectedBy: string; 
-  selectedAt: any; 
-}
-
-export interface QuotationItem {
-  id?: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  condition?: string;
-}
-
-export interface RfqItem {
-    id: string;
-    internalItemId: string;
-    itemName: string;
-    quantity: number;
-}
-
-export interface RequestForQuotation {
-    id?: string;
-    rfqNumber: string;
-    date: any;
-    status: 'draft' | 'sent' | 'closed' | 'cancelled';
-    vendorIds: string[];
-    items: RfqItem[];
-    createdAt?: any;
-}
-
-export interface SupplierQuotationItem {
-    rfqItemId: string; // Links to the ID in the RFQ's items array
-    unitPrice: number;
-}
-
-export interface SupplierQuotation {
-    id?: string;
-    rfqId: string;
-    vendorId: string;
-    quotationReference?: string;
-    date: any;
-    deliveryTimeDays?: number;
-    paymentTerms?: string;
-    items: SupplierQuotationItem[];
-    createdAt?: any;
-}
-
-
-export interface Quotation {
-  id?: string;
-  quotationNumber: string;
-  quotationSequence: number;
-  quotationYear: number;
-  clientId: string;
-  clientName: string;
-  date: any; 
-  validUntil: any; 
-  subject: string;
-  departmentId?: string;
-  transactionTypeId?: string;
-  items: QuotationItem[];
-  totalAmount: number;
-  notes?: string;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-  createdAt: any; 
-  createdBy?: string;
-  scopeOfWork?: ContractScopeItem[];
-  termsAndConditions?: ContractTerm[];
-  openClauses?: ContractTerm[];
-  templateDescription?: string;
-  transactionId?: string;
-}
-
-export interface Vendor {
-    id?: string;
-    name: string;
-    contactPerson?: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-}
-
-export interface PurchaseOrderItem {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-}
-
-export interface PurchaseOrder {
-    id?: string;
-    poNumber: string;
-    orderDate: any;
-    vendorId: string;
-    vendorName: string;
-    projectId?: string;
-    items: PurchaseOrderItem[];
-    totalAmount: number;
-    paymentTerms?: string;
-    notes?: string;
-    status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
-    createdAt: any;
-}
-
-export interface ResidencyRenewal {
-    id?: string;
-    employeeId: string;
-    renewalDate: any;
-    newExpiryDate: any;
-    cost: number;
-    paymentVoucherId: string;
-    monthlyAmortizationAmount: number;
-    amortizationStatus: 'in-progress' | 'completed';
-    lastAmortizationDate?: any;
-}
-
-// INVENTORY TYPES
-export interface Warehouse {
-  id?: string;
-  name: string;
-  location?: string;
-  isDefault?: boolean;
-}
-
-export interface ItemCategory {
-  id?: string;
-  name: string;
-  parentCategoryId?: string | null;
-  order?: number;
-}
-
-export interface Item {
-  id?: string;
-  name: string;
-  description?: string;
-  sku: string; // Stock Keeping Unit
-  categoryId: string;
-  itemType: 'product' | 'service';
-  inventoryTracked?: boolean;
-  unitOfMeasure: string; // e.g., 'piece', 'kg', 'box'
-  costPrice?: number;
-  sellingPrice?: number;
-  reorderLevel?: number; // Minimum stock level to trigger reorder
-  expiryTracked?: boolean;
-  createdAt: any;
-}
-
-export interface SupplierItem {
-    id?: string;
-    supplierId: string;
-    internalItemId: string;
-    supplierSku: string;
-    supplierItemName?: string;
-}
-
-export interface GoodsReceiptNote {
-    id?: string;
-    grnNumber: string;
-    purchaseOrderId: string;
-    warehouseId: string;
-    date: any;
-    itemsReceived: {
-        internalItemId: string;
-        quantityReceived: number;
-        batchNumber?: string;
-        expiryDate?: any;
-    }[];
-}
-
-export interface InventoryAdjustment {
-    id?: string;
-    adjustmentNumber: string;
-    date: any;
-    type: 'opening_balance' | 'damage' | 'theft' | 'other';
-    notes?: string;
-    journalEntryId?: string;
-    items: {
-        itemId: string;
-        itemName: string;
-        quantity: number;
-        unitCost: number;
-        totalCost: number;
-        expiryDate?: any;
-    }[];
-}
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -31,6 +32,7 @@ const initialData: Partial<Company> = {
     email: '',
     crNumber: '',
     logoUrl: '',
+    parentCompanyId: '',
 };
 
 export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormProps) {
@@ -48,6 +50,7 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
             email: company.email || '',
             crNumber: company.crNumber || '',
             logoUrl: company.logoUrl || '',
+            parentCompanyId: company.parentCompanyId || '',
         });
     } else {
         setFormData(initialData);
@@ -85,6 +88,10 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                     <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" />
                 </div>
                  <div className="grid gap-2">
+                    <Label htmlFor="parentCompanyId">ID الشركة الأم (اختياري)</Label>
+                    <Input id="parentCompanyId" value={formData.parentCompanyId} onChange={handleChange} placeholder="الصقه هنا للربط" dir="ltr" />
+                </div>
+                 <div className="grid gap-2">
                     <Label htmlFor="phone">الهاتف</Label>
                     <Input id="phone" value={formData.phone} onChange={handleChange} dir="ltr" />
                 </div>
@@ -114,3 +121,5 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
     </Dialog>
   );
 }
+
+    
