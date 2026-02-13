@@ -142,8 +142,6 @@
         "properties": {
             "name": { "type": "string" },
             "nameEn": { "type": "string" },
-            "phone": { "type": "string" },
-            "email": { "type": "string", "format": "email" },
             "crNumber": { "type": "string", "description": "Commercial Registration Number" },
             "parentCompanyId": { "type": "string", "description": "The ID of the parent company, if this is a subsidiary." },
             "activityType": {
@@ -1775,4 +1773,4 @@
     }
   }
 }
-  
+    

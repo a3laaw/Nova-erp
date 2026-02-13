@@ -845,20 +845,22 @@ function TransactionTypeManager({ onBack, category, title }: { onBack: () => voi
     setLoading(true);
     try {
       const [typesSnap, deptsSnap] = await Promise.all([
-        getDocs(query(collection(firestore, 'transactionTypes'), where('category', '==', category))),
+        getDocs(query(collection(firestore, 'transactionTypes'))),
         getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
       ]);
       
-      let typesData = typesSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as TransactionType))
-        .filter(t => t && t.name);
+      const allTypes = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
       
-      typesData.sort((a, b) => {
-          const orderA = a.order ?? Infinity;
-          const orderB = b.order ?? Infinity;
-          if(orderA !== orderB) return orderA - orderB;
-          return a.name.localeCompare(b.name, 'ar');
-      });
+      const typesData = allTypes
+        .filter(t => {
+            if (category === 'consulting') {
+                return t.category === 'consulting' || !t.category;
+            }
+            return t.category === category;
+        })
+        .filter(t => t && t.name);
+
+      typesData.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
       
       setTransactionTypes(typesData);
       setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)).filter(d => d && d.name));
@@ -1093,7 +1095,7 @@ export function ReferenceDataManager() {
                     govs: govsSnap.size,
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
-                    consultingTransTypes: allTypes.filter(t => t.category === 'consulting').length,
+                    consultingTransTypes: allTypes.filter(t => t.category === 'consulting' || !t.category).length,
                     constructionTransTypes: allTypes.filter(t => t.category === 'construction').length,
                     workStages: workStagesSnap.size,
                     subcontractorTypes: subTypesSnap.size,
@@ -1235,4 +1237,4 @@ export function ReferenceDataManager() {
     );
 }
 
-  
+    
