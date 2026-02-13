@@ -7,6 +7,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import type { Company } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 
 interface CompanyFormProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const initialData: Partial<Company> = {
     email: '',
     crNumber: '',
     parentCompanyId: '',
+    activityType: 'مكتب هندسي',
 };
 
 export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormProps) {
@@ -38,6 +40,7 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
             email: company.email || '',
             crNumber: company.crNumber || '',
             parentCompanyId: company.parentCompanyId || '',
+            activityType: company.activityType || 'مكتب هندسي',
         });
     } else {
         setFormData(initialData);
@@ -46,6 +49,10 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+   const handleSelectChange = (id: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
@@ -73,6 +80,17 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                  <div className="grid gap-2">
                     <Label htmlFor="nameEn">اسم الشركة (بالإنجليزية)</Label>
                     <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="activityType">نوع النشاط</Label>
+                    <Select value={formData.activityType} onValueChange={(v) => handleSelectChange('activityType', v!)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="مكتب هندسي">مكتب هندسي</SelectItem>
+                            <SelectItem value="مقاولات">مقاولات</SelectItem>
+                            <SelectItem value="مبيعات">مبيعات</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="parentCompanyId">ID الشركة الأم (اختياري)</Label>

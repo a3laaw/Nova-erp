@@ -1,5 +1,6 @@
 
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -8,6 +9,7 @@ export interface Company {
     email?: string;
     crNumber?: string;
     parentCompanyId?: string;
+    activityType?: 'مكتب هندسي' | 'مقاولات' | 'مبيعات';
 }
 
 export type MultilingualString = {

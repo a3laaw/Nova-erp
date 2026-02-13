@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import type { Company } from '@/lib/types';
 import { CompanyForm } from './company-form';
+import { Badge } from '../ui/badge';
 
 interface CompanyManagerProps {
     onBack?: () => void;
@@ -109,9 +110,9 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
         <>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 overflow-hidden">
                         <Building />
-                        <CardTitle>إدارة الشركات</CardTitle>
+                        <CardTitle className="whitespace-nowrap truncate">إدارة الشركات</CardTitle>
                     </div>
                     {onBack && <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>}
                 </CardHeader>
@@ -124,6 +125,7 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>اسم الشركة</TableHead>
+                                    <TableHead>نوع النشاط</TableHead>
                                     <TableHead>ID الشركة</TableHead>
                                     <TableHead>ID الشركة الأم</TableHead>
                                     <TableHead><span className="sr-only">الإجراءات</span></TableHead>
@@ -133,17 +135,18 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
                                 {loading ? (
                                     Array.from({ length: 2 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell>
+                                            <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : companies.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-center h-24">لا توجد شركات</TableCell>
+                                        <TableCell colSpan={5} className="text-center h-24">لا توجد شركات</TableCell>
                                     </TableRow>
                                 ) : (
                                     companies.map(company => (
                                         <TableRow key={company.id}>
                                             <TableCell className="font-medium">{company.name}</TableCell>
+                                            <TableCell><Badge variant="secondary">{company.activityType || '-'}</Badge></TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-xs">{company.id}</span>

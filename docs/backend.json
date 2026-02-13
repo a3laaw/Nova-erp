@@ -11,9 +11,14 @@
             "phone": { "type": "string" },
             "email": { "type": "string", "format": "email" },
             "crNumber": { "type": "string", "description": "Commercial Registration Number" },
-            "parentCompanyId": { "type": "string", "description": "The ID of the parent company, if this is a subsidiary." }
+            "parentCompanyId": { "type": "string", "description": "The ID of the parent company, if this is a subsidiary." },
+            "activityType": {
+                "type": "string",
+                "description": "The business activity type of the company.",
+                "enum": ["مكتب هندسي", "مقاولات", "مبيعات"]
+            }
         },
-        "required": ["name"]
+        "required": ["name", "activityType"]
     },
     "UserProfile": {
       "title": "User Profile",
