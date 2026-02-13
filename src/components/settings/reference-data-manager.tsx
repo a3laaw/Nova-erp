@@ -120,7 +120,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   
   const [itemName, setItemName] = useState('');
-  const [itemActivityType, setItemActivityType] = useState<'consulting' | 'construction' | 'sales'>('consulting');
+  const [itemActivityTypes, setItemActivityTypes] = useState<string[]>([]);
   const [itemRoles, setItemRoles] = useState<string[]>([]);
   const [itemStageType, setItemStageType] = useState<'sequential' | 'parallel'>('sequential');
   const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
@@ -155,7 +155,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     let items = primaryItems;
     if (primaryCollectionName === 'departments') {
         if (departmentActivityFilter !== 'all') {
-            items = items.filter(item => (item as any).activityType === departmentActivityFilter);
+            items = items.filter(item => (item as any).activityTypes?.includes(departmentActivityFilter));
         }
     }
     return items;
@@ -293,7 +293,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     if (type === 'primary') {
         setItemName(item?.name || '');
         if (primaryCollectionName === 'departments') {
-            setItemActivityType((item as any)?.activityType || 'consulting');
+            setItemActivityTypes((item as any)?.activityTypes || []);
         }
         setIsPrimaryDialogOpen(true);
     } else { // Secondary
@@ -318,7 +318,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     setIsSecondaryDialogOpen(false);
     setEditingItem(null);
     setItemName('');
-    setItemActivityType('consulting');
+    setItemActivityTypes([]);
     setItemRoles([]);
     setItemStageType('sequential');
     setItemTrackingType('duration');
@@ -338,7 +338,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     try {
       const dataToSave: any = { name: itemName };
        if (type === 'primary' && primaryCollectionName === 'departments') {
-            dataToSave.activityType = itemActivityType;
+            dataToSave.activityTypes = itemActivityTypes;
        }
        if (isWorkStageView && type === 'secondary') {
           dataToSave.stageType = itemStageType;
@@ -604,7 +604,7 @@ const handleImportWorkStages = async () => {
               filteredPrimaryItems.map((item) => (
                 <div key={item.id} onClick={() => handleSelectPrimary(item)}
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Input 
                       type="number"
                       value={primaryOrderValues[item.id] ?? item.order ?? ''}
@@ -613,8 +613,12 @@ const handleImportWorkStages = async () => {
                       className="h-7 w-14"
                     />
                     <span>{item.name}</span>
-                     {(item as any).activityType && (
-                        <Badge variant="secondary">{activityTypeTranslations[(item as any).activityType] || (item as any).activityType}</Badge>
+                     {(item as any).activityTypes && Array.isArray((item as any).activityTypes) && (
+                        <div className="flex flex-wrap gap-1">
+                            {(item as any).activityTypes.map((type: string) => (
+                                <Badge key={type} variant="secondary">{activityTypeTranslations[type] || type}</Badge>
+                            ))}
+                        </div>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
@@ -717,15 +721,18 @@ const handleImportWorkStages = async () => {
 
                 {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
                     <div className="px-4 grid gap-2">
-                        <Label>نوع النشاط</Label>
-                        <Select value={itemActivityType} onValueChange={(v) => setItemActivityType(v as any)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="consulting">استشاري</SelectItem>
-                                <SelectItem value="construction">مقاولات</SelectItem>
-                                <SelectItem value="sales">مبيعات</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <Label>أنواع الأنشطة</Label>
+                         <MultiSelect
+                            options={[
+                                { value: 'consulting', label: 'استشاري' },
+                                { value: 'construction', label: 'مقاولات' },
+                                { value: 'sales', label: 'مبيعات' },
+                            ]}
+                            selected={itemActivityTypes}
+                            onChange={setItemActivityTypes}
+                            placeholder="اختر نوع نشاط واحد أو أكثر..."
+                            menuPortalTarget={portalTarget}
+                        />
                     </div>
                 )}
 

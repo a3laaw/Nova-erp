@@ -761,10 +761,13 @@
             "type": "number",
             "description": "The display order."
         },
-        "activityType": {
-            "type": "string",
-            "description": "The business activity this department belongs to.",
-            "enum": ["consulting", "construction", "sales"]
+        "activityTypes": {
+            "type": "array",
+            "description": "The business activities this department belongs to.",
+            "items": {
+                "type": "string",
+                "enum": ["consulting", "construction", "sales"]
+            }
         }
       },
       "required": ["name"]
