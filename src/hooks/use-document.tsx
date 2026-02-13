@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { cache } from '@/lib/cache/smart-cache';
@@ -67,3 +68,5 @@ export function useDocument<T extends { id?: string }>(
 
   return { data, loading, error };
 }
+
+

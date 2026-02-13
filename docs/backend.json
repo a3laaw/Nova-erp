@@ -1187,7 +1187,8 @@
             "properties": {
                 "reconciledAt": { "type": "string", "format": "date-time" },
                 "reconciledBy": { "type": "string" },
-                "bankTransactionId": { "type": "string" }
+                "bankTransactionId": { "type": "string" },
+                "reconciliationEntryId": { "type": "string" }
             }
         },
         "lines": {
@@ -1554,7 +1555,6 @@
         "projectId": { "type": "string" },
         "projectName": { "type": "string" },
         "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
         "projectType": { "type": "string", "enum": ["استشاري", "تنفيذي", "مختلط"] },
         "contractValue": { "type": "number" },
         "startDate": { "type": "string", "format": "date-time" },
@@ -1564,7 +1564,6 @@
         "actualCosts": { "$ref": "#/entities/ProjectCosts" },
         "progressPercentage": { "type": "number" },
         "mainEngineerId": { "type": "string" },
-        "mainEngineerName": { "type": "string" },
         "linkedTransactionId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },

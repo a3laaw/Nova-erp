@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -84,7 +85,7 @@ export function StandardReconciliationView() {
     const [selectedSystemTx, setSelectedSystemTx] = useState<string | null>(null);
 
     const bankAccountOptions = useMemo(() => 
-        accounts
+        (accounts || [])
             .filter(a => a.code.startsWith('110103')) // Filter for bank accounts
             .map(a => ({ value: a.id!, label: `${a.name} (${a.code})`}))
     , [accounts]);
@@ -283,7 +284,10 @@ export function StandardReconciliationView() {
     return (
         <Card dir="rtl">
             <CardHeader>
-                <CardTitle>1. رفع كشف حساب البنك</CardTitle>
+                <CardTitle>التسوية البنكية القياسية</CardTitle>
+                <CardDescription>
+                    مطابقة كشف حساب البنك العادي (حركة مقابل حركة) مع قيود النظام.
+                </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-4 p-4 border rounded-lg bg-muted/50">
@@ -307,7 +311,7 @@ export function StandardReconciliationView() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                     <Card>
                         <CardHeader>
-                            <CardTitle>رفع كشف الحساب (Excel)</CardTitle>
+                            <CardTitle>1. رفع كشف الحساب (Excel)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Input type="file" onChange={(e) => e.target.files && handleFileProcess(e.target.files[0])} accept=".xlsx, .xls, .csv" disabled={!bankAccountId || isFileLoading} />
@@ -336,11 +340,11 @@ export function StandardReconciliationView() {
                      <Button onClick={handleManualMatch} disabled={isProcessingManualMatch || !selectedBankTx || !selectedSystemTx}><Link2 className="ml-2"/> مطابقة يدوية</Button>
                 </div>
 
-                <h3 className="text-lg font-semibold text-center">نتائج التسوية</h3>
+                <h3 className="text-lg font-semibold text-center">3. الحركات غير المسواة</h3>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <Card>
-                        <CardHeader><CardTitle>حركات البنك (غير مسواة)</CardTitle></CardHeader>
+                        <CardHeader><CardTitle>حركات البنك</CardTitle></CardHeader>
                         <CardContent className="h-72 overflow-y-auto">
                             <Table>
                                 {unmatchedBank.map(tx => (
@@ -354,7 +358,7 @@ export function StandardReconciliationView() {
                         </CardContent>
                     </Card>
                      <Card>
-                        <CardHeader><CardTitle>حركات النظام (غير مسواة)</CardTitle></CardHeader>
+                        <CardHeader><CardTitle>حركات النظام</CardTitle></CardHeader>
                         <CardContent className="h-72 overflow-y-auto">
                              <Table>
                                 {unmatchedSystem.map(tx => (
@@ -389,3 +393,5 @@ export function StandardReconciliationView() {
         </Card>
     );
 }
+
+
