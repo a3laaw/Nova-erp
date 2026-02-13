@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bot, MessageSquare, Send, User, Loader2, X as CloseIcon } from 'lucide-react';
@@ -11,7 +11,6 @@ import { ScrollArea } from '../ui/scroll-area';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-
 
 type Message = {
   role: 'user' | 'model';
@@ -26,16 +25,89 @@ export function SystemExpertChatWidget() {
   const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages are added
-    useEffect(() => {
-        if (scrollAreaRef.current) {
-            const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-            if (viewport) {
-                viewport.scrollTop = viewport.scrollHeight;
-            }
-        }
-    }, [messages, isLoading]);
+  // --- Dragging Logic ---
+  const [position, setPosition] = useState({ x: 24, y: 24 }); // in pixels, from right and bottom
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const hasMoved = useRef(false);
+  const widgetRef = useRef<HTMLDivElement>(null);
 
+  const handleMouseDown = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    // Prevent text selection during drag
+    e.preventDefault();
+    setIsDragging(true);
+    hasMoved.current = false;
+
+    // Calculate the initial offset from the corner of the viewport
+    // This allows dragging from any point on the button, not just its top-left corner
+    if (widgetRef.current) {
+        dragOffset.current = {
+            x: window.innerWidth - e.clientX - position.x,
+            y: window.innerHeight - e.clientY - position.y
+        };
+    }
+  };
+  
+   useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !widgetRef.current) return;
+      
+      // Set hasMoved to true only if there is a significant mouse movement
+      if (!hasMoved.current && (Math.abs(e.movementX) > 2 || Math.abs(e.movementY) > 2)) {
+          hasMoved.current = true;
+      }
+
+      // Calculate new position based on the right and bottom edges
+      let newX = window.innerWidth - e.clientX - dragOffset.current.x;
+      let newY = window.innerHeight - e.clientY - dragOffset.current.y;
+      
+      // Enforce boundaries to keep the widget within the viewport
+      const rect = widgetRef.current.getBoundingClientRect();
+      newX = Math.max(0, Math.min(newX, window.innerWidth - rect.width));
+      newY = Math.max(0, Math.min(newY, window.innerHeight - rect.height));
+
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  const handleButtonClick = () => {
+    // Only toggle the window if the button was clicked, not dragged
+    if (!hasMoved.current) {
+        setIsOpen(prev => !prev);
+    }
+  };
+  // --- End Dragging Logic ---
+
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+        setMessages([
+            { role: 'model', content: 'أهلاً بك! أنا مساعدك الذكي. كيف يمكنني مساعدتك اليوم في استخدام النظام؟' }
+        ]);
+    }
+  }, [isOpen, messages.length]);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+            viewport.scrollTop = viewport.scrollHeight;
+        }
+    }
+  }, [messages, isLoading]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -58,20 +130,18 @@ export function SystemExpertChatWidget() {
         setIsLoading(false);
     }
   };
-  
-    // Add a welcome message when the chat opens for the first time
-    useEffect(() => {
-        if (isOpen && messages.length === 0) {
-            setMessages([
-                { role: 'model', content: 'أهلاً بك! أنا مساعدك الذكي. كيف يمكنني مساعدتك اليوم في استخدام النظام؟' }
-            ]);
-        }
-    }, [isOpen, messages.length]);
-
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4" dir="rtl">
-        {/* Chat Window */}
+    <div
+      ref={widgetRef}
+      className="fixed z-50 flex flex-col items-end gap-4"
+      dir="rtl"
+      style={{
+        right: `${position.x}px`,
+        bottom: `${position.y}px`,
+        touchAction: 'none', // Prevent default touch actions like scrolling on mobile
+      }}
+    >
         <Card className={cn(
             "w-[380px] h-[60vh] flex-col shadow-2xl transition-all duration-300 ease-in-out",
             isOpen ? "flex" : "hidden"
@@ -154,10 +224,10 @@ export function SystemExpertChatWidget() {
             </CardFooter>
         </Card>
         
-        {/* Floating Action Button */}
         <Button
-            className="h-16 w-16 rounded-full bg-primary shadow-lg hover:bg-primary/90"
-            onClick={() => setIsOpen(prev => !prev)}
+            className="h-16 w-16 rounded-full bg-primary shadow-lg hover:bg-primary/90 cursor-grab active:cursor-grabbing"
+            onMouseDown={handleMouseDown}
+            onClick={handleButtonClick}
         >
             {isOpen ? <CloseIcon className="h-8 w-8 text-primary-foreground" /> : <MessageSquare className="h-8 w-8 text-primary-foreground" />}
         </Button>
