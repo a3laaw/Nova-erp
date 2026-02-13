@@ -846,9 +846,9 @@ export interface ConstructionProject {
 export interface Subcontractor {
   id?: string;
   name: string;
-  type: 'كهرباء' | 'إنشائي' | 'تشطيبات' | 'سباكة' | 'تكييف' | 'أخرى';
+  type: string;
   specialization?: string;
-  rating?: number;
+  performanceRating?: number;
   contactPerson?: string;
   phone?: string;
   mobile?: string;
@@ -863,6 +863,18 @@ export interface Subcontractor {
   isActive: boolean;
   blacklisted?: boolean;
   blacklistedReason?: string;
+}
+
+export interface SubcontractorType {
+  id: string;
+  name: string;
+  order?: number;
+}
+
+export interface SubcontractorSpecialization {
+  id: string;
+  name: string;
+  order?: number;
 }
 
 export interface WorkOrder {
@@ -931,3 +943,5 @@ export interface QualityTest {
     }[];
     relatedWorkOrderId?: string;
 }
+
+  

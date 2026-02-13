@@ -1536,6 +1536,7 @@
         "projectId": { "type": "string" },
         "projectName": { "type": "string" },
         "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
         "projectType": { "type": "string", "enum": ["استشاري", "تنفيذي", "مختلط"] },
         "contractValue": { "type": "number" },
         "startDate": { "type": "string", "format": "date-time" },
@@ -1567,7 +1568,7 @@
         "type": "object",
         "properties": {
             "name": { "type": "string" },
-            "type": { "type": "string", "enum": ["كهرباء", "إنشائي", "تشطيبات", "سباكة", "تكييف", "أخرى"] },
+            "type": { "type": "string" },
             "specialization": { "type": "string" },
             "rating": { "type": "number" },
             "contactPerson": { "type": "string" },
@@ -1607,6 +1608,26 @@
             "blacklistedReason": { "type": "string" }
         },
         "required": ["name", "type", "isActive"]
+    },
+    "SubcontractorType": {
+      "title": "Subcontractor Type",
+      "description": "Represents a main type for subcontractors, e.g., Electrical, Civil.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the type." },
+        "order": { "type": "number", "description": "The display order." }
+      },
+      "required": ["name"]
+    },
+    "SubcontractorSpecialization": {
+      "title": "Subcontractor Specialization",
+      "description": "Represents a specific specialization within a type, e.g., Concrete Works.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the specialization." },
+        "order": { "type": "number", "description": "The display order." }
+      },
+      "required": ["name"]
     },
     "WorkOrder": {
         "title": "Work Order",
@@ -1956,6 +1977,14 @@
         "schema": { "$ref": "#/entities/Subcontractor" },
         "description": "Stores subcontractor information."
     },
+    "/subcontractorTypes/{typeId}": {
+      "schema": { "$ref": "#/entities/SubcontractorType" },
+      "description": "Stores main types for subcontractors."
+    },
+    "/subcontractorTypes/{typeId}/specializations/{specializationId}": {
+      "schema": { "$ref": "#/entities/SubcontractorSpecialization" },
+      "description": "Stores specializations for a subcontractor type."
+    },
     "/projects/{projectId}/workOrders/{workOrderId}": {
         "schema": { "$ref": "#/entities/WorkOrder" },
         "description": "Stores work orders for subcontractors on a project."
@@ -1974,3 +2003,4 @@
     }
   }
 }
+  

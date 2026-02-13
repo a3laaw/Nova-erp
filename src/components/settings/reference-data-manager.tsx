@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch, collectionGroup } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup } from 'firebase/firestore';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -26,16 +27,15 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 import {
@@ -1169,9 +1169,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages' | 'subcontractorTypes'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1183,7 +1183,7 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, companiesSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, companiesSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
                     getDocs(query(collection(firestore, 'companies'))),
@@ -1191,6 +1191,8 @@ export function ReferenceDataManager() {
                     getDocs(query(collectionGroup(firestore, 'areas'))),
                     getDocs(query(collection(firestore, 'transactionTypes'))),
                     getDocs(query(collectionGroup(firestore, 'workStages'))),
+                    getDocs(query(collection(firestore, 'subcontractorTypes'))),
+                    getDocs(query(collectionGroup(firestore, 'specializations'))),
                 ]);
 
                 setCounts({
@@ -1201,6 +1203,8 @@ export function ReferenceDataManager() {
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
                     workStages: workStagesSnap.size,
+                    subcontractorTypes: subTypesSnap.size,
+                    subcontractorSpecializations: subSpecsSnap.size,
                 });
 
             } catch (error) {
@@ -1262,6 +1266,19 @@ export function ReferenceDataManager() {
     if (view === 'companies') {
         return <CompanyManager onBack={() => setView('dashboard')} />
     }
+    
+    if (view === 'subcontractorTypes') {
+        return <ManagerView
+            primaryTitle="أنواع المقاولين"
+            primarySingularTitle="نوع المقاول"
+            primaryCollectionName="subcontractorTypes"
+            secondaryTitle="التخصصات الدقيقة"
+            secondarySingularTitle="تخصص دقيق"
+            secondaryCollectionName="specializations"
+            icon={<Users className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
 
     return (
         <Card>
@@ -1312,9 +1329,19 @@ export function ReferenceDataManager() {
                     color="purple" 
                     loading={loadingCounts} 
                 />
+                <StatCard 
+                    title="تخصصات المقاولين" 
+                    count={counts.subcontractorTypes + counts.subcontractorSpecializations} 
+                    icon={<Users className="h-full w-full" />} 
+                    onNavigate={() => setView('subcontractorTypes')} 
+                    color="purple" 
+                    loading={loadingCounts} 
+                />
             </CardContent>
         </Card>
     );
 }
 
     
+
+  

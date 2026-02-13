@@ -1,19 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp, query, getDocs, orderBy } from 'firebase/firestore';
 import { Loader2, Save } from 'lucide-react';
-import type { Subcontractor } from '@/lib/types';
+import type { Subcontractor, SubcontractorType, SubcontractorSpecialization } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
-import { Separator } from '../ui/separator';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 interface SubcontractorFormProps {
     isOpen: boolean;
@@ -29,7 +28,7 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
 
     const [formData, setFormData] = useState({
         name: '',
-        type: 'إنشائي' as Subcontractor['type'],
+        type: '',
         specialization: '',
         contactPerson: '',
         phone: '',
@@ -43,6 +42,24 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
         blacklisted: false,
         blacklistedReason: '',
     });
+
+    const { data: subcontractorTypes, loading: typesLoading } = useSubscription<SubcontractorType>(firestore, 'subcontractorTypes', useMemo(() => [orderBy('name')], []));
+    const [specializations, setSpecializations] = useState<SubcontractorSpecialization[]>([]);
+    const [specializationsLoading, setSpecializationsLoading] = useState(false);
+    
+    const selectedType = useMemo(() => subcontractorTypes.find(t => t.name === formData.type), [subcontractorTypes, formData.type]);
+    
+    useEffect(() => {
+        if (selectedType) {
+            setSpecializationsLoading(true);
+            const q = query(collection(firestore, `subcontractorTypes/${selectedType.id}/specializations`), orderBy('name'));
+            getDocs(q).then(snap => {
+                setSpecializations(snap.docs.map(d => ({id: d.id, ...d.data()}) as SubcontractorSpecialization));
+            }).finally(() => setSpecializationsLoading(false));
+        } else {
+            setSpecializations([]);
+        }
+    }, [selectedType, firestore]);
 
     useEffect(() => {
         if (subcontractor) {
@@ -64,7 +81,7 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
             });
         } else {
             setFormData({
-                name: '', type: 'إنشائي', specialization: '', contactPerson: '', phone: '',
+                name: '', type: '', specialization: '', contactPerson: '', phone: '',
                 mobile: '', email: '', address: '',
                 bankName: '', accountNumber: '', iban: '',
                 isActive: true, blacklisted: false, blacklistedReason: '',
@@ -77,7 +94,11 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
     };
     
     const handleSelectChange = (id: string, value: string) => {
-        setFormData(prev => ({...prev, [id]: value}));
+        const newFormData = { ...formData, [id]: value };
+        if (id === 'type') {
+            newFormData.specialization = '';
+        }
+        setFormData(newFormData);
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +132,9 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
             setIsSaving(false);
         }
     };
+    
+    const typeOptions = useMemo(() => subcontractorTypes.map(t => ({value: t.name, label: t.name})), [subcontractorTypes]);
+    const specializationOptions = useMemo(() => specializations.map(s => ({value: s.name, label: s.name})), [specializations]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -126,21 +150,23 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="type">النوع/التخصص الرئيسي</Label>
-                            <Select value={formData.type} onValueChange={(v) => handleSelectChange('type', v)}>
-                                <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="كهرباء">كهرباء</SelectItem>
-                                    <SelectItem value="إنشائي">إنشائي</SelectItem>
-                                    <SelectItem value="تشطيبات">تشطيبات</SelectItem>
-                                    <SelectItem value="سباكة">سباكة</SelectItem>
-                                    <SelectItem value="تكييف">تكييف</SelectItem>
-                                    <SelectItem value="أخرى">أخرى</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <InlineSearchList 
+                                value={formData.type}
+                                onSelect={(v) => handleSelectChange('type', v)}
+                                options={typeOptions}
+                                placeholder={typesLoading ? "تحميل..." : "اختر نوعًا..."}
+                                disabled={typesLoading}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="specialization">التخصص الدقيق</Label>
-                            <Input id="specialization" value={formData.specialization} onChange={handleChange} placeholder="مثال: أعمال خرسانية" />
+                            <InlineSearchList 
+                                value={formData.specialization}
+                                onSelect={(v) => handleSelectChange('specialization', v)}
+                                options={specializationOptions}
+                                placeholder={!selectedType ? "اختر النوع أولاً" : specializationsLoading ? "تحميل..." : "اختر تخصصًا..."}
+                                disabled={!selectedType || specializationsLoading}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="contactPerson">جهة الاتصال</Label>
@@ -211,3 +237,5 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
         </Dialog>
     );
 }
+
+  
