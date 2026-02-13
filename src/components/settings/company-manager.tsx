@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -30,8 +29,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import type { Company } from '@/lib/types';
@@ -45,29 +44,23 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const [companies, setCompanies] = useState<Company[]>([]);
-    const [loading, setLoading] = useState(true);
+    const companiesQuery = useMemo(() => {
+        if (!firestore) return null;
+        return [orderBy('name')];
+    }, [firestore]);
+    const { data: companies, loading, error } = useSubscription<Company>(firestore, 'companies', companiesQuery || []);
+
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
-    const fetchCompanies = useCallback(async () => {
-        if (!firestore) return;
-        setLoading(true);
-        try {
-            const companiesSnapshot = await getDocs(query(collection(firestore, 'companies'), orderBy('name')));
-            setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الشركات.' });
-        } finally {
-            setLoading(false);
-        }
-    }, [firestore, toast]);
-
     useEffect(() => {
-        fetchCompanies();
-    }, [fetchCompanies]);
-    
+        if(error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب قائمة الشركات.' });
+        }
+    }, [error, toast]);
+
+
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
         toast({ title: 'تم النسخ', description: 'تم نسخ ID الشركة إلى الحافظة.' });
@@ -88,7 +81,6 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
         try {
             await deleteDoc(doc(firestore, 'companies', companyToDelete.id!));
             toast({ title: 'نجاح', description: 'تم حذف الشركة.' });
-            fetchCompanies();
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الشركة.' });
         } finally {
@@ -108,7 +100,6 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
                 toast({ title: 'نجاح', description: 'تمت إضافة الشركة.' });
             }
             setIsFormOpen(false);
-            fetchCompanies();
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ بيانات الشركة.' });
         }
@@ -213,5 +204,3 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
         </>
     );
 }
-
-    
