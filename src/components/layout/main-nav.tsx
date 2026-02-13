@@ -85,7 +85,7 @@ const navItems = {
       roles: ['Admin', 'Engineer'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/construction/projects', label: 'لوحة المشاريع' },
+        { href: '/dashboard/construction/projects', label: 'المشاريع' },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين' },
       ]
     },
@@ -195,7 +195,6 @@ const navItems = {
         { href: '/dashboard/reports/upsell-opportunities', label: 'Upsell Opportunities' },
       ]
     },
-    { href: '/dashboard/projects', label: 'Projects', icon: Briefcase, roles: ['Admin', 'Engineer', 'Secretary'] },
     { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
     { 
       label: 'Construction',
@@ -203,7 +202,7 @@ const navItems = {
       roles: ['Admin', 'Engineer'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/construction/projects', label: 'Projects Dashboard' },
+        { href: '/dashboard/construction/projects', label: 'Projects' },
         { href: '/dashboard/construction/subcontractors', label: 'Subcontractors' },
       ]
     },
