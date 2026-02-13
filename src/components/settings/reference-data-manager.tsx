@@ -828,10 +828,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<TransactionType | null>(null);
   const [itemToDelete, setItemToDelete] = useState<TransactionType | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
-
-
+  
   const [itemName, setItemName] = useState('');
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   
@@ -915,53 +912,6 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     }
   };
 
-  
-  const handleImportOldTypes = async () => {
-    if (!firestore) return;
-    setIsImporting(true);
-    try {
-        const batch = writeBatch(firestore);
-        const rootTypesRef = collection(firestore, 'transactionTypes');
-        
-        const existingNewTypesSnap = await getDocs(rootTypesRef);
-        const existingNewTypeNames = new Set(existingNewTypesSnap.docs.map(d => d.data().name));
-
-        const oldTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
-        const oldTypesSnapshot = await getDocs(oldTypesQuery);
-
-        let importedCount = 0;
-
-        for (const oldTypeDoc of oldTypesSnapshot.docs) {
-            const oldTypeData = oldTypeDoc.data();
-            const oldTypeName = oldTypeData.name;
-            const parentDeptId = oldTypeDoc.ref.parent.parent?.id;
-
-            if (oldTypeName && !existingNewTypeNames.has(oldTypeName)) {
-                const newTypeRef = doc(rootTypesRef);
-                batch.set(newTypeRef, {
-                    name: oldTypeName,
-                    departmentIds: parentDeptId ? [parentDeptId] : []
-                });
-                existingNewTypeNames.add(oldTypeName);
-                importedCount++;
-            }
-        }
-
-        if (importedCount > 0) {
-            await batch.commit();
-            toast({ title: 'نجاح', description: `تم استيراد ${importedCount} أنواع معاملات فريدة بنجاح.` });
-            fetchData();
-        } else {
-            toast({ title: 'لا توجد بيانات جديدة', description: 'لم يتم العثور على أنواع معاملات قديمة غير موجودة حاليًا.' });
-        }
-
-    } catch (error) {
-        console.error("Error importing old transaction types:", error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات القديمة.' });
-    } finally {
-        setIsImporting(false);
-    }
-};
 
   const handleSave = async () => {
     if (!firestore || !itemName.trim()) return;
@@ -995,38 +945,6 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const handleImportDefaults = async () => {
-    if (!firestore || !departments.length) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'يجب تحميل بيانات الأقسام أولاً.' });
-        return;
-    }
-    setIsImporting(true);
-    try {
-        const batch = writeBatch(firestore);
-        
-        const existingSnap = await getDocs(query(collection(firestore, 'transactionTypes')));
-        existingSnap.forEach(doc => batch.delete(doc.ref));
-
-        const deptsMap = new Map(departments.map(d => [d.name, d.id]));
-
-        for (const type of defaultTransactionTypes) {
-            const newTypeRef = doc(collection(firestore, 'transactionTypes'));
-            const departmentIds = type.departmentNames.map(name => deptsMap.get(name)).filter(Boolean) as string[];
-            batch.set(newTypeRef, { name: type.name, order: type.order, departmentIds });
-        };
-        
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تم استيراد أنواع المعاملات الافتراضية.' });
-        fetchData(); // to refresh the list
-    } catch(e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات.' });
-    } finally {
-        setIsImporting(false);
-        setIsImportConfirmOpen(false);
-    }
-  };
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -1037,18 +955,8 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
         <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-2">
+        <div className="flex justify-end mb-4">
             <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
-            <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
-                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                استيراد الافتراضي
-            </Button>
-          </div>
-            <Button onClick={handleImportOldTypes} size="sm" variant="secondary" disabled={isImporting}>
-                {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                استيراد الأنواع القديمة
-            </Button>
         </div>
         <div className="border rounded-lg">
           <Table>
@@ -1145,24 +1053,6 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-        <AlertDialogContent dir="rtl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
-                <AlertDialogDescription>
-                    سيؤدي هذا الإجراء إلى مسح جميع أنواع المعاملات الحالية واستبدالها بالقائمة الافتراضية.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
-                    {isImporting ? 'جاري الاستيراد...' : 'نعم، قم بالاستيراد'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </Card>
   );
 }
@@ -1191,7 +1081,7 @@ export function ReferenceDataManager() {
                     getDocs(query(collectionGroup(firestore, 'areas'))),
                     getDocs(query(collection(firestore, 'transactionTypes'))),
                     getDocs(query(collectionGroup(firestore, 'workStages'))),
-                    getDocs(query(collection(firestore, 'subcontractorTypes'))),
+                    getDocs(query(collectionGroup(firestore, 'subcontractorTypes'))),
                     getDocs(query(collectionGroup(firestore, 'specializations'))),
                 ]);
 
