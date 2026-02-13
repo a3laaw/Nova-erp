@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "CompanyBranding": {
@@ -1536,7 +1537,6 @@
         "projectId": { "type": "string" },
         "projectName": { "type": "string" },
         "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
         "projectType": { "type": "string", "enum": ["استشاري", "تنفيذي", "مختلط"] },
         "contractValue": { "type": "number" },
         "startDate": { "type": "string", "format": "date-time" },
@@ -1563,51 +1563,51 @@
         }
     },
     "Subcontractor": {
-        "title": "Subcontractor",
-        "description": "Represents a subcontractor company or individual.",
-        "type": "object",
-        "properties": {
-            "name": { "type": "string" },
-            "type": { "type": "string" },
-            "specialization": { "type": "string" },
-            "rating": { "type": "number" },
-            "contactPerson": { "type": "string" },
-            "phone": { "type": "string" },
-            "mobile": { "type": "string" },
-            "email": { "type": "string", "format": "email" },
-            "address": { "type": "string" },
-            "bankAccount": {
-                "type": "object",
-                "properties": {
-                    "bankName": { "type": "string" },
-                    "accountNumber": { "type": "string" },
-                    "iban": { "type": "string" }
-                }
-            },
-            "performanceHistory": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "projectId": { "type": "string" },
-                  "projectName": { "type": "string" },
-                  "startDate": { "type": "string", "format": "date-time" },
-                  "endDate": { "type": "string", "format": "date-time" },
-                  "totalValue": { "type": "number" },
-                  "paidAmount": { "type": "number" },
-                  "remainingAmount": { "type": "number" },
-                  "qualityRating": { "type": "number" },
-                  "timelinessRating": { "type": "number" },
-                  "overallRating": { "type": "number" },
-                  "notes": { "type": "string" }
-                }
-              }
-            },
-            "isActive": { "type": "boolean" },
-            "blacklisted": { "type": "boolean" },
-            "blacklistedReason": { "type": "string" }
+      "title": "Subcontractor",
+      "description": "Represents a subcontractor company or individual.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "description": "The main category of the subcontractor, selected from the /subcontractorTypes collection." },
+        "specialization": { "type": "string", "description": "A specific specialization within the main type, selected from the nested /specializations subcollection." },
+        "rating": { "type": "number" },
+        "contactPerson": { "type": "string" },
+        "phone": { "type": "string" },
+        "mobile": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" },
+        "bankAccount": {
+          "type": "object",
+          "properties": {
+            "bankName": { "type": "string" },
+            "accountNumber": { "type": "string" },
+            "iban": { "type": "string" }
+          }
         },
-        "required": ["name", "type", "isActive"]
+        "performanceHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectId": { "type": "string" },
+              "projectName": { "type": "string" },
+              "startDate": { "type": "string", "format": "date-time" },
+              "endDate": { "type": "string", "format": "date-time" },
+              "totalValue": { "type": "number" },
+              "paidAmount": { "type": "number" },
+              "remainingAmount": { "type": "number" },
+              "qualityRating": { "type": "number" },
+              "timelinessRating": { "type": "number" },
+              "overallRating": { "type": "number" },
+              "notes": { "type": "string" }
+            }
+          }
+        },
+        "isActive": { "type": "boolean" },
+        "blacklisted": { "type": "boolean" },
+        "blacklistedReason": { "type": "string" }
+      },
+      "required": ["name", "type", "isActive"]
     },
     "SubcontractorType": {
       "title": "Subcontractor Type",
@@ -2003,4 +2003,5 @@
     }
   }
 }
-  
+
+    
