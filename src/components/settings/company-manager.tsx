@@ -37,7 +37,7 @@ import type { Company } from '@/lib/types';
 import { CompanyForm } from './company-form';
 
 interface CompanyManagerProps {
-    onBack: () => void;
+    onBack?: () => void;
 }
 
 export function CompanyManager({ onBack }: CompanyManagerProps) {
@@ -116,7 +116,7 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
                         <Building />
                         <CardTitle>إدارة الشركات</CardTitle>
                     </div>
-                    <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
+                    {onBack && <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>}
                 </CardHeader>
                 <CardContent>
                     <div className="flex justify-end mb-4">

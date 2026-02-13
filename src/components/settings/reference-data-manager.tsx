@@ -48,8 +48,8 @@ import {
 } from '@/components/ui/table';
 import { defaultDepartments, defaultJobs, defaultGovernorates, defaultAreas, defaultTransactionTypes, defaultWorkStages } from '@/lib/default-reference-data';
 
+// --- Reusable Components ---
 
-// --- NEW StatCard Component ---
 function StatCard({ title, count, icon, onNavigate, color, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, color: string, loading: boolean }) {
     const colorClasses: Record<string, string> = {
         green: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300',
@@ -1059,9 +1059,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'companies' | 'workStages' | 'subcontractorTypes'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'workStages' | 'subcontractorTypes'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, companies: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1073,22 +1073,20 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, companiesSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
-                    getDocs(query(collection(firestore, 'companies'))),
                     getDocs(query(collectionGroup(firestore, 'jobs'))),
                     getDocs(query(collectionGroup(firestore, 'areas'))),
                     getDocs(query(collection(firestore, 'transactionTypes'))),
                     getDocs(query(collectionGroup(firestore, 'workStages'))),
-                    getDocs(query(collectionGroup(firestore, 'subcontractorTypes'))),
+                    getDocs(query(collection(firestore, 'subcontractorTypes'))),
                     getDocs(query(collectionGroup(firestore, 'specializations'))),
                 ]);
 
                 setCounts({
                     depts: deptsSnap.size,
                     govs: govsSnap.size,
-                    companies: companiesSnap.size,
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
                     transTypes: transTypesSnap.size,
@@ -1152,10 +1150,6 @@ export function ReferenceDataManager() {
             onBack={() => setView('dashboard')}
         />
     }
-
-    if (view === 'companies') {
-        return <CompanyManager onBack={() => setView('dashboard')} />
-    }
     
     if (view === 'subcontractorTypes') {
         return <ManagerView
@@ -1179,14 +1173,6 @@ export function ReferenceDataManager() {
             </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <StatCard 
-                    title="الشركات" 
-                    count={counts.companies} 
-                    icon={<Building className="h-full w-full" />} 
-                    onNavigate={() => setView('companies')} 
-                    color="green" 
-                    loading={loadingCounts} 
-                />
                 <StatCard 
                     title="الأقسام والوظائف" 
                     count={counts.depts + counts.jobs} 
@@ -1231,7 +1217,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
-    
-
-  
