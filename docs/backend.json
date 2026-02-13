@@ -353,6 +353,23 @@
         },
         "required": ["transactionNumber", "clientId", "transactionType", "status", "createdAt"]
     },
+    "BoqItem": {
+      "title": "BOQ Item",
+      "description": "A single line item in the Bill of Quantities for a project.",
+      "type": "object",
+      "properties": {
+        "itemNumber": { "type": "string", "description": "Hierarchical item number (e.g., '1', '1.1', '1.1.1')." },
+        "description": { "type": "string" },
+        "unit": { "type": "string" },
+        "plannedQuantity": { "type": "number" },
+        "plannedUnitPrice": { "type": "number" },
+        "executedQuantity": { "type": "number", "description": "Defaults to 0" },
+        "parentId": { "type": ["string", "null"], "description": "ID of the parent item for sub-items." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itemNumber", "description", "unit", "plannedQuantity", "plannedUnitPrice", "executedQuantity"]
+    },
     "TransactionAssignment": {
         "title": "Transaction Assignment",
         "description": "Represents an assignment or forwarding of a transaction to a specific department and engineer.",
@@ -1537,6 +1554,7 @@
         "projectId": { "type": "string" },
         "projectName": { "type": "string" },
         "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
         "projectType": { "type": "string", "enum": ["استشاري", "تنفيذي", "مختلط"] },
         "contractValue": { "type": "number" },
         "startDate": { "type": "string", "format": "date-time" },
@@ -1546,6 +1564,7 @@
         "actualCosts": { "$ref": "#/entities/ProjectCosts" },
         "progressPercentage": { "type": "number" },
         "mainEngineerId": { "type": "string" },
+        "mainEngineerName": { "type": "string" },
         "linkedTransactionId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -1570,7 +1589,7 @@
         "name": { "type": "string" },
         "type": { "type": "string", "description": "The main category of the subcontractor, selected from the /subcontractorTypes collection." },
         "specialization": { "type": "string", "description": "A specific specialization within the main type, selected from the nested /specializations subcollection." },
-        "rating": { "type": "number" },
+        "performanceRating": { "type": "number" },
         "contactPerson": { "type": "string" },
         "phone": { "type": "string" },
         "mobile": { "type": "string" },
@@ -1786,6 +1805,10 @@
             "$ref": "#/entities/ClientTransaction"
         },
         "description": "Stores internal transactions/services for a specific client."
+    },
+    "/clients/{clientId}/transactions/{transactionId}/boq/{boqItemId}": {
+      "schema": { "$ref": "#/entities/BoqItem" },
+      "description": "Stores the Bill of Quantities items for a specific client transaction."
     },
     "/transaction_assignments/{assignmentId}": {
         "schema": {

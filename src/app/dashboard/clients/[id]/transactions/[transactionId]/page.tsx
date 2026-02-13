@@ -1,5 +1,5 @@
 
-'use client';
+      'use client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, Workflow, Play, Check, Pause, Users, CheckSquare, FileSignature, MessageSquare, Undo2, Plus, ClipboardCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -65,6 +65,7 @@ import {
     getDocs as getDocsFromFirestore,
     collection as collectionFromFirestore
 } from 'firebase/firestore';
+import { BoqView } from '@/components/clients/boq/boq-view';
 
 
 const getTotalPaidForProject = async (projectId: string, db: any) => {
@@ -318,6 +319,7 @@ export default function TransactionDetailPage() {
         
         batch.update(transactionRefDoc, { stages: currentStages });
 
+        const safeApptDate = toFirestoreDate(new Date());
         const logContent = `قام ${currentUser.fullName} بتسجيل تعديل جديد للمرحلة: "${stage.name}" (التعديل رقم ${stage.modificationCount}).`;
         
         const logData = {
@@ -335,10 +337,6 @@ export default function TransactionDetailPage() {
         const historyRef = doc(collection(firestore, `clients/${clientId}/history`));
         batch.set(historyRef, { ...logData, content: `[${transaction.transactionType}] ${logContent}`});
         
-        // This is a key action on the visit, so we mark it as "updated"
-        const appointmentRef = doc(firestore, 'appointments', params.id as string);
-        batch.update(appointmentRef, { workStageUpdated: true });
-
         await batch.commit();
 
         toast({ title: 'نجاح', description: 'تم تسجيل التعديل بنجاح.' });
@@ -500,7 +498,7 @@ export default function TransactionDetailPage() {
 
         return combined.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
     }, [transaction, workStageTemplates]);
-
+    
     const currentInProgressStage = useMemo(() => {
       if (!enrichedStages) return undefined;
       const stage = enrichedStages.find(s => s.status === 'in-progress');
@@ -568,8 +566,9 @@ export default function TransactionDetailPage() {
         </Card>
         
         <Tabs defaultValue="stages" dir="rtl">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="stages">مراحل المعاملة</TabsTrigger>
+                <TabsTrigger value="boq">جدول الكميات (BOQ)</TabsTrigger>
                 <TabsTrigger value="comments">التعليقات والمتابعة</TabsTrigger>
                 <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
             </TabsList>
@@ -655,6 +654,9 @@ export default function TransactionDetailPage() {
                     </CardContent>
                 </Card>
             </TabsContent>
+            <TabsContent value="boq" className="mt-6">
+                <BoqView transactionId={transactionId} />
+            </TabsContent>
             <TabsContent value="comments" className="mt-6">
                 <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="comment" showInput={true} title="التعليقات والمتابعة" icon={<MessageSquare className="text-primary" />} client={client} transaction={transaction}/>
             </TabsContent>
@@ -666,3 +668,5 @@ export default function TransactionDetailPage() {
     </>
   );
 }
+
+    

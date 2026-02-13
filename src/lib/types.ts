@@ -1,4 +1,5 @@
 
+
 export interface Company {
     id?: string;
     name: string;
@@ -823,6 +824,19 @@ export interface ProjectCosts {
   overhead?: number;
 }
 
+export interface BoqItem {
+  id?: string;
+  itemNumber: string;
+  description: string;
+  unit: string;
+  plannedQuantity: number;
+  plannedUnitPrice: number;
+  executedQuantity: number;
+  parentId?: string | null;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
 export interface ConstructionProject {
   id?: string;
   projectId: string;
@@ -945,3 +959,5 @@ export interface QualityTest {
 }
 
   
+
+    
