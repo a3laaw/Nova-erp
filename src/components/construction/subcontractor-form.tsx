@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -237,5 +238,3 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
         </Dialog>
     );
 }
-
-  
