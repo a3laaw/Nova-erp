@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -75,13 +76,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [refDataLoading, setRefDataLoading] = useState(true);
     
     const isDayLaborer = formData.contractType === 'day_laborer';
-    const isSubcontractor = formData.contractType === 'subcontractor';
-    const isSimpleLayout = isDayLaborer || isSubcontractor;
+    const isSimpleLayout = isDayLaborer;
 
     const showStandardSalary = useMemo(() => {
         if (formData.contractType === 'percentage' || 
-            formData.contractType === 'day_laborer' || 
-            formData.contractType === 'subcontractor') {
+            formData.contractType === 'day_laborer') {
             return false;
         }
         if (formData.contractType === 'piece-rate' && formData.pieceRateMode === 'per_piece') {
@@ -140,8 +139,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [initialData, branding]);
 
     useEffect(() => {
-        const noSalaryContractTypes = ['percentage', 'day_laborer', 'subcontractor'];
-        const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate', 'day_laborer', 'subcontractor'].includes(formData.contractType);
+        const noSalaryContractTypes = ['percentage', 'day_laborer'];
+        const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate', 'day_laborer'].includes(formData.contractType);
 
         if (noSalaryContractTypes.includes(formData.contractType) || (formData.contractType === 'piece-rate' && formData.pieceRateMode === 'per_piece')) {
             setFormData(prev => ({
@@ -202,7 +201,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const { id, value } = e.target;
         let sanitizedValue = value;
         if (id === 'fullName') {
-            sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
+            sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, ''); 
         } else if (id === 'nameEn') {
             sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         }
@@ -250,8 +249,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         };
 
         if (isSimpleLayout) {
-            dataToSave.department = isDayLaborer ? 'عمالة خارجية' : 'مقاول باطن';
-            dataToSave.jobTitle = isDayLaborer ? 'عامل يومية' : 'مقاول باطن';
+            dataToSave.department = 'عمالة خارجية';
+            dataToSave.jobTitle = 'عامل يومية';
             dataToSave.civilId = formData.civilId || '000000000000';
             dataToSave.hireDate = new Date();
             dataToSave.basicSalary = 0;
@@ -349,7 +348,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <SelectItem value="part-time">دوام جزئي</SelectItem>
                                 <SelectItem value="special">دوام خاص</SelectItem>
                                 <SelectItem value="day_laborer">عامل باليومية</SelectItem>
-                                <SelectItem value="subcontractor">مقاول باطن</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -551,3 +549,5 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
+    

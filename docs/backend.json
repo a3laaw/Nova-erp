@@ -548,7 +548,7 @@
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", "probation", null] },
         "contractType": {
           "type": "string",
-          "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special", "day_laborer", "subcontractor"]
+          "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special", "day_laborer"]
         },
         "dailyRate": {
             "type": "number",
@@ -2032,3 +2032,5 @@
     }
   }
 }
+
+    
