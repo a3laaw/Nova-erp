@@ -823,6 +823,11 @@
           "type": "string",
           "description": "The name of the transaction type (e.g., 'Municipality Design')."
         },
+        "category": {
+            "type": "string",
+            "description": "The category of the transaction type.",
+            "enum": ["consulting", "construction"]
+        },
         "departmentIds": {
             "type": "array",
             "description": "A list of department IDs involved in this transaction type.",
@@ -833,7 +838,7 @@
           "description": "The display and logical order of the type."
         }
       },
-      "required": ["name", "departmentIds"]
+      "required": ["name", "category"]
     },
     "WorkStage": {
       "title": "Work Stage",
@@ -1564,6 +1569,10 @@
       "schema": { "$ref": "#/entities/CompanyBranding" },
       "description": "Stores the main company branding and letterhead information. Expects a single document with a known ID like 'main'."
     },
+    "/companies/{companyId}": {
+        "schema": { "$ref": "#/entities/Company" },
+        "description": "Stores company profiles for multi-company support."
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "#/entities/UserProfile"
@@ -1766,4 +1775,4 @@
     }
   }
 }
-    
+  

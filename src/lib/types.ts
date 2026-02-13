@@ -378,6 +378,7 @@ export type Area = {
 export type TransactionType = {
   id: string;
   name: string;
+  category: 'consulting' | 'construction';
   departmentIds?: string[];
   order?: number;
 };
@@ -750,3 +751,4 @@ export type BoqItem = {
     updatedAt?: any;
 };
     
+  

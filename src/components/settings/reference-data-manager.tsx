@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup } from 'firebase/firestore';
+import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where } from 'firebase/firestore';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
@@ -27,7 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -57,6 +57,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
         cyan: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300',
         red: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
         purple: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
+        orange: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300',
     }
 
     return (
@@ -817,7 +818,7 @@ const handleImportWorkStages = async () => {
 }
 
 // --- NEW TransactionTypeManager Component ---
-function TransactionTypeManager({ onBack }: { onBack: () => void }) {
+function TransactionTypeManager({ onBack, category, title }: { onBack: () => void, category: 'consulting' | 'construction', title: string }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
@@ -844,7 +845,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       const [typesSnap, deptsSnap] = await Promise.all([
-        getDocs(query(collection(firestore, 'transactionTypes'))),
+        getDocs(query(collection(firestore, 'transactionTypes'), where('category', '==', category))),
         getDocs(query(collection(firestore, 'departments'), orderBy('name'))),
       ]);
       
@@ -867,7 +868,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [firestore, toast]);
+  }, [firestore, toast, category]);
   
   useEffect(() => {
     fetchData();
@@ -916,9 +917,9 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   const handleSave = async () => {
     if (!firestore || !itemName.trim()) return;
     try {
-        const dataToSave = { name: itemName, departmentIds: selectedDepartments };
+        const dataToSave = { name: itemName, departmentIds: selectedDepartments, category };
         if (editingItem) {
-            await updateDoc(doc(firestore, 'transactionTypes', editingItem.id), dataToSave);
+            await updateDoc(doc(firestore, 'transactionTypes', editingItem.id!), dataToSave);
             toast({ title: 'نجاح', description: 'تم تحديث نوع المعاملة.' });
         } else {
             const newOrder = transactionTypes.length;
@@ -935,7 +936,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   const handleDelete = async () => {
     if (!firestore || !itemToDelete) return;
     try {
-        await deleteDoc(doc(firestore, 'transactionTypes', itemToDelete.id));
+        await deleteDoc(doc(firestore, 'transactionTypes', itemToDelete.id!));
         toast({ title: 'نجاح', description: 'تم حذف نوع المعاملة.' });
         fetchData();
     } catch (e) {
@@ -950,7 +951,7 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-3 overflow-hidden">
           <FileText className="h-6 w-6 flex-shrink-0" />
-          <CardTitle className="whitespace-nowrap truncate">إدارة أنواع المعاملات</CardTitle>
+          <CardTitle className="whitespace-nowrap truncate">{title}</CardTitle>
         </div>
         <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
@@ -976,8 +977,8 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
                   <TableCell>
                     <Input 
                       type="number"
-                      value={orderValues[item.id] ?? item.order ?? ''}
-                      onChange={e => handleOrderChange(item.id, e.target.value)}
+                      value={orderValues[item.id!] ?? item.order ?? ''}
+                      onChange={e => handleOrderChange(item.id!, e.target.value)}
                       className="h-8 w-16"
                     />
                   </TableCell>
@@ -1057,11 +1058,12 @@ function TransactionTypeManager({ onBack }: { onBack: () => void }) {
   );
 }
 
+
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transTypes' | 'workStages' | 'subcontractorTypes'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'consultingTransTypes' | 'constructionTransTypes' | 'workStages' | 'subcontractorTypes'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, consultingTransTypes: 0, constructionTransTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1084,12 +1086,15 @@ export function ReferenceDataManager() {
                     getDocs(query(collectionGroup(firestore, 'specializations'))),
                 ]);
 
+                const allTypes = transTypesSnap.docs.map(d => d.data());
+
                 setCounts({
                     depts: deptsSnap.size,
                     govs: govsSnap.size,
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
-                    transTypes: transTypesSnap.size,
+                    consultingTransTypes: allTypes.filter(t => t.category === 'consulting').length,
+                    constructionTransTypes: allTypes.filter(t => t.category === 'construction').length,
                     workStages: workStagesSnap.size,
                     subcontractorTypes: subTypesSnap.size,
                     subcontractorSpecializations: subSpecsSnap.size,
@@ -1133,8 +1138,12 @@ export function ReferenceDataManager() {
         />
     }
     
-    if (view === 'transTypes') {
-         return <TransactionTypeManager onBack={() => setView('dashboard')} />
+    if (view === 'consultingTransTypes') {
+         return <TransactionTypeManager onBack={() => setView('dashboard')} category="consulting" title="أنواع معاملات التصميم" />
+    }
+
+    if (view === 'constructionTransTypes') {
+         return <TransactionTypeManager onBack={() => setView('dashboard')} category="construction" title="أنواع معاملات المقاولات" />
     }
 
     if (view === 'workStages') {
@@ -1190,11 +1199,19 @@ export function ReferenceDataManager() {
                     loading={loadingCounts} 
                 />
                 <StatCard 
-                    title="أنواع المعاملات" 
-                    count={counts.transTypes} 
+                    title="أنواع معاملات التصميم" 
+                    count={counts.consultingTransTypes} 
                     icon={<FileText className="h-full w-full" />} 
-                    onNavigate={() => setView('transTypes')} 
+                    onNavigate={() => setView('consultingTransTypes')} 
                     color="red" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="أنواع معاملات المقاولات" 
+                    count={counts.constructionTransTypes} 
+                    icon={<Construction className="h-full w-full" />} 
+                    onNavigate={() => setView('constructionTransTypes')} 
+                    color="orange" 
                     loading={loadingCounts} 
                 />
                  <StatCard 
@@ -1217,3 +1234,5 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
+
+  
