@@ -572,6 +572,7 @@ export type ContractClause = {
 export type ContractTemplate = {
   id?: string;
   title: string;
+  templateType?: 'Consulting' | 'Execution';
   description?: string;
   transactionTypes?: string[];
   scopeOfWork?: ContractScopeItem[];
@@ -748,27 +749,4 @@ export type BoqItem = {
     createdAt?: any;
     updatedAt?: any;
 };
-```
-  </change>
-  <change>
-    <file>src/app/dashboard/construction/page.tsx</file>
-    <content><![CDATA[
-'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader } from 'lucide-react';
-
-export default function ConstructionDashboardRedirect() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/dashboard/construction/projects');
-  }, [router]);
-
-  return (
-    <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
-        <Loader className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
-    </div>
-  );
-}
+    

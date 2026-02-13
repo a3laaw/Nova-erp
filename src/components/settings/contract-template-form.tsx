@@ -22,6 +22,7 @@ interface ContractTemplateFormProps {
   onClose: () => void;
   onSaveSuccess: () => void;
   template: ContractTemplate | null;
+  initialType?: 'Consulting' | 'Execution';
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -29,13 +30,14 @@ const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابع�
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 
-export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template }: ContractTemplateFormProps) {
+export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template, initialType }: ContractTemplateFormProps) {
   const { firestore } = useFirebase();
   const { user } = useAuth();
   const { toast } = useToast();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [templateType, setTemplateType] = useState<'Consulting' | 'Execution'>('Consulting');
   const [selectedTransactionTypes, setSelectedTransactionTypes] = useState<string[]>([]);
   const [scopeOfWork, setScopeOfWork] = useState<ContractScopeItem[]>([]);
   const [termsAndConditions, setTermsAndConditions] = useState<ContractTerm[]>([]);
@@ -97,6 +99,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     if (template) {
         setTitle(template.title);
         setDescription(template.description || '');
+        setTemplateType(template.templateType || initialType || 'Consulting');
         setSelectedTransactionTypes(template.transactionTypes || []);
         setScopeOfWork(template.scopeOfWork || []);
         setTermsAndConditions(template.termsAndConditions || []);
@@ -105,13 +108,14 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
     } else {
         setTitle('');
         setDescription('');
+        setTemplateType(initialType || 'Consulting');
         setSelectedTransactionTypes([]);
         setScopeOfWork([]);
         setTermsAndConditions([]);
         setFinancials({ type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
         setOpenClauses([]);
     }
-  }, [template, isOpen]);
+  }, [template, isOpen, initialType]);
 
 
   const addScopeItem = () => setScopeOfWork(prev => [...prev, { id: generateId(), title: '', description: '' }]);
@@ -184,6 +188,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
         const templateData: Omit<ContractTemplate, 'id'> = {
             title,
             description,
+            templateType,
             transactionTypes: selectedTransactionTypes,
             scopeOfWork,
             termsAndConditions,
@@ -234,9 +239,21 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template 
                 <div className="p-4 space-y-8">
                     <section className="space-y-4 p-4 border rounded-lg">
                         <h3 className="font-semibold">البيانات الأساسية</h3>
-                        <div className="grid gap-2">
-                            <Label htmlFor="template-title">عنوان النموذج <span className="text-destructive">*</span></Label>
-                            <Input id="template-title" value={title} onChange={e => setTitle(e.target.value)} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="template-title">عنوان النموذج <span className="text-destructive">*</span></Label>
+                                <Input id="template-title" value={title} onChange={e => setTitle(e.target.value)} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="template-type">نوع النموذج</Label>
+                                <Select value={templateType} onValueChange={(v) => setTemplateType(v as any)}>
+                                    <SelectTrigger><SelectValue/></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Consulting">استشاري</SelectItem>
+                                        <SelectItem value="Execution">تنفيذ</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="template-description">الوصف</Label>
