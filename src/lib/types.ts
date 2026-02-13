@@ -1,9 +1,4 @@
 
-
-
-
-
-
 export interface Company {
     id?: string;
     name: string;
@@ -716,8 +711,7 @@ export interface Vendor {
 }
 
 export interface PurchaseOrderItem {
-    internalItemId: string;
-    itemName: string;
+    description: string;
     quantity: number;
     unitPrice: number;
     total: number;
@@ -827,7 +821,6 @@ export interface ProjectCosts {
   labor?: number;
   equipment?: number;
   overhead?: number;
-  total?: number;
 }
 
 export interface ConstructionProject {
@@ -838,25 +831,16 @@ export interface ConstructionProject {
   clientName?: string;
   projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
   contractValue: number;
-  currency?: string;
   startDate: any;
-  plannedEndDate: any;
-  actualEndDate?: any;
-  status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى';
-  progressPercentage: number;
+  endDate: any;
+  status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق';
   budget?: ProjectCosts;
   actualCosts?: ProjectCosts;
+  progressPercentage: number;
   mainEngineerId: string;
   mainEngineerName?: string;
-  projectManagerId?: string;
-  siteEngineers?: string[];
   linkedTransactionId?: string;
   createdAt?: any;
-  createdBy?: string;
-  updatedAt?: any;
-  updatedBy?: string;
-  companyId?: string;
-  isActive?: boolean;
 }
 
 export interface Subcontractor {
@@ -879,11 +863,6 @@ export interface Subcontractor {
   isActive: boolean;
   blacklisted?: boolean;
   blacklistedReason?: string;
-  createdAt?: any;
-  createdBy?: string;
-  updatedAt?: any;
-  updatedBy?: string;
-  companyId?: string;
 }
 
 export interface WorkOrder {
@@ -904,6 +883,20 @@ export interface WorkOrder {
     completionDate?: any;
     qualityCheckPassed?: boolean;
     notes?: string;
+}
+
+export interface InventoryTransaction {
+    id?: string;
+    projectId: string;
+    materialId: string;
+    type: 'استلام' | 'صرف' | 'إرجاع' | 'جرد';
+    quantity: number;
+    unitPriceAtTime: number;
+    totalCost: number;
+    date: any;
+    notes?: string;
+    relatedDocumentId?: string;
+    relatedDocumentType: 'purchaseOrder' | 'workOrder' | 'manual';
 }
 
 export interface SiteVisit {
