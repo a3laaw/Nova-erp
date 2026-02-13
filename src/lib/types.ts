@@ -4,11 +4,9 @@ export interface Company {
     id?: string;
     name: string;
     nameEn?: string;
-    address?: string;
     phone?: string;
     email?: string;
     crNumber?: string;
-    logoUrl?: string;
     parentCompanyId?: string;
 }
 
@@ -253,5 +251,3 @@ export type TransactionTimelineEvent = {
   userAvatar?: string;
   createdAt: any;
 };
-
-    

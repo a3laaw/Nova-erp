@@ -8,11 +8,9 @@
         "properties": {
             "name": { "type": "string" },
             "nameEn": { "type": "string" },
-            "address": { "type": "string" },
             "phone": { "type": "string" },
             "email": { "type": "string", "format": "email" },
             "crNumber": { "type": "string", "description": "Commercial Registration Number" },
-            "logoUrl": { "type": "string", "format": "uri" },
             "parentCompanyId": { "type": "string", "description": "The ID of the parent company, if this is a subsidiary." }
         },
         "required": ["name"]
@@ -339,5 +337,3 @@
     }
   }
 }
-
-    

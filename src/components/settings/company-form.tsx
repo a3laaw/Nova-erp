@@ -1,15 +1,6 @@
-
 'use client';
-
 import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -27,11 +18,9 @@ interface CompanyFormProps {
 const initialData: Partial<Company> = {
     name: '',
     nameEn: '',
-    address: '',
     phone: '',
     email: '',
     crNumber: '',
-    logoUrl: '',
     parentCompanyId: '',
 };
 
@@ -45,11 +34,9 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
         setFormData({
             name: company.name || '',
             nameEn: company.nameEn || '',
-            address: company.address || '',
             phone: company.phone || '',
             email: company.email || '',
             crNumber: company.crNumber || '',
-            logoUrl: company.logoUrl || '',
             parentCompanyId: company.parentCompanyId || '',
         });
     } else {
@@ -103,14 +90,6 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                     <Label htmlFor="crNumber">رقم السجل التجاري</Label>
                     <Input id="crNumber" value={formData.crNumber} onChange={handleChange} dir="ltr" />
                 </div>
-                 <div className="grid gap-2">
-                    <Label htmlFor="address">العنوان</Label>
-                    <Textarea id="address" value={formData.address} onChange={handleChange} rows={3} />
-                </div>
-                 <div className="grid gap-2">
-                    <Label htmlFor="logoUrl">رابط الشعار (Logo URL)</Label>
-                    <Input id="logoUrl" value={formData.logoUrl} onChange={handleChange} dir="ltr" placeholder="https://example.com/logo.png" />
-                </div>
             </div>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
@@ -121,5 +100,3 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
     </Dialog>
   );
 }
-
-    
