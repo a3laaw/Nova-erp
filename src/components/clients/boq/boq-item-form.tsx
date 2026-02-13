@@ -46,6 +46,8 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const isEditing = !!item;
+  
+  const [clientId, txId] = transactionId.split('/');
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<BoqFormValues>({
     resolver: zodResolver(boqItemSchema),
@@ -72,20 +74,19 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
   }, [isOpen, item, reset]);
 
   const onSubmit = async (data: BoqFormValues) => {
-    if (!firestore || !transactionId) return;
+    if (!firestore || !clientId || !txId) return;
     setIsSaving(true);
-    console.log("Submitting BOQ data:", data);
 
     try {
-      const collectionPath = `clients/${transactionId.split('/')[0]}/transactions/${transactionId}/boq`;
+      const collectionPath = `clients/${clientId}/transactions/${txId}/boq`;
       
       const dataToSave = {
         ...data,
         updatedAt: serverTimestamp(),
       };
 
-      if (isEditing) {
-        const itemRef = doc(firestore, collectionPath, item!.id!);
+      if (isEditing && item?.id) {
+        const itemRef = doc(firestore, collectionPath, item.id);
         await updateDoc(itemRef, cleanFirestoreData(dataToSave));
         toast({ title: "نجاح", description: "تم تحديث البند بنجاح." });
       } else {
@@ -95,7 +96,7 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
             executedQuantity: 0,
             createdAt: serverTimestamp(),
         };
-        await addDoc(collection(collectionPath), cleanFirestoreData(fullData));
+        await addDoc(collection(firestore, collectionPath), cleanFirestoreData(fullData));
         toast({ title: "نجاح", description: "تمت إضافة البند بنجاح." });
       }
       onClose();
@@ -110,7 +111,7 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{isEditing ? 'تعديل بند في جدول الكميات' : 'إضافة بند جديد'}</DialogTitle>
           </DialogHeader>
@@ -160,4 +161,3 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
   );
 }
 
-    

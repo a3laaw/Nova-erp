@@ -34,18 +34,18 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
   {
     accessorKey: 'plannedQuantity',
     header: 'الكمية المخططة',
-    cell: ({ row }) => row.original.plannedQuantity.toFixed(2),
+    cell: ({ row }) => (row.original.plannedQuantity || 0).toFixed(2),
   },
   {
     accessorKey: 'plannedUnitPrice',
     header: 'سعر الوحدة',
-    cell: ({ row }) => formatCurrency(row.original.plannedUnitPrice),
+    cell: ({ row }) => formatCurrency(row.original.plannedUnitPrice || 0),
   },
   {
     id: 'plannedTotal',
     header: 'الإجمالي المخطط',
     cell: ({ row }) => {
-      const total = row.original.plannedQuantity * row.original.plannedUnitPrice;
+      const total = (row.original.plannedQuantity || 0) * (row.original.plannedUnitPrice || 0);
       return <div className="font-semibold">{formatCurrency(total)}</div>;
     },
   },
@@ -59,8 +59,10 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
     id: 'completion',
     header: '% الإنجاز',
     cell: ({ row }) => {
-        const completion = row.original.plannedQuantity > 0 
-            ? (row.original.executedQuantity / row.original.plannedQuantity) * 100
+        const plannedQty = row.original.plannedQuantity || 0;
+        const executedQty = row.original.executedQuantity || 0;
+        const completion = plannedQty > 0 
+            ? (executedQty / plannedQty) * 100
             : 0;
         return `${completion.toFixed(1)}%`;
     }
@@ -89,4 +91,4 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
   },
 ];
 
-    
+

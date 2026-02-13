@@ -126,4 +126,4 @@ export function BoqDataTable<TData, TValue>({ columns, data, loading }: BoqDataT
   );
 }
 
-    
+

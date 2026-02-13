@@ -23,12 +23,15 @@ export function BoqView({ transactionId }: BoqViewProps) {
 
     const boqQuery = useMemo(() => {
         if (!firestore || !transactionId) return null;
-        const boqCollectionRef = collection(firestore, `clients/${transactionId.split('/')[0]}/transactions/${transactionId}/boq`);
+        // The path needs to be constructed carefully.
+        const pathSegments = transactionId.split('/');
+        const collectionPath = `clients/${clientId}/transactions/${transactionId}/boq`;
         return [orderBy('itemNumber')];
     }, [firestore, transactionId]);
     
-    // The path needs to be constructed carefully. This assumes `transactionId` is the full path segment.
-    const collectionPath = `clients/${transactionId.split('/')[0]}/transactions/${transactionId}/boq`;
+    const clientId = transactionId.split('/')[0];
+    const txId = transactionId;
+    const collectionPath = `clients/${clientId}/transactions/${txId}/boq`;
     
     const { data: boqItems, loading: boqLoading } = useSubscription<BoqItem>(
         firestore, 
@@ -64,7 +67,7 @@ export function BoqView({ transactionId }: BoqViewProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <BoqDataTable columns={columns} data={boqItems} loading={boqLoading} />
+                    <BoqDataTable columns={columns} data={boqItems || []} loading={boqLoading} />
                 </CardContent>
             </Card>
             {isFormOpen && (
@@ -79,4 +82,4 @@ export function BoqView({ transactionId }: BoqViewProps) {
     );
 }
 
-    
+
