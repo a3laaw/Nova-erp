@@ -176,6 +176,7 @@ const navItems = {
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة' },
+        { href: '/dashboard/settings', label: 'إدارة الشركات' },
         { href: '/dashboard/contracts', label: 'العقود والنماذج' },
         { href: '/dashboard/settings/classifications', label: 'التصنيفات' },
       ]
@@ -293,6 +294,7 @@ const navItems = {
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings', label: 'General Settings' },
+        { href: '/dashboard/settings', label: 'Company Management' },
         { href: '/dashboard/contracts', label: 'Contract Templates' },
         { href: '/dashboard/settings/classifications', label: 'Classifications' },
       ]
