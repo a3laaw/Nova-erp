@@ -87,8 +87,6 @@ const navItems = {
       children: [
         { href: '/dashboard/construction/projects', label: 'لوحة المشاريع' },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين' },
-        { href: '/dashboard/construction/inventory', label: 'إدارة المخزون' },
-        { href: '/dashboard/construction/reports', label: 'تقارير المقاولات' },
       ]
     },
     { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Building, roles: ['Admin', 'Accountant'] },
@@ -207,8 +205,6 @@ const navItems = {
       children: [
         { href: '/dashboard/construction/projects', label: 'Projects Dashboard' },
         { href: '/dashboard/construction/subcontractors', label: 'Subcontractors' },
-        { href: '/dashboard/construction/inventory', label: 'Inventory' },
-        { href: '/dashboard/construction/reports', label: 'Construction Reports' },
       ]
     },
     { href: '/dashboard/purchasing/vendors', label: 'Vendors', icon: Building, roles: ['Admin', 'Accountant'] },
@@ -474,5 +470,3 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     </>
   );
 }
-
-    
