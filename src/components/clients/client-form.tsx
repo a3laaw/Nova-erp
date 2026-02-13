@@ -108,7 +108,13 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
+        let sanitizedValue = value;
+        if (id === 'nameAr') {
+            sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, ''); 
+        } else if (id === 'nameEn') {
+            sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
+        }
+        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
 
     const handleSelectChange = (id: string, value: string) => {
