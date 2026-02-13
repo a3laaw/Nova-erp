@@ -73,6 +73,12 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
     );
 }
 
+const activityTypeTranslations: Record<string, string> = {
+    consulting: 'استشاري',
+    construction: 'مقاولات',
+    sales: 'مبيعات',
+};
+
 
 // Reusable component for the management UI
 function ManagerView<T extends {id: string, name: string, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
@@ -114,6 +120,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   
   const [itemName, setItemName] = useState('');
+  const [itemActivityType, setItemActivityType] = useState<'consulting' | 'construction' | 'sales'>('consulting');
   const [itemRoles, setItemRoles] = useState<string[]>([]);
   const [itemStageType, setItemStageType] = useState<'sequential' | 'parallel'>('sequential');
   const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
@@ -140,6 +147,19 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
       setPortalTarget(document.body);
     }
   }, []);
+
+  // Filter state for departments view
+  const [departmentActivityFilter, setDepartmentActivityFilter] = useState('all');
+
+  const filteredPrimaryItems = useMemo(() => {
+    let items = primaryItems;
+    if (primaryCollectionName === 'departments') {
+        if (departmentActivityFilter !== 'all') {
+            items = items.filter(item => (item as any).activityType === departmentActivityFilter);
+        }
+    }
+    return items;
+  }, [primaryItems, primaryCollectionName, departmentActivityFilter]);
 
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
@@ -270,20 +290,27 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
 
   const openDialog = (type: 'primary' | 'secondary', item: any | null = null) => {
     setEditingItem(item);
-    setItemName(item?.name || '');
-    if (isWorkStageView && type === 'secondary') {
-        setItemRoles(item?.allowedRoles || []);
-        setItemStageType(item?.stageType || 'sequential');
-        setItemTrackingType(item?.trackingType || 'duration');
-        setItemDuration(item?.expectedDurationDays ?? '');
-        setItemMaxOccurrences(item?.maxOccurrences ?? '');
-        setItemAllowManualCompletion(item?.allowManualCompletion || false);
-        setItemEnableModificationTracking(item?.enableModificationTracking || false);
-        setItemNextStageIds(item?.nextStageIds || []);
-        setItemAllowedDuringStages(item?.allowedDuringStages || []);
+    if (type === 'primary') {
+        setItemName(item?.name || '');
+        if (primaryCollectionName === 'departments') {
+            setItemActivityType((item as any)?.activityType || 'consulting');
+        }
+        setIsPrimaryDialogOpen(true);
+    } else { // Secondary
+        setItemName(item?.name || '');
+        if (isWorkStageView) {
+            setItemRoles(item?.allowedRoles || []);
+            setItemStageType(item?.stageType || 'sequential');
+            setItemTrackingType(item?.trackingType || 'duration');
+            setItemDuration(item?.expectedDurationDays ?? '');
+            setItemMaxOccurrences(item?.maxOccurrences ?? '');
+            setItemAllowManualCompletion(item?.allowManualCompletion || false);
+            setItemEnableModificationTracking(item?.enableModificationTracking || false);
+            setItemNextStageIds(item?.nextStageIds || []);
+            setItemAllowedDuringStages(item?.allowedDuringStages || []);
+        }
+        setIsSecondaryDialogOpen(true);
     }
-    if (type === 'primary') setIsPrimaryDialogOpen(true);
-    else setIsSecondaryDialogOpen(true);
   }
 
   const closeDialog = () => {
@@ -291,6 +318,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     setIsSecondaryDialogOpen(false);
     setEditingItem(null);
     setItemName('');
+    setItemActivityType('consulting');
     setItemRoles([]);
     setItemStageType('sequential');
     setItemTrackingType('duration');
@@ -309,6 +337,9 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     
     try {
       const dataToSave: any = { name: itemName };
+       if (type === 'primary' && primaryCollectionName === 'departments') {
+            dataToSave.activityType = itemActivityType;
+       }
        if (isWorkStageView && type === 'secondary') {
           dataToSave.stageType = itemStageType;
           dataToSave.allowedRoles = itemRoles;
@@ -555,9 +586,22 @@ const handleImportWorkStages = async () => {
                  <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
             </div>
           </div>
+          {primaryCollectionName === 'departments' && (
+              <div className="mb-4">
+                  <Select value={departmentActivityFilter} onValueChange={(v) => setDepartmentActivityFilter(v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">كل أنواع الأنشطة</SelectItem>
+                          <SelectItem value="consulting">استشاري</SelectItem>
+                          <SelectItem value="construction">مقاولات</SelectItem>
+                          <SelectItem value="sales">مبيعات</SelectItem>
+                      </SelectContent>
+                  </Select>
+              </div>
+          )}
           <ScrollArea className="h-72 border rounded-md">
-            {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-              primaryItems.map((item) => (
+            {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : filteredPrimaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+              filteredPrimaryItems.map((item) => (
                 <div key={item.id} onClick={() => handleSelectPrimary(item)}
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
                   <div className="flex items-center gap-2">
@@ -569,6 +613,9 @@ const handleImportWorkStages = async () => {
                       className="h-7 w-14"
                     />
                     <span>{item.name}</span>
+                     {(item as any).activityType && (
+                        <Badge variant="secondary">{activityTypeTranslations[(item as any).activityType] || (item as any).activityType}</Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }} disabled={disablePrimaryActions}><Pencil className="h-4 w-4" /></Button>
@@ -646,7 +693,7 @@ const handleImportWorkStages = async () => {
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
-            className="max-w-4xl"
+            className={cn("max-w-xl", isWorkStageView && !isPrimaryDialogOpen && "max-w-4xl")}
             onInteractOutside={(e) => {
               const target = e.target as HTMLElement;
               if (
@@ -667,6 +714,20 @@ const handleImportWorkStages = async () => {
                     <Label htmlFor="item-name">{`اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}`}</Label>
                     <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
                 </div>
+
+                {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
+                    <div className="px-4 grid gap-2">
+                        <Label>نوع النشاط</Label>
+                        <Select value={itemActivityType} onValueChange={(v) => setItemActivityType(v as any)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="consulting">استشاري</SelectItem>
+                                <SelectItem value="construction">مقاولات</SelectItem>
+                                <SelectItem value="sales">مبيعات</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
 
                 {isWorkStageView && !isPrimaryDialogOpen && (
                     <div className="grid md:grid-cols-2 gap-6 px-4">
@@ -818,7 +879,7 @@ const handleImportWorkStages = async () => {
 }
 
 // --- NEW TransactionTypeManager Component ---
-function TransactionTypeManager({ onBack, category, title }: { onBack: () => void, category: 'consulting' | 'construction', title: string }) {
+function TransactionTypeManager({ onBack, activityType, title }: { onBack: () => void, activityType: 'consulting' | 'construction', title: string }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
@@ -853,10 +914,10 @@ function TransactionTypeManager({ onBack, category, title }: { onBack: () => voi
       
       const typesData = allTypes
         .filter(t => {
-            if (category === 'consulting') {
-                return t.category === 'consulting' || !t.category;
+            if (activityType === 'consulting') {
+                return t.activityType === 'consulting' || t.category === 'consulting' || (!t.activityType && !t.category);
             }
-            return t.category === category;
+            return t.activityType === activityType;
         })
         .filter(t => t && t.name);
 
@@ -870,7 +931,7 @@ function TransactionTypeManager({ onBack, category, title }: { onBack: () => voi
     } finally {
       setLoading(false);
     }
-  }, [firestore, toast, category]);
+  }, [firestore, toast, activityType]);
   
   useEffect(() => {
     fetchData();
@@ -919,7 +980,7 @@ function TransactionTypeManager({ onBack, category, title }: { onBack: () => voi
   const handleSave = async () => {
     if (!firestore || !itemName.trim()) return;
     try {
-        const dataToSave = { name: itemName, departmentIds: selectedDepartments, category };
+        const dataToSave = { name: itemName, departmentIds: selectedDepartments, activityType };
         if (editingItem) {
             await updateDoc(doc(firestore, 'transactionTypes', editingItem.id!), dataToSave);
             toast({ title: 'نجاح', description: 'تم تحديث نوع المعاملة.' });
@@ -1095,8 +1156,8 @@ export function ReferenceDataManager() {
                     govs: govsSnap.size,
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
-                    consultingTransTypes: allTypes.filter(t => t.category === 'consulting' || !t.category).length,
-                    constructionTransTypes: allTypes.filter(t => t.category === 'construction').length,
+                    consultingTransTypes: allTypes.filter(t => t.activityType === 'consulting' || t.category === 'consulting' || (!t.activityType && !t.category)).length,
+                    constructionTransTypes: allTypes.filter(t => t.activityType === 'construction' || t.category === 'construction').length,
                     workStages: workStagesSnap.size,
                     subcontractorTypes: subTypesSnap.size,
                     subcontractorSpecializations: subSpecsSnap.size,
@@ -1141,11 +1202,11 @@ export function ReferenceDataManager() {
     }
     
     if (view === 'consultingTransTypes') {
-         return <TransactionTypeManager onBack={() => setView('dashboard')} category="consulting" title="أنواع معاملات التصميم" />
+         return <TransactionTypeManager onBack={() => setView('dashboard')} activityType="consulting" title="أنواع معاملات التصميم" />
     }
 
     if (view === 'constructionTransTypes') {
-         return <TransactionTypeManager onBack={() => setView('dashboard')} category="construction" title="أنواع معاملات المقاولات" />
+         return <TransactionTypeManager onBack={() => setView('dashboard')} activityType="construction" title="أنواع معاملات المقاولات" />
     }
 
     if (view === 'workStages') {
@@ -1187,7 +1248,7 @@ export function ReferenceDataManager() {
                 <StatCard 
                     title="الأقسام والوظائف" 
                     count={counts.depts + counts.jobs} 
-                    icon={<Workflow className="h-full w-full" />} 
+                    icon={<Building className="h-full w-full" />} 
                     onNavigate={() => setView('depts')} 
                     color="blue" 
                     loading={loadingCounts} 
@@ -1236,5 +1297,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
-    

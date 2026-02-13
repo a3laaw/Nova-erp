@@ -760,6 +760,11 @@
         "order": {
             "type": "number",
             "description": "The display order."
+        },
+        "activityType": {
+            "type": "string",
+            "description": "The business activity this department belongs to.",
+            "enum": ["consulting", "construction", "sales"]
         }
       },
       "required": ["name"]
@@ -821,10 +826,10 @@
           "type": "string",
           "description": "The name of the transaction type (e.g., 'Municipality Design')."
         },
-        "category": {
+        "activityType": {
             "type": "string",
-            "description": "The category of the transaction type.",
-            "enum": ["consulting", "construction"]
+            "description": "The business activity this transaction type belongs to.",
+            "enum": ["consulting", "construction", "sales"]
         },
         "departmentIds": {
             "type": "array",
@@ -836,7 +841,7 @@
           "description": "The display and logical order of the type."
         }
       },
-      "required": ["name", "category"]
+      "required": ["name", "activityType"]
     },
     "WorkStage": {
       "title": "Work Stage",
@@ -1773,4 +1778,3 @@
     }
   }
 }
-    
