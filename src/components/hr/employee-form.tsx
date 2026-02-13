@@ -184,10 +184,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        let sanitizedValue = value;
-        if (id === 'fullName') sanitizedValue = value.replace(/[^ \\u0600-\\u06FF]/g, '');
-        else if (id === 'nameEn') sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
-        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
+        setFormData(prev => ({ ...prev, [id]: value }));
     };
     
     const handleSelectChange = (id: keyof typeof formData, value: any) => {

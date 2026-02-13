@@ -108,10 +108,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        let sanitizedValue = value;
-        if (id === 'nameAr') sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, '');
-        else if (id === 'nameEn') sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
-        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
+        setFormData(prev => ({ ...prev, [id]: value }));
     };
 
     const handleSelectChange = (id: string, value: string) => {
@@ -187,7 +184,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div className="grid gap-2">
                             <Label htmlFor="governorate">المحافظة</Label>
-                            <InlineSearchList value={formData.governorateId} onSelect={handleGovernorateChange} options={governorateOptions} placeholder={refDataLoading ? "تحميل..." : "اختر محافظة..."} disabled={refDataLoading}/>
+                            <InlineSearchList value={formData.governorateId} onSelect={(v) => handleGovernorateChange(v)} options={governorateOptions} placeholder={refDataLoading ? "تحميل..." : "اختر محافظة..."} disabled={refDataLoading}/>
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="area">المنطقة</Label>
