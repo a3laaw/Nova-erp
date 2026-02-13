@@ -249,7 +249,8 @@ export type Employee = {
     noticeStartDate: any | null; 
     terminationDate: any | null;
     terminationReason: 'resignation' | 'termination' | 'probation' | null;
-    contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special';
+    contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special' | 'day_laborer' | 'subcontractor';
+    dailyRate?: number;
     contractPercentage?: number;
     pieceRateMode?: 'salary_with_target' | 'per_piece';
     targetDescription?: number;
@@ -959,4 +960,3 @@ export interface QualityTest {
 }
 
   
-

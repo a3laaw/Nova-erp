@@ -546,7 +546,14 @@
         "noticeStartDate": { "type": ["string", "null"], "format": "date-time", "description": "Date when resignation/termination notice was given." },
         "terminationDate": { "type": ["string", "null"], "format": "date-time" },
         "terminationReason": { "type": "string", "enum": ["resignation", "termination", "probation", null] },
-        "contractType": { "type": "string", "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special"] },
+        "contractType": {
+          "type": "string",
+          "enum": ["permanent", "temporary", "piece-rate", "percentage", "part-time", "special", "day_laborer", "subcontractor"]
+        },
+        "dailyRate": {
+            "type": "number",
+            "description": "The daily rate for a day laborer."
+        },
         "contractPercentage": { "type": "number", "description": "The percentage of contract value for commission-based employees." },
         "pieceRateMode": {
           "type": "string",
@@ -2025,5 +2032,3 @@
     }
   }
 }
-
-
