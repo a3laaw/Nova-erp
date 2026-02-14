@@ -21,6 +21,7 @@ interface MultiSelectProps {
 export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
   const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
   React.useEffect(() => {
+    // This needs to run on the client side to access document.body
     if (typeof window !== 'undefined') {
       setPortalTarget(document.body);
     }
