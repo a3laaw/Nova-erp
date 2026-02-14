@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -888,7 +887,7 @@ const handleImportWorkStages = async () => {
 }
 
 // --- NEW TransactionTypeManager Component ---
-function TransactionTypeManager({ onBack, activityType, title }: { onBack: () => void, activityType: 'consulting' | 'construction', title: string }) {
+function TransactionTypeManager({ onBack, activityType, title }: { onBack: () => void, activityType: 'consulting' | 'construction' | 'sales', title: string }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
@@ -907,13 +906,14 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
   const [isOrderChanged, setIsOrderChanged] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
-
   const [isImporting, setIsImporting] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
 
+  // New state for department selection dialog
+  const [isDeptSelectorOpen, setIsDeptSelectorOpen] = useState(false);
+
   const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
   const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
-
 
   const fetchData = useCallback(async () => {
     if (!firestore) return;
@@ -994,7 +994,6 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
     }
   };
 
-
   const handleSave = async () => {
     if (!firestore || !itemName.trim()) return;
     try {
@@ -1050,7 +1049,7 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
                 name: type.name,
                 order: type.order,
                 departmentIds: departmentIds,
-                activityType: activityType
+                category: activityType,
             };
             batch.set(newDocRef, dataToAdd);
         }
@@ -1066,7 +1065,6 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
         setIsImportConfirmOpen(false);
     }
   };
-
 
   return (
     <Card>
@@ -1148,6 +1146,12 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
        <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
         <DialogContent 
             dir="rtl"
+            onPointerDownOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[role="dialog"]')) {
+                  e.preventDefault();
+                }
+            }}
         >
             <DialogHeader>
                 <DialogTitle>{editingItem ? 'تعديل نوع معاملة' : 'إضافة نوع معاملة جديد'}</DialogTitle>
@@ -1157,9 +1161,28 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
                     <Label htmlFor="item-name">اسم نوع المعاملة</Label>
                     <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                     <Label>الأقسام المرتبطة</Label>
-                    <MultiSelect options={departmentOptions} selected={selectedDepartments} onChange={setSelectedDepartments} placeholder="اختر الأقسام..." />
+                    <div className="p-3 border rounded-md min-h-[40px] bg-muted/50">
+                        {selectedDepartments.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {selectedDepartments.map(deptId => {
+                            const dept = departments.find(d => d.id === deptId);
+                            return <Badge key={deptId} variant="secondary">{dept?.name || '...'}</Badge>
+                            })}
+                        </div>
+                        ) : (
+                        <p className="text-sm text-muted-foreground">لم يتم اختيار أي قسم</p>
+                        )}
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsDeptSelectorOpen(true)}
+                    >
+                        تعديل الأقسام المرتبطة
+                    </Button>
                 </div>
             </div>
             <DialogFooter>
@@ -1197,6 +1220,13 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+     <DepartmentSelectionDialog
+        isOpen={isDeptSelectorOpen}
+        onClose={() => setIsDeptSelectorOpen(false)}
+        allDepartments={departmentOptions}
+        selectedDepartments={selectedDepartments}
+        onSave={setSelectedDepartments}
+      />
     </Card>
   );
 }
@@ -1376,4 +1406,99 @@ export function ReferenceDataManager() {
             </CardContent>
         </Card>
     );
+}
+
+// --- NEW DepartmentSelectionDialog ---
+function DepartmentSelectionDialog({
+  isOpen,
+  onClose,
+  allDepartments,
+  selectedDepartments,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  allDepartments: MultiSelectOption[];
+  selectedDepartments: string[];
+  onSave: (newSelection: string[]) => void;
+}) {
+  const [currentSelection, setCurrentSelection] = useState<string[]>(selectedDepartments);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentSelection(selectedDepartments);
+      setSearchQuery('');
+    }
+  }, [isOpen, selectedDepartments]);
+
+  const handleCheckedChange = (checked: boolean, value: string) => {
+    setCurrentSelection(prev => {
+      if (checked) {
+        return [...prev, value];
+      } else {
+        return prev.filter(item => item !== value);
+      }
+    });
+  };
+
+  const handleConfirm = () => {
+    onSave(currentSelection);
+    onClose();
+  };
+
+  const filteredDepts = useMemo(() => {
+      if (!searchQuery) {
+          return allDepartments;
+      }
+      return allDepartments.filter(type =>
+          type.label.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  }, [allDepartments, searchQuery]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent dir="rtl" className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>اختر الأقسام المرتبطة</DialogTitle>
+          <DialogDescription>
+            حدد الأقسام التي تشارك في إنجاز هذا النوع من المعاملات.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground rtl:right-3 rtl:left-auto" />
+            <Input
+                placeholder="ابحث عن قسم..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 rtl:pr-10"
+            />
+        </div>
+        <ScrollArea className="h-72 border rounded-md p-4">
+          <div className="space-y-4">
+            {filteredDepts.length > 0 ? (
+                filteredDepts.map(dept => (
+                <div key={dept.value} className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <Checkbox
+                    id={`dept-${dept.value}`}
+                    checked={currentSelection.includes(dept.value)}
+                    onCheckedChange={(checked) => handleCheckedChange(!!checked, dept.value)}
+                    />
+                    <Label htmlFor={`dept-${dept.value}`} className="flex-1 cursor-pointer">
+                    {dept.label}
+                    </Label>
+                </div>
+                ))
+            ) : (
+                <p className="text-center text-sm text-muted-foreground py-4">لا توجد نتائج مطابقة.</p>
+            )}
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button type="button" onClick={handleConfirm}>حفظ الاختيارات</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
