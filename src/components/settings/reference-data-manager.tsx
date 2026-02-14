@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -27,7 +28,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -607,7 +608,7 @@ const handleImportWorkStages = async () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Input 
                       type="number"
-                      value={primaryOrderValues[item.id] ?? item.order ?? ''}
+                      value={primaryOrderValues[item.id!] ?? item.order ?? ''}
                       onChange={e => handleOrderChange('primary', item.id, e.target.value)}
                       onClick={e => e.stopPropagation()}
                       className="h-7 w-14"
@@ -662,7 +663,7 @@ const handleImportWorkStages = async () => {
                         <div className="flex items-center gap-2 flex-wrap">
                             <Input
                                 type="number"
-                                value={secondaryOrderValues[item.id] ?? item.order ?? ''}
+                                value={secondaryOrderValues[item.id!] ?? item.order ?? ''}
                                 onChange={e => handleOrderChange('secondary', item.id, e.target.value)}
                                 onClick={e => e.stopPropagation()}
                                 className="h-7 w-14"
@@ -905,6 +906,8 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
   
   const [orderValues, setOrderValues] = useState<Record<string, string>>({});
   const [isOrderChanged, setIsOrderChanged] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState('');
 
   const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
   const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
@@ -922,12 +925,7 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
       const allTypes = typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
       
       const typesData = allTypes
-        .filter(t => {
-            if (activityType === 'consulting') {
-                return t.activityType === 'consulting' || t.category === 'consulting' || (!t.activityType && !t.category);
-            }
-            return t.activityType === activityType;
-        })
+        .filter(t => t.activityType === activityType)
         .filter(t => t && t.name);
 
       typesData.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
@@ -945,6 +943,15 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const filteredTransactionTypes = useMemo(() => {
+    if (!searchQuery) {
+        return transactionTypes;
+    }
+    return transactionTypes.filter(type => 
+        type.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [transactionTypes, searchQuery]);
 
   const openDialog = (item: TransactionType | null = null) => {
     setEditingItem(item);
@@ -1028,7 +1035,16 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
         <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between items-center mb-4">
+           <div className="relative w-full max-w-sm">
+                <Search className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="ابحث بالاسم..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 rtl:pr-10"
+                />
+            </div>
             <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
         </div>
         <div className="border rounded-lg">
@@ -1043,8 +1059,8 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
             </TableHeader>
             <TableBody>
               {loading && Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell></TableRow>)}
-              {!loading && transactionTypes.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">لا توجد بيانات</TableCell></TableRow>}
-              {!loading && transactionTypes.map((item) => (
+              {!loading && filteredTransactionTypes.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">لا توجد بيانات</TableCell></TableRow>}
+              {!loading && filteredTransactionTypes.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
                     <Input 
@@ -1155,8 +1171,8 @@ export function ReferenceDataManager() {
                     govs: govsSnap.size,
                     jobs: jobsSnap.size,
                     areas: areasSnap.size,
-                    consultingTransTypes: allTypes.filter(t => t.activityType === 'consulting' || t.category === 'consulting' || (!t.activityType && !t.category)).length,
-                    constructionTransTypes: allTypes.filter(t => t.activityType === 'construction' || t.category === 'construction').length,
+                    consultingTransTypes: allTypes.filter(t => t.activityType === 'consulting').length,
+                    constructionTransTypes: allTypes.filter(t => t.activityType === 'construction').length,
                     workStages: workStagesSnap.size,
                     subcontractorTypes: subTypesSnap.size,
                     subcontractorSpecializations: subSpecsSnap.size,
