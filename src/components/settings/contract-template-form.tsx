@@ -3,8 +3,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup } from 'firebase/firestore';
-import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType } from '@/lib/types';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup, orderBy } from 'firebase/firestore';
+import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, WorkStage } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2, ArrowUp, ArrowDown, Save, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
+import { Checkbox } from '../ui/checkbox';
+import { Badge } from '../ui/badge';
+
 
 interface ContractTemplateFormProps {
   isOpen: boolean;
@@ -28,6 +31,77 @@ interface ContractTemplateFormProps {
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+
+// --- NEW Sub-component for Transaction Type Selection ---
+function TransactionTypeSelectionDialog({
+  isOpen,
+  onClose,
+  allTypes,
+  selectedTypes,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  allTypes: MultiSelectOption[];
+  selectedTypes: string[];
+  onSave: (newSelection: string[]) => void;
+}) {
+  const [currentSelection, setCurrentSelection] = useState<string[]>(selectedTypes);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentSelection(selectedTypes);
+    }
+  }, [isOpen, selectedTypes]);
+
+  const handleCheckedChange = (checked: boolean, value: string) => {
+    setCurrentSelection(prev => {
+      if (checked) {
+        return [...prev, value];
+      } else {
+        return prev.filter(item => item !== value);
+      }
+    });
+  };
+
+  const handleConfirm = () => {
+    onSave(currentSelection);
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent dir="rtl" className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>اختر أنواع المعاملات</DialogTitle>
+          <DialogDescription>
+            حدد أنواع المعاملات التي يمكن استخدام هذا النموذج معها.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-72 border rounded-md p-4">
+          <div className="space-y-4">
+            {allTypes.map(type => (
+              <div key={type.value} className="flex items-center space-x-2 rtl:space-x-reverse">
+                <Checkbox
+                  id={`type-${type.value}`}
+                  checked={currentSelection.includes(type.value)}
+                  onCheckedChange={(checked) => handleCheckedChange(!!checked, type.value)}
+                />
+                <Label htmlFor={`type-${type.value}`} className="flex-1 cursor-pointer">
+                  {type.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button type="button" onClick={handleConfirm}>حفظ الاختيارات</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 
 export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template, initialType }: ContractTemplateFormProps) {
@@ -54,6 +128,8 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
+  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
+  
   useEffect(() => {
     const fetchRefData = async () => {
       if (!firestore) return;
@@ -64,7 +140,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         transTypesSnapshot.forEach(typeDoc => {
           types.push({ value: typeDoc.data().name, label: typeDoc.data().name });
         });
-        setAllTransactionTypes(types);
+        setAllTransactionTypes(types.sort((a,b) => a.label.localeCompare(b.label, 'ar')));
         
         const stages: MultiSelectOption[] = [];
         const stagesSnapshot = await getDocs(query(collectionGroup(firestore, 'workStages')));
@@ -209,6 +285,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           dir="rtl"
@@ -244,7 +321,26 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
                         <div className="grid gap-2">
                             <Label>ربط بأنواع المعاملات</Label>
-                            <MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع المعاملات..." disabled={loadingRefData} />
+                            <div className="p-3 border rounded-md min-h-[40px] bg-muted/50">
+                                {selectedTransactionTypes.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedTransactionTypes.map(type => (
+                                    <Badge key={type} variant="secondary">{type}</Badge>
+                                    ))}
+                                </div>
+                                ) : (
+                                <p className="text-sm text-muted-foreground">لم يتم اختيار أي نوع</p>
+                                )}
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsTypeSelectorOpen(true)}
+                                disabled={loadingRefData}
+                            >
+                                تعديل أنواع المعاملات
+                            </Button>
                         </div>
                     </section>
 
@@ -293,7 +389,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
                     <section className="space-y-4 p-4 border rounded-lg">
                         <h3 className="font-semibold">البنود المالية</h3>
-                        <div className="grid md:grid-cols-2 gap-4">
+                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>نوع العقد المالي</Label>
                                 <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
@@ -324,9 +420,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="_NONE_">بدون شرط</SelectItem>
-                                            {allWorkStages.map(stage => (
-                                                <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>
-                                            ))}
+                                            {allWorkStages.map(stage => <SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                     <div className="col-span-3 flex items-center gap-1">
@@ -372,13 +466,21 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                 </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t">
-                <Button variant="outline" type="button" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                <Button type="button" onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                    {template ? 'حفظ التعديلات' : 'إنشاء النموذج'}
-                </Button>
+              <Button variant="outline" type="button" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+              <Button type="button" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                {template ? 'حفظ التعديلات' : 'إنشاء النموذج'}
+              </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
+    <TransactionTypeSelectionDialog
+        isOpen={isTypeSelectorOpen}
+        onClose={() => setIsTypeSelectorOpen(false)}
+        allTypes={allTransactionTypes}
+        selectedTypes={selectedTransactionTypes}
+        onSave={setSelectedTransactionTypes}
+      />
+    </>
   )
 }
