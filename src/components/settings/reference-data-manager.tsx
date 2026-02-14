@@ -698,16 +698,6 @@ const handleImportWorkStages = async () => {
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
             className={cn("max-w-xl", isWorkStageView && !isPrimaryDialogOpen && "max-w-4xl")}
-            onInteractOutside={(e) => {
-              const target = e.target as HTMLElement;
-              if (
-                target.closest('[cmdk-root]') ||
-                target.closest('[role="listbox"]') ||
-                target.closest('[data-radix-popper-content-wrapper]')
-              ) {
-                e.preventDefault();
-              }
-            }}
         >
           <DialogHeader>
             <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
@@ -722,17 +712,29 @@ const handleImportWorkStages = async () => {
                 {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
                     <div className="px-4 grid gap-2">
                         <Label>أنواع الأنشطة</Label>
-                         <MultiSelect
-                            options={[
-                                { value: 'consulting', label: 'استشاري' },
-                                { value: 'construction', label: 'مقاولات' },
-                                { value: 'sales', label: 'مبيعات' },
-                            ]}
-                            selected={itemActivityTypes}
-                            onChange={setItemActivityTypes}
-                            placeholder="اختر نوع نشاط واحد أو أكثر..."
-                            menuPortalTarget={portalTarget}
-                        />
+                        <div className="flex flex-wrap gap-4 pt-2">
+                            {(['consulting', 'construction', 'sales'] as const).map(type => {
+                                const handleCheckedChange = (checked: boolean) => {
+                                    setItemActivityTypes(prev => {
+                                        if (checked) {
+                                            return [...prev, type];
+                                        } else {
+                                            return prev.filter(t => t !== type);
+                                        }
+                                    });
+                                };
+                                return (
+                                    <div key={type} className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={`activity-${type}`}
+                                            checked={itemActivityTypes.includes(type)}
+                                            onCheckedChange={handleCheckedChange}
+                                        />
+                                        <Label htmlFor={`activity-${type}`}>{activityTypeTranslations[type] || type}</Label>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 
@@ -1081,16 +1083,6 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
        <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
         <DialogContent 
             dir="rtl"
-             onInteractOutside={(e) => {
-              const target = e.target as HTMLElement;
-              if (
-                target.closest('[cmdk-root]') ||
-                target.closest('[role="listbox"]') ||
-                target.closest('[data-radix-popper-content-wrapper]')
-              ) {
-                e.preventDefault();
-              }
-            }}
         >
             <DialogHeader>
                 <DialogTitle>{editingItem ? 'تعديل نوع معاملة' : 'إضافة نوع معاملة جديد'}</DialogTitle>
