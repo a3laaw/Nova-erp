@@ -53,8 +53,8 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       zIndex: 100,
     }),
     menuPortal: (base) => ({
-        ...base,
-        zIndex: 9999,
+      ...base,
+      zIndex: 9999,
     }),
     option: (base, state) => ({
       ...base,

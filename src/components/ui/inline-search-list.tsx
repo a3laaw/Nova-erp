@@ -107,7 +107,7 @@ export function InlineSearchList({
         autoComplete="off"
       />
       {showOptions && !disabled && (
-        <div data-inline-search-list-options className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
+        <div data-inline-search-list-options className="absolute z-[100] mt-1 w-full rounded-md border bg-card shadow-lg">
           <ul className="max-h-60 overflow-y-auto p-1">
             {displayOptions.length > 0 ? (
               <>
