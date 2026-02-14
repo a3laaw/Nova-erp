@@ -47,6 +47,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { defaultDepartments, defaultJobs, defaultGovernorates, defaultAreas, defaultTransactionTypes, defaultWorkStages } from '@/lib/default-reference-data';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 // --- Reusable Components ---
 
@@ -1049,7 +1050,7 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
                 name: type.name,
                 order: type.order,
                 departmentIds: departmentIds,
-                category: activityType,
+                activityType: activityType as any,
             };
             batch.set(newDocRef, dataToAdd);
         }
@@ -1232,182 +1233,6 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
 }
 
 
-// --- Main Component (Router) ---
-export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'consultingTransTypes' | 'constructionTransTypes' | 'workStages' | 'subcontractorTypes'>('dashboard');
-
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, consultingTransTypes: 0, constructionTransTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0 });
-    const [loadingCounts, setLoadingCounts] = useState(true);
-    const { firestore } = useFirebase();
-    const { toast } = useToast();
-
-    // Fetch counts for the dashboard
-    useEffect(() => {
-        if (!firestore) return;
-
-        const fetchCounts = async () => {
-            setLoadingCounts(true);
-            try {
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'departments'))),
-                    getDocs(query(collection(firestore, 'governorates'))),
-                    getDocs(query(collectionGroup(firestore, 'jobs'))),
-                    getDocs(query(collectionGroup(firestore, 'areas'))),
-                    getDocs(query(collection(firestore, 'transactionTypes'))),
-                    getDocs(query(collectionGroup(firestore, 'workStages'))),
-                    getDocs(query(collection(firestore, 'subcontractorTypes'))),
-                    getDocs(query(collectionGroup(firestore, 'specializations'))),
-                ]);
-
-                const allTypes = transTypesSnap.docs.map(d => d.data());
-
-                setCounts({
-                    depts: deptsSnap.size,
-                    govs: govsSnap.size,
-                    jobs: jobsSnap.size,
-                    areas: areasSnap.size,
-                    consultingTransTypes: allTypes.filter(t => t.activityType === 'consulting').length,
-                    constructionTransTypes: allTypes.filter(t => t.activityType === 'construction').length,
-                    workStages: workStagesSnap.size,
-                    subcontractorTypes: subTypesSnap.size,
-                    subcontractorSpecializations: subSpecsSnap.size,
-                });
-
-            } catch (error) {
-                console.error("Failed to fetch counts for reference data dashboard", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل إحصائيات البيانات المرجعية.' });
-            } finally {
-                setLoadingCounts(false);
-            }
-        };
-
-        fetchCounts();
-    }, [firestore, toast]);
-    
-
-    if (view === 'depts') {
-        return <ManagerView
-            primaryTitle="الأقسام"
-            primarySingularTitle="قسم"
-            primaryCollectionName="departments"
-            secondaryTitle="الوظائف"
-            secondarySingularTitle="وظيفة"
-            secondaryCollectionName="jobs"
-            icon={<Building className="h-full w-full" />}
-            onBack={() => setView('dashboard')}
-        />
-    }
-
-    if (view === 'locations') {
-         return <ManagerView 
-            primaryTitle="المحافظات"
-            primarySingularTitle="محافظة"
-            primaryCollectionName="governorates"
-            secondaryTitle="المناطق"
-            secondarySingularTitle="منطقة"
-            secondaryCollectionName="areas"
-            icon={<Globe className="h-full w-full" />}
-            onBack={() => setView('dashboard')}
-        />
-    }
-    
-    if (view === 'consultingTransTypes') {
-         return <TransactionTypeManager onBack={() => setView('dashboard')} activityType="consulting" title="أنواع معاملات التصميم" />
-    }
-
-    if (view === 'constructionTransTypes') {
-         return <TransactionTypeManager onBack={() => setView('dashboard')} activityType="construction" title="أنواع معاملات المقاولات" />
-    }
-
-    if (view === 'workStages') {
-        return <ManagerView
-            primaryTitle="أقسام العمل"
-            primarySingularTitle="قسم"
-            primaryCollectionName="departments"
-            secondaryTitle="مراحل العمل"
-            secondarySingularTitle="مرحلة عمل"
-            secondaryCollectionName="workStages"
-            icon={<Workflow className="h-full w-full" />}
-            disablePrimaryActions={true}
-            onBack={() => setView('dashboard')}
-        />
-    }
-    
-    if (view === 'subcontractorTypes') {
-        return <ManagerView
-            primaryTitle="أنواع المقاولين"
-            primarySingularTitle="نوع المقاول"
-            primaryCollectionName="subcontractorTypes"
-            secondaryTitle="التخصصات الدقيقة"
-            secondarySingularTitle="تخصص دقيق"
-            secondaryCollectionName="specializations"
-            icon={<Users className="h-full w-full" />}
-            onBack={() => setView('dashboard')}
-        />
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-            <CardTitle>إدارة البيانات المرجعية</CardTitle>
-            <CardDescription>
-                تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام.
-            </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <StatCard 
-                    title="الأقسام والوظائف" 
-                    count={counts.depts + counts.jobs} 
-                    icon={<Building className="h-full w-full" />} 
-                    onNavigate={() => setView('depts')} 
-                    color="blue" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="المحافظات والمناطق" 
-                    count={counts.govs + counts.areas} 
-                    icon={<Globe className="h-full w-full" />} 
-                    onNavigate={() => setView('locations')} 
-                    color="cyan" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="أنواع معاملات التصميم" 
-                    count={counts.consultingTransTypes} 
-                    icon={<FileText className="h-full w-full" />} 
-                    onNavigate={() => setView('consultingTransTypes')} 
-                    color="red" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="أنواع معاملات المقاولات" 
-                    count={counts.constructionTransTypes} 
-                    icon={<Construction className="h-full w-full" />} 
-                    onNavigate={() => setView('constructionTransTypes')} 
-                    color="orange" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="مراحل العمل" 
-                    count={counts.workStages} 
-                    icon={<Workflow className="h-full w-full" />} 
-                    onNavigate={() => setView('workStages')} 
-                    color="purple" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="تخصصات المقاولين" 
-                    count={counts.subcontractorTypes + counts.subcontractorSpecializations} 
-                    icon={<Users className="h-full w-full" />} 
-                    onNavigate={() => setView('subcontractorTypes')} 
-                    color="purple" 
-                    loading={loadingCounts} 
-                />
-            </CardContent>
-        </Card>
-    );
-}
-
 // --- NEW DepartmentSelectionDialog ---
 function DepartmentSelectionDialog({
   isOpen,
@@ -1502,3 +1327,203 @@ function DepartmentSelectionDialog({
     </Dialog>
   );
 }
+
+
+// --- Main Component (Router) ---
+export function ReferenceDataManager() {
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'consultingTransTypes' | 'constructionTransTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes'>('dashboard');
+
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, consultingTransTypes: 0, constructionTransTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0 });
+    const [loadingCounts, setLoadingCounts] = useState(true);
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+
+    // Fetch counts for the dashboard
+    useEffect(() => {
+        if (!firestore) return;
+
+        const fetchCounts = async () => {
+            setLoadingCounts(true);
+            try {
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'departments'))),
+                    getDocs(query(collection(firestore, 'governorates'))),
+                    getDocs(query(collectionGroup(firestore, 'jobs'))),
+                    getDocs(query(collectionGroup(firestore, 'areas'))),
+                    getDocs(query(collection(firestore, 'transactionTypes'))),
+                    getDocs(query(collectionGroup(firestore, 'workStages'))),
+                    getDocs(query(collection(firestore, 'subcontractorTypes'))),
+                    getDocs(query(collectionGroup(firestore, 'specializations'))),
+                    getDocs(query(collection(firestore, 'companyActivityTypes'))),
+                ]);
+
+                const allTypes = transTypesSnap.docs.map(d => d.data());
+
+                setCounts({
+                    depts: deptsSnap.size,
+                    govs: govsSnap.size,
+                    jobs: jobsSnap.size,
+                    areas: areasSnap.size,
+                    consultingTransTypes: allTypes.filter(t => t.activityType === 'consulting').length,
+                    constructionTransTypes: allTypes.filter(t => t.activityType === 'construction').length,
+                    workStages: workStagesSnap.size,
+                    subcontractorTypes: subTypesSnap.size,
+                    subcontractorSpecializations: subSpecsSnap.size,
+                    companyActivityTypes: companyActivityTypesSnap.size,
+                });
+
+            } catch (error) {
+                console.error("Failed to fetch counts for reference data dashboard", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل إحصائيات البيانات المرجعية.' });
+            } finally {
+                setLoadingCounts(false);
+            }
+        };
+
+        fetchCounts();
+    }, [firestore, toast]);
+    
+
+    if (view === 'depts') {
+        return <ManagerView
+            primaryTitle="الأقسام"
+            primarySingularTitle="قسم"
+            primaryCollectionName="departments"
+            secondaryTitle="الوظائف"
+            secondarySingularTitle="وظيفة"
+            secondaryCollectionName="jobs"
+            icon={<Building className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
+
+    if (view === 'locations') {
+         return <ManagerView 
+            primaryTitle="المحافظات"
+            primarySingularTitle="محافظة"
+            primaryCollectionName="governorates"
+            secondaryTitle="المناطق"
+            secondarySingularTitle="منطقة"
+            secondaryCollectionName="areas"
+            icon={<Globe className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
+    
+    if (view === 'consultingTransTypes') {
+         return <TransactionTypeManager onBack={() => setView('dashboard')} activityType="consulting" title="أنواع معاملات التصميم" />
+    }
+
+    if (view === 'constructionTransTypes') {
+         return <TransactionTypeManager onBack={() => setView('dashboard')} activityType="construction" title="أنواع معاملات المقاولات" />
+    }
+
+    if (view === 'workStages') {
+        return <ManagerView
+            primaryTitle="أقسام العمل"
+            primarySingularTitle="قسم"
+            primaryCollectionName="departments"
+            secondaryTitle="مراحل العمل"
+            secondarySingularTitle="مرحلة عمل"
+            secondaryCollectionName="workStages"
+            icon={<Workflow className="h-full w-full" />}
+            disablePrimaryActions={true}
+            onBack={() => setView('dashboard')}
+        />
+    }
+    
+    if (view === 'subcontractorTypes') {
+        return <ManagerView
+            primaryTitle="أنواع المقاولين"
+            primarySingularTitle="نوع المقاول"
+            primaryCollectionName="subcontractorTypes"
+            secondaryTitle="التخصصات الدقيقة"
+            secondarySingularTitle="تخصص دقيق"
+            secondaryCollectionName="specializations"
+            icon={<Users className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
+    
+    if (view === 'companyActivityTypes') {
+        return <ManagerView
+            primaryTitle="أنواع أنشطة الشركات"
+            primarySingularTitle="نوع نشاط"
+            primaryCollectionName="companyActivityTypes"
+            icon={<Building className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
+
+
+    return (
+        <Card>
+            <CardHeader>
+            <CardTitle>إدارة البيانات المرجعية</CardTitle>
+            <CardDescription>
+                تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام.
+            </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    title="الأقسام والوظائف" 
+                    count={counts.depts + counts.jobs} 
+                    icon={<Building className="h-full w-full" />} 
+                    onNavigate={() => setView('depts')} 
+                    color="blue" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="المحافظات والمناطق" 
+                    count={counts.govs + counts.areas} 
+                    icon={<Globe className="h-full w-full" />} 
+                    onNavigate={() => setView('locations')} 
+                    color="cyan" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="أنواع معاملات التصميم" 
+                    count={counts.consultingTransTypes} 
+                    icon={<FileText className="h-full w-full" />} 
+                    onNavigate={() => setView('consultingTransTypes')} 
+                    color="red" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="أنواع معاملات المقاولات" 
+                    count={counts.constructionTransTypes} 
+                    icon={<Construction className="h-full w-full" />} 
+                    onNavigate={() => setView('constructionTransTypes')} 
+                    color="orange" 
+                    loading={loadingCounts} 
+                />
+                 <StatCard 
+                    title="مراحل العمل" 
+                    count={counts.workStages} 
+                    icon={<Workflow className="h-full w-full" />} 
+                    onNavigate={() => setView('workStages')} 
+                    color="purple" 
+                    loading={loadingCounts} 
+                />
+                <StatCard 
+                    title="تخصصات المقاولين" 
+                    count={counts.subcontractorTypes + counts.subcontractorSpecializations} 
+                    icon={<Users className="h-full w-full" />} 
+                    onNavigate={() => setView('subcontractorTypes')} 
+                    color="purple" 
+                    loading={loadingCounts} 
+                />
+                 <StatCard 
+                    title="أنواع أنشطة الشركات" 
+                    count={counts.companyActivityTypes} 
+                    icon={<Building className="h-full w-full" />} 
+                    onNavigate={() => setView('companyActivityTypes')} 
+                    color="orange" 
+                    loading={loadingCounts} 
+                />
+            </CardContent>
+        </Card>
+    );
+}
+
+  

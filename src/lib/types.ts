@@ -4,11 +4,19 @@ export interface Company {
     id?: string;
     name: string;
     nameEn?: string;
+    address?: string;
     phone?: string;
     email?: string;
     crNumber?: string;
+    logoUrl?: string;
     parentCompanyId?: string;
-    activityType?: 'مكتب هندسي' | 'مقاولات' | 'مبيعات';
+    activityType?: string;
+}
+
+export interface CompanyActivityType {
+    id: string;
+    name: string;
+    order?: number;
 }
 
 export type MultilingualString = {
@@ -420,16 +428,6 @@ export type TransactionStage = {
     completedCount?: number | null;
 };
 
-export type WorkStageProgress = {
-    id?: string;
-    transactionId: string;
-    visitId: string;
-    stageId: string;
-    stageName: string;
-    selectedBy: string;
-    selectedAt: any;
-};
-
 export type ClientTransaction = {
     id?: string;
     transactionNumber?: string;
@@ -751,4 +749,5 @@ export type BoqItem = {
     updatedAt?: any;
 };
     
+  
   

@@ -142,15 +142,25 @@
         "properties": {
             "name": { "type": "string" },
             "nameEn": { "type": "string" },
+            "address": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
             "crNumber": { "type": "string", "description": "Commercial Registration Number" },
+            "logoUrl": { "type": "string", "format": "uri" },
             "parentCompanyId": { "type": "string", "description": "The ID of the parent company, if this is a subsidiary." },
-            "activityType": {
-                "type": "string",
-                "description": "The business activity type of the company.",
-                "enum": ["مكتب هندسي", "مقاولات", "مبيعات"]
-            }
+            "activityType": { "type": "string", "description": "The business activity type of the company." }
         },
-        "required": ["name", "activityType"]
+        "required": ["name"]
+    },
+     "CompanyActivityType": {
+        "title": "Company Activity Type",
+        "description": "Defines a type of business activity a company can have.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "order": { "type": "number" }
+        },
+        "required": ["name"]
     },
     "UserProfile": {
       "title": "User Profile",
@@ -1579,6 +1589,10 @@
         "schema": { "$ref": "#/entities/Company" },
         "description": "Stores company profiles for multi-company support."
     },
+    "/companyActivityTypes/{typeId}": {
+        "schema": { "$ref": "#/entities/CompanyActivityType" },
+        "description": "Stores the different types of company business activities."
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "#/entities/UserProfile"
@@ -1781,3 +1795,4 @@
     }
   }
 }
+  

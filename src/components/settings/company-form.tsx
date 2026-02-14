@@ -1,13 +1,16 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import type { Company } from '@/lib/types';
+import type { Company, CompanyActivityType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { InlineSearchList } from '../ui/inline-search-list';
 
 interface CompanyFormProps {
   isOpen: boolean;
@@ -23,13 +26,17 @@ const initialData: Partial<Company> = {
     email: '',
     crNumber: '',
     parentCompanyId: '',
-    activityType: 'مكتب هندسي',
+    activityType: '',
+    address: '',
 };
 
 export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormProps) {
+  const { firestore } = useFirebase();
   const { toast } = useToast();
   const isEditing = !!company;
   const [formData, setFormData] = useState(initialData);
+
+  const { data: activityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes', useMemo(() => [orderBy('name')], []));
 
   useEffect(() => {
     if (isEditing && company) {
@@ -40,7 +47,8 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
             email: company.email || '',
             crNumber: company.crNumber || '',
             parentCompanyId: company.parentCompanyId || '',
-            activityType: company.activityType || 'مكتب هندسي',
+            activityType: company.activityType || '',
+            address: company.address || '',
         });
     } else {
         setFormData(initialData);
@@ -64,6 +72,11 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
     }
     onSave(formData);
   };
+  
+  const activityTypeOptions = useMemo(() => {
+    if (!activityTypes) return [];
+    return activityTypes.map(t => ({ value: t.name, label: t.name }));
+  }, [activityTypes]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -83,14 +96,13 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="activityType">نوع النشاط</Label>
-                    <Select value={formData.activityType} onValueChange={(v) => handleSelectChange('activityType', v!)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="مكتب هندسي">مكتب هندسي</SelectItem>
-                            <SelectItem value="مقاولات">مقاولات</SelectItem>
-                            <SelectItem value="مبيعات">مبيعات</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <InlineSearchList 
+                        value={formData.activityType}
+                        onSelect={(v) => handleSelectChange('activityType', v!)}
+                        options={activityTypeOptions}
+                        placeholder={activityTypesLoading ? "تحميل..." : "اختر نوع النشاط..."}
+                        disabled={activityTypesLoading}
+                    />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="parentCompanyId">ID الشركة الأم (اختياري)</Label>
@@ -103,6 +115,10 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                  <div className="grid gap-2">
                     <Label htmlFor="email">البريد الإلكتروني</Label>
                     <Input id="email" type="email" value={formData.email} onChange={handleChange} dir="ltr" />
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="address">العنوان</Label>
+                    <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
                 </div>
                  <div className="grid gap-2">
                     <Label htmlFor="crNumber">رقم السجل التجاري</Label>
@@ -118,3 +134,4 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
     </Dialog>
   );
 }
+  
