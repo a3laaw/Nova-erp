@@ -52,7 +52,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
         ...base,
         color: 'hsl(var(--foreground))',
     }),
-    menuPortal: (base) => ({ ...base, zIndex: 10001 }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
     menu: (base) => ({
       ...base,
       backgroundColor: 'hsl(var(--card))',

@@ -66,7 +66,6 @@ export function InlineSearchList({
       </PopoverTrigger>
       <PopoverContent
         className="w-[--radix-popover-trigger-width] p-0"
-        data-inline-search-list-options
       >
         <Command
           filter={(value, search) => {
