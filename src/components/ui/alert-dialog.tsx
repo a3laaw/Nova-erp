@@ -42,7 +42,7 @@ const AlertDialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[data-radix-popper-content-wrapper]')) {
+        if (target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]') || target.closest('.react-select__menu-portal')) {
           e.preventDefault();
         }
       }}
