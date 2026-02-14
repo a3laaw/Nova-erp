@@ -106,7 +106,7 @@ export function useSubscription<T extends { id?: string }>(
         );
         
         return () => { isMounted = false; unsubscribe(); };
-    }, [firestore, cacheKey, collectionPath, signalUpdate, JSON.stringify(constraints)]);
+    }, [firestore, cacheKey, collectionPath, signalUpdate, constraints]);
 
     return { data, setData, loading, error };
 }
