@@ -1,8 +1,23 @@
 'use client';
 
 import * as React from 'react';
-import { Input } from './input';
+import { Check, ChevronsUpDown } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 export interface SearchOption {
   value: string;
@@ -27,117 +42,77 @@ export function InlineSearchList({
   disabled,
   className,
 }: InlineSearchListProps) {
-  const [search, setSearch] = React.useState('');
-  const [showOptions, setShowOptions] = React.useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [open, setOpen] = React.useState(false);
 
-  // Sync the input text when the external `value` prop changes.
-  // This happens when the form is first loaded or reset.
-  React.useEffect(() => {
-    const selectedLabel = options.find(opt => opt.value === value)?.label || '';
-    setSearch(selectedLabel);
-  }, [value, options]);
-
-  // Handle user typing
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSearch = e.target.value;
-    setSearch(newSearch);
-    // If user clears the input, we should also clear the underlying value
-    if (newSearch === '') {
-      onSelect('');
-    }
-    setShowOptions(true);
-  };
-
-  // Handle selecting an option from the list
-  const handleSelectOption = (option: SearchOption) => {
-    setSearch(option.label);
-    onSelect(option.value);
-    setShowOptions(false);
-  };
-  
-  // Handle clicking outside the component
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowOptions(false);
-        // Find if the current text in the search input matches any option label
-        const match = options.find(opt => opt.label.toLowerCase() === search.toLowerCase());
-
-        if (match) {
-          // The user typed a full, valid option. Let's select it for them.
-          if (match.value !== value) {
-            onSelect(match.value);
-          }
-          // And make sure the input casing is correct
-          setSearch(match.label);
-        } else {
-          // The user typed something invalid or partial. Revert to the last valid selection's label.
-          const selectedLabel = options.find(opt => opt.value === value)?.label || '';
-          setSearch(selectedLabel);
-        }
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [value, options, search, onSelect]);
-
-
-  const filteredOptions = React.useMemo(() => {
-    if (!search) {
-      return options; // Show all options if search is empty
-    }
-    return options.filter(opt =>
-      opt.label.toLowerCase().includes(search.toLowerCase()) ||
-      (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
-    );
-  }, [options, search]);
-
-  const MAX_DISPLAY_ITEMS = 50;
-  const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
+  const selectedLabel = options.find((option) => option.value === value)?.label;
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
-      <Input
-        value={search}
-        placeholder={placeholder}
-        onFocus={() => !disabled && setShowOptions(true)}
-        onChange={handleInputChange}
-        disabled={disabled}
-        autoComplete="off"
-      />
-      {showOptions && !disabled && (
-        <div data-inline-search-list-options className="absolute z-[100] mt-1 w-full rounded-md border bg-card shadow-lg">
-          <ul className="max-h-60 overflow-y-auto p-1">
-            {displayOptions.length > 0 ? (
-              <>
-                {displayOptions.map(opt => (
-                  <li
-                    key={opt.value}
-                    className="cursor-pointer p-2 text-sm rounded-md hover:bg-accent"
-                    onMouseDown={(e) => { // Use onMouseDown to fire before blur
-                      e.preventDefault();
-                      handleSelectOption(opt);
-                    }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span>{opt.label}</span>
-                      {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
-                    </div>
-                  </li>
-                ))}
-                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
-                  <li className="p-2 text-xs text-center text-muted-foreground">
-                    ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
-                  </li>
-                )}
-              </>
-            ) : (
-              <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            'w-full justify-between font-normal',
+            !value && 'text-muted-foreground',
+            className
+          )}
+          disabled={disabled}
+        >
+          {selectedLabel || placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        data-inline-search-list-options
+      >
+        <Command
+          filter={(value, search) => {
+            const option = options.find(
+              (o) => o.label.toLowerCase() === value.toLowerCase()
+            );
+            if (!option) return 0;
+            const textToSearch =
+              `${option.label} ${option.searchKey || ''}`.toLowerCase();
+            if (textToSearch.includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput placeholder="ابحث..." />
+          <CommandList>
+            <CommandEmpty>لا توجد نتائج.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => {
+                    onSelect(option.value === value ? '' : option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === option.value ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  <div className="flex justify-between items-center w-full">
+                    <span>{option.label}</span>
+                    {option.searchKey && (
+                      <span className="text-xs text-muted-foreground dir-ltr">
+                        {option.searchKey}
+                      </span>
+                    )}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

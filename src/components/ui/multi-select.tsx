@@ -16,10 +16,15 @@ interface MultiSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-  menuPortalTarget?: HTMLElement | null;
 }
 
-export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false, menuPortalTarget }: MultiSelectProps) {
+export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
   
   const handleChange = (newSelected: MultiValue<MultiSelectOption>) => {
     const values = newSelected ? newSelected.map(opt => opt.value) : [];
@@ -47,14 +52,10 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
         ...base,
         color: 'hsl(var(--foreground))',
     }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
     menu: (base) => ({
       ...base,
       backgroundColor: 'hsl(var(--card))',
-      zIndex: 100,
-    }),
-    menuPortal: (base) => ({
-      ...base,
-      zIndex: 9999,
     }),
     option: (base, state) => ({
       ...base,
@@ -101,7 +102,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       isSearchable={true}
       noOptionsMessage={() => "لا توجد نتائج"}
       styles={customStyles}
-      menuPortalTarget={menuPortalTarget}
+      menuPortalTarget={portalTarget}
       theme={(theme) => ({
         ...theme,
         borderRadius: 6,
