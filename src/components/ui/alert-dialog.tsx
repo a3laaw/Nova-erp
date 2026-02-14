@@ -43,7 +43,8 @@ const AlertDialogContent = React.forwardRef<
         const target = e.target as HTMLElement;
         if (
           target.closest('[data-radix-popper-content-wrapper]') ||
-          target.closest('.react-select__menu')
+          target.closest('.react-select__menu') ||
+          target.closest('[data-inline-search-list-options]')
         ) {
           e.preventDefault();
         }
