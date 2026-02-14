@@ -1,8 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { Input } from './input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { Check, ChevronsUpDown } from 'lucide-react';
 
 export interface SearchOption {
   value: string;
@@ -27,113 +30,62 @@ export function InlineSearchList({
   disabled,
   className,
 }: InlineSearchListProps) {
-  const [search, setSearch] = React.useState('');
-  const [showOptions, setShowOptions] = React.useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  // تحديث النص الظاهر عند تغيير القيمة المختارة من الخارج
-  React.useEffect(() => {
-    const selectedLabel = options.find(opt => opt.value === value)?.label || '';
-    setSearch(selectedLabel);
-  }, [value, options]);
-
-  // التعامل مع كتابة المستخدم
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSearch = e.target.value;
-    setSearch(newSearch);
-    if (newSearch === '') {
-      onSelect('');
-    }
-    setShowOptions(true);
-  };
-
-  // التعامل مع اختيار عنصر من القائمة
-  const handleSelectOption = (option: SearchOption) => {
-    setSearch(option.label);
-    onSelect(option.value);
-    setShowOptions(false);
-  };
-  
-  // إغلاق القائمة عند النقر خارج المكون
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowOptions(false);
-        // البحث عن تطابق تام لما كتبه المستخدم
-        const match = options.find(opt => opt.label.toLowerCase() === search.toLowerCase());
-
-        if (match) {
-          if (match.value !== value) {
-            onSelect(match.value);
-          }
-          setSearch(match.label);
-        } else {
-          // إذا لم يوجد تطابق، العودة لآخر قيمة صحيحة مختارة
-          const selectedLabel = options.find(opt => opt.value === value)?.label || '';
-          setSearch(selectedLabel);
-        }
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [value, options, search, onSelect]);
-
-
-  const filteredOptions = React.useMemo(() => {
-    if (!search) {
-      return options; 
-    }
-    return options.filter(opt =>
-      opt.label.toLowerCase().includes(search.toLowerCase()) ||
-      (opt.searchKey && opt.searchKey.toLowerCase().includes(search.toLowerCase()))
-    );
-  }, [options, search]);
-
-  const MAX_DISPLAY_ITEMS = 50; // عرض 50 نتيجة فقط للأداء
-  const displayOptions = filteredOptions.slice(0, MAX_DISPLAY_ITEMS);
+  const [open, setOpen] = React.useState(false);
+  const selectedLabel = options.find((option) => option.value === value)?.label;
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
-      <Input
-        value={search}
-        placeholder={placeholder}
-        onFocus={() => !disabled && setShowOptions(true)}
-        onChange={handleInputChange}
-        disabled={disabled}
-        autoComplete="off"
-      />
-      {showOptions && !disabled && (
-        <div data-inline-search-list-options className="absolute z-[9999] mt-1 w-full rounded-md border bg-card shadow-lg">
-          <ul className="max-h-60 overflow-y-auto p-1">
-            {displayOptions.length > 0 ? (
-              <>
-                {displayOptions.map(opt => (
-                  <li
-                    key={opt.value}
-                    className="cursor-pointer p-2 text-sm rounded-md hover:bg-accent"
-                    onMouseDown={(e) => { 
-                      e.preventDefault(); // منع فقدان التركيز قبل الاختيار
-                      handleSelectOption(opt);
-                    }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span>{opt.label}</span>
-                      {opt.searchKey && <span className="text-xs text-muted-foreground dir-ltr">{opt.searchKey}</span>}
-                    </div>
-                  </li>
-                ))}
-                {filteredOptions.length > MAX_DISPLAY_ITEMS && (
-                  <li className="p-2 text-xs text-center text-muted-foreground">
-                    ... و {filteredOptions.length - MAX_DISPLAY_ITEMS} نتائج أخرى
-                  </li>
-                )}
-              </>
-            ) : (
-              <li className="p-2 text-sm text-center text-muted-foreground">لا توجد نتائج</li>
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between font-normal", !value && "text-muted-foreground", className)}
+          disabled={disabled}
+        >
+          <span className="truncate">{selectedLabel || placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 rtl:mr-2 rtl:ml-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command
+          filter={(value, search) => {
+            const option = options.find(opt => opt.value.toLowerCase() === value.toLowerCase());
+            if (!option) return 0;
+            const labelMatch = option.label.toLowerCase().includes(search.toLowerCase());
+            const searchKeyMatch = option.searchKey?.toLowerCase().includes(search.toLowerCase());
+            return labelMatch || searchKeyMatch ? 1 : 0;
+          }}
+        >
+          <CommandInput placeholder="ابحث..." />
+          <CommandList>
+            <CommandEmpty>لا توجد نتائج.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.value} // Use value for logic
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue === value ? "" : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4 rtl:ml-2 rtl:mr-0",
+                      value === option.value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <div className="flex justify-between items-center w-full">
+                    <span>{option.label}</span>
+                    {option.searchKey && <span className="text-xs text-muted-foreground">{option.searchKey}</span>}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

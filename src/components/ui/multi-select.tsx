@@ -98,11 +98,14 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       onChange={handleChange}
       placeholder={placeholder}
       className={cn("w-full", className)}
+      classNamePrefix="react-select"
       isDisabled={disabled}
       isSearchable={true}
       noOptionsMessage={() => "لا توجد نتائج"}
       styles={customStyles}
       menuPortalTarget={portalTarget}
+      menuPosition="fixed"
+      menuPlacement="auto"
       theme={(theme) => ({
         ...theme,
         borderRadius: 6,
