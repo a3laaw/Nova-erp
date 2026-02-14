@@ -1,14 +1,15 @@
+
 import type { Department, Job, Governorate, Area, TransactionType, WorkStage, ItemCategory } from '@/lib/types';
 
 export const defaultDepartments: Omit<Department, 'id'>[] = [
-  { name: 'القسم المعماري', order: 1 },
-  { name: 'القسم الإنشائي', order: 2 },
-  { name: 'قسم الكهرباء', order: 3 },
-  { name: 'قسم الميكانيك', order: 4 },
-  { name: 'الإدارة', order: 5 },
-  { name: 'المحاسبة', order: 6 },
-  { name: 'الموارد البشرية', order: 7 },
-  { name: 'سكرتارية', order: 8 },
+  { name: 'القسم المعماري', order: 1, activityTypes: ['consulting'] },
+  { name: 'القسم الإنشائي', order: 2, activityTypes: ['consulting', 'construction'] },
+  { name: 'قسم الكهرباء', order: 3, activityTypes: ['consulting', 'construction'] },
+  { name: 'قسم الميكانيك', order: 4, activityTypes: ['consulting', 'construction'] },
+  { name: 'الإدارة', order: 5, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'المحاسبة', order: 6, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'الموارد البشرية', order: 7, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'سكرتارية', order: 8, activityTypes: ['consulting', 'construction', 'sales'] },
 ];
 
 export const defaultJobs: Record<string, Omit<Job, 'id'>[]> = {
@@ -53,12 +54,12 @@ export const defaultAreas: Record<string, Omit<Area, 'id'>[]> = {
 };
 
 export const defaultTransactionTypes: (Omit<TransactionType, 'id'> & { departmentNames: string[] })[] = [
-    { name: 'تصميم بلدية (سكن خاص)', departmentNames: ['القسم المعماري'], order: 1 },
-    { name: 'تصميم كهرباء', departmentNames: ['قسم الكهرباء'], order: 2 },
-    { name: 'تصميم إنشائي', departmentNames: ['القسم الإنشائي'], order: 3 },
-    { name: 'إشراف على التنفيذ', departmentNames: ['القسم المعماري', 'القسم الإنشائي'], order: 4 },
-    { name: 'تصميم واجهات', departmentNames: ['القسم المعماري'], order: 5 },
-    { name: 'تصميم ديكور داخلي', departmentNames: ['القسم المعماري'], order: 6 },
+    { name: 'تصميم بلدية (سكن خاص)', departmentNames: ['القسم المعماري'], order: 1, activityType: 'consulting' },
+    { name: 'تصميم كهرباء', departmentNames: ['قسم الكهرباء'], order: 2, activityType: 'consulting' },
+    { name: 'تصميم إنشائي', departmentNames: ['القسم الإنشائي'], order: 3, activityType: 'consulting' },
+    { name: 'إشراف على التنفيذ', departmentNames: ['القسم المعماري', 'القسم الإنشائي'], order: 4, activityType: 'consulting' },
+    { name: 'تصميم واجهات', departmentNames: ['القسم المعماري'], order: 5, activityType: 'consulting' },
+    { name: 'تصميم ديكور داخلي', departmentNames: ['القسم المعماري'], order: 6, activityType: 'consulting' },
 ];
 
 export const defaultWorkStages: Record<string, (Omit<WorkStage, 'id'> & { nextStageNames?: string[], allowedDuringStagesNames?: string[] })[]> = {

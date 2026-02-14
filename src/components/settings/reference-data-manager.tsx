@@ -447,7 +447,6 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     const handleImportDefaults = async () => {
     if (!firestore) return;
     setIsImporting(true);
-
     try {
         const batch = writeBatch(firestore);
         
@@ -581,7 +580,7 @@ const handleImportWorkStages = async () => {
                  {secondaryCollectionName !== 'workStages' && (
                     <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={disablePrimaryActions || isImporting}>
                         {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                        استيراد الافتراضي
+                        استعادة البيانات
                     </Button>
                  )}
                  <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
@@ -650,7 +649,7 @@ const handleImportWorkStages = async () => {
                     {secondaryCollectionName === 'workStages' && (
                         <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
                             {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                            استيراد مراحل العمل
+                            استعادة مراحل العمل
                         </Button>
                     )}
                     <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
@@ -909,6 +908,9 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
   
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [isImporting, setIsImporting] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+
   const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
   const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
@@ -1025,6 +1027,47 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
     }
   };
 
+   const handleImportDefaults = async () => {
+    if (!firestore) return;
+    setIsImporting(true);
+    try {
+        const batch = writeBatch(firestore);
+
+        const existingSnap = await getDocs(query(collection(firestore, 'transactionTypes'), where('activityType', '==', activityType)));
+        existingSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        const defaultTypesForActivity = defaultTransactionTypes.filter(type => type.activityType === activityType);
+
+        for (const type of defaultTypesForActivity) {
+            const newDocRef = doc(collection(firestore, 'transactionTypes'));
+            const departmentIds = type.departmentNames
+                .map(name => departments.find(d => d.name === name)?.id)
+                .filter((id): id is string => !!id);
+            
+            const dataToAdd: Omit<TransactionType, 'id'> = {
+                name: type.name,
+                order: type.order,
+                departmentIds: departmentIds,
+                activityType: activityType
+            };
+            batch.set(newDocRef, dataToAdd);
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم استعادة أنواع المعاملات الافتراضية.' });
+        fetchData(); // to refresh the list
+    } catch (e) {
+        console.error("Error importing default transaction types:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات.' });
+    } finally {
+        setIsImporting(false);
+        setIsImportConfirmOpen(false);
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -1045,7 +1088,13 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
                     className="pl-10 rtl:pr-10"
                 />
             </div>
-            <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
+            <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
+                    {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>}
+                    استعادة البيانات
+                </Button>
+                <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
+            </div>
         </div>
         <div className="border rounded-lg">
           <Table>
@@ -1132,6 +1181,22 @@ function TransactionTypeManager({ onBack, activityType, title }: { onBack: () =>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد استعادة البيانات الافتراضية؟</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {`سيؤدي هذا الإجراء إلى مسح جميع أنواع المعاملات لنشاط '${activityType === 'consulting' ? 'استشاري' : 'مقاولات'}' واستبدالها بالقائمة الافتراضية.`}
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
+                    {isImporting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الاستيراد...</> : 'نعم، قم بالاستعادة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </Card>
   );
 }
