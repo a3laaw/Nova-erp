@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where } from 'firebase/firestore';
-import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -91,7 +91,9 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   secondaryCollectionName,
   icon,
   onBack,
-  disablePrimaryActions
+  disablePrimaryActions,
+  companyActivityTypes,
+  loadingCompanyActivityTypes,
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -102,6 +104,8 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   icon: React.ReactNode;
   onBack: () => void;
   disablePrimaryActions?: boolean;
+  companyActivityTypes?: CompanyActivityType[];
+  loadingCompanyActivityTypes?: boolean;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -592,9 +596,9 @@ const handleImportWorkStages = async () => {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                           <SelectItem value="all">كل أنواع الأنشطة</SelectItem>
-                          <SelectItem value="consulting">استشاري</SelectItem>
-                          <SelectItem value="construction">مقاولات</SelectItem>
-                          <SelectItem value="sales">مبيعات</SelectItem>
+                          {(companyActivityTypes || []).map(type => (
+                              <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                          ))}
                       </SelectContent>
                   </Select>
               </div>
@@ -713,24 +717,26 @@ const handleImportWorkStages = async () => {
                     <div className="px-4 grid gap-2">
                         <Label>أنواع الأنشطة</Label>
                         <div className="flex flex-wrap gap-4 pt-2">
-                            {(['consulting', 'construction', 'sales'] as const).map(type => {
+                             {loadingCompanyActivityTypes ? (
+                                <Skeleton className="h-6 w-full" />
+                            ) : (companyActivityTypes || []).map(type => {
                                 const handleCheckedChange = (checked: boolean) => {
                                     setItemActivityTypes(prev => {
                                         if (checked) {
-                                            return [...prev, type];
+                                            return [...prev, type.name];
                                         } else {
-                                            return prev.filter(t => t !== type);
+                                            return prev.filter(t => t !== type.name);
                                         }
                                     });
                                 };
                                 return (
-                                    <div key={type} className="flex items-center gap-2">
+                                    <div key={type.id} className="flex items-center gap-2">
                                         <Checkbox
-                                            id={`activity-${type}`}
-                                            checked={itemActivityTypes.includes(type)}
+                                            id={`activity-${type.id}`}
+                                            checked={itemActivityTypes.includes(type.name)}
                                             onCheckedChange={handleCheckedChange}
                                         />
-                                        <Label htmlFor={`activity-${type}`}>{activityTypeTranslations[type] || type}</Label>
+                                        <Label htmlFor={`activity-${type.id}`}>{type.name}</Label>
                                     </div>
                                 );
                             })}
@@ -1047,6 +1053,61 @@ function UnifiedTransactionTypeManager({ onBack }: { onBack: () => void }) {
     )
 }
 
+// --- NEW DepartmentSelectionDialog ---
+function DepartmentSelectionDialog({ isOpen, onClose, allDepartments, selectedDepartments, onSave }: { isOpen: boolean; onClose: () => void; allDepartments: MultiSelectOption[]; selectedDepartments: string[]; onSave: (newSelection: string[]) => void; }) {
+  const [currentSelection, setCurrentSelection] = useState<string[]>(selectedDepartments);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentSelection(selectedDepartments);
+    }
+  }, [isOpen, selectedDepartments]);
+
+  const handleCheckedChange = (checked: boolean, value: string) => {
+    setCurrentSelection(prev => {
+      if (checked) {
+        return [...prev, value];
+      } else {
+        return prev.filter(item => item !== value);
+      }
+    });
+  };
+
+  const handleConfirm = () => {
+    onSave(currentSelection);
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent dir="rtl">
+        <DialogHeader>
+          <DialogTitle>اختر الأقسام</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="h-72 border rounded-md p-4">
+          <div className="space-y-4">
+            {allDepartments.map(dept => (
+              <div key={dept.value} className="flex items-center space-x-2 rtl:space-x-reverse">
+                <Checkbox
+                  id={`dept-${dept.value}`}
+                  checked={currentSelection.includes(dept.value)}
+                  onCheckedChange={(checked) => handleCheckedChange(!!checked, dept.value)}
+                />
+                <Label htmlFor={`dept-${dept.value}`} className="flex-1 cursor-pointer">{dept.label}</Label>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button type="button" onClick={handleConfirm}>حفظ الاختيارات</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
     const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes'>('dashboard');
@@ -1055,6 +1116,8 @@ export function ReferenceDataManager() {
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    
+    const { data: companyActivityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes');
 
     // Fetch counts for the dashboard
     useEffect(() => {
@@ -1109,6 +1172,8 @@ export function ReferenceDataManager() {
             secondaryCollectionName="jobs"
             icon={<Building className="h-full w-full" />}
             onBack={() => setView('dashboard')}
+            companyActivityTypes={companyActivityTypes || []}
+            loadingCompanyActivityTypes={activityTypesLoading}
         />
     }
 
