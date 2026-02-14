@@ -16,7 +16,6 @@ interface MultiSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-  menuPortalTarget?: HTMLElement | null;
 }
 
 export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
