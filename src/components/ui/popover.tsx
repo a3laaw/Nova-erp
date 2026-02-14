@@ -24,11 +24,7 @@ const PopoverContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (
-          target.closest('[cmdk-root]') ||
-          target.closest('.react-select__menu') ||
-          target.closest('[data-inline-search-list-options]')
-        ) {
+        if (target.closest('[data-radix-popper-content-wrapper]')) {
           e.preventDefault();
         }
       }}
