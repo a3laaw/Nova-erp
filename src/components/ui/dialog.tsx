@@ -37,9 +37,8 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      onInteractOutside={(e) => {
+      onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        // Check for react-select, cmdk, and other potential popover/menu classes
         if (target.closest('[class*="menu"]') || target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]')) {
           e.preventDefault();
         }

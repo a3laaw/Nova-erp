@@ -35,9 +35,9 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
       ref={ref}
-      onInteractOutside={(e) => {
+      onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[class*="menu"]')) {
+        if (target.closest('[class*="menu"]') || target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]')) {
           e.preventDefault();
         }
       }}
