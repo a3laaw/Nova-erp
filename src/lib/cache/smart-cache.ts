@@ -1,4 +1,3 @@
-
 'use client';
 
 import { getFirebaseServices } from '@/firebase/init';
