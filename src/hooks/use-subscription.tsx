@@ -18,7 +18,6 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { signalUpdate } = useSyncStatus();
 
-    // Create a stable and unique key from the constraints array.
     const serializedConstraints = useMemo(() => {
         if (!constraints || constraints.length === 0) return 'all';
         return constraints.map(c => {
@@ -106,7 +105,8 @@ export function useSubscription<T extends { id?: string }>(
         );
         
         return () => { isMounted = false; unsubscribe(); };
-    }, [firestore, cacheKey, collectionPath, signalUpdate, constraints]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firestore, cacheKey, collectionPath, signalUpdate]);
 
     return { data, setData, loading, error };
 }
