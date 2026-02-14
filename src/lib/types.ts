@@ -386,7 +386,7 @@ export type Area = {
 export type TransactionType = {
   id: string;
   name: string;
-  category: 'consulting' | 'construction';
+  activityType: 'consulting' | 'construction' | 'sales';
   departmentIds?: string[];
   order?: number;
 };
