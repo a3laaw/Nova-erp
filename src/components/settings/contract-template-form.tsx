@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -54,13 +54,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setPortalTarget(document.body);
-    }
-  }, []);
-
   useEffect(() => {
     const fetchRefData = async () => {
       if (!firestore) return;
@@ -124,11 +117,11 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   };
   const removeScopeItem = (id: string) => setScopeOfWork(prev => prev.filter(item => item.id !== id));
   const reorderScopeItem = (index: number, direction: 'up' | 'down') => {
-    const newItems = [...scopeOfWork];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= newItems.length) return;
-    [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
-    setScopeOfWork(newItems);
+      const newItems = [...scopeOfWork];
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= newItems.length) return;
+      [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
+      setScopeOfWork(newItems);
   };
 
 
@@ -220,16 +213,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         <DialogContent
           dir="rtl"
           className="max-w-4xl h-[90vh]"
-           onInteractOutside={(e) => {
-              const target = e.target as HTMLElement;
-              if (
-                target.closest('[cmdk-root]') ||
-                target.closest('[role="listbox"]') ||
-                target.closest('[data-radix-popper-content-wrapper]')
-              ) {
-                e.preventDefault();
-              }
-            }}
         >
             <DialogHeader>
                 <DialogTitle>{template ? 'تعديل نموذج عقد' : 'إنشاء نموذج عقد جديد'}</DialogTitle>
@@ -261,7 +244,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
                         <div className="grid gap-2">
                             <Label>ربط بأنواع المعاملات</Label>
-                            <MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع المعاملات..." disabled={loadingRefData} menuPortalTarget={portalTarget}/>
+                            <MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع المعاملات..." disabled={loadingRefData} />
                         </div>
                     </section>
 
@@ -399,5 +382,3 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     </Dialog>
   )
 }
-
-    

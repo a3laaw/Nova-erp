@@ -204,6 +204,7 @@ export function ArchitecturalAppointmentsView() {
         const buffer = workHours.appointment_buffer_time || 0;
     
         const todayDayIndex = date.getDay();
+    
         const todayDayName = weekDays[todayDayIndex].id;
     
         const isHoliday = branding?.work_hours?.holidays?.includes(todayDayName);
@@ -765,17 +766,9 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 }
                  // Check if prospective client already exists
                 const prospectiveApptsRef = collection(firestore, 'appointments');
-                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile));
+                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '!=', 'cancelled'), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
-                
-                const activeExistingAppt = prospectiveSnapshot.docs.find(doc => {
-                    const appt = doc.data();
-                    const isNotCancelled = appt.status !== 'cancelled';
-                    const isDifferentAppointment = !isEditing || doc.id !== dialogData.id;
-                    return isNotCancelled && isDifferentAppointment;
-                });
-                
-                if (activeExistingAppt) {
+                if (!prospectiveSnapshot.empty && (!isEditing || prospectiveSnapshot.docs[0].id !== dialogData.id)) {
                     toast({
                         variant: 'destructive',
                         title: 'عميل محتمل موجود',
@@ -884,13 +877,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
              <DialogContent
                 dir="rtl"
                 className="w-[95vw] max-w-md"
-                onInteractOutside={(e) => {
-                    // Prevent closing when interacting with Combobox/Select popovers
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                        e.preventDefault();
-                    }
-                }}
              >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
@@ -975,5 +961,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-
-    
