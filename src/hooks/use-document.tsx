@@ -1,72 +1,53 @@
 
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { cache } from '@/lib/cache/smart-cache';
-import { useSyncStatus } from '@/context/sync-context';
-import { cleanFirestoreData } from '@/lib/utils';
+import {
+  type Firestore,
+  doc,
+  onSnapshot,
+  type DocumentData,
+} from 'firebase/firestore';
 
+/**
+ * A simplified, stable hook for real-time Firestore document subscriptions.
+ */
 export function useDocument<T extends { id?: string }>(
-  firestore: any,
+  firestore: Firestore | null,
   docPath: string | null
 ): { data: T | null, loading: boolean, error: Error | null } {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { signalUpdate } = useSyncStatus();
-
-  const cacheKey = useMemo(() => docPath, [docPath]);
 
   useEffect(() => {
-    if (!cacheKey || !firestore) {
-      setData(null);
+    if (!firestore || !docPath) {
       setLoading(false);
+      setData(null);
       return;
     }
 
-    let isMounted = true;
-    let isFirstLoad = true;
     setLoading(true);
 
-    cache.getFromStorage<T>(cacheKey).then(cached => {
-      if (isMounted && cached?.data) {
-        setData(cached.data);
-      }
-    });
-
-    const unsubscribe = cache.subscribeDoc<T>(
-      firestore,
-      cacheKey,
-      (newData) => {
-        if (isMounted) {
-          setData(newData);
-          setError(null);
-          if (newData !== null) {
-            // Sanitize before setting to cache to ensure serializability
-            const plainData = cleanFirestoreData(newData);
-            cache.set(cacheKey, plainData);
-          } else {
-             cache.invalidate(cacheKey);
-          }
-          if (isFirstLoad) {
-            setLoading(false);
-            isFirstLoad = false;
-          } else {
-            signalUpdate();
-          }
+    const unsubscribe = onSnapshot(
+      doc(firestore, docPath),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setData({ id: snapshot.id, ...snapshot.data() } as T);
+        } else {
+          setData(null);
         }
+        setLoading(false);
+        setError(null);
       },
       (err) => {
-        if (isMounted) {
-          setError(err);
-          setLoading(false);
-        }
+        console.error(`Error listening to doc ${docPath}:`, err);
+        setError(err);
+        setLoading(false);
       }
     );
 
-    return () => { isMounted = false; unsubscribe(); };
-  }, [firestore, cacheKey, signalUpdate]);
+    return () => unsubscribe();
+  }, [firestore, docPath]);
 
   return { data, loading, error };
 }
-
-
