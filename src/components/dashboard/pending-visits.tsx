@@ -12,10 +12,10 @@ import Link from 'next/link';
 import { AlertCircle, ArrowUpRight } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy, limit, type QueryConstraint } from 'firebase/firestore';
 import type { Appointment, Client } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
-import { format, isPast } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 
@@ -27,48 +27,43 @@ export function PendingVisits() {
     const { firestore } = useFirebase();
     const { user, loading: userLoading } = useAuth();
     
+    // NEW: Direct query for pending visits. This is the core of the fix.
+    const pendingVisitsQuery = useMemo(() => {
+        if (userLoading || !user) return null;
+        
+        // Base query for past, non-updated architectural appointments
+        const now = new Date();
+        const constraints: QueryConstraint[] = [
+            where('type', '==', 'architectural'),
+            where('status', '!=', 'cancelled'),
+            where('appointmentDate', '<', Timestamp.fromDate(now)),
+            where('workStageUpdated', '==', false),
+            orderBy('appointmentDate', 'desc'),
+            limit(10) // Limit to a reasonable number for the dashboard
+        ];
+
+        // Add user-specific filter if not an admin
+        if (user.role !== 'Admin' && user.employeeId) {
+            constraints.push(where('engineerId', '==', user.employeeId));
+        }
+        
+        return constraints;
+    }, [user, userLoading]);
+
+    const { data: pendingVisits, loading: visitsLoading } = useSubscription<Appointment>(
+        firestore, 
+        pendingVisitsQuery ? 'appointments' : null, 
+        pendingVisitsQuery || []
+    );
+
     const [augmentedVisits, setAugmentedVisits] = useState<PendingVisit[]>([]);
     const [clientsMap, setClientsMap] = useState<Map<string, Client>>(new Map());
     const [clientsFetched, setClientsFetched] = useState(false);
 
-    // 1. Subscribe to appointments based on user role
-    const appointmentsQuery = useMemo(() => {
-        if (userLoading || !user) return null;
-
-        const baseQuery = [where('type', '==', 'architectural'), where('status', '!=', 'cancelled')];
-
-        if (user.role === 'Admin') {
-            return baseQuery;
-        }
-        if (user.employeeId) {
-            return [...baseQuery, where('engineerId', '==', user.employeeId)];
-        }
-        
-        return null; // Should not happen for logged-in users with roles
-    }, [user, userLoading]);
-
-    const { data: allAppointments, loading: appointmentsLoading } = useSubscription<Appointment>(
-        firestore, 
-        appointmentsQuery ? 'appointments' : null, 
-        appointmentsQuery || []
-    );
-
-    // 2. Filter for pending visits client-side in real-time
-    const pendingVisits = useMemo(() => {
-        if (!allAppointments) return [];
-        return allAppointments
-            .filter(appt =>
-                appt.appointmentDate &&
-                isPast(toFirestoreDate(appt.appointmentDate)!) &&
-                !appt.workStageUpdated
-            )
-            .sort((a, b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
-    }, [allAppointments]);
-
-    // 3. Fetch client data when pending visit IDs change
+    // Effect to fetch client data only for the pending visits received from the subscription
     useEffect(() => {
         if (!firestore || pendingVisits.length === 0) {
-            if(!clientsFetched) setClientsFetched(true); // Mark as "fetched" even if there's nothing to fetch
+            setClientsFetched(true);
             return;
         }
 
@@ -81,7 +76,6 @@ export function PendingVisits() {
         }
         
         const fetchClients = async () => {
-            // Firestore 'in' queries are limited to 30 items. We batch the requests if needed.
             const batches = [];
             for (let i = 0; i < newClientIdsToFetch.length; i += 30) {
                 batches.push(newClientIdsToFetch.slice(i, i + 30));
@@ -107,7 +101,7 @@ export function PendingVisits() {
         fetchClients();
     }, [pendingVisits, firestore, clientsMap, clientsFetched]);
     
-    // 4. Augment visits with client names
+    // Augment visits with client names once clients are fetched
     useEffect(() => {
         const augmented = pendingVisits.map(visit => ({
             ...visit,
@@ -116,7 +110,7 @@ export function PendingVisits() {
         setAugmentedVisits(augmented);
     }, [pendingVisits, clientsMap]);
     
-    const loading = appointmentsLoading || !clientsFetched;
+    const loading = visitsLoading || !clientsFetched;
     
     if (loading) {
         return (
@@ -152,7 +146,7 @@ export function PendingVisits() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow space-y-3 overflow-y-auto">
-                {augmentedVisits.slice(0, 5).map(visit => (
+                {augmentedVisits.map(visit => (
                      <Link href={`/dashboard/appointments/${visit.id}`} key={visit.id} className="block p-2 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30">
                         <div className="flex justify-between items-center">
                             <span className="font-semibold text-sm">{visit.clientName || 'عميل غير معروف'}</span>

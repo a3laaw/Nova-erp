@@ -782,6 +782,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile,
                     engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime),
                     type: 'architectural' as const, status: 'scheduled' as const, visitCount: 1, color: '#facc15', createdAt: serverTimestamp(),
+                    workStageUpdated: false, // Ensure this is set
                 };
                 if(isEditing) {
                     await updateDoc(doc(firestore, 'appointments', dialogData.id), newAppointmentData);
@@ -814,6 +815,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     appointmentDate: Timestamp.fromDate(appointmentDateTime),
                     clientId: client.id, title: title || client.nameAr, notes: notes, engineerId: dialogData.engineerId,
                     contractSigned, type: 'architectural' as const, status: 'scheduled' as const, transactionId: selectedTransactionId,
+                    workStageUpdated: false, // Ensure this is set
                 };
                 let processingList: (Appointment | typeof newAppointmentObject)[] = [...existingAppointments, newAppointmentObject];
                 processingList = processingList.filter(appt => appt.status !== 'cancelled');
