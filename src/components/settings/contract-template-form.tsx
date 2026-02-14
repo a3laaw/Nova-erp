@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
@@ -13,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, ArrowUp, ArrowDown, Save, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, ArrowUp, ArrowDown, Save, Loader2, Search } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Checkbox } from '../ui/checkbox';
@@ -32,7 +33,46 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
-// --- NEW Sub-component for Transaction Type Selection ---
+// --- Sub-component for Template Selection ---
+function TemplateSelectionView({
+  templates,
+  onSelect,
+  onContinueWithout,
+}: {
+  templates: ContractTemplate[];
+  onSelect: (template: ContractTemplate) => void;
+  onContinueWithout: () => void;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>اختر نموذج العقد</DialogTitle>
+        <DialogDescription>
+          تم العثور على عدة نماذج مرتبطة بنوع هذه المعاملة. الرجاء اختيار النموذج المناسب للبدء.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-4 space-y-2 max-h-[60vh] overflow-y-auto">
+        {templates.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => onSelect(t)}
+            className="block w-full text-right p-4 border rounded-lg hover:bg-accent transition-colors"
+          >
+            <p className="font-semibold">{t.title}</p>
+            <p className="text-sm text-muted-foreground">{t.description}</p>
+          </button>
+        ))}
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" type="button" onClick={onContinueWithout}>
+          متابعة بدون نموذج (إنشاء يدوي)
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+// --- NEW Sub-component for Transaction Selection ---
 function TransactionTypeSelectionDialog({
   isOpen,
   onClose,
@@ -47,10 +87,12 @@ function TransactionTypeSelectionDialog({
   onSave: (newSelection: string[]) => void;
 }) {
   const [currentSelection, setCurrentSelection] = useState<string[]>(selectedTypes);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setCurrentSelection(selectedTypes);
+      setSearchQuery('');
     }
   }, [isOpen, selectedTypes]);
 
@@ -69,6 +111,15 @@ function TransactionTypeSelectionDialog({
     onClose();
   };
 
+  const filteredTypes = useMemo(() => {
+      if (!searchQuery) {
+          return allTypes;
+      }
+      return allTypes.filter(type => 
+          type.label.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  }, [allTypes, searchQuery]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent dir="rtl" className="max-w-md">
@@ -78,20 +129,33 @@ function TransactionTypeSelectionDialog({
             حدد أنواع المعاملات التي يمكن استخدام هذا النموذج معها.
           </DialogDescription>
         </DialogHeader>
+        <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground rtl:right-3 rtl:left-auto" />
+            <Input
+                placeholder="ابحث عن نوع معاملة..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 rtl:pr-10"
+            />
+        </div>
         <ScrollArea className="h-72 border rounded-md p-4">
           <div className="space-y-4">
-            {allTypes.map(type => (
-              <div key={type.value} className="flex items-center space-x-2 rtl:space-x-reverse">
-                <Checkbox
-                  id={`type-${type.value}`}
-                  checked={currentSelection.includes(type.value)}
-                  onCheckedChange={(checked) => handleCheckedChange(!!checked, type.value)}
-                />
-                <Label htmlFor={`type-${type.value}`} className="flex-1 cursor-pointer">
-                  {type.label}
-                </Label>
-              </div>
-            ))}
+            {filteredTypes.length > 0 ? (
+                filteredTypes.map(type => (
+                <div key={type.value} className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <Checkbox
+                    id={`type-${type.value}`}
+                    checked={currentSelection.includes(type.value)}
+                    onCheckedChange={(checked) => handleCheckedChange(!!checked, type.value)}
+                    />
+                    <Label htmlFor={`type-${type.value}`} className="flex-1 cursor-pointer">
+                    {type.label}
+                    </Label>
+                </div>
+                ))
+            ) : (
+                <p className="text-center text-sm text-muted-foreground py-4">لا توجد نتائج مطابقة.</p>
+            )}
           </div>
         </ScrollArea>
         <DialogFooter>
@@ -137,8 +201,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
       try {
         const types: MultiSelectOption[] = [];
         const transTypesSnapshot = await getDocs(query(collectionGroup(firestore, 'transactionTypes')));
+        const uniqueTypeNames = new Set<string>();
         transTypesSnapshot.forEach(typeDoc => {
-          types.push({ value: typeDoc.data().name, label: typeDoc.data().name });
+            const typeName = typeDoc.data().name;
+            if (typeName && !uniqueTypeNames.has(typeName)) {
+                types.push({ value: typeName, label: typeName });
+                uniqueTypeNames.add(typeName);
+            }
         });
         setAllTransactionTypes(types.sort((a,b) => a.label.localeCompare(b.label, 'ar')));
         
