@@ -43,7 +43,7 @@ const DialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[data-inline-search-list-options]')) {
+        if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
           e.preventDefault();
         }
       }}
