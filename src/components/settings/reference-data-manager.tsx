@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -73,13 +74,6 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
         </button>
     );
 }
-
-const activityTypeTranslations: Record<string, string> = {
-    consulting: 'استشاري',
-    construction: 'مقاولات',
-    sales: 'مبيعات',
-};
-
 
 // Reusable component for the management UI
 function ManagerView<T extends {id: string, name: string, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
@@ -620,7 +614,7 @@ const handleImportWorkStages = async () => {
                      {(item as any).activityTypes && Array.isArray((item as any).activityTypes) && (
                         <div className="flex flex-wrap gap-1">
                             {(item as any).activityTypes.map((type: string) => (
-                                <Badge key={type} variant="secondary">{activityTypeTranslations[type] || type}</Badge>
+                                <Badge key={type} variant="secondary">{type}</Badge>
                             ))}
                         </div>
                     )}
@@ -894,7 +888,7 @@ const handleImportWorkStages = async () => {
 }
 
 // --- NEW Unified TransactionTypeManager ---
-function UnifiedTransactionTypeManager({ onBack }: { onBack: () => void }) {
+function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCompanyActivityTypes }: { onBack: () => void, companyActivityTypes: CompanyActivityType[], loadingCompanyActivityTypes: boolean }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
@@ -920,7 +914,7 @@ function UnifiedTransactionTypeManager({ onBack }: { onBack: () => void }) {
         if (!searchQuery) return transactionTypes;
         return transactionTypes.filter(type => 
             type.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            activityTypeTranslations[type.activityType]?.toLowerCase().includes(searchQuery.toLowerCase())
+            type.activityType?.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [transactionTypes, searchQuery]);
 
@@ -991,7 +985,7 @@ function UnifiedTransactionTypeManager({ onBack }: { onBack: () => void }) {
                             {!loading && filteredTransactionTypes.map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell className="font-semibold">{item.name}</TableCell>
-                                    <TableCell><Badge variant="secondary">{activityTypeTranslations[item.activityType] || item.activityType}</Badge></TableCell>
+                                    <TableCell><Badge variant="secondary">{item.activityType}</Badge></TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1">
                                             {item.departmentIds?.map(id => <Badge key={id} variant="outline">{departmentsMap.get(id) || '...'}</Badge>)}
@@ -1014,12 +1008,14 @@ function UnifiedTransactionTypeManager({ onBack }: { onBack: () => void }) {
                         <div className="grid gap-2"><Label>اسم نوع المعاملة</Label><Input value={itemName} onChange={(e) => setItemName(e.target.value)} /></div>
                         <div className="grid gap-2">
                             <Label>نوع النشاط</Label>
-                            <Select value={itemActivityType} onValueChange={(v) => setItemActivityType(v as any)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select value={itemActivityType} onValueChange={(v) => setItemActivityType(v as any)} disabled={loadingCompanyActivityTypes}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوع النشاط..."} />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="consulting">استشاري</SelectItem>
-                                    <SelectItem value="construction">مقاولات</SelectItem>
-                                    <SelectItem value="sales">مبيعات</SelectItem>
+                                    {(companyActivityTypes || []).map(type => (
+                                        <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1191,7 +1187,11 @@ export function ReferenceDataManager() {
     }
     
     if (view === 'transactionTypes') {
-         return <UnifiedTransactionTypeManager onBack={() => setView('dashboard')} />
+         return <UnifiedTransactionTypeManager 
+            onBack={() => setView('dashboard')} 
+            companyActivityTypes={companyActivityTypes || []}
+            loadingCompanyActivityTypes={activityTypesLoading}
+        />
     }
 
     if (view === 'workStages') {
