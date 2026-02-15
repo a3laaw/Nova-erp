@@ -2,8 +2,8 @@
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
-  cpu: 2
-  memoryMiB: 2048
+  cpu: 4
+  memoryMiB: 8192
   maxInstances: 2
   minInstances: 0
   concurrency: 80
