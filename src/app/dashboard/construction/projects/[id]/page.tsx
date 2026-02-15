@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BoqView } from '@/components/clients/boq/boq-view';
 import Link from 'next/link';
+import { Label } from '@/components/ui/label';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
