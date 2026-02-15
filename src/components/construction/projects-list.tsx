@@ -45,10 +45,13 @@ const statusColors: Record<string, string> = {
     'ملغى': 'bg-red-100 text-red-800',
 };
 
-export function ProjectsList() {
+interface ProjectsListProps {
+    searchQuery: string;
+}
+
+export function ProjectsList({ searchQuery }: ProjectsListProps) {
     const { firestore } = useFirebase();
     const [sorting, setSorting] = React.useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = React.useState('');
 
     const projectsQuery = React.useMemo(() => {
         if (!firestore) return null;
@@ -57,6 +60,17 @@ export function ProjectsList() {
 
     const { data: projects, loading } = useSubscription<ConstructionProject>(firestore, 'projects', projectsQuery || []);
 
+    const filteredProjects = React.useMemo(() => {
+        if (!projects) return [];
+        if (!searchQuery) return projects;
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        return projects.filter(p => 
+            p.projectName.toLowerCase().includes(lowerCaseQuery) ||
+            p.projectId.toLowerCase().includes(lowerCaseQuery) ||
+            p.clientName?.toLowerCase().includes(lowerCaseQuery)
+        );
+    }, [projects, searchQuery]);
+    
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
         return date ? format(date, 'dd/MM/yyyy') : '-';
@@ -139,67 +153,54 @@ export function ProjectsList() {
     );
 
     const table = useReactTable({
-        data: projects || [],
+        data: filteredProjects || [],
         columns,
         state: {
             sorting,
-            globalFilter,
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
     });
 
     return (
-        <div>
-            <div className="flex items-center py-4">
-                <Input
-                    placeholder="ابحث في جميع الأعمدة..."
-                    value={globalFilter ?? ''}
-                    onChange={(event) => setGlobalFilter(event.target.value)}
-                    className="max-w-sm"
-                />
-            </div>
-            <div className="rounded-md border">
-                <Table>
-                    <TableHeader>
-                        {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id}>
-                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                                    </TableHead>
+        <div className="rounded-md border">
+            <Table>
+                <TableHeader>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                            {headerGroup.headers.map((header) => (
+                                <TableHead key={header.id}>
+                                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                </TableHead>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableHeader>
+                <TableBody>
+                    {loading ? (
+                         Array.from({ length: 5 }).map((_, i) => (
+                            <TableRow key={i}><TableCell colSpan={columns.length}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        ))
+                    ) : table.getRowModel().rows?.length ? (
+                        table.getRowModel().rows.map((row) => (
+                            <TableRow key={row.id}>
+                                {row.getVisibleCells().map((cell) => (
+                                    <TableCell key={cell.id}>
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </TableCell>
                                 ))}
                             </TableRow>
-                        ))}
-                    </TableHeader>
-                    <TableBody>
-                        {loading ? (
-                             Array.from({ length: 5 }).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={columns.length}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-                            ))
-                        ) : table.getRowModel().rows?.length ? (
-                            table.getRowModel().rows.map((row) => (
-                                <TableRow key={row.id}>
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    لا توجد مشاريع مقاولات لعرضها.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={columns.length} className="h-24 text-center">
+                                لا توجد مشاريع مقاولات لعرضها.
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
         </div>
     );
 }

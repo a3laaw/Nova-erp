@@ -1,5 +1,5 @@
-
 'use client';
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -11,8 +11,11 @@ import { ProjectsList } from '@/components/construction/projects-list';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 
 export default function ConstructionProjectsPage() {
+    const [searchQuery, setSearchQuery] = useState('');
+    
     return (
         <Card dir="rtl">
             <CardHeader>
@@ -32,7 +35,15 @@ export default function ConstructionProjectsPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <ProjectsList />
+                <div className="flex items-center py-4">
+                    <Input
+                        placeholder="ابحث باسم المشروع أو العميل أو رقم المشروع..."
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        className="max-w-sm"
+                    />
+                </div>
+                <ProjectsList searchQuery={searchQuery} />
             </CardContent>
         </Card>
     );
