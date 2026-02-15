@@ -6,7 +6,6 @@ import {
   getCoreRowModel,
   useReactTable,
   getSortedRowModel,
-  getFilteredRowModel,
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
@@ -36,6 +35,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import { Input } from '../ui/input';
+import { orderBy } from 'firebase/firestore';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
