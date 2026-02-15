@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -17,3 +16,4 @@ export default function ConstructionDashboardRedirect() {
         <p className="text-muted-foreground">جاري إعادة التوجيه...</p>
     </div>
   );
+}
