@@ -1,7 +1,15 @@
-
 'use client';
-import { useState, useMemo } from 'react';
-import Link from 'next/link';
+
+import * as React from 'react';
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  getSortedRowModel,
+  getFilteredRowModel,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table';
 import {
   Table,
   TableBody,
@@ -11,21 +19,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
 import type { ConstructionProject } from '@/lib/types';
-import { Skeleton } from '../ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import Link from 'next/link';
+import { formatCurrency } from '@/lib/utils';
+import { Input } from '../ui/input';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -37,7 +47,10 @@ const statusColors: Record<string, string> = {
 
 export function ProjectsList() {
     const { firestore } = useFirebase();
-    const projectsQuery = useMemo(() => {
+    const [sorting, setSorting] = React.useState<SortingState>([]);
+    const [globalFilter, setGlobalFilter] = React.useState('');
+
+    const projectsQuery = React.useMemo(() => {
         if (!firestore) return null;
         return [orderBy('createdAt', 'desc')];
     }, [firestore]);
@@ -49,65 +62,144 @@ export function ProjectsList() {
         return date ? format(date, 'dd/MM/yyyy') : '-';
     };
 
+    const columns = React.useMemo<ColumnDef<ConstructionProject>[]>(
+        () => [
+            {
+                accessorKey: 'projectId',
+                header: ({ column }) => (
+                    <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+                        رقم المشروع
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                ),
+                cell: ({ row }) => <div className="font-mono">{row.original.projectId}</div>,
+            },
+            {
+                accessorKey: 'projectName',
+                header: 'اسم المشروع',
+                cell: ({ row }) => (
+                    <div>
+                        <Link href={`/dashboard/construction/projects/${row.original.id}`} className="font-medium hover:underline text-primary">
+                            {row.original.projectName}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">{row.original.clientName}</p>
+                    </div>
+                )
+            },
+            {
+                accessorKey: 'startDate',
+                header: 'تاريخ البدء',
+                cell: ({ row }) => formatDate(row.original.startDate),
+            },
+            {
+                accessorKey: 'endDate',
+                header: 'تاريخ الانتهاء',
+                cell: ({ row }) => formatDate(row.original.endDate),
+            },
+            {
+                accessorKey: 'contractValue',
+                header: 'قيمة العقد',
+                cell: ({ row }) => formatCurrency(row.original.contractValue),
+            },
+            {
+                accessorKey: 'status',
+                header: 'الحالة',
+                cell: ({ row }) => <Badge variant="outline" className={statusColors[row.original.status] || ''}>{row.original.status}</Badge>,
+            },
+            {
+                accessorKey: 'progressPercentage',
+                header: 'نسبة الإنجاز',
+                cell: ({ row }) => (
+                    <div className="flex items-center gap-2">
+                        <Progress value={row.original.progressPercentage} className="w-24 h-2" />
+                        <span className="text-xs font-mono">{row.original.progressPercentage}%</span>
+                    </div>
+                )
+            },
+            {
+                id: 'actions',
+                cell: ({ row }) => (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">فتح القائمة</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" dir="rtl">
+                            <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/construction/projects/${row.original.id}`}>عرض التفاصيل</Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ),
+            },
+        ],
+        []
+    );
+
+    const table = useReactTable({
+        data: projects || [],
+        columns,
+        state: {
+            sorting,
+            globalFilter,
+        },
+        onSortingChange: setSorting,
+        onGlobalFilterChange: setGlobalFilter,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+    });
+
     return (
-        <div className="border rounded-lg">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>اسم المشروع</TableHead>
-                        <TableHead>العميل</TableHead>
-                        <TableHead>تاريخ البدء</TableHead>
-                        <TableHead>تاريخ الانتهاء المخطط</TableHead>
-                        <TableHead>الحالة</TableHead>
-                        <TableHead><span className="sr-only">الإجراءات</span></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {loading && Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
-                        </TableRow>
-                    ))}
-                    {!loading && projects.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">لا توجد مشاريع مقاولات حاليًا.</TableCell>
-                        </TableRow>
-                    )}
-                    {!loading && projects.map((project) => (
-                        <TableRow key={project.id}>
-                            <TableCell className="font-medium">
-                                <Link href={`/dashboard/construction/projects/${project.id}`} className="hover:underline text-primary">
-                                    {project.projectName}
-                                </Link>
-                                <p className="text-xs text-muted-foreground font-mono">{project.projectId}</p>
-                            </TableCell>
-                            <TableCell>{project.clientName}</TableCell>
-                            <TableCell>{formatDate(project.startDate)}</TableCell>
-                            <TableCell>{formatDate(project.endDate)}</TableCell>
-                            <TableCell>
-                                <Badge variant="outline" className={statusColors[project.status] || ''}>
-                                    {project.status}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl">
-                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                        <DropdownMenuItem asChild>
-                                            <Link href={`/dashboard/construction/projects/${project.id}`}>عرض التفاصيل</Link>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+        <div>
+            <div className="flex items-center py-4">
+                <Input
+                    placeholder="ابحث في جميع الأعمدة..."
+                    value={globalFilter ?? ''}
+                    onChange={(event) => setGlobalFilter(event.target.value)}
+                    className="max-w-sm"
+                />
+            </div>
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                             Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}><TableCell colSpan={columns.length}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                            ))
+                        ) : table.getRowModel().rows?.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id}>
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                    لا توجد مشاريع مقاولات لعرضها.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     );
 }
