@@ -884,7 +884,6 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     const [itemActivityType, setItemActivityType] = useState<'consulting' | 'construction' | 'sales'>('consulting');
     const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
     
-    const [isDeptSelectorOpen, setIsDeptSelectorOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     
@@ -1002,14 +1001,13 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
                         </div>
                         <div className="space-y-2">
                             <Label>الأقسام المرتبطة</Label>
-                            <div className="p-3 border rounded-md min-h-[40px] bg-muted/50">
-                                {selectedDepartments.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedDepartments.map(deptId => <Badge key={deptId} variant="secondary">{departmentsMap.get(deptId) || '...'}</Badge>)}
-                                    </div>
-                                ) : <p className="text-sm text-muted-foreground">لم يتم اختيار أي قسم</p>}
-                            </div>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setIsDeptSelectorOpen(true)}>تعديل الأقسام</Button>
+                            <MultiSelect
+                                options={departmentOptions}
+                                selected={selectedDepartments}
+                                onChange={setSelectedDepartments}
+                                placeholder="اختر قسمًا أو أكثر..."
+                                disabled={deptsLoading}
+                            />
                         </div>
                     </div>
                     <DialogFooter>
@@ -1018,70 +1016,8 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            <DepartmentSelectionDialog
-                isOpen={isDeptSelectorOpen}
-                onClose={() => setIsDeptSelectorOpen(false)}
-                allDepartments={departmentOptions}
-                selectedDepartments={selectedDepartments}
-                onSave={setSelectedDepartments}
-            />
         </Card>
     )
-}
-
-// --- NEW DepartmentSelectionDialog ---
-function DepartmentSelectionDialog({ isOpen, onClose, allDepartments, selectedDepartments, onSave }: { isOpen: boolean; onClose: () => void; allDepartments: MultiSelectOption[]; selectedDepartments: string[]; onSave: (newSelection: string[]) => void; }) {
-  const [currentSelection, setCurrentSelection] = useState<string[]>(selectedDepartments);
-
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentSelection(selectedDepartments);
-    }
-  }, [isOpen, selectedDepartments]);
-
-  const handleCheckedChange = (checked: boolean, value: string) => {
-    setCurrentSelection(prev => {
-      if (checked) {
-        return [...prev, value];
-      } else {
-        return prev.filter(item => item !== value);
-      }
-    });
-  };
-
-  const handleConfirm = () => {
-    onSave(currentSelection);
-    onClose();
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent dir="rtl">
-        <DialogHeader>
-          <DialogTitle>اختر الأقسام</DialogTitle>
-        </DialogHeader>
-        <ScrollArea className="h-72 border rounded-md p-4">
-          <div className="space-y-4">
-            {allDepartments.map(dept => (
-              <div key={dept.value} className="flex items-center space-x-2 rtl:space-x-reverse">
-                <Checkbox
-                  id={`dept-${dept.value}`}
-                  checked={currentSelection.includes(dept.value)}
-                  onCheckedChange={(checked) => handleCheckedChange(!!checked, dept.value)}
-                />
-                <Label htmlFor={`dept-${dept.value}`} className="flex-1 cursor-pointer">{dept.label}</Label>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-          <Button type="button" onClick={handleConfirm}>حفظ الاختيارات</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 

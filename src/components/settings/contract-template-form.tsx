@@ -1,12 +1,15 @@
-
 'use client';
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useFirebase } from '@/firebase';
-import { useAuth } from '@/context/auth-context';
-import { useToast } from '@/hooks/use-toast';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup, orderBy } from 'firebase/firestore';
-import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, WorkStage } from '@/lib/types';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { useRouter } from 'next/navigation';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,11 +18,15 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2, ArrowUp, ArrowDown, Save, Loader2, Search } from 'lucide-react';
+import { useFirebase } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
+import { useToast } from '@/hooks/use-toast';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup, orderBy } from 'firebase/firestore';
+import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, WorkStage } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { Checkbox } from '../ui/checkbox';
 import { Badge } from '../ui/badge';
-
+import { InlineSearchList } from '../ui/inline-search-list';
 
 interface ContractTemplateFormProps {
   isOpen: boolean;
@@ -32,141 +39,6 @@ interface ContractTemplateFormProps {
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً', 'حادي عشر', 'ثاني عشر', 'ثالث عشر', 'رابع عشر', 'خامس عشر'];
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
-
-// --- Sub-component for Template Selection ---
-function TemplateSelectionView({
-  templates,
-  onSelect,
-  onContinueWithout,
-}: {
-  templates: ContractTemplate[];
-  onSelect: (template: ContractTemplate) => void;
-  onContinueWithout: () => void;
-}) {
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>اختر نموذج العقد</DialogTitle>
-        <DialogDescription>
-          تم العثور على عدة نماذج مرتبطة بنوع هذه المعاملة. الرجاء اختيار النموذج المناسب للبدء.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="py-4 space-y-2 max-h-[60vh] overflow-y-auto">
-        {templates.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => onSelect(t)}
-            className="block w-full text-right p-4 border rounded-lg hover:bg-accent transition-colors"
-          >
-            <p className="font-semibold">{t.title}</p>
-            <p className="text-sm text-muted-foreground">{t.description}</p>
-          </button>
-        ))}
-      </div>
-      <DialogFooter>
-        <Button variant="ghost" type="button" onClick={onContinueWithout}>
-          متابعة بدون نموذج (إنشاء يدوي)
-        </Button>
-      </DialogFooter>
-    </>
-  );
-}
-
-// --- NEW Sub-component for Transaction Selection ---
-function TransactionTypeSelectionDialog({
-  isOpen,
-  onClose,
-  allTypes,
-  selectedTypes,
-  onSave,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  allTypes: MultiSelectOption[];
-  selectedTypes: string[];
-  onSave: (newSelection: string[]) => void;
-}) {
-  const [currentSelection, setCurrentSelection] = useState<string[]>(selectedTypes);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentSelection(selectedTypes);
-      setSearchQuery('');
-    }
-  }, [isOpen, selectedTypes]);
-
-  const handleCheckedChange = (checked: boolean, value: string) => {
-    setCurrentSelection(prev => {
-      if (checked) {
-        return [...prev, value];
-      } else {
-        return prev.filter(item => item !== value);
-      }
-    });
-  };
-
-  const handleConfirm = () => {
-    onSave(currentSelection);
-    onClose();
-  };
-
-  const filteredTypes = useMemo(() => {
-      if (!searchQuery) {
-          return allTypes;
-      }
-      return allTypes.filter(type => 
-          type.label.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-  }, [allTypes, searchQuery]);
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent dir="rtl" className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>اختر أنواع المعاملات</DialogTitle>
-          <DialogDescription>
-            حدد أنواع المعاملات التي يمكن استخدام هذا النموذج معها.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground rtl:right-3 rtl:left-auto" />
-            <Input
-                placeholder="ابحث عن نوع معاملة..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 rtl:pr-10"
-            />
-        </div>
-        <ScrollArea className="h-72 border rounded-md p-4">
-          <div className="space-y-4">
-            {filteredTypes.length > 0 ? (
-                filteredTypes.map(type => (
-                <div key={type.value} className="flex items-center space-x-2 rtl:space-x-reverse">
-                    <Checkbox
-                    id={`type-${type.value}`}
-                    checked={currentSelection.includes(type.value)}
-                    onCheckedChange={(checked) => handleCheckedChange(!!checked, type.value)}
-                    />
-                    <Label htmlFor={`type-${type.value}`} className="flex-1 cursor-pointer">
-                    {type.label}
-                    </Label>
-                </div>
-                ))
-            ) : (
-                <p className="text-center text-sm text-muted-foreground py-4">لا توجد نتائج مطابقة.</p>
-            )}
-          </div>
-        </ScrollArea>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-          <Button type="button" onClick={handleConfirm}>حفظ الاختيارات</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 
 export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template, initialType }: ContractTemplateFormProps) {
   const { firestore } = useFirebase();
@@ -191,8 +63,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
-  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
   
   useEffect(() => {
     const fetchRefData = async () => {
@@ -354,7 +224,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   };
 
   return (
-    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           dir="rtl"
@@ -390,26 +259,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
                         <div className="grid gap-2">
                             <Label>ربط بأنواع المعاملات</Label>
-                            <div className="p-3 border rounded-md min-h-[40px] bg-muted/50">
-                                {selectedTransactionTypes.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedTransactionTypes.map(type => (
-                                    <Badge key={type} variant="secondary">{type}</Badge>
-                                    ))}
-                                </div>
-                                ) : (
-                                <p className="text-sm text-muted-foreground">لم يتم اختيار أي نوع</p>
-                                )}
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setIsTypeSelectorOpen(true)}
+                            <MultiSelect
+                                options={allTransactionTypes}
+                                selected={selectedTransactionTypes}
+                                onChange={setSelectedTransactionTypes}
+                                placeholder={loadingRefData ? "تحميل..." : "اختر نوعًا أو أكثر..."}
                                 disabled={loadingRefData}
-                            >
-                                تعديل أنواع المعاملات
-                            </Button>
+                            />
                         </div>
                     </section>
 
@@ -511,7 +367,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                             </div>
                          )}
                     </section>
-
                     <section className="space-y-4 p-4 border rounded-lg">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">بنود إضافية (اختياري)</h3>
@@ -543,13 +398,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
             </DialogFooter>
         </DialogContent>
     </Dialog>
-    <TransactionTypeSelectionDialog
-        isOpen={isTypeSelectorOpen}
-        onClose={() => setIsTypeSelectorOpen(false)}
-        allTypes={allTransactionTypes}
-        selectedTypes={selectedTransactionTypes}
-        onSave={setSelectedTransactionTypes}
-      />
     </>
   )
 }
