@@ -18,12 +18,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, Pencil, FolderLock, FolderOpen } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -35,7 +37,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import { Input } from '../ui/input';
-import { orderBy } from 'firebase/firestore';
+import { doc, orderBy, query, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -51,7 +54,10 @@ interface ProjectsListProps {
 
 export function ProjectsList({ searchQuery }: ProjectsListProps) {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const [sorting, setSorting] = React.useState<SortingState>([]);
+    const [isProcessing, setIsProcessing] = React.useState(false);
+
 
     const projectsQuery = React.useMemo(() => {
         if (!firestore) return null;
@@ -75,6 +81,26 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
         const date = toFirestoreDate(dateValue);
         return date ? format(date, 'dd/MM/yyyy') : '-';
     };
+
+     const handleToggleStatus = async (project: ConstructionProject) => {
+        if (!firestore) return;
+        setIsProcessing(true);
+        const newStatus = project.status === 'معلق' ? 'قيد التنفيذ' : 'معلق';
+        try {
+            const projectRef = doc(firestore, 'projects', project.id!);
+            await updateDoc(projectRef, { status: newStatus });
+            toast({
+                title: 'نجاح',
+                description: `تم تغيير حالة المشروع إلى "${newStatus}".`
+            });
+        } catch (error) {
+            console.error("Failed to toggle project status:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة المشروع.' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
 
     const columns = React.useMemo<ColumnDef<ConstructionProject>[]>(
         () => [
@@ -132,24 +158,39 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
             },
             {
                 id: 'actions',
-                cell: ({ row }) => (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">فتح القائمة</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" dir="rtl">
-                            <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/construction/projects/${row.original.id}`}>عرض التفاصيل</Link>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                ),
+                cell: ({ row }) => {
+                    const project = row.original;
+                    return (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={isProcessing}>
+                                    <span className="sr-only">فتح القائمة</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" dir="rtl">
+                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/construction/projects/${project.id}`}>عرض التفاصيل</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                     <Link href={`/dashboard/construction/projects/${project.id}/edit`}>
+                                        <Pencil className="ml-2 h-4 w-4" />
+                                        تعديل
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleToggleStatus(project)}>
+                                    {project.status === 'معلق' ? <FolderOpen className="ml-2 h-4 w-4" /> : <FolderLock className="ml-2 h-4 w-4" />}
+                                    {project.status === 'معلق' ? 'إلغاء التعليق' : 'تعليق المشروع'}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )
+                },
             },
         ],
-        []
+        [isProcessing]
     );
 
     const table = useReactTable({
