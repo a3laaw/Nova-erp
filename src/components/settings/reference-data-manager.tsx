@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where } from 'firebase/firestore';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -710,31 +709,13 @@ const handleImportWorkStages = async () => {
                 {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
                     <div className="px-4 grid gap-2">
                         <Label>أنواع الأنشطة</Label>
-                        <div className="flex flex-wrap gap-4 pt-2">
-                             {loadingCompanyActivityTypes ? (
-                                <Skeleton className="h-6 w-full" />
-                            ) : (companyActivityTypes || []).map(type => {
-                                const handleCheckedChange = (checked: boolean) => {
-                                    setItemActivityTypes(prev => {
-                                        if (checked) {
-                                            return [...prev, type.name];
-                                        } else {
-                                            return prev.filter(t => t !== type.name);
-                                        }
-                                    });
-                                };
-                                return (
-                                    <div key={type.id} className="flex items-center gap-2">
-                                        <Checkbox
-                                            id={`activity-${type.id}`}
-                                            checked={itemActivityTypes.includes(type.name)}
-                                            onCheckedChange={handleCheckedChange}
-                                        />
-                                        <Label htmlFor={`activity-${type.id}`}>{type.name}</Label>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <MultiSelect
+                            options={(companyActivityTypes || []).map(type => ({ value: type.name, label: type.name }))}
+                            selected={itemActivityTypes}
+                            onChange={setItemActivityTypes}
+                            placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                            disabled={loadingCompanyActivityTypes}
+                        />
                     </div>
                 )}
 
