@@ -63,7 +63,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   useEffect(() => {
     const fetchRefData = async () => {
       if (!firestore) return;
@@ -259,7 +259,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
                         <div className="grid gap-2">
                             <Label>ربط بأنواع المعاملات</Label>
-                            <MultiSelect
+                             <MultiSelect
                                 options={allTransactionTypes}
                                 selected={selectedTransactionTypes}
                                 onChange={setSelectedTransactionTypes}
@@ -386,7 +386,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                             ))}
                         </div>
                     </section>
-
                 </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t">
@@ -398,6 +397,5 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
             </DialogFooter>
         </DialogContent>
     </Dialog>
-    </>
-  )
+  );
 }
