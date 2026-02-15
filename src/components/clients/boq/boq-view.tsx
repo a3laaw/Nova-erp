@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -21,22 +20,23 @@ export function BoqView({ transactionId }: BoqViewProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<BoqItem | null>(null);
 
-    const boqQuery = useMemo(() => {
-        if (!firestore || !transactionId) return null;
-        // The path needs to be constructed carefully.
-        const pathSegments = transactionId.split('/');
-        const collectionPath = `clients/${clientId}/transactions/${transactionId}/boq`;
-        return [orderBy('itemNumber')];
-    }, [firestore, transactionId]);
-    
-    const clientId = transactionId.split('/')[0];
-    const txId = transactionId;
-    const collectionPath = `clients/${clientId}/transactions/${txId}/boq`;
-    
+    const { clientId, txId } = useMemo(() => {
+        if (!transactionId) return { clientId: null, txId: null };
+        const parts = transactionId.split('/');
+        return { clientId: parts[0], txId: parts[1] };
+    }, [transactionId]);
+
+    const collectionPath = useMemo(() => {
+        if (!clientId || !txId) return null;
+        return `clients/${clientId}/transactions/${txId}/boq`;
+    }, [clientId, txId]);
+
+    const boqQuery = useMemo(() => [orderBy('itemNumber')], []);
+
     const { data: boqItems, loading: boqLoading } = useSubscription<BoqItem>(
         firestore, 
-        boqQuery ? collectionPath : null, 
-        boqQuery || []
+        collectionPath, 
+        boqQuery
     );
 
     const handleAddItem = () => {
@@ -45,7 +45,6 @@ export function BoqView({ transactionId }: BoqViewProps) {
     };
 
     const handleEditItem = (item: BoqItem) => {
-        console.log("Editing item:", item);
         setEditingItem(item);
         setIsFormOpen(true);
     };
@@ -81,5 +80,3 @@ export function BoqView({ transactionId }: BoqViewProps) {
         </>
     );
 }
-
-

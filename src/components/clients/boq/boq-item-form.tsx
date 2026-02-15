@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -47,7 +47,11 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
   const [isSaving, setIsSaving] = useState(false);
   const isEditing = !!item;
   
-  const [clientId, txId] = transactionId.split('/');
+  const { clientId, txId } = useMemo(() => {
+    if (!transactionId) return { clientId: null, txId: null };
+    const parts = transactionId.split('/');
+    return { clientId: parts[0], txId: parts[1] };
+  }, [transactionId]);
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<BoqFormValues>({
     resolver: zodResolver(boqItemSchema),
@@ -111,7 +115,7 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent dir="rtl">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>{isEditing ? 'تعديل بند في جدول الكميات' : 'إضافة بند جديد'}</DialogTitle>
           </DialogHeader>
@@ -160,4 +164,3 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
     </Dialog>
   );
 }
-
