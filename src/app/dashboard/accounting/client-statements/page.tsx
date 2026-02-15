@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Search } from 'lucide-react';
 import { collection, query, orderBy, type DocumentData } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useSubscription } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Client } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -28,21 +28,16 @@ import { Input } from '@/components/ui/input';
 
 export default function ClientStatementsPage() {
   const { language } = useLanguage();
-  const firestore = useFirestore();
+  const { firestore } = useFirebase();
   const [searchQuery, setSearchQuery] = useState('');
 
   const clientsQuery = useMemo(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'clients'), orderBy('createdAt', 'desc'));
+    return [orderBy('createdAt', 'desc')];
   }, [firestore]);
 
-  const [snapshot, loading, error] = useCollection(clientsQuery);
+  const { data: clients, loading, error } = useSubscription<Client>(firestore, clientsQuery ? 'clients' : null, clientsQuery || []);
   
-  const clients = useMemo(() => {
-    if (!snapshot) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-  }, [snapshot]);
-
   const filteredClients = useMemo(() => {
     if (!searchQuery) return clients;
     const lowercasedQuery = searchQuery.toLowerCase();
