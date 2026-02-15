@@ -62,7 +62,7 @@ export function InlineSearchList({
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput placeholder="ابحث..." />
-          <CommandList>
+          <CommandList data-inline-search-list-options>
             <CommandEmpty>لا توجد نتائج.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
