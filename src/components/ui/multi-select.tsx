@@ -52,7 +52,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
         ...base,
         color: 'hsl(var(--foreground))',
     }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    menuPortal: (base) => ({ ...base, zIndex: 99999 }),
     menu: (base) => ({
       ...base,
       backgroundColor: 'hsl(var(--card))',
@@ -104,8 +104,10 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       noOptionsMessage={() => "لا توجد نتائج"}
       styles={customStyles}
       menuPortalTarget={portalTarget}
-      menuPosition="fixed"
+      menuPosition="absolute"
       menuPlacement="auto"
+      closeMenuOnScroll={false}
+      maxMenuHeight={250}
       theme={(theme) => ({
         ...theme,
         borderRadius: 6,
