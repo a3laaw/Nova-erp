@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Loader2, Save } from 'lucide-react';
 import type { BoqItem } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
@@ -37,11 +37,12 @@ type BoqFormValues = z.infer<typeof boqItemSchema>;
 interface BoqItemFormProps {
   isOpen: boolean;
   onClose: () => void;
+  onSaveSuccess: () => void;
   transactionId: string;
   item: BoqItem | null;
 }
 
-export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFormProps) {
+export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, item }: BoqItemFormProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -103,6 +104,8 @@ export function BoqItemForm({ isOpen, onClose, transactionId, item }: BoqItemFor
         await addDoc(collection(firestore, collectionPath), cleanFirestoreData(fullData));
         toast({ title: "نجاح", description: "تمت إضافة البند بنجاح." });
       }
+      
+      onSaveSuccess();
       onClose();
     } catch (error) {
       console.error("Error saving BOQ item:", error);

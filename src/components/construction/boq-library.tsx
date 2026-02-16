@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collectionGroup, query, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, orderBy, where } from 'firebase/firestore';
 import type { ClientTransaction, Client } from '@/lib/types';
 import {
   Table,
@@ -19,15 +19,17 @@ import { PlusCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import Fuse from 'fuse.js';
+import { formatCurrency } from '@/lib/utils';
+import { Badge } from '../ui/badge';
 
-export function BoqList() {
+export function BoqLibrary() {
     const { firestore } = useFirebase();
     const [searchQuery, setSearchQuery] = useState('');
 
     const transactionsQuery = useMemo(() => {
         if (!firestore) return null;
         // Using collectionGroup to fetch all transactions from all clients
-        return [orderBy('createdAt', 'desc')];
+        return [where('boqItemCount', '>', 0), orderBy('createdAt', 'desc')];
     }, [firestore]);
 
     const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction & {id: string}>(firestore, 'transactions', transactionsQuery, true);
@@ -85,35 +87,38 @@ export function BoqList() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>رقم المعاملة</TableHead>
-                            <TableHead>اسم المعاملة/المشروع</TableHead>
+                            <TableHead>اسم المشروع/المعاملة</TableHead>
                             <TableHead>العميل</TableHead>
                             <TableHead>تاريخ الإنشاء</TableHead>
+                            <TableHead>عدد البنود</TableHead>
+                            <TableHead className="text-left">القيمة الإجمالية</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading && Array.from({ length: 5 }).map((_, i) => (
                             <TableRow key={i}>
-                                <TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell>
+                                <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
                             </TableRow>
                         ))}
                         {!loading && filteredTransactions.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">
-                                    لا توجد معاملات لعرضها.
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    لا توجد جداول كميات لعرضها.
                                 </TableCell>
                             </TableRow>
                         )}
                         {!loading && filteredTransactions.map(tx => (
                              <TableRow key={tx.id}>
-                                <TableCell className="font-mono">{tx.transactionNumber}</TableCell>
                                 <TableCell className="font-medium">
                                     <Link href={`/dashboard/clients/${tx.clientId}/transactions/${tx.id}`} className="hover:underline text-primary">
                                         {tx.transactionType}
                                     </Link>
+                                    <p className="text-xs text-muted-foreground font-mono">{tx.transactionNumber}</p>
                                 </TableCell>
                                 <TableCell>{tx.clientName}</TableCell>
                                 <TableCell>{formatDate(tx.createdAt)}</TableCell>
+                                <TableCell className="text-center">{tx.boqItemCount || 0}</TableCell>
+                                <TableCell className="text-left font-mono font-semibold">{formatCurrency(tx.boqTotalValue || 0)}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

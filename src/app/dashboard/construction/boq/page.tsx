@@ -1,18 +1,18 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BoqList } from '@/components/construction/boq-list';
+import { BoqLibrary } from '@/components/construction/boq-library';
 
-export default function BoqListPage() {
+export default function BoqLibraryPage() {
     return (
         <Card dir="rtl">
             <CardHeader>
-                <CardTitle>جداول الكميات المركزية (BOQ)</CardTitle>
+                <CardTitle>مكتبة جداول الكميات (BOQ)</CardTitle>
                 <CardDescription>
                     عرض وإدارة جميع جداول الكميات للمشاريع والمعاملات من مكان واحد.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <BoqList />
+                <BoqLibrary />
             </CardContent>
         </Card>
     );

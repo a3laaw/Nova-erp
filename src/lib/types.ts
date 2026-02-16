@@ -442,6 +442,8 @@ export type ClientTransaction = {
     updatedAt?: any;
     engineerName?: string;
     stages?: TransactionStage[];
+    boqItemCount?: number;
+    boqTotalValue?: number;
     contract?: {
         clauses: ContractClause[];
         scopeOfWork?: ContractScopeItem[];
