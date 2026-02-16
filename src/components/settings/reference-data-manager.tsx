@@ -389,8 +389,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
         if (isBoqView) {
-            setItemSubcontractorTypeIds(item?.subcontractorTypeIds || []);
-            setItemActivityTypeIdsForBoq(item?.activityTypeIds || []);
+            setItemSubcontractorTypeIds(item?.subcontractorTypeIds || parent?.subcontractorTypeIds || []);
+            setItemActivityTypeIdsForBoq(item?.activityTypeIds || parent?.activityTypeIds || []);
             setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
         }
         setIsPrimaryDialogOpen(true);
@@ -904,7 +904,21 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                             <Label>البند الأب (اختياري)</Label>
                             <InlineSearchList 
                                 value={parentBoqItemId || ''}
-                                onSelect={setParentBoqItemId}
+                                onSelect={(val) => {
+                                    setParentBoqItemId(val);
+                                    if (val) {
+                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                        if (parent) {
+                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                        }
+                                    } else {
+                                        if (!editingItem) {
+                                            setItemSubcontractorTypeIds([]);
+                                            setItemActivityTypeIdsForBoq([]);
+                                        }
+                                    }
+                                }}
                                 options={boqRefOptions}
                                 placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
                             />
