@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where } from 'firebase/firestore';
-import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType, BoqReferenceItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -27,7 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -75,7 +75,7 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
 }
 
 // Reusable component for the management UI
-function ManagerView<T extends {id: string, name: string, order?: number}, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
+function ManagerView<T extends {id: string, name: string, order?: number, unit?: string, classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى' }, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -117,6 +117,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   
+  // State for forms
   const [itemName, setItemName] = useState('');
   const [itemActivityTypes, setItemActivityTypes] = useState<string[]>([]);
   const [itemRoles, setItemRoles] = useState<string[]>([]);
@@ -128,6 +129,12 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
   const [itemEnableModificationTracking, setItemEnableModificationTracking] = useState(false);
   const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
   const [itemAllowedDuringStages, setItemAllowedDuringStages] = useState<string[]>([]);
+  // BOQ Item state
+  const [itemUnit, setItemUnit] = useState('');
+  const [itemClassification, setItemClassification] = useState<'خرسانة' | 'حديد' | 'شدات' | 'أخرى' | undefined>();
+  const [itemDefaultCost, setItemDefaultCost] = useState<number | ''>('');
+  const [itemDefaultSelling, setItemDefaultSelling] = useState<number | ''>('');
+
 
   // States for numerical ordering
   const [primaryOrderValues, setPrimaryOrderValues] = useState<Record<string, string>>({});
@@ -161,6 +168,7 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
 
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
+  const isBoqView = primaryCollectionName === 'boqReferenceItems';
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [allSequentialStages, setAllSequentialStages] = useState<MultiSelectOption[]>([]);
   const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
@@ -293,6 +301,12 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         if (primaryCollectionName === 'departments') {
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
+        if (isBoqView) {
+            setItemUnit(item?.unit || '');
+            setItemClassification(item?.classification);
+            setItemDefaultCost(item?.defaultCostUnitPrice ?? '');
+            setItemDefaultSelling(item?.defaultSellingUnitPrice ?? '');
+        }
         setIsPrimaryDialogOpen(true);
     } else { // Secondary
         setItemName(item?.name || '');
@@ -326,6 +340,10 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     setItemEnableModificationTracking(false);
     setItemNextStageIds([]);
     setItemAllowedDuringStages([]);
+    setItemUnit('');
+    setItemClassification(undefined);
+    setItemDefaultCost('');
+    setItemDefaultSelling('');
   }
 
   const handleSave = async (type: 'primary' | 'secondary') => {
@@ -334,9 +352,18 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
     try {
-      const dataToSave: any = { name: itemName };
+      let dataToSave: any = { name: itemName };
        if (type === 'primary' && primaryCollectionName === 'departments') {
             dataToSave.activityTypes = itemActivityTypes;
+       }
+       if (isBoqView && type === 'primary') {
+           dataToSave = {
+                ...dataToSave,
+                unit: itemUnit,
+                classification: itemClassification,
+                defaultCostUnitPrice: Number(itemDefaultCost) || 0,
+                defaultSellingUnitPrice: Number(itemDefaultSelling) || 0,
+           }
        }
        if (isWorkStageView && type === 'secondary') {
           dataToSave.stageType = itemStageType;
@@ -497,9 +524,9 @@ function ManagerView<T extends {id: string, name: string, order?: number}, S ext
         setIsImporting(false);
         setIsImportConfirmOpen(false);
     }
-};
+  };
 
-const handleImportWorkStages = async () => {
+  const handleImportWorkStages = async () => {
     if (!firestore) return;
     setIsImporting(true);
     try {
@@ -610,6 +637,8 @@ const handleImportWorkStages = async () => {
                       className="h-7 w-14"
                     />
                     <span>{item.name}</span>
+                    {isBoqView && <Badge variant="secondary">{item.unit}</Badge>}
+                    {isBoqView && item.classification && <Badge variant="outline">{item.classification}</Badge>}
                      {(item as any).activityTypes && Array.isArray((item as any).activityTypes) && (
                         <div className="flex flex-wrap gap-1">
                             {(item as any).activityTypes.map((type: string) => (
@@ -694,7 +723,7 @@ const handleImportWorkStages = async () => {
 
       <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
         <DialogContent
-            className={cn("max-w-xl", isWorkStageView && !isPrimaryDialogOpen && "max-w-4xl")}
+            className={cn("max-w-xl", (isWorkStageView || isBoqView) && !isPrimaryDialogOpen && "max-w-4xl")}
         >
           <DialogHeader>
             <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
@@ -716,6 +745,20 @@ const handleImportWorkStages = async () => {
                             placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
                             disabled={loadingCompanyActivityTypes}
                         />
+                    </div>
+                )}
+                
+                {isBoqView && isPrimaryDialogOpen && (
+                    <div className="px-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid gap-2"><Label htmlFor="item-unit">الوحدة *</Label><Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} required /></div>
+                        <div className="grid gap-2"><Label htmlFor="item-classification">التصنيف</Label>
+                           <Select value={itemClassification} onValueChange={(v) => setItemClassification(v as any)}>
+                                <SelectTrigger><SelectValue placeholder="اختر..."/></SelectTrigger>
+                                <SelectContent><SelectItem value="خرسانة">خرسانة</SelectItem><SelectItem value="حديد">حديد</SelectItem><SelectItem value="شدات">شدات</SelectItem><SelectItem value="أخرى">أخرى</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2"><Label htmlFor="item-cost">التكلفة الافتراضية</Label><Input id="item-cost" type="number" step="0.001" value={itemDefaultCost} onChange={e => setItemDefaultCost(Number(e.target.value))} /></div>
+                        <div className="grid gap-2"><Label htmlFor="item-selling">سعر البيع الافتراضي</Label><Input id="item-selling" type="number" step="0.001" value={itemDefaultSelling} onChange={e => setItemDefaultSelling(Number(e.target.value))} /></div>
                     </div>
                 )}
 
@@ -785,7 +828,6 @@ const handleImportWorkStages = async () => {
                                     onChange={setItemRoles}
                                     placeholder="اتركه فارغًا ليكون متاحًا للجميع"
                                     disabled={refDataLoading}
-                                    menuPortalTarget={portalTarget}
                                 />
                             </div>
 
@@ -798,7 +840,6 @@ const handleImportWorkStages = async () => {
                                         onChange={setItemAllowedDuringStages}
                                         placeholder="اتركه فارغًا ليظهر دائماً..."
                                         disabled={refDataLoading}
-                                        menuPortalTarget={portalTarget}
                                     />
                                 </div>
                             )}
@@ -811,7 +852,6 @@ const handleImportWorkStages = async () => {
                                     onChange={setItemNextStageIds}
                                     placeholder="اختر مرحلة أو أكثر للانتقال إليها..."
                                     disabled={refDataLoading}
-                                    menuPortalTarget={portalTarget}
                                 />
                             </div>
 
@@ -1023,9 +1063,9 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1039,7 +1079,7 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap, boqRefItemsSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
                     getDocs(query(collectionGroup(firestore, 'jobs'))),
@@ -1049,6 +1089,7 @@ export function ReferenceDataManager() {
                     getDocs(query(collection(firestore, 'subcontractorTypes'))),
                     getDocs(query(collectionGroup(firestore, 'specializations'))),
                     getDocs(query(collection(firestore, 'companyActivityTypes'))),
+                    getDocs(query(collection(firestore, 'boqReferenceItems'))),
                 ]);
 
                 setCounts({
@@ -1061,6 +1102,7 @@ export function ReferenceDataManager() {
                     subcontractorTypes: subTypesSnap.size,
                     subcontractorSpecializations: subSpecsSnap.size,
                     companyActivityTypes: companyActivityTypesSnap.size,
+                    boqReferenceItems: boqRefItemsSnap.size,
                 });
 
             } catch (error) {
@@ -1148,6 +1190,16 @@ export function ReferenceDataManager() {
         />
     }
 
+    if (view === 'boqReferenceItems') {
+        return <ManagerView
+            primaryTitle="بنود جداول الكميات"
+            primarySingularTitle="بند مرجعي"
+            primaryCollectionName="boqReferenceItems"
+            icon={<ClipboardCheck className="h-full w-full" />}
+            onBack={() => setView('dashboard')}
+        />
+    }
+
 
     return (
         <Card>
@@ -1204,6 +1256,14 @@ export function ReferenceDataManager() {
                     icon={<Building className="h-full w-full" />} 
                     onNavigate={() => setView('companyActivityTypes')} 
                     color="orange" 
+                    loading={loadingCounts} 
+                />
+                 <StatCard 
+                    title="بنود جداول الكميات" 
+                    count={counts.boqReferenceItems} 
+                    icon={<ClipboardCheck className="h-full w-full" />} 
+                    onNavigate={() => setView('boqReferenceItems')} 
+                    color="green" 
                     loading={loadingCounts} 
                 />
             </CardContent>
