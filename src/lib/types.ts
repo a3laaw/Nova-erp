@@ -744,15 +744,15 @@ export type SubcontractorSpecialization = {
 
 export type BoqItem = {
     id?: string;
-    itemId?: string;
+    itemId?: string; // Link to master BoqReferenceItem
     itemNumber: string;
     description: string;
     classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
     unit: string;
-    quantity: number;
-    costUnitPrice?: number;
-    sellingUnitPrice?: number;
-    margin?: number;
+    quantity: number; // planned quantity
+    costUnitPrice?: number; // planned cost
+    sellingUnitPrice?: number; // planned selling price
+    margin?: number; // calculated profit margin
     executedQuantity?: number;
     actualCost?: number;
     deviation?: number;
@@ -786,5 +786,6 @@ export type BoqReferenceItem = {
   
 
     
+
 
 
