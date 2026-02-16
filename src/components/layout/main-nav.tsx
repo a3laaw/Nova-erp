@@ -1,5 +1,5 @@
-
 'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -86,6 +86,7 @@ const navItems = {
       hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/construction/projects', label: 'المشاريع' },
+        { href: '/dashboard/construction/boq-list', label: 'جداول الكميات (BOQ)' },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين' },
       ]
     },
@@ -204,6 +205,7 @@ const navItems = {
       hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/construction/projects', label: 'Projects' },
+        { href: '/dashboard/construction/boq-list', label: 'Bill of Quantities (BOQ)' },
         { href: '/dashboard/construction/subcontractors', label: 'Subcontractors' },
       ]
     },
