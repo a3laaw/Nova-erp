@@ -158,8 +158,8 @@ export function BoqForm() {
                                     <TableCell><Input {...register(`items.${index}.itemNumber`)} className="w-20"/></TableCell>
                                     <TableCell><Textarea {...register(`items.${index}.description`)} rows={1}/></TableCell>
                                     <TableCell><Input {...register(`items.${index}.unit`)} className="w-24"/></TableCell>
-                                    <TableCell><Input type="number" {...register(`items.${index}.plannedQuantity`)} className="w-24 dir-ltr"/></TableCell>
-                                    <TableCell><Input type="number" {...register(`items.${index}.plannedUnitPrice`)} className="w-24 dir-ltr"/></TableCell>
+                                    <TableCell><Input type="number" step="any" {...register(`items.${index}.plannedQuantity`)} className="dir-ltr"/></TableCell>
+                                    <TableCell><Input type="number" step="0.001" {...register(`items.${index}.plannedUnitPrice`)} className="dir-ltr"/></TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency((watchedItems[index]?.plannedQuantity || 0) * (watchedItems[index]?.plannedUnitPrice || 0))}</TableCell>
                                     <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button></TableCell>
                                 </TableRow>
@@ -181,4 +181,3 @@ export function BoqForm() {
         </form>
     );
 }
-

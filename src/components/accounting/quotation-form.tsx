@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -94,14 +94,14 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const fetchRefData = async () => {
       setRefDataLoading(true);
       try {
-        const [clientsSnapshot, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
+        const [clientsSnap, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'))),
           getDocs(query(collectionGroup(firestore, 'workStages'))),
         ]);
 
-        const fetchedClients = clientsSnapshot.docs
+        const fetchedClients = clientsSnap.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as Client))
             .filter(c => c && c.nameAr && c.isActive === true);
         fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
@@ -303,7 +303,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
            {financials_type === 'percentage' && (
               <div className="grid gap-2 md:w-1/3">
                   <Label>إجمالي قيمة العقد (لحساب النسب)</Label>
-                  <Input type="number" {...register('totalAmount')} />
+                  <Input type="number" step="0.001" {...register('totalAmount')} />
               </div>
            )}
 

@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -151,7 +150,7 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
             </div>
              <div className="grid gap-2">
                 <Label htmlFor="plannedUnitPrice">سعر الوحدة المخطط (د.ك)</Label>
-                <Input id="plannedUnitPrice" type="number" step="any" {...register('plannedUnitPrice')} />
+                <Input id="plannedUnitPrice" type="number" step="0.001" {...register('plannedUnitPrice')} />
                 {errors.plannedUnitPrice && <p className="text-xs text-destructive">{errors.plannedUnitPrice.message}</p>}
             </div>
           </div>
