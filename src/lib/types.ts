@@ -363,6 +363,7 @@ export type Department = {
     id: string;
     name: string;
     order?: number;
+    activityTypes?: string[];
 };
 
 export type Job = {
@@ -772,9 +773,19 @@ export type Boq = {
   createdAt?: any;
 };
   
+export type BoqReferenceItem = {
+  id?: string;
+  name: string;
+  unit: string;
+  classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
+  defaultCostUnitPrice?: number;
+  defaultSellingUnitPrice?: number;
+  order?: number;
+};
   
 
     
+
 
 
 

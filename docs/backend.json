@@ -1624,6 +1624,24 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["boqNumber", "name", "status"]
+    },
+    "BoqReferenceItem": {
+      "title": "BOQ Reference Item",
+      "description": "A master list item for frequently used Bill of Quantities entries.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The common name or description of the BOQ item." },
+        "unit": { "type": "string", "description": "The standard unit of measure (e.g., m³, ton, item)." },
+        "classification": {
+          "type": "string",
+          "enum": ["خرسانة", "حديد", "شدات", "أخرى"],
+          "description": "The category of the work item."
+        },
+        "defaultCostUnitPrice": { "type": "number", "description": "The typical unit cost for this item." },
+        "defaultSellingUnitPrice": { "type": "number", "description": "The typical unit selling price for this item." },
+        "order": { "type": "number", "description": "The display order of the item in lists." }
+      },
+      "required": ["name", "unit"]
     }
   },
   "auth": {
@@ -1673,6 +1691,10 @@
     "/boqs/{boqId}/items/{itemId}": {
       "schema": { "$ref": "#/entities/BoqItem" },
       "description": "Stores the individual line items for a BOQ."
+    },
+    "/boqReferenceItems/{itemId}": {
+      "schema": { "$ref": "#/entities/BoqReferenceItem" },
+      "description": "Stores a master list of reusable Bill of Quantities items."
     },
     "/transaction_assignments/{assignmentId}": {
         "schema": {
