@@ -60,13 +60,14 @@ export default function ViewQuotationPage() {
       description: quotation.templateDescription || '',
       contract: {
         totalAmount: quotation.totalAmount,
-        financialsType: 'fixed',
+        financialsType: quotation.financialsType || 'fixed',
         clauses: quotation.items.map(item => ({
             id: item.id || '',
             name: item.description,
             amount: item.total,
             status: 'غير مستحقة',
-            condition: item.condition || ''
+            condition: item.condition || '',
+            percentage: item.percentage
         })),
         scopeOfWork: quotation.scopeOfWork || [],
         termsAndConditions: quotation.termsAndConditions || [],
@@ -238,3 +239,5 @@ export default function ViewQuotationPage() {
     </>
   );
 }
+
+  

@@ -1318,6 +1318,7 @@
         "departmentId": { "type": "string", "description": "The ID of the department this quotation is for." },
         "transactionTypeId": { "type": "string", "description": "The ID of the transaction type this quotation is for." },
         "templateDescription": { "type": "string" },
+        "financialsType": { "type": "string", "enum": ["fixed", "percentage"] },
         "scopeOfWork": { "type": "array", "items": { "$ref": "#/entities/ContractScopeItem" } },
         "termsAndConditions": { "type": "array", "items": { "$ref": "#/entities/ContractTerm" } },
         "openClauses": { "type": "array", "items": { "$ref": "#/entities/ContractTerm" } },
@@ -1331,6 +1332,7 @@
               "quantity": { "type": "number" },
               "unitPrice": { "type": "number" },
               "total": { "type": "number" },
+              "percentage": { "type": "number" },
               "condition": { "type": "string", "description": "The condition for this item to be due, often linked to a work stage."}
             },
             "required": ["description", "quantity", "unitPrice", "total"]
@@ -1795,4 +1797,4 @@
     }
   }
 }
-    
+  

@@ -593,6 +593,7 @@ export type QuotationItem = {
   quantity: number;
   unitPrice: number;
   total: number;
+  percentage?: number;
   condition?: string;
 };
 
@@ -609,6 +610,7 @@ export type Quotation = {
   departmentId: string;
   transactionTypeId: string;
   templateDescription?: string;
+  financialsType?: 'fixed' | 'percentage';
   scopeOfWork?: ContractScopeItem[];
   termsAndConditions?: ContractTerm[];
   openClauses?: ContractTerm[];
@@ -749,5 +751,6 @@ export type BoqItem = {
     updatedAt?: any;
 };
     
+  
   
   

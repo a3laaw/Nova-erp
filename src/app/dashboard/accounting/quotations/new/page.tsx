@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -36,7 +37,7 @@ import {
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
-import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, Department, TransactionType } from '@/lib/types';
+import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, Department, TransactionType, WorkStage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -44,14 +45,16 @@ import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
+import { useAuth } from '@/context/auth-context';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 const itemSchema = z.object({
   id: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب"),
-  quantity: z.preprocess(v => (String(v || '').trim() === '' ? 0 : parseFloat(String(v))), z.number().min(0.01, "الكمية يجب أن تكون أكبر من صفر")),
-  unitPrice: z.preprocess(v => (String(v || '').trim() === '' ? 0 : parseFloat(String(v))), z.number().min(0, "السعر يجب أن لا يكون سالبًا")),
+  quantity: z.preprocess((v) => parseFloat(String(v || '1')), z.number().min(0.01)),
+  unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
+  percentage: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
   condition: z.string().optional(),
 });
 
@@ -64,7 +67,10 @@ const quotationSchema = z.object({
   notes: z.string().optional(),
   departmentId: z.string().min(1, 'القسم مطلوب'),
   transactionTypeId: z.string().min(1, 'نوع المعاملة مطلوب'),
+  financialsType: z.enum(['fixed', 'percentage']),
+  totalAmount: z.preprocess((a) => parseFloat(String(a || '0')), z.number().optional()),
 });
+
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
@@ -115,14 +121,12 @@ export default function NewQuotationPage() {
 
   const clientIdFromUrl = searchParams.get('clientId');
 
-  // Reference data states
   const [clients, setClients] = useState<Client[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
 
-  // Form-related states
   const [quotationNumber, setQuotationNumber] = useState('جاري التوليد...');
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
@@ -131,24 +135,25 @@ export default function NewQuotationPage() {
   const [terms, setTerms] = useState<ContractTerm[]>([]);
   const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
 
-  // Control flow for template selection
   const [step, setStep] = useState<'form' | 'select'>('form');
   const [availableTemplates, setAvailableTemplates] = useState<ContractTemplate[]>([]);
   const [chosenTemplate, setChosenTemplate] = useState<ContractTemplate | null>(null);
 
 
-  const { register, handleSubmit, control, formState: { errors }, watch, setValue } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, formState: { errors }, watch, setValue, getValues } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     mode: 'onChange',
     defaultValues: {
       clientId: clientIdFromUrl || '',
       date: new Date(),
       validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
-      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' }],
+      items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0, percentage: 0, condition: '' }],
       notes: '',
       departmentId: '',
       transactionTypeId: '',
       subject: '',
+      financialsType: 'fixed',
+      totalAmount: 0,
     },
   });
 
@@ -157,15 +162,19 @@ export default function NewQuotationPage() {
     name: "items",
   });
 
-  const watchedItems = useWatch({ control, name: "items" });
+  const watchedItems = watch("items");
   const selectedTransactionTypeId = watch("transactionTypeId");
+  const financials_type = watch("financialsType");
+  const total_amount = watch("totalAmount");
+  
+  const totalCalculatedAmount = useMemo(() => {
+    if (financials_type === 'fixed') {
+        return (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
+    }
+    return total_amount || 0;
+  }, [watchedItems, financials_type, total_amount]);
 
-  const totalAmount = useMemo(() =>
-    (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
-  [watchedItems]);
 
-
-  // Fetch clients, departments and templates
   useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
@@ -199,16 +208,17 @@ export default function NewQuotationPage() {
   }, [firestore, toast]);
   
 
-  // Use a callback to populate form from a template
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
-    // Reset fields first
-    replace([{ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' }]);
+    replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, percentage: 0, condition: '' }]);
     setScopeOfWork([]);
     setTerms([]);
     setOpenClauses([]);
     setValue('notes', '');
     
     if (template) {
+      setValue('financialsType', template.financials?.type || 'fixed');
+      setValue('totalAmount', template.financials?.totalAmount || 0);
+
       const notesParts: string[] = [];
       if (template.description) {
         notesParts.push(`**ملخص:**\n${template.description}`);
@@ -231,22 +241,30 @@ export default function NewQuotationPage() {
       
       setValue('notes', notesParts.join('\n\n'), { shouldValidate: true });
 
-      const newItems = template.financials?.milestones?.map(milestone => ({
-        id: milestone.id || generateId(),
-        description: milestone.name,
-        quantity: 1,
-        unitPrice: milestone.value,
-        condition: milestone.condition || '',
-      })) || [];
+      const newItems = template.financials?.milestones?.map(milestone => {
+        const isPercentage = template.financials?.type === 'percentage';
+        const value = Number(milestone.value || 0);
+        return {
+          id: milestone.id || generateId(),
+          description: milestone.name,
+          quantity: 1,
+          unitPrice: isPercentage ? (value / 100) * (template.financials?.totalAmount || 0) : value,
+          percentage: isPercentage ? value : 0,
+          condition: milestone.condition || '',
+        };
+      }) || [];
 
       if (newItems.length > 0) {
         replace(newItems);
       }
+    } else {
+        setValue('financialsType', 'fixed');
+        setValue('totalAmount', 0);
     }
+    setChosenTemplate(template);
   }, [replace, setValue]);
 
 
-  // Handle template selection logic
   useEffect(() => {
     if (!selectedTransactionTypeId || transactionTypes.length === 0 || templates.length === 0) return;
 
@@ -266,14 +284,12 @@ export default function NewQuotationPage() {
         setStep('form');
     }
     
-    // Also set the primary department
     if (transType.departmentIds && transType.departmentIds.length > 0) {
         setValue('departmentId', transType.departmentIds[0], { shouldValidate: true });
     }
 
   }, [selectedTransactionTypeId, transactionTypes, templates, setValue, populateFormFromTemplate]);
 
-  // Generate Quotation Number
   useEffect(() => {
     if (!firestore) return;
     setIsGeneratingNumber(true);
@@ -324,14 +340,26 @@ export default function NewQuotationPage() {
             const newQuotationRef = doc(collection(firestore, 'quotations'));
             newQuotationId = newQuotationRef.id;
             const client = clients.find(c => c.id === data.clientId);
-            const template = templates.find(t => t.transactionTypes?.includes(transactionTypes.find(tt => tt.id === data.transactionTypeId)?.name || ''));
             
-            const processedItems = data.items.map(item => ({
-                ...item,
-                quantity: Number(item.quantity),
-                unitPrice: Number(item.unitPrice),
-                total: Number(item.quantity) * Number(item.unitPrice),
-            }));
+            const processedItems = data.items.map(item => {
+                const isPercentage = data.financialsType === 'percentage';
+                const percentage = Number(item.percentage || 0);
+                const unitPrice = isPercentage 
+                    ? (percentage / 100) * (data.totalAmount || 0) 
+                    : Number(item.unitPrice || 0);
+                
+                return {
+                    id: item.id || generateId(),
+                    description: item.description,
+                    quantity: Number(item.quantity),
+                    unitPrice: unitPrice,
+                    total: unitPrice * Number(item.quantity),
+                    percentage: isPercentage ? percentage : undefined,
+                    condition: item.condition,
+                };
+            });
+
+            const finalTotalAmount = processedItems.reduce((sum, item) => sum + item.total, 0);
 
             transaction.set(newQuotationRef, {
                 quotationNumber: newQuotationNumber,
@@ -345,14 +373,15 @@ export default function NewQuotationPage() {
                 departmentId: data.departmentId,
                 transactionTypeId: data.transactionTypeId,
                 items: processedItems,
-                totalAmount: totalAmount,
+                totalAmount: finalTotalAmount,
                 notes: data.notes,
                 status: 'draft',
                 createdAt: serverTimestamp(),
+                financialsType: data.financialsType,
                 scopeOfWork: scopeOfWork,
                 termsAndConditions: terms,
                 openClauses: openClauses,
-                templateDescription: template?.description || '',
+                templateDescription: chosenTemplate?.description || '',
             });
         });
         
@@ -390,7 +419,7 @@ export default function NewQuotationPage() {
       </Dialog>
     
       <Card className="max-w-4xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
@@ -446,14 +475,21 @@ export default function NewQuotationPage() {
                     </div>
                 </div>
                 
+                 {financials_type === 'percentage' && (
+                    <div className="grid gap-2 md:w-1/3">
+                        <Label>إجمالي قيمة العقد (لحساب النسب)</Label>
+                        <Input type="number" {...register('totalAmount')} />
+                    </div>
+                 )}
+
                 <div>
                     <Label className="mb-2 block">البنود</Label>
                      <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-2/5">الوصف</TableHead>
-                                <TableHead className="w-1/6">الكمية</TableHead>
-                                <TableHead className="w-1/6">سعر الوحدة</TableHead>
+                                <TableHead className="w-[100px]">الكمية</TableHead>
+                                <TableHead className="w-1/5">{financials_type === 'percentage' ? 'النسبة' : 'سعر الوحدة'}</TableHead>
                                 <TableHead className="w-1/6 text-left">الإجمالي</TableHead>
                                 <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
                             </TableRow>
@@ -461,7 +497,10 @@ export default function NewQuotationPage() {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const item = watchedItems?.[index] || {};
-                                const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
+                                const lineTotal = financials_type === 'percentage'
+                                    ? ((Number(item?.percentage) || 0) / 100) * (total_amount || 0)
+                                    : (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
+
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
@@ -477,7 +516,14 @@ export default function NewQuotationPage() {
                                         <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
+                                        {financials_type === 'percentage' ? (
+                                            <div className="flex items-center gap-1">
+                                                <Input type="number" step="any" {...register(`items.${index}.percentage`)} className="dir-ltr" />
+                                                <span className="text-sm">%</span>
+                                            </div>
+                                        ) : (
+                                            <Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
                                     <TableCell>
@@ -491,18 +537,19 @@ export default function NewQuotationPage() {
                         <TableFooter>
                             <TableRow>
                                 <TableCell colSpan={3} className="font-bold text-lg">الإجمالي</TableCell>
-                                <TableCell className="font-bold font-mono text-lg text-left">{formatCurrency(totalAmount)}</TableCell>
+                                <TableCell className="font-bold font-mono text-lg text-left">{formatCurrency(totalCalculatedAmount)}</TableCell>
                                 <TableCell />
                             </TableRow>
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0, percentage: 0, condition: '' })}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة بند
                         </Button>
                      </div>
                 </div>
+                {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
 
                 <div className="grid gap-2">
                     <Label htmlFor="notes">ملاحظات إضافية (تحتوي على بنود العقد)</Label>
@@ -510,9 +557,7 @@ export default function NewQuotationPage() {
                 </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>
-                    <X className="ml-2 h-4 w-4"/> إلغاء
-                </Button>
+                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
                 <Button type="submit" disabled={isSaving || isGeneratingNumber}>
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
                     حفظ كمسودة
@@ -523,3 +568,5 @@ export default function NewQuotationPage() {
     </>
   );
 }
+
+  
