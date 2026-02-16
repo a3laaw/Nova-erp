@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import * as React from 'react';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,21 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, FileSignature } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, QuotationItem, ContractTemplate, ContractTerm, ContractScopeItem, TransactionType, WorkStage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
-import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
-import { DialogFooter } from '../ui/dialog';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -34,7 +32,7 @@ const itemSchema = z.object({
   unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
   percentage: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
   condition: z.string().optional(),
-  total: z.number().optional(), // Added for calculation
+  total: z.number().optional(),
 });
 
 const quotationSchema = z.object({
@@ -69,11 +67,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const { firestore } = useFirebase();
   const { toast } = useToast();
   
-  const [allTransactionTypes, setAllTransactionTypes] = useState<any[]>([]);
-  const [allTemplates, setAllTemplates] = useState<ContractTemplate[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
-  const [refDataLoading, setRefDataLoading] = useState(true);
+  const [allTransactionTypes, setAllTransactionTypes] = React.useState<any[]>([]);
+  const [allTemplates, setAllTemplates] = React.useState<ContractTemplate[]>([]);
+  const [clients, setClients] = React.useState<Client[]>([]);
+  const [allWorkStages, setAllWorkStages] = React.useState<MultiSelectOption[]>([]);
+  const [refDataLoading, setRefDataLoading] = React.useState(true);
 
   const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
@@ -84,15 +82,14 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const financials_type = watch("financialsType");
   const total_amount = watch("totalAmount");
   
-  const totalCalculatedAmount = useMemo(() => {
+  const totalCalculatedAmount = React.useMemo(() => {
     if (financials_type === 'fixed') {
         return (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
     }
     return total_amount || 0;
   }, [watchedItems, financials_type, total_amount]);
 
-
-  useEffect(() => {
+  React.useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
       setRefDataLoading(true);
@@ -143,7 +140,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     fetchRefData();
   }, [firestore, toast]);
   
-  const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
+  const populateFormFromTemplate = React.useCallback((template: ContractTemplate | null) => {
     if (template) {
       setValue('financialsType', template.financials?.type || 'fixed');
       setValue('totalAmount', template.financials?.totalAmount || 0);
@@ -204,7 +201,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
 
   const selectedTransactionTypeId = watch("transactionTypeId");
-  useEffect(() => {
+  React.useEffect(() => {
     if (isEditing) return; // Don't auto-change template on edit
     if (!selectedTransactionTypeId || allTransactionTypes.length === 0 || allTemplates.length === 0) return;
 
@@ -217,15 +214,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     
     const templateToUse = matchingTemplates.length > 0 ? matchingTemplates[0] : null;
     populateFormFromTemplate(templateToUse);
-    
-    //This logic is flawed as `allTransactionTypes` does not have departmentIds
-    //const originalType = allTransactionTypes.find(t => t.id === selectedTransactionTypeId);
-    //if (originalType?.departmentIds && originalType.departmentIds.length > 0) {
-    //    setValue('departmentId', originalType.departmentIds[0]);
-    //}
   }, [isEditing, selectedTransactionTypeId, allTransactionTypes, allTemplates, setValue, populateFormFromTemplate]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (initialData) {
       reset({
         ...initialData,
@@ -240,8 +231,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   }, [initialData, reset]);
 
-  const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
-  const transactionTypeOptions = useMemo(() => allTransactionTypes.map(t => ({ value: t.value, label: t.label })), [allTransactionTypes]);
+  const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
+  const transactionTypeOptions = React.useMemo(() => allTransactionTypes.map(t => ({ value: t.value, label: t.label })), [allTransactionTypes]);
   
   const onSubmit = (data: QuotationFormValues) => {
     const processedItems = data.items.map(item => {
@@ -385,13 +376,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
           </div>
       </div>
-      <DialogFooter className="mt-6 pt-4 border-t">
+      <div className="mt-6 pt-4 border-t flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
           <Button type="submit" disabled={isSaving || refDataLoading}>
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
               {isSaving ? 'جاري الحفظ...' : 'حفظ'}
           </Button>
-      </DialogFooter>
+      </div>
     </form>
   );
 }
