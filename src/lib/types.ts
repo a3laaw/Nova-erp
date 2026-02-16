@@ -753,8 +753,20 @@ export type BoqItem = {
     updatedAt?: any;
 };
     
-  
+export type Boq = {
+  id?: string;
+  boqNumber: string;
+  name: string;
+  status: 'تقديري' | 'تعاقدي' | 'منفذ';
+  clientId?: string;
+  clientName?: string; // For prospective
+  transactionId?: string;
+  totalValue: number;
+  itemCount: number;
+  createdAt?: any;
+};
   
   
 
     
+

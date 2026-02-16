@@ -375,6 +375,14 @@
                     "financialsType": { "type": "string", "enum": ["fixed", "percentage"] }
                 },
                 "required": ["clauses", "totalAmount"]
+            },
+            "boqItemCount": {
+                "type": "number",
+                "description": "A summary field holding the total number of items in the BOQ subcollection."
+            },
+            "boqTotalValue": {
+                "type": "number",
+                "description": "A summary field holding the total planned value of the BOQ subcollection."
             }
         },
         "required": ["transactionNumber", "clientId", "transactionType", "status", "createdAt"]
@@ -1589,6 +1597,23 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["itemNumber", "description", "unit", "plannedQuantity", "plannedUnitPrice"]
+    },
+     "Boq": {
+      "title": "Bill of Quantities",
+      "description": "A standalone Bill of Quantities document, can be linked to a project or quotation.",
+      "type": "object",
+      "properties": {
+        "boqNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["تقديري", "تعاقدي", "منفذ"] },
+        "clientId": { "type": "string", "description": "Optional link to a registered client" },
+        "clientName": { "type": "string", "description": "Stored client name for display (can be a prospective client)" },
+        "transactionId": { "type": "string", "description": "Optional link to a transaction" },
+        "totalValue": { "type": "number" },
+        "itemCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["boqNumber", "name", "status"]
     }
   },
   "auth": {
@@ -1630,6 +1655,14 @@
     "/clients/{clientId}/transactions/{transactionId}/boq/{boqItemId}": {
         "schema": { "$ref": "#/entities/BoqItem" },
         "description": "Stores the Bill of Quantities for a specific transaction."
+    },
+    "/boqs/{boqId}": {
+      "schema": { "$ref": "#/entities/Boq" },
+      "description": "Stores all standalone Bill of Quantities documents."
+    },
+    "/boqs/{boqId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/BoqItem" },
+      "description": "Stores the individual line items for a BOQ."
     },
     "/transaction_assignments/{assignmentId}": {
         "schema": {
@@ -1815,4 +1848,3 @@
     }
   }
 }
-    
