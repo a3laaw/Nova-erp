@@ -10,13 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, orderBy, getDoc } from 'firebase/firestore';
 import { Loader2, Save } from 'lucide-react';
-import type { BoqItem, Item } from '@/lib/types';
+import type { BoqItem, BoqReferenceItem, ClientTransaction, TransactionType, CompanyActivityType } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { Separator } from '../ui/separator';
 
 const boqItemSchema = z.object({
   itemId: z.string().optional(),
@@ -24,15 +24,15 @@ const boqItemSchema = z.object({
   classification: z.enum(['خرسانة', 'حديد', 'شدات', 'أخرى']).optional(),
   unit: z.string().min(1, "الوحدة مطلوبة."),
   quantity: z.preprocess(
-    (a) => parseFloat(String(a).replace(/,/g, '')),
+    (a) => parseFloat(String(a || '0')),
     z.number().positive("الكمية يجب أن تكون أكبر من صفر.")
   ),
   costUnitPrice: z.preprocess(
-    (a) => parseFloat(String(a).replace(/,/g, '')),
+    (a) => parseFloat(String(a || '0')),
     z.number().min(0, "التكلفة لا يمكن أن تكون سالبة.")
   ),
   sellingUnitPrice: z.preprocess(
-    (a) => parseFloat(String(a).replace(/,/g, '')),
+    (a) => parseFloat(String(a || '0')),
     z.number().min(0, "السعر لا يمكن أن يكون سالبًا.")
   ),
 });
@@ -59,8 +59,9 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
     return { clientId: parts[0], txId: parts[1] };
   }, [transactionId]);
 
-  const { data: masterItems, loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
-
+  const { data: masterItems, loading: itemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
+  const { data: companyActivityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes');
+  const [transactionActivityType, setTransactionActivityType] = useState<string | null>(null);
 
   const { register, handleSubmit, control, reset, setValue, formState: { errors } } = useForm<BoqFormValues>({
     resolver: zodResolver(boqItemSchema),
@@ -95,28 +96,66 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
     }
   }, [isOpen, item, reset]);
 
+  // Fetch transaction's activity type
+  useEffect(() => {
+    if (!firestore || !txId || !isOpen) {
+        setTransactionActivityType(null); // Reset on close or if no txId
+        return;
+    };
+
+    const fetchActivityType = async () => {
+        try {
+            const txDocSnap = await getDoc(doc(firestore, `clients/${clientId}/transactions/${txId}`));
+            if (txDocSnap.exists()) {
+                const txData = txDocSnap.data() as ClientTransaction;
+                if (txData.transactionTypeId) {
+                    const typeDocSnap = await getDoc(doc(firestore, 'transactionTypes', txData.transactionTypeId));
+                    if (typeDocSnap.exists()) {
+                        const typeData = typeDocSnap.data() as TransactionType;
+                        setTransactionActivityType(typeData.activityType);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch transaction activity type:", error);
+        }
+    };
+
+    fetchActivityType();
+  }, [firestore, clientId, txId, isOpen]);
+
   const handleMasterItemSelect = (itemId: string) => {
     const selectedItem = masterItems.find(i => i.id === itemId);
     if (selectedItem) {
         setValue('itemId', itemId, { shouldValidate: true });
         setValue('description', selectedItem.name, { shouldValidate: true });
-        setValue('unit', selectedItem.unitOfMeasure, { shouldValidate: true });
-        setValue('costUnitPrice', selectedItem.costPrice || 0, { shouldValidate: true });
-        setValue('sellingUnitPrice', selectedItem.sellingPrice || 0, { shouldValidate: true });
     } else {
         setValue('itemId', '', { shouldValidate: true });
         setValue('description', '', { shouldValidate: true });
-        setValue('unit', '', { shouldValidate: true });
-        setValue('costUnitPrice', 0, { shouldValidate: true });
-        setValue('sellingUnitPrice', 0, { shouldValidate: true });
     }
   };
+
+  const masterItemOptions = useMemo(() => {
+    if (!masterItems || !companyActivityTypes) return [];
+    
+    let filteredItems = masterItems;
+
+    if (transactionActivityType) {
+        const activityTypeDoc = companyActivityTypes.find(act => act.name === transactionActivityType);
+        const activityTypeId = activityTypeDoc?.id;
+        
+        if (activityTypeId) {
+            filteredItems = masterItems.filter(item => 
+                !item.activityTypeIds ||
+                item.activityTypeIds.length === 0 || 
+                item.activityTypeIds.includes(activityTypeId)
+            );
+        }
+    }
+
+    return filteredItems.map(i => ({ value: i.id!, label: i.name }));
+  }, [masterItems, transactionActivityType, companyActivityTypes]);
   
-  const masterItemOptions = useMemo(() => 
-    (masterItems || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku }))
-  , [masterItems]);
-
-
   const onSubmit = async (data: BoqFormValues) => {
     if (!firestore || !clientId || !txId) return;
     setIsSaving(true);
@@ -162,13 +201,13 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent dir="rtl" className="max-w-2xl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'تعديل بند في جدول الكميات' : 'إضافة بند جديد'}</DialogTitle>
+            <DialogTitle>{isEditing ? `تعديل البند: ${item?.description}` : 'إضافة بند جديد لجدول الكميات'}</DialogTitle>
           </DialogHeader>
           <div className="py-4 grid gap-4">
              <div className="grid gap-2">
-              <Label>بحث عن صنف (اختياري)</Label>
+              <Label>بحث عن بند مرجعي (اختياري)</Label>
               <Controller
                 name="itemId"
                 control={control}
@@ -180,8 +219,8 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
                         handleMasterItemSelect(value);
                     }}
                     options={masterItemOptions}
-                    placeholder={itemsLoading ? 'تحميل...' : 'ابحث في قائمة الأصناف لتعبئة الحقول...'}
-                    disabled={itemsLoading}
+                    placeholder={itemsLoading || activityTypesLoading ? "تحميل..." : "ابحث في قائمة البنود المرجعية..."}
+                    disabled={itemsLoading || activityTypesLoading}
                   />
                 )}
               />
