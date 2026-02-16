@@ -745,10 +745,15 @@ export type BoqItem = {
     id?: string;
     itemNumber: string;
     description: string;
+    classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
     unit: string;
-    plannedQuantity: number;
-    plannedUnitPrice: number;
+    quantity: number;
+    costUnitPrice?: number;
+    sellingUnitPrice?: number;
+    margin?: number;
     executedQuantity?: number;
+    actualCost?: number;
+    deviation?: number;
     createdAt?: any;
     updatedAt?: any;
 };
@@ -769,4 +774,6 @@ export type Boq = {
   
 
     
+
+
 

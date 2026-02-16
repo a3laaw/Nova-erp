@@ -1587,17 +1587,22 @@
       "description": "A single line item in a Bill of Quantities.",
       "type": "object",
       "properties": {
-        "itemId": { "type": "string", "description": "Reference to the master Item ID." },
+        "itemId": { "type": "string", "description": "Reference to the master Item ID from the main inventory." },
         "itemNumber": { "type": "string" },
         "description": { "type": "string" },
+        "classification": { "type": "string", "enum": ["خرسانة", "حديد", "شدات", "أخرى"] },
         "unit": { "type": "string" },
-        "plannedQuantity": { "type": "number" },
-        "plannedUnitPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "costUnitPrice": { "type": "number", "description": "The estimated unit cost for the company." },
+        "sellingUnitPrice": { "type": "number", "description": "The unit price presented to the client." },
+        "margin": { "type": "number", "description": "The profit margin percentage for this item." },
         "executedQuantity": { "type": "number" },
+        "actualCost": { "type": "number" },
+        "deviation": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["itemNumber", "description", "unit", "plannedQuantity", "plannedUnitPrice"]
+      "required": ["itemNumber", "description", "unit", "quantity", "sellingUnitPrice"]
     },
      "Boq": {
       "title": "Bill of Quantities",
@@ -1849,5 +1854,3 @@
     }
   }
 }
-
-    

@@ -15,17 +15,23 @@ import { Loader2, Save } from 'lucide-react';
 import type { BoqItem, Item } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 const boqItemSchema = z.object({
   itemId: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب."),
+  classification: z.enum(['خرسانة', 'حديد', 'شدات', 'أخرى']).optional(),
   unit: z.string().min(1, "الوحدة مطلوبة."),
-  plannedQuantity: z.preprocess(
+  quantity: z.preprocess(
     (a) => parseFloat(String(a).replace(/,/g, '')),
     z.number().positive("الكمية يجب أن تكون أكبر من صفر.")
   ),
-  plannedUnitPrice: z.preprocess(
+  costUnitPrice: z.preprocess(
+    (a) => parseFloat(String(a).replace(/,/g, '')),
+    z.number().min(0, "التكلفة لا يمكن أن تكون سالبة.")
+  ),
+  sellingUnitPrice: z.preprocess(
     (a) => parseFloat(String(a).replace(/,/g, '')),
     z.number().min(0, "السعر لا يمكن أن يكون سالبًا.")
   ),
@@ -69,17 +75,21 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
         reset({
           itemId: item.itemId,
           description: item.description,
+          classification: item.classification,
           unit: item.unit,
-          plannedQuantity: item.plannedQuantity,
-          plannedUnitPrice: item.plannedUnitPrice,
+          quantity: item.quantity,
+          costUnitPrice: item.costUnitPrice,
+          sellingUnitPrice: item.sellingUnitPrice,
         });
       } else {
         reset({
           itemId: '',
           description: '',
+          classification: undefined,
           unit: '',
-          plannedQuantity: 1,
-          plannedUnitPrice: 0,
+          quantity: 1,
+          costUnitPrice: 0,
+          sellingUnitPrice: 0,
         });
       }
     }
@@ -90,11 +100,13 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
     if (selectedItem) {
         setValue('description', selectedItem.name, { shouldValidate: true });
         setValue('unit', selectedItem.unitOfMeasure, { shouldValidate: true });
-        setValue('plannedUnitPrice', selectedItem.sellingPrice || 0, { shouldValidate: true });
+        setValue('costUnitPrice', selectedItem.costPrice || 0, { shouldValidate: true });
+        setValue('sellingUnitPrice', selectedItem.sellingPrice || 0, { shouldValidate: true });
     } else {
         setValue('description', '', { shouldValidate: true });
         setValue('unit', '', { shouldValidate: true });
-        setValue('plannedUnitPrice', 0, { shouldValidate: true });
+        setValue('costUnitPrice', 0, { shouldValidate: true });
+        setValue('sellingUnitPrice', 0, { shouldValidate: true });
     }
   };
   
@@ -110,8 +122,13 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
     try {
       const collectionPath = `clients/${clientId}/transactions/${txId}/boq`;
       
+      const margin = data.sellingUnitPrice && data.costUnitPrice && data.sellingUnitPrice > 0
+        ? ((data.sellingUnitPrice - data.costUnitPrice) / data.sellingUnitPrice) * 100
+        : 0;
+
       const dataToSave = {
         ...data,
+        margin: parseFloat(margin.toFixed(2)),
         updatedAt: serverTimestamp(),
       };
 
@@ -179,15 +196,42 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
                     {errors.unit && <p className="text-xs text-destructive">{errors.unit.message}</p>}
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="plannedQuantity">الكمية المخططة <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="classification">التصنيف</Label>
+                    <Controller
+                        name="classification"
+                        control={control}
+                        render={({field}) => (
+                           <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger><SelectValue placeholder="اختر تصنيف البند..."/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="خرسانة">خرسانة</SelectItem>
+                                    <SelectItem value="حديد">حديد</SelectItem>
+                                    <SelectItem value="شدات">شدات</SelectItem>
+                                    <SelectItem value="أخرى">أخرى</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="plannedQuantity">الكمية <span className="text-destructive">*</span></Label>
                     <Input id="plannedQuantity" type="number" step="any" {...register('plannedQuantity')} required />
                     {errors.plannedQuantity && <p className="text-xs text-destructive">{errors.plannedQuantity.message}</p>}
                 </div>
             </div>
-             <div className="grid gap-2">
-                <Label htmlFor="plannedUnitPrice">سعر الوحدة المخطط (د.ك) <span className="text-destructive">*</span></Label>
-                <Input id="plannedUnitPrice" type="number" step="0.001" {...register('plannedUnitPrice')} required />
-                {errors.plannedUnitPrice && <p className="text-xs text-destructive">{errors.plannedUnitPrice.message}</p>}
+            <div className="p-4 border rounded-lg bg-muted/50 grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="costUnitPrice">سعر تكلفة الوحدة (د.ك)</Label>
+                    <Input id="costUnitPrice" type="number" step="0.001" {...register('costUnitPrice')} />
+                    {errors.costUnitPrice && <p className="text-xs text-destructive">{errors.costUnitPrice.message}</p>}
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="sellingUnitPrice">سعر بيع الوحدة (د.ك)</Label>
+                    <Input id="sellingUnitPrice" type="number" step="0.001" {...register('sellingUnitPrice')} />
+                    {errors.sellingUnitPrice && <p className="text-xs text-destructive">{errors.sellingUnitPrice.message}</p>}
+                </div>
             </div>
           </div>
           <DialogFooter>
@@ -202,3 +246,4 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
     </Dialog>
   );
 }
+

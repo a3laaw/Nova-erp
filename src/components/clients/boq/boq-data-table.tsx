@@ -49,10 +49,17 @@ export function BoqDataTable<TData, TValue>({ columns, data, loading }: BoqDataT
     },
   });
 
-  const totalPlannedValue = React.useMemo(() => {
-    return data.reduce((sum, row: any) => {
-        return sum + (row.plannedQuantity * row.plannedUnitPrice);
-    }, 0);
+  const { totalCost, totalSelling, overallMargin } = React.useMemo(() => {
+    const totals = data.reduce((acc, row: any) => {
+        const cost = (row.quantity || 0) * (row.costUnitPrice || 0);
+        const selling = (row.quantity || 0) * (row.sellingUnitPrice || 0);
+        acc.totalCost += cost;
+        acc.totalSelling += selling;
+        return acc;
+    }, { totalCost: 0, totalSelling: 0 });
+
+    const margin = totals.totalSelling > 0 ? ((totals.totalSelling - totals.totalCost) / totals.totalSelling) * 100 : 0;
+    return { ...totals, overallMargin: margin };
   }, [data]);
   
 
@@ -116,8 +123,11 @@ export function BoqDataTable<TData, TValue>({ columns, data, loading }: BoqDataT
             </TableBody>
              <TableFooter>
                 <TableRow className="bg-muted font-bold">
-                    <TableCell colSpan={5}>الإجمالي المخطط</TableCell>
-                    <TableCell colSpan={4}>{formatCurrency(totalPlannedValue)}</TableCell>
+                    <TableCell colSpan={6}>الإجمالي</TableCell>
+                    <TableCell className="text-left font-mono">{formatCurrency(totalCost)}</TableCell>
+                    <TableCell className="text-left font-mono">{formatCurrency(totalSelling)}</TableCell>
+                    <TableCell className="text-center font-mono">{overallMargin.toFixed(1)}%</TableCell>
+                    <TableCell colSpan={3}></TableCell>
                 </TableRow>
             </TableFooter>
         </Table>
@@ -125,5 +135,6 @@ export function BoqDataTable<TData, TValue>({ columns, data, loading }: BoqDataT
     </div>
   );
 }
+
 
 

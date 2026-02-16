@@ -2,7 +2,7 @@
 'use client';
 import { type ColumnDef } from '@tanstack/react-table';
 import type { BoqItem } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,24 +32,46 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
     header: 'الوحدة',
   },
   {
-    accessorKey: 'plannedQuantity',
-    header: 'الكمية المخططة',
-    cell: ({ row }) => (row.original.plannedQuantity || 0).toFixed(2),
+    accessorKey: 'quantity',
+    header: 'الكمية',
+    cell: ({ row }) => (row.original.quantity || 0).toFixed(2),
   },
   {
-    accessorKey: 'plannedUnitPrice',
-    header: 'سعر الوحدة',
-    cell: ({ row }) => formatCurrency(row.original.plannedUnitPrice || 0),
+    accessorKey: 'costUnitPrice',
+    header: 'سعر تكلفة الوحدة',
+    cell: ({ row }) => formatCurrency(row.original.costUnitPrice || 0),
   },
   {
-    id: 'plannedTotal',
-    header: 'الإجمالي المخطط',
+    accessorKey: 'sellingUnitPrice',
+    header: 'سعر بيع الوحدة',
+    cell: ({ row }) => formatCurrency(row.original.sellingUnitPrice || 0),
+  },
+  {
+    id: 'totalCost',
+    header: 'إجمالي التكلفة',
     cell: ({ row }) => {
-      const total = (row.original.plannedQuantity || 0) * (row.original.plannedUnitPrice || 0);
-      return <div className="font-semibold">{formatCurrency(total)}</div>;
+        const total = (row.original.quantity || 0) * (row.original.costUnitPrice || 0);
+        return formatCurrency(total);
     },
   },
-  // Placeholders for future implementation
+  {
+    id: 'totalSelling',
+    header: 'إجمالي البيع',
+    cell: ({ row }) => {
+        const total = (row.original.quantity || 0) * (row.original.sellingUnitPrice || 0);
+        return <div className="font-semibold">{formatCurrency(total)}</div>;
+    },
+  },
+  {
+    accessorKey: 'margin',
+    header: 'هامش الربح',
+     cell: ({ row }) => {
+      const margin = row.original.margin;
+      if (typeof margin !== 'number') return '-';
+      const color = margin < 15 ? 'text-destructive' : margin < 30 ? 'text-amber-600' : 'text-green-600';
+      return <div className={cn("font-semibold", color)}>{margin.toFixed(1)}%</div>;
+    },
+  },
   {
     accessorKey: 'executedQuantity',
     header: 'الكمية المنفذة',
@@ -59,7 +81,7 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
     id: 'completion',
     header: '% الإنجاز',
     cell: ({ row }) => {
-        const plannedQty = row.original.plannedQuantity || 0;
+        const plannedQty = row.original.quantity || 0;
         const executedQty = row.original.executedQuantity || 0;
         const completion = plannedQty > 0 
             ? (executedQty / plannedQty) * 100
@@ -90,5 +112,4 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
     },
   },
 ];
-
 
