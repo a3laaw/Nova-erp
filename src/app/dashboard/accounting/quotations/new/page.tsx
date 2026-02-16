@@ -58,8 +58,8 @@ const itemSchema = z.object({
 const quotationSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
   subject: z.string().min(1, 'الموضوع مطلوب.'),
-  date: z.string().min(1, 'تاريخ عرض السعر مطلوب.'),
-  validUntil: z.string().min(1, 'تاريخ انتهاء الصلاحية مطلوب.'),
+  date: z.date({ required_error: "التاريخ مطلوب." }),
+  validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   notes: z.string().optional(),
   departmentId: z.string().min(1, 'القسم مطلوب'),
@@ -142,8 +142,8 @@ export default function NewQuotationPage() {
     mode: 'onChange',
     defaultValues: {
       clientId: clientIdFromUrl || '',
-      date: new Date().toISOString().split('T')[0],
-      validUntil: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
+      date: new Date(),
+      validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
       items: [{ id: generateId(), description: '', quantity: 1, unitPrice: '', condition: '' }],
       notes: '',
       departmentId: '',
@@ -172,13 +172,15 @@ export default function NewQuotationPage() {
       setRefDataLoading(true);
       try {
         const [clientsSnapshot, departmentsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
-          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
+          getDocs(query(collection(firestore, 'clients'))),
           getDocs(query(collection(firestore, 'departments'))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')))
         ]);
 
-        const fetchedClients = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).filter(c => c && c.nameAr);
+        const fetchedClients = clientsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Client))
+            .filter(c => c && c.nameAr && c.isActive === true);
         fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
         setClients(fetchedClients);
         
@@ -187,6 +189,7 @@ export default function NewQuotationPage() {
         setTransactionTypes(transTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)).filter(t => t && t.name));
 
       } catch (error) {
+        console.error("Error fetching ref data for quotations:", error)
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
         setRefDataLoading(false);
@@ -336,8 +339,8 @@ export default function NewQuotationPage() {
                 quotationYear: currentYear,
                 clientId: data.clientId,
                 clientName: client?.nameAr || '',
-                date: new Date(data.date),
-                validUntil: new Date(data.validUntil),
+                date: data.date,
+                validUntil: data.validUntil,
                 subject: data.subject,
                 departmentId: data.departmentId,
                 transactionTypeId: data.transactionTypeId,
