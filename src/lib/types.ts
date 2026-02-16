@@ -59,7 +59,7 @@ export type Client = {
   fileId: string;
   fileNumber: number;
   fileYear: number;
-  status: 'new' | 'contracted' | 'cancelled';
+  status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
   assignedEngineer?: string;
   createdAt: any;
   isActive: boolean;
@@ -754,3 +754,5 @@ export type BoqItem = {
   
   
   
+
+    
