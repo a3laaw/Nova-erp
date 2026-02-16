@@ -78,6 +78,7 @@ export function InlineSearchList({
       
       {open && (
         <div 
+          data-inline-search-list-options
           className="absolute z-[99999] w-full mt-1 bg-popover border rounded-md shadow-md"
           style={{ pointerEvents: 'auto' }}
         >
