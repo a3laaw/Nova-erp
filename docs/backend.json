@@ -783,8 +783,7 @@
             "type": "array",
             "description": "The business activities this department belongs to.",
             "items": {
-                "type": "string",
-                "enum": ["consulting", "construction", "sales"]
+                "type": "string"
             }
         }
       },
@@ -849,8 +848,7 @@
         },
         "activityType": {
             "type": "string",
-            "description": "The business activity this transaction type belongs to.",
-            "enum": ["consulting", "construction", "sales"]
+            "description": "The business activity this transaction type belongs to."
         },
         "departmentIds": {
             "type": "array",
@@ -1631,6 +1629,11 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "description": "The common name or description of the BOQ item." },
+        "transactionTypeIds": {
+            "type": "array",
+            "description": "Links to the specific transaction types this item is relevant to.",
+            "items": { "type": "string" }
+        },
         "subcontractorTypeIds": {
             "type": "array",
             "description": "Links to the types of subcontractors related to this item.",

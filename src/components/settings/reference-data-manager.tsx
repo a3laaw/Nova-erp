@@ -86,6 +86,7 @@ function BoqRefItem({
   setOpenCategories,
   subTypeMap,
   activityTypeMap,
+  transactionTypeMap,
 }: {
   node: BoqReferenceItem & { children: any[] };
   level: number;
@@ -96,6 +97,7 @@ function BoqRefItem({
   setOpenCategories: React.Dispatch<React.SetStateAction<Set<string>>>;
   subTypeMap: Map<string, string>;
   activityTypeMap: Map<string, string>;
+  transactionTypeMap: Map<string, string>;
 }) {
   const isOpen = openCategories.has(node.id!);
 
@@ -109,9 +111,16 @@ function BoqRefItem({
     });
   };
 
+  const handleSelect = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <div style={{ paddingRight: `${level * 1.5}rem` }}>
-      <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group">
+      <div 
+        className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group"
+        onClick={handleSelect}
+      >
         <div className="flex items-center gap-2 cursor-pointer flex-grow min-w-0" onClick={toggleOpen}>
           {node.children.length > 0 ? (
             <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -121,6 +130,9 @@ function BoqRefItem({
           <div className="flex flex-col">
             <span className="font-medium">{node.name}</span>
             <div className="flex flex-wrap gap-1 mt-1">
+              {node.transactionTypeIds?.map((id: string) => (
+                  <Badge key={id} variant="outline" className="border-blue-300 text-blue-700">{transactionTypeMap.get(id) || '...'}</Badge>
+              ))}
               {node.subcontractorTypeIds?.map((id: string) => (
                   <Badge key={id} variant="secondary">{subTypeMap.get(id) || '...'}</Badge>
               ))}
@@ -148,6 +160,7 @@ function BoqRefItem({
           setOpenCategories={setOpenCategories}
           subTypeMap={subTypeMap}
           activityTypeMap={activityTypeMap}
+          transactionTypeMap={transactionTypeMap}
         />
       ))}
     </div>
@@ -170,6 +183,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   loadingCompanyActivityTypes,
   subcontractorTypes,
   subcontractorTypesLoading,
+  transactionTypes,
+  transactionTypesLoading,
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -184,6 +199,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   loadingCompanyActivityTypes?: boolean;
   subcontractorTypes?: SubcontractorType[];
   subcontractorTypesLoading?: boolean;
+  transactionTypes?: TransactionType[];
+  transactionTypesLoading?: boolean;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -218,6 +235,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   // New state for BOQ reference item form
   const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = useState<string[]>([]);
   const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = useState<string[]>([]);
+  const [itemTransactionTypeIds, setItemTransactionTypeIds] = useState<string[]>([]);
   const [parentBoqItemId, setParentBoqItemId] = useState<string | null>(null);
 
 
@@ -389,6 +407,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
         if (isBoqView) {
+            setItemTransactionTypeIds(item?.transactionTypeIds || parent?.transactionTypeIds || []);
             setItemSubcontractorTypeIds(item?.subcontractorTypeIds || parent?.subcontractorTypeIds || []);
             setItemActivityTypeIdsForBoq(item?.activityTypeIds || parent?.activityTypeIds || []);
             setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
@@ -427,6 +446,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     setItemNextStageIds([]);
     setItemAllowedDuringStages([]);
     // Reset new BOQ item states
+    setItemTransactionTypeIds([]);
     setItemSubcontractorTypeIds([]);
     setItemActivityTypeIdsForBoq([]);
     setParentBoqItemId(null);
@@ -445,6 +465,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
        if (isBoqView && type === 'primary') {
            dataToSave = {
                 ...dataToSave,
+                transactionTypeIds: itemTransactionTypeIds,
                 subcontractorTypeIds: itemSubcontractorTypeIds,
                 activityTypeIds: itemActivityTypeIdsForBoq,
                 parentBoqReferenceItemId: parentBoqItemId,
@@ -671,6 +692,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
   const subTypeMap = useMemo(() => new Map((subcontractorTypes || []).map(t => [t.id, t.name])), [subcontractorTypes]);
   const activityTypeMap = useMemo(() => new Map((companyActivityTypes || []).map(t => [t.id, t.name])), [companyActivityTypes]);
+  const transactionTypeMap = useMemo(() => new Map((transactionTypes || []).map(t => [t.id, t.name])), [transactionTypes]);
   
   const subcontractorTypeOptions: MultiSelectOption[] = useMemo(() => 
     (subcontractorTypes || []).map(t => ({ value: t.id!, label: t.name })),
@@ -680,6 +702,11 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const activityTypeOptions: MultiSelectOption[] = useMemo(() =>
     (companyActivityTypes || []).map(t => ({ value: t.id!, label: t.name })),
     [companyActivityTypes]
+  );
+
+  const transactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() => 
+    (transactionTypes || []).map(t => ({ value: t.id!, label: t.name })),
+    [transactionTypes]
   );
 
   const boqRefTree = useMemo(() => {
@@ -774,6 +801,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                         setOpenCategories={setOpenCategories}
                         subTypeMap={subTypeMap}
                         activityTypeMap={activityTypeMap}
+                        transactionTypeMap={transactionTypeMap}
                     />
                 ))
               ) : (
@@ -899,8 +927,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                 )}
                 
                 {isBoqView && isPrimaryDialogOpen && (
-                    <>
-                         <div className="px-4 grid gap-2">
+                    <div className="px-4 space-y-4">
+                         <div className="grid gap-2">
                             <Label>البند الأب (اختياري)</Label>
                             <InlineSearchList 
                                 value={parentBoqItemId || ''}
@@ -909,11 +937,13 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                     if (val) {
                                         const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
                                         if (parent) {
+                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
                                             setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
                                             setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
                                         }
                                     } else {
                                         if (!editingItem) {
+                                            setItemTransactionTypeIds([]);
                                             setItemSubcontractorTypeIds([]);
                                             setItemActivityTypeIdsForBoq([]);
                                         }
@@ -924,7 +954,17 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                             />
                         </div>
                         <Separator className="my-4" />
-                        <div className="px-4 grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
+                            <div className="grid gap-2">
+                                <Label>أنواع المعاملات المرتبطة</Label>
+                                <MultiSelect
+                                    options={transactionTypeOptionsForBoq}
+                                    selected={itemTransactionTypeIds}
+                                    onChange={setItemTransactionTypeIds}
+                                    placeholder={transactionTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                    disabled={transactionTypesLoading}
+                                />
+                            </div>
                             <div className="grid gap-2">
                                 <Label>أنواع المقاولين المرتبطة</Label>
                                 <MultiSelect
@@ -946,7 +986,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                 />
                             </div>
                         </div>
-                    </>
+                    </div>
                 )}
 
                 {isWorkStageView && !isPrimaryDialogOpen && (
@@ -1108,7 +1148,7 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     const [itemToDelete, setItemToDelete] = useState<TransactionType | null>(null);
     
     const [itemName, setItemName] = useState('');
-    const [itemActivityType, setItemActivityType] = useState<'consulting' | 'construction' | 'sales'>('consulting');
+    const [itemActivityType, setItemActivityType] = useState<string>('');
     const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
     
     const [isSaving, setIsSaving] = useState(false);
@@ -1128,7 +1168,7 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     const openDialog = (item: TransactionType | null = null) => {
         setEditingItem(item);
         setItemName(item?.name || '');
-        setItemActivityType(item?.activityType || 'consulting');
+        setItemActivityType(item?.activityType || '');
         setSelectedDepartments(item?.departmentIds || []);
         setIsDialogOpen(true);
     };
@@ -1259,6 +1299,7 @@ export function ReferenceDataManager() {
     
     const { data: companyActivityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes');
     const { data: subcontractorTypes, loading: subcontractorTypesLoading } = useSubscription<SubcontractorType>(firestore, 'subcontractorTypes');
+    const { data: transactionTypes, loading: transactionTypesLoading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
 
 
     // Fetch counts for the dashboard
@@ -1390,6 +1431,8 @@ export function ReferenceDataManager() {
             loadingCompanyActivityTypes={activityTypesLoading}
             subcontractorTypes={subcontractorTypes || []}
             subcontractorTypesLoading={subcontractorTypesLoading}
+            transactionTypes={transactionTypes || []}
+            transactionTypesLoading={transactionTypesLoading}
         />
     }
 
@@ -1463,3 +1506,4 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
+
