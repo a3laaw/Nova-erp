@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 interface BoqColumnsProps {
   onEdit: (item: BoqItem) => void;
@@ -26,6 +27,11 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
     accessorKey: 'description',
     header: 'وصف البند',
     cell: ({ row }) => <div className="min-w-[200px] whitespace-pre-wrap">{row.original.description}</div>,
+  },
+  {
+    accessorKey: 'classification',
+    header: 'التصنيف',
+    cell: ({ row }) => row.original.classification ? <Badge variant="outline">{row.original.classification}</Badge> : '-',
   },
   {
     accessorKey: 'unit',
@@ -112,4 +118,3 @@ export const getBoqColumns = ({ onEdit, onDelete }: BoqColumnsProps): ColumnDef<
     },
   },
 ];
-

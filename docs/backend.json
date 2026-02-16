@@ -1590,7 +1590,11 @@
         "itemId": { "type": "string", "description": "Reference to the master Item ID from the main inventory." },
         "itemNumber": { "type": "string" },
         "description": { "type": "string" },
-        "classification": { "type": "string", "enum": ["خرسانة", "حديد", "شدات", "أخرى"] },
+        "classification": {
+          "type": "string",
+          "enum": ["خرسانة", "حديد", "شدات", "أخرى"],
+          "description": "The classification of the BOQ item (e.g., Concrete, Steel, Formwork)."
+        },
         "unit": { "type": "string" },
         "quantity": { "type": "number" },
         "costUnitPrice": { "type": "number", "description": "The estimated unit cost for the company." },

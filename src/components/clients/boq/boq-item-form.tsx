@@ -98,11 +98,13 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
   const handleMasterItemSelect = (itemId: string) => {
     const selectedItem = masterItems.find(i => i.id === itemId);
     if (selectedItem) {
+        setValue('itemId', itemId, { shouldValidate: true });
         setValue('description', selectedItem.name, { shouldValidate: true });
         setValue('unit', selectedItem.unitOfMeasure, { shouldValidate: true });
         setValue('costUnitPrice', selectedItem.costPrice || 0, { shouldValidate: true });
         setValue('sellingUnitPrice', selectedItem.sellingPrice || 0, { shouldValidate: true });
     } else {
+        setValue('itemId', '', { shouldValidate: true });
         setValue('description', '', { shouldValidate: true });
         setValue('unit', '', { shouldValidate: true });
         setValue('costUnitPrice', 0, { shouldValidate: true });
@@ -216,9 +218,9 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                    <Label htmlFor="plannedQuantity">الكمية <span className="text-destructive">*</span></Label>
-                    <Input id="plannedQuantity" type="number" step="any" {...register('plannedQuantity')} required />
-                    {errors.plannedQuantity && <p className="text-xs text-destructive">{errors.plannedQuantity.message}</p>}
+                    <Label htmlFor="quantity">الكمية <span className="text-destructive">*</span></Label>
+                    <Input id="quantity" type="number" step="any" {...register('quantity')} required />
+                    {errors.quantity && <p className="text-xs text-destructive">{errors.quantity.message}</p>}
                 </div>
             </div>
             <div className="p-4 border rounded-lg bg-muted/50 grid grid-cols-2 gap-4">
@@ -246,4 +248,3 @@ export function BoqItemForm({ isOpen, onClose, onSaveSuccess, transactionId, ite
     </Dialog>
   );
 }
-

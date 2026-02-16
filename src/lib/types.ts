@@ -743,6 +743,7 @@ export type SubcontractorSpecialization = {
 
 export type BoqItem = {
     id?: string;
+    itemId?: string;
     itemNumber: string;
     description: string;
     classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
@@ -774,6 +775,7 @@ export type Boq = {
   
 
     
+
 
 
 
