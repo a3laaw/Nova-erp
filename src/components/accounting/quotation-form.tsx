@@ -100,7 +100,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         const [clientsSnapshot, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('createdAt', 'desc'), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
-          getDocs(query(collectionGroup(firestore, 'transactionTypes'))),
+          getDocs(query(collection(firestore, 'transactionTypes'))), // Corrected: use collection()
           getDocs(query(collectionGroup(firestore, 'workStages'))),
         ]);
 
@@ -116,7 +116,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         const uniqueTypeNames = new Set<string>();
         transTypesSnapshot.forEach(doc => {
             const typeName = doc.data().name;
-            const typeData = doc.data() as TransactionType;
             if (typeName && !uniqueTypeNames.has(typeName)) {
                 types.push({ value: doc.id, label: typeName });
                 uniqueTypeNames.add(typeName);
@@ -141,8 +140,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         setRefDataLoading(false);
       }
     };
-    fetchRefData();
-  }, [firestore, toast]);
+    if (isOpen) {
+        fetchRefData();
+    }
+  }, [firestore, toast, isOpen]);
   
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
     if (template) {
@@ -388,5 +389,3 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     </form>
   );
 }
-
-    
