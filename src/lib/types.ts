@@ -774,6 +774,7 @@ export type BoqReferenceItem = {
   id?: string;
   name: string;
   unit?: string;
+  isHeader?: boolean;
   transactionTypeIds?: string[];
   subcontractorTypeIds?: string[];
   activityTypeIds?: string[];
@@ -783,6 +784,7 @@ export type BoqReferenceItem = {
   
 
     
+
 
 
 
