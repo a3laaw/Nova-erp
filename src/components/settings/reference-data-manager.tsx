@@ -89,6 +89,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   companyActivityTypes,
   loadingCompanyActivityTypes,
   subcontractorTypes,
+  subcontractorTypesLoading,
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -102,6 +103,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   companyActivityTypes?: CompanyActivityType[];
   loadingCompanyActivityTypes?: boolean;
   subcontractorTypes?: SubcontractorType[];
+  subcontractorTypesLoading?: boolean;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -585,12 +587,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const activityTypeMap = useMemo(() => new Map((companyActivityTypes || []).map(t => [t.id, t.name])), [companyActivityTypes]);
   
   const subcontractorTypeOptions: MultiSelectOption[] = useMemo(() => 
-    (subcontractorTypes || []).map(t => ({ value: t.id, label: t.name })),
+    (subcontractorTypes || []).map(t => ({ value: t.id!, label: t.name })),
     [subcontractorTypes]
   );
   
   const activityTypeOptions: MultiSelectOption[] = useMemo(() =>
-    (companyActivityTypes || []).map(t => ({ value: t.id, label: t.name })),
+    (companyActivityTypes || []).map(t => ({ value: t.id!, label: t.name })),
     [companyActivityTypes]
   );
 
@@ -775,8 +777,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                 options={subcontractorTypeOptions}
                                 selected={itemSubcontractorTypeIds}
                                 onChange={setItemSubcontractorTypeIds}
-                                placeholder="اختر نوعًا أو أكثر..."
-                                disabled={loading}
+                                placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                disabled={subcontractorTypesLoading}
                             />
                         </div>
                         <div className="grid gap-2">
@@ -958,7 +960,7 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     const [searchQuery, setSearchQuery] = useState('');
     
     const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
-    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id, label: d.name })), [departments]);
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
 
     const filteredTransactionTypes = useMemo(() => {
         if (!searchQuery) return transactionTypes;
@@ -1232,6 +1234,7 @@ export function ReferenceDataManager() {
             companyActivityTypes={companyActivityTypes || []}
             loadingCompanyActivityTypes={activityTypesLoading}
             subcontractorTypes={subcontractorTypes || []}
+            subcontractorTypesLoading={subcontractorTypesLoading}
         />
     }
 
