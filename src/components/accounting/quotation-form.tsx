@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
+import { DialogFooter } from '../ui/dialog';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -358,5 +359,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </Button>
       </DialogFooter>
     </form>
-  )
+  );
 }
+  
