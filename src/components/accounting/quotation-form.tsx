@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -9,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
-import { useFirebase, useSubscription } from '@/firebase';
-import type { Client, Quotation, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, TransactionType, WorkStage } from '@/lib/types';
+import { useFirebase } from '@/firebase';
+import type { Client, Quotation, QuotationItem, ContractTemplate, ContractTerm, ContractScopeItem, TransactionType, WorkStage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -21,6 +22,8 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '../ui/dialog';
+import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
+
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -69,6 +72,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const [allTransactionTypes, setAllTransactionTypes] = useState<any[]>([]);
   const [allTemplates, setAllTemplates] = useState<ContractTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
 
   const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset } = useForm<QuotationFormValues>({
@@ -93,10 +97,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const fetchRefData = async () => {
       setRefDataLoading(true);
       try {
-        const [clientsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
+        const [clientsSnapshot, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('createdAt', 'desc'), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
-          getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')))
+          getDocs(query(collectionGroup(firestore, 'transactionTypes'))),
+          getDocs(query(collectionGroup(firestore, 'workStages'))),
         ]);
 
         const fetchedClients = clientsSnapshot.docs
@@ -106,9 +111,31 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         setClients(fetchedClients);
         
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
-        setAllTransactionTypes(transTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+        
+        const types: MultiSelectOption[] = [];
+        const uniqueTypeNames = new Set<string>();
+        transTypesSnapshot.forEach(doc => {
+            const typeName = doc.data().name;
+            const typeData = doc.data() as TransactionType;
+            if (typeName && !uniqueTypeNames.has(typeName)) {
+                types.push({ value: doc.id, label: typeName });
+                uniqueTypeNames.add(typeName);
+            }
+        });
+        setAllTransactionTypes(types.sort((a,b) => a.label.localeCompare(b.label, 'ar')));
+
+        const stages: MultiSelectOption[] = [];
+        const uniqueStages = new Map<string, MultiSelectOption>();
+        stagesSnapshot.forEach(doc => {
+          const stageName = doc.data().name;
+          if (stageName && !uniqueStages.has(stageName)) {
+              uniqueStages.set(stageName, { value: stageName, label: stageName });
+          }
+        });
+        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
 
       } catch (error) {
+        console.error("Error fetching reference data:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
         setRefDataLoading(false);
@@ -182,19 +209,19 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     if (isEditing) return; // Don't auto-change template on edit
     if (!selectedTransactionTypeId || allTransactionTypes.length === 0 || allTemplates.length === 0) return;
 
-    const transType = allTransactionTypes.find(t => t.id === selectedTransactionTypeId);
+    const transType = allTransactionTypes.find(t => t.value === selectedTransactionTypeId);
     if (!transType) return;
     
-    setValue('subject', transType.name);
+    setValue('subject', transType.label);
     
-    const matchingTemplates = allTemplates.filter(t => t.transactionTypes?.includes(transType.name));
+    const matchingTemplates = allTemplates.filter(t => t.transactionTypes?.includes(transType.label));
     
-    // Simplified logic: just pick the first one if it exists
     const templateToUse = matchingTemplates.length > 0 ? matchingTemplates[0] : null;
     populateFormFromTemplate(templateToUse);
     
-    if (transType.departmentIds && transType.departmentIds.length > 0) {
-        setValue('departmentId', transType.departmentIds[0]);
+    const originalType = allTransactionTypes.find(t => t.id === selectedTransactionTypeId);
+    if (originalType?.departmentIds && originalType.departmentIds.length > 0) {
+        setValue('departmentId', originalType.departmentIds[0]);
     }
   }, [isEditing, selectedTransactionTypeId, allTransactionTypes, allTemplates, setValue, populateFormFromTemplate]);
 
@@ -214,7 +241,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   }, [initialData, reset]);
 
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
-  const transactionTypeOptions = useMemo(() => allTransactionTypes.map(t => ({ value: t.id, label: t.name })), [allTransactionTypes]);
+  const transactionTypeOptions = useMemo(() => allTransactionTypes.map(t => ({ value: t.value, label: t.label })), [allTransactionTypes]);
   
   const onSubmit = (data: QuotationFormValues) => {
     const processedItems = data.items.map(item => {
@@ -361,4 +388,5 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     </form>
   );
 }
-  
+
+    
