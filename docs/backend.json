@@ -1318,7 +1318,6 @@
         "departmentId": { "type": "string", "description": "The ID of the department this quotation is for." },
         "transactionTypeId": { "type": "string", "description": "The ID of the transaction type this quotation is for." },
         "templateDescription": { "type": "string" },
-        "financialsType": { "type": "string", "enum": ["fixed", "percentage"] },
         "scopeOfWork": { "type": "array", "items": { "$ref": "#/entities/ContractScopeItem" } },
         "termsAndConditions": { "type": "array", "items": { "$ref": "#/entities/ContractTerm" } },
         "openClauses": { "type": "array", "items": { "$ref": "#/entities/ContractTerm" } },
@@ -1332,7 +1331,6 @@
               "quantity": { "type": "number" },
               "unitPrice": { "type": "number" },
               "total": { "type": "number" },
-              "percentage": { "type": "number" },
               "condition": { "type": "string", "description": "The condition for this item to be due, often linked to a work stage."}
             },
             "required": ["description", "quantity", "unitPrice", "total"]
@@ -1575,6 +1573,22 @@
             }
         },
         "required": ["adjustmentNumber", "date", "type", "items"]
+    },
+    "BoqItem": {
+      "title": "Bill of Quantities Item",
+      "description": "A single line item in a Bill of Quantities.",
+      "type": "object",
+      "properties": {
+        "itemNumber": { "type": "string" },
+        "description": { "type": "string" },
+        "unit": { "type": "string" },
+        "plannedQuantity": { "type": "number" },
+        "plannedUnitPrice": { "type": "number" },
+        "executedQuantity": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itemNumber", "description", "unit", "plannedQuantity", "plannedUnitPrice"]
     }
   },
   "auth": {
@@ -1612,6 +1626,10 @@
             "$ref": "#/entities/ClientTransaction"
         },
         "description": "Stores internal transactions/services for a specific client."
+    },
+    "/clients/{clientId}/transactions/{transactionId}/boq/{boqItemId}": {
+        "schema": { "$ref": "#/entities/BoqItem" },
+        "description": "Stores the Bill of Quantities for a specific transaction."
     },
     "/transaction_assignments/{assignmentId}": {
         "schema": {
@@ -1797,4 +1815,3 @@
     }
   }
 }
-  

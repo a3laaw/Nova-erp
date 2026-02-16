@@ -655,7 +655,7 @@ export default function TransactionDetailPage() {
                 </Card>
             </TabsContent>
             <TabsContent value="boq" className="mt-6">
-                <BoqView transactionId={transactionId} />
+                <BoqView transactionId={`${clientId}/${transactionId}`} />
             </TabsContent>
             <TabsContent value="comments" className="mt-6">
                 <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="comment" showInput={true} title="التعليقات والمتابعة" icon={<MessageSquare className="text-primary" />} client={client} transaction={transaction}/>
@@ -670,4 +670,5 @@ export default function TransactionDetailPage() {
 }
 
     
+
 

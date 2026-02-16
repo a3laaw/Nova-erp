@@ -118,7 +118,6 @@ export default function ProjectDetailPage() {
             <Tabs defaultValue="overview">
                 <TabsList>
                     <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
-                    <TabsTrigger value="boq" disabled={!project.linkedTransactionId}>جدول الكميات (BOQ)</TabsTrigger>
                     <TabsTrigger value="subcontracts" disabled>المقاولون</TabsTrigger>
                     <TabsTrigger value="procurement" disabled>المشتريات</TabsTrigger>
                     <TabsTrigger value="financials" disabled>المالية</TabsTrigger>
@@ -129,17 +128,6 @@ export default function ProjectDetailPage() {
                         <StatCard title="قيمة العقد" value={formatCurrency(project.contractValue)} icon={<DollarSign/>}/>
                         <StatCard title="نسبة الإنجاز" value={`${project.progressPercentage}%`} icon={<Percent/>}/>
                      </div>
-                </TabsContent>
-                <TabsContent value="boq" className="mt-4">
-                    {project.linkedTransactionId ? (
-                        <BoqView transactionId={`${project.clientId}/${project.linkedTransactionId}`} />
-                    ) : (
-                        <Card>
-                            <CardContent className="p-8 text-center text-muted-foreground">
-                                <p>يجب ربط هذا المشروع بمعاملة استشارية أولاً لعرض جدول الكميات.</p>
-                            </CardContent>
-                        </Card>
-                    )}
                 </TabsContent>
             </Tabs>
         </div>
