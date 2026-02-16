@@ -776,15 +776,14 @@ export type Boq = {
 export type BoqReferenceItem = {
   id?: string;
   name: string;
-  unit: string;
-  classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
-  defaultCostUnitPrice?: number;
-  defaultSellingUnitPrice?: number;
+  subcontractorTypeIds?: string[];
+  activityTypeIds?: string[];
   order?: number;
 };
   
 
     
+
 
 
 

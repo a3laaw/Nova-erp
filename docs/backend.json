@@ -1631,17 +1631,19 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "description": "The common name or description of the BOQ item." },
-        "unit": { "type": "string", "description": "The standard unit of measure (e.g., m³, ton, item)." },
-        "classification": {
-          "type": "string",
-          "enum": ["خرسانة", "حديد", "شدات", "أخرى"],
-          "description": "The category of the work item."
+        "subcontractorTypeIds": {
+            "type": "array",
+            "description": "Links to the types of subcontractors related to this item.",
+            "items": { "type": "string" }
         },
-        "defaultCostUnitPrice": { "type": "number", "description": "The typical unit cost for this item." },
-        "defaultSellingUnitPrice": { "type": "number", "description": "The typical unit selling price for this item." },
+        "activityTypeIds": {
+            "type": "array",
+            "description": "Links to the business activities this item is relevant to.",
+            "items": { "type": "string" }
+        },
         "order": { "type": "number", "description": "The display order of the item in lists." }
       },
-      "required": ["name", "unit"]
+      "required": ["name"]
     }
   },
   "auth": {
