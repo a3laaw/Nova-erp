@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -43,7 +44,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const [engineersLoading, setEngineersLoading] = useState(true);
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
     const [typesLoading, setTypesLoading] = useState(true);
-    const [departments, setDepartments] = useState<Department[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
 
 
@@ -78,7 +79,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const fetchedTypes = transTypesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType));
                 setTransactionTypes(fetchedTypes);
                 
-                setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+                setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setWorkStages(stagesSnap.docs.map(doc => ({id: doc.id, ...doc.data()} as WorkStage)))
 
             } catch (error) {

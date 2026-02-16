@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -70,7 +71,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
       setLoadingRefData(true);
       try {
         const types: MultiSelectOption[] = [];
-        const transTypesSnapshot = await getDocs(query(collectionGroup(firestore, 'transactionTypes')));
+        const transTypesSnapshot = await getDocs(query(collection(firestore, 'transactionTypes')));
         const uniqueTypeNames = new Set<string>();
         transTypesSnapshot.forEach(typeDoc => {
             const typeName = typeDoc.data().name;
@@ -222,6 +223,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         setIsSaving(false);
     }
   };
+  
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -265,6 +273,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                 onChange={setSelectedTransactionTypes}
                                 placeholder={loadingRefData ? "تحميل..." : "اختر نوعًا أو أكثر..."}
                                 disabled={loadingRefData}
+                                className="w-full"
                             />
                         </div>
                     </section>

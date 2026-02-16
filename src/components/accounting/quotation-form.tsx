@@ -92,10 +92,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   React.useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
-      setRefDataLoading(true);
+      setLoadingRefData(true);
       try {
         const [clientsSnapshot, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
-          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('createdAt', 'desc'), limit(200))),
+          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'))),
           getDocs(query(collectionGroup(firestore, 'workStages'))),
@@ -134,7 +134,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         console.error("Error fetching reference data:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
-        setRefDataLoading(false);
+        setLoadingRefData(false);
       }
     };
     fetchRefData();
@@ -251,13 +251,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     onSave({ ...data, items: processedItems });
   };
   
-  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setPortalTarget(document.body);
-    }
-  }, []);
-
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="space-y-6 py-4 px-1 max-h-[70vh] overflow-y-auto">
@@ -376,13 +369,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
           </div>
       </div>
-      <div className="mt-6 pt-4 border-t flex justify-end gap-2">
+      <DialogFooter className="mt-6 pt-4 border-t">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
           <Button type="submit" disabled={isSaving || refDataLoading}>
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
               {isSaving ? 'جاري الحفظ...' : 'حفظ'}
           </Button>
-      </div>
+      </DialogFooter>
     </form>
   );
 }
