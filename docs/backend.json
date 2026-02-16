@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "CompanyBranding": {
@@ -1629,6 +1630,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "description": "The common name or description of the BOQ item." },
+        "unit": { "type": "string", "description": "The default unit of measure for this item (e.g., m3, m2, item)." },
         "transactionTypeIds": {
             "type": "array",
             "description": "Links to the specific transaction types this item is relevant to.",

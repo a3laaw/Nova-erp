@@ -127,7 +127,10 @@ function BoqRefItem({
             </Button>
           ) : <span className="w-6 h-6 inline-block" />}
           <div className="flex flex-col">
-            <span className="font-medium">{node.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{node.name}</span>
+              {node.unit && <Badge variant="secondary">{node.unit}</Badge>}
+            </div>
             <div className="flex flex-wrap gap-1 mt-1">
               {node.transactionTypeIds?.map((id: string) => (
                   <Badge key={id} variant="outline" className="border-blue-300 text-blue-700">{transactionTypeMap.get(id) || '...'}</Badge>
@@ -220,6 +223,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   
   // Form state
   const [itemName, setItemName] = React.useState('');
+  const [itemUnit, setItemUnit] = React.useState('');
   const [itemActivityTypes, setItemActivityTypes] = React.useState<string[]>([]);
   const [itemRoles, setItemRoles] = React.useState<string[]>([]);
   const [itemStageType, setItemStageType] = React.useState<'sequential' | 'parallel'>('sequential');
@@ -413,6 +417,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemSubcontractorTypeIds(item?.subcontractorTypeIds || parentSubcontractorIds);
             setItemTransactionTypeIds(item?.transactionTypeIds || parentTransactionTypeIds);
             setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
+            setItemUnit(item?.unit || '');
         }
         setIsPrimaryDialogOpen(true);
     } else { // Secondary
@@ -437,6 +442,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     setIsSecondaryDialogOpen(false);
     setEditingItem(null);
     setItemName('');
+    setItemUnit('');
     setItemActivityTypes([]);
     setItemRoles([]);
     setItemStageType('sequential');
@@ -467,6 +473,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
        if (isBoqView && type === 'primary') {
            dataToSave = {
                 ...dataToSave,
+                unit: itemUnit,
                 transactionTypeIds: itemTransactionTypeIds,
                 subcontractorTypeIds: itemSubcontractorTypeIds,
                 activityTypeIds: itemActivityTypeIdsForBoq,
@@ -957,30 +964,36 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                         
                         {isBoqView && isPrimaryDialogOpen && (
                             <div className="px-4 space-y-4">
-                                <div className="grid gap-2">
-                                    <Label>البند الأب (اختياري)</Label>
-                                    <InlineSearchList 
-                                        value={parentBoqItemId || ''}
-                                        onSelect={(val) => {
-                                            setParentBoqItemId(val);
-                                            if (val) {
-                                                const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                                if (parent) {
-                                                    setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                                    setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                                    setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
+                                        <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>البند الأب (اختياري)</Label>
+                                        <InlineSearchList 
+                                            value={parentBoqItemId || ''}
+                                            onSelect={(val) => {
+                                                setParentBoqItemId(val);
+                                                if (val) {
+                                                    const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                                    if (parent) {
+                                                        setItemTransactionTypeIds(parent.transactionTypeIds || []);
+                                                        setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                                        setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                                    }
+                                                } else {
+                                                    if (!editingItem) {
+                                                        setItemTransactionTypeIds([]);
+                                                        setItemSubcontractorTypeIds([]);
+                                                        setItemActivityTypeIdsForBoq([]);
+                                                    }
                                                 }
-                                            } else {
-                                                if (!editingItem) {
-                                                    setItemTransactionTypeIds([]);
-                                                    setItemSubcontractorTypeIds([]);
-                                                    setItemActivityTypeIdsForBoq([]);
-                                                }
-                                            }
-                                        }}
-                                        options={boqRefOptions}
-                                        placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                    />
+                                            }}
+                                            options={boqRefOptions}
+                                            placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
+                                        />
+                                    </div>
                                 </div>
                                 <Separator className="my-4" />
                                 <div className="grid grid-cols-1 gap-4">
@@ -1459,7 +1472,7 @@ export function ReferenceDataManager() {
             companyActivityTypes={companyActivityTypes || []}
             loadingCompanyActivityTypes={activityTypesLoading}
             subcontractorTypes={subcontractorTypes || []}
-            subcontractorTypesLoading={subcontractorTypesLoading}
+            subcontractorTypesLoading={subcontractorTypesLoading || false}
             transactionTypes={transactionTypes || []}
             transactionTypesLoading={transactionTypesLoading}
         />

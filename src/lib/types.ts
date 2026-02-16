@@ -387,7 +387,7 @@ export type Area = {
 export type TransactionType = {
   id: string;
   name: string;
-  activityType: 'consulting' | 'construction' | 'sales';
+  activityType?: string;
   departmentIds?: string[];
   order?: number;
 };
@@ -776,6 +776,7 @@ export type Boq = {
 export type BoqReferenceItem = {
   id?: string;
   name: string;
+  unit?: string;
   transactionTypeIds?: string[];
   subcontractorTypeIds?: string[];
   activityTypeIds?: string[];
@@ -785,4 +786,5 @@ export type BoqReferenceItem = {
   
 
     
+
 
