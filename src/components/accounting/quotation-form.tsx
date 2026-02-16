@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -22,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
+import { DialogFooter } from '@/components/ui/dialog';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -92,10 +92,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   React.useEffect(() => {
     if (!firestore) return;
     const fetchRefData = async () => {
-      setLoadingRefData(true);
+      setRefDataLoading(true);
       try {
         const [clientsSnapshot, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
-          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
+          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'))),
           getDocs(query(collectionGroup(firestore, 'workStages'))),
@@ -134,7 +134,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         console.error("Error fetching reference data:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
-        setLoadingRefData(false);
+        setRefDataLoading(false);
       }
     };
     fetchRefData();
@@ -251,6 +251,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     onSave({ ...data, items: processedItems });
   };
   
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
+
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="space-y-6 py-4 px-1 max-h-[70vh] overflow-y-auto">
