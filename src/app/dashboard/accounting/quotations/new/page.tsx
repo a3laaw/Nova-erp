@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -37,7 +36,7 @@ import {
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
-import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, Department, TransactionType, WorkStage } from '@/lib/types';
+import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -46,6 +45,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
 import { useAuth } from '@/context/auth-context';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -117,13 +117,13 @@ export default function NewQuotationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
   const clientIdFromUrl = searchParams.get('clientId');
 
   const [clients, setClients] = useState<Client[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
+  const [transactionTypes, setTransactionTypes] = useState<any[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
 
@@ -180,9 +180,8 @@ export default function NewQuotationPage() {
     const fetchRefData = async () => {
       setRefDataLoading(true);
       try {
-        const [clientsSnapshot, departmentsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
+        const [clientsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'))),
-          getDocs(query(collection(firestore, 'departments'))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')))
         ]);
@@ -193,9 +192,8 @@ export default function NewQuotationPage() {
         fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
         setClients(fetchedClients);
         
-        setDepartments(departmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)).filter(d => d && d.name));
         setTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
-        setTransactionTypes(transTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)).filter(t => t && t.name));
+        setTransactionTypes(transTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
 
       } catch (error) {
         console.error("Error fetching ref data for quotations:", error)
@@ -320,7 +318,7 @@ export default function NewQuotationPage() {
   const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id, label: t.name })), [transactionTypes]);
 
   const onSubmit = async (data: QuotationFormValues) => {
-    if (!firestore || isGeneratingNumber) return;
+    if (!firestore || !currentUser || isGeneratingNumber) return;
     setIsSaving(true);
     let newQuotationId = '';
     try {
@@ -334,7 +332,6 @@ export default function NewQuotationPage() {
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
             
-            transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             const newQuotationNumber = `Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
             const newQuotationRef = doc(collection(firestore, 'quotations'));
@@ -361,7 +358,7 @@ export default function NewQuotationPage() {
 
             const finalTotalAmount = processedItems.reduce((sum, item) => sum + item.total, 0);
 
-            transaction.set(newQuotationRef, {
+            const quotationData = {
                 quotationNumber: newQuotationNumber,
                 quotationSequence: nextNumber,
                 quotationYear: currentYear,
@@ -377,12 +374,16 @@ export default function NewQuotationPage() {
                 notes: data.notes,
                 status: 'draft',
                 createdAt: serverTimestamp(),
+                createdBy: currentUser.id,
                 financialsType: data.financialsType,
                 scopeOfWork: scopeOfWork,
                 termsAndConditions: terms,
                 openClauses: openClauses,
                 templateDescription: chosenTemplate?.description || '',
-            });
+            };
+            
+            transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            transaction.set(newQuotationRef, cleanFirestoreData(quotationData));
         });
         
         toast({ title: 'نجاح', description: 'تم حفظ عرض السعر كمسودة.' });
@@ -419,7 +420,7 @@ export default function NewQuotationPage() {
       </Dialog>
     
       <Card className="max-w-4xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
@@ -568,5 +569,3 @@ export default function NewQuotationPage() {
     </>
   );
 }
-
-  
