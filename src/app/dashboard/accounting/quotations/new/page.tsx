@@ -33,10 +33,10 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, FileSignature } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
-import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm } from '@/lib/types';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, where, limit } from 'firebase/firestore';
+import type { Client, QuotationItem, ContractTemplate, ContractScopeItem, ContractTerm, TransactionType, WorkStage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -46,6 +46,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
 import { useAuth } from '@/context/auth-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
+import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -181,7 +183,7 @@ export default function NewQuotationPage() {
       setRefDataLoading(true);
       try {
         const [clientsSnapshot, templatesSnapshot, transTypesSnapshot] = await Promise.all([
-          getDocs(query(collection(firestore, 'clients'))),
+          getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('createdAt', 'desc'), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')))
         ]);
@@ -189,6 +191,8 @@ export default function NewQuotationPage() {
         const fetchedClients = clientsSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as Client))
             .filter(c => c && c.nameAr && c.isActive === true);
+        
+        // Sorting is now done client-side on the fetched (limited) data for better UX
         fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
         setClients(fetchedClients);
         

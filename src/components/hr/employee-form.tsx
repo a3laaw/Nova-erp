@@ -168,9 +168,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setRefDataLoading(true);
             try {
                 const deptsQuery = query(collection(firestore, 'departments'));
-                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
-                
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
+                const deptsSnapshot = await getDocs(deptsQuery);
 
                 const fetchedDepartments = deptsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
@@ -178,13 +176,19 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 fetchedDepartments.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
                 setDepartments(fetchedDepartments);
-
-                const fetchedJobs = jobsSnapshot.docs.map(doc => {
-                    const departmentId = doc.ref.parent.parent!.id;
-                    return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
-                }).filter(job => job && job.name);
                 
-                setJobs(fetchedJobs);
+                const jobsPromises = fetchedDepartments.map(dept => getDocs(query(collection(firestore, `departments/${dept.id}/jobs`))));
+                const jobsSnapshots = await Promise.all(jobsPromises);
+
+                const fetchedJobs: (Job & { departmentId: string })[] = [];
+                jobsSnapshots.forEach((jobsSnap, index) => {
+                    const departmentId = fetchedDepartments[index].id;
+                    jobsSnap.forEach(doc => {
+                        fetchedJobs.push({ id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string });
+                    });
+                });
+                
+                setJobs(fetchedJobs.filter(job => job && job.name));
 
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
