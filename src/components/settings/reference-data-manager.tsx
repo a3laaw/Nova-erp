@@ -406,9 +406,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
         if (isBoqView) {
-            setItemTransactionTypeIds(item?.transactionTypeIds || parent?.transactionTypeIds || []);
-            setItemSubcontractorTypeIds(item?.subcontractorTypeIds || parent?.subcontractorTypeIds || []);
-            setItemActivityTypeIdsForBoq(item?.activityTypeIds || parent?.activityTypeIds || []);
+            const parentActivityIds = parent ? (parent.activityTypeIds || []) : [];
+            const parentSubcontractorIds = parent ? (parent.subcontractorTypeIds || []) : [];
+            const parentTransactionTypeIds = parent ? (parent.transactionTypeIds || []) : [];
+            setItemActivityTypeIdsForBoq(item?.activityTypeIds || parentActivityIds);
+            setItemSubcontractorTypeIds(item?.subcontractorTypeIds || parentSubcontractorIds);
+            setItemTransactionTypeIds(item?.transactionTypeIds || parentTransactionTypeIds);
             setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
         }
         setIsPrimaryDialogOpen(true);
@@ -574,564 +577,591 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   };
 
     const handleImportDefaults = async () => {
-    if (!firestore) return;
-    setIsImporting(true);
-    try {
-        const batch = writeBatch(firestore);
-        
-        const primarySnap = await getDocs(query(collection(firestore, primaryCollectionName)));
-        for (const doc of primarySnap.docs) {
-            if (secondaryCollectionName) {
-                const secondarySnap = await getDocs(query(collection(firestore, `${primaryCollectionName}/${doc.id}/${secondaryCollectionName}`)));
-                secondarySnap.forEach(secDoc => batch.delete(secDoc.ref));
+        if (!firestore) return;
+        setIsImporting(true);
+        try {
+            const batch = writeBatch(firestore);
+            
+            const primarySnap = await getDocs(query(collection(firestore, primaryCollectionName)));
+            for (const doc of primarySnap.docs) {
+                if (secondaryCollectionName) {
+                    const secondarySnap = await getDocs(query(collection(firestore, `${primaryCollectionName}/${doc.id}/${secondaryCollectionName}`)));
+                    secondarySnap.forEach(secDoc => batch.delete(secDoc.ref));
+                }
+                batch.delete(doc.ref);
             }
-            batch.delete(doc.ref);
-        }
 
-        switch(primaryCollectionName) {
-            case 'departments':
-                for (const dept of defaultDepartments) {
-                    const newDeptRef = doc(collection(firestore, 'departments'));
-                    batch.set(newDeptRef, dept);
-                    
-                    const jobsForDept = defaultJobs[dept.name as keyof typeof defaultJobs];
-                    if (jobsForDept && secondaryCollectionName === 'jobs') {
-                        for (const job of jobsForDept) {
-                            const newJobRef = doc(collection(firestore, `${newDeptRef.path}/jobs`));
-                            batch.set(newJobRef, job);
+            switch(primaryCollectionName) {
+                case 'departments':
+                    for (const dept of defaultDepartments) {
+                        const newDeptRef = doc(collection(firestore, 'departments'));
+                        batch.set(newDeptRef, dept);
+                        
+                        const jobsForDept = defaultJobs[dept.name as keyof typeof defaultJobs];
+                        if (jobsForDept && secondaryCollectionName === 'jobs') {
+                            for (const job of jobsForDept) {
+                                const newJobRef = doc(collection(firestore, `${newDeptRef.path}/jobs`));
+                                batch.set(newJobRef, job);
+                            }
                         }
                     }
-                }
-                break;
-            case 'governorates':
-                for (const gov of defaultGovernorates) {
-                    const newGovRef = doc(collection(firestore, 'governorates'));
-                    batch.set(newGovRef, gov);
-                    
-                    const areasForGov = defaultAreas[gov.name as keyof typeof defaultAreas];
-                    if (areasForGov && secondaryCollectionName === 'areas') {
-                        for (const area of areasForGov) {
-                            const newAreaRef = doc(collection(firestore, `${newGovRef.path}/areas`));
-                            batch.set(newAreaRef, area);
+                    break;
+                case 'governorates':
+                    for (const gov of defaultGovernorates) {
+                        const newGovRef = doc(collection(firestore, 'governorates'));
+                        batch.set(newGovRef, gov);
+                        
+                        const areasForGov = defaultAreas[gov.name as keyof typeof defaultAreas];
+                        if (areasForGov && secondaryCollectionName === 'areas') {
+                            for (const area of areasForGov) {
+                                const newAreaRef = doc(collection(firestore, `${newGovRef.path}/areas`));
+                                batch.set(newAreaRef, area);
+                            }
                         }
                     }
-                }
-                break;
+                    break;
+            }
+
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم استيراد البيانات الافتراضية بنجاح.' });
+            fetchPrimaryItems();
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات.' });
+        } finally {
+            setIsImporting(false);
+            setIsImportConfirmOpen(false);
         }
+    };
 
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تم استيراد البيانات الافتراضية بنجاح.' });
-        fetchPrimaryItems();
-    } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد البيانات.' });
-    } finally {
-        setIsImporting(false);
-        setIsImportConfirmOpen(false);
-    }
-  };
+    const handleImportWorkStages = async () => {
+        if (!firestore) return;
+        setIsImporting(true);
+        try {
+            const deptsSnapshot = await getDocs(query(collection(firestore, 'departments')));
+            const allNewStagesByName = new Map<string, { id: string, ref: any }>();
+            const allDeptsToProcess: { deptDoc: any; stages: any[] }[] = [];
 
-  const handleImportWorkStages = async () => {
-    if (!firestore) return;
-    setIsImporting(true);
-    try {
-        const deptsSnapshot = await getDocs(query(collection(firestore, 'departments')));
-        const allNewStagesByName = new Map<string, { id: string, ref: any }>();
-        const allDeptsToProcess: { deptDoc: any; stages: any[] }[] = [];
-
-        // Pre-calculate all new stage IDs and references across all departments first
-        for (const deptDoc of deptsSnapshot.docs) {
-            const deptName = deptDoc.data().name;
-            const stagesForDept = defaultWorkStages[deptName as keyof typeof defaultWorkStages];
-            if (stagesForDept) {
-                allDeptsToProcess.push({ deptDoc, stages: stagesForDept });
-                for (const stage of stagesForDept) {
-                    const newStageRef = doc(collection(firestore, `departments/${deptDoc.id}/workStages`));
-                    allNewStagesByName.set(stage.name, { id: newStageRef.id, ref: newStageRef });
+            // Pre-calculate all new stage IDs and references across all departments first
+            for (const deptDoc of deptsSnapshot.docs) {
+                const deptName = deptDoc.data().name;
+                const stagesForDept = defaultWorkStages[deptName as keyof typeof defaultWorkStages];
+                if (stagesForDept) {
+                    allDeptsToProcess.push({ deptDoc, stages: stagesForDept });
+                    for (const stage of stagesForDept) {
+                        const newStageRef = doc(collection(firestore, `departments/${deptDoc.id}/workStages`));
+                        allNewStagesByName.set(stage.name, { id: newStageRef.id, ref: newStageRef });
+                    }
                 }
             }
-        }
-        
-        const batch = writeBatch(firestore);
-        
-        // Delete all existing work stages
-        const allExistingStagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages')));
-        allExistingStagesSnap.forEach(doc => batch.delete(doc.ref));
+            
+            const batch = writeBatch(firestore);
+            
+            // Delete all existing work stages
+            const allExistingStagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages')));
+            allExistingStagesSnap.forEach(doc => batch.delete(doc.ref));
 
-        // Create new stages with resolved links
-        for (const { stages } of allDeptsToProcess) {
-            for (const stage of stages) {
-                const { nextStageNames, allowedDuringStagesNames, ...stageData } = stage as any;
-                const newStageInfo = allNewStagesByName.get(stage.name);
-                if (newStageInfo) {
-                    const finalStageData = { ...stageData };
-                    if (nextStageNames) {
-                        finalStageData.nextStageIds = nextStageNames.map((name: string) => allNewStagesByName.get(name)?.id).filter(Boolean);
+            // Create new stages with resolved links
+            for (const { stages } of allDeptsToProcess) {
+                for (const stage of stages) {
+                    const { nextStageNames, allowedDuringStagesNames, ...stageData } = stage as any;
+                    const newStageInfo = allNewStagesByName.get(stage.name);
+                    if (newStageInfo) {
+                        const finalStageData = { ...stageData };
+                        if (nextStageNames) {
+                            finalStageData.nextStageIds = nextStageNames.map((name: string) => allNewStagesByName.get(name)?.id).filter(Boolean);
+                        }
+                        if (allowedDuringStagesNames) {
+                            finalStageData.allowedDuringStages = allowedDuringStagesNames.map((name: string) => allNewStagesByName.get(name)?.id).filter(Boolean);
+                        }
+                        batch.set(newStageInfo.ref, finalStageData);
                     }
-                    if (allowedDuringStagesNames) {
-                        finalStageData.allowedDuringStages = allowedDuringStagesNames.map((name: string) => allNewStagesByName.get(name)?.id).filter(Boolean);
-                    }
-                    batch.set(newStageInfo.ref, finalStageData);
                 }
             }
+
+            await batch.commit();
+            
+            toast({ title: 'نجاح', description: 'تم استيراد/تحديث مراحل العمل الافتراضية لجميع الأقسام.' });
+            fetchSecondaryItems(); // Refresh the view
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد مراحل العمل.' });
+        } finally {
+            setIsImporting(false);
+            setIsImportConfirmOpen(false);
+        }
+    };
+
+    const subTypeMap = React.useMemo(() => new Map((subcontractorTypes || []).map(t => [t.id, t.name])), [subcontractorTypes]);
+    const activityTypeMap = React.useMemo(() => new Map((companyActivityTypes || []).map(t => [t.id, t.name])), [companyActivityTypes]);
+    const transactionTypeMap = React.useMemo(() => new Map((transactionTypes || []).map(t => [t.id, t.name])), [transactionTypes]);
+    
+    const subcontractorTypeOptions: MultiSelectOption[] = React.useMemo(() => 
+        (subcontractorTypes || []).map(t => ({ value: t.id!, label: t.name })),
+        [subcontractorTypes]
+    );
+    
+    const activityTypeOptions: MultiSelectOption[] = React.useMemo(() =>
+        (companyActivityTypes || []).map(t => ({ value: t.id!, label: t.name })),
+        [companyActivityTypes]
+    );
+
+    const transactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() => 
+        (transactionTypes || []).map(t => ({ value: t.id!, label: t.name })),
+        [transactionTypes]
+    );
+
+    const filteredTransactionTypeOptionsForBoq = React.useMemo(() => {
+        if (!transactionTypes || !companyActivityTypes) return [];
+
+        if (!itemActivityTypeIdsForBoq || itemActivityTypeIdsForBoq.length === 0) {
+            return transactionTypes.map(t => ({ value: t.id!, label: t.name }));
         }
 
-        await batch.commit();
-        
-        toast({ title: 'نجاح', description: 'تم استيراد/تحديث مراحل العمل الافتراضية لجميع الأقسام.' });
-        fetchSecondaryItems(); // Refresh the view
-    } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد مراحل العمل.' });
-    } finally {
-        setIsImporting(false);
-        setIsImportConfirmOpen(false);
-    }
-  };
+        const selectedActivityTypeNames = new Set(
+            itemActivityTypeIdsForBoq
+                .map(id => companyActivityTypes.find(at => at.id === id)?.name)
+                .filter(Boolean) as string[]
+        );
 
-  const subTypeMap = React.useMemo(() => new Map((subcontractorTypes || []).map(t => [t.id, t.name])), [subcontractorTypes]);
-  const activityTypeMap = React.useMemo(() => new Map((companyActivityTypes || []).map(t => [t.id, t.name])), [companyActivityTypes]);
-  const transactionTypeMap = React.useMemo(() => new Map((transactionTypes || []).map(t => [t.id, t.name])), [transactionTypes]);
-  
-  const subcontractorTypeOptions: MultiSelectOption[] = React.useMemo(() => 
-    (subcontractorTypes || []).map(t => ({ value: t.id!, label: t.name })),
-    [subcontractorTypes]
-  );
-  
-  const activityTypeOptions: MultiSelectOption[] = React.useMemo(() =>
-    (companyActivityTypes || []).map(t => ({ value: t.id!, label: t.name })),
-    [companyActivityTypes]
-  );
+        return transactionTypes
+            .filter(t => t.activityType && selectedActivityTypeNames.has(t.activityType))
+            .map(t => ({ value: t.id!, label: t.name }));
 
-  const transactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() => 
-    (transactionTypes || []).map(t => ({ value: t.id, label: t.name })),
-    [transactionTypes]
-  );
+    }, [transactionTypes, companyActivityTypes, itemActivityTypeIdsForBoq]);
 
-  const boqRefTree = React.useMemo(() => {
-    if (!primaryItems || primaryCollectionName !== 'boqReferenceItems') return [];
-    const items = primaryItems as (BoqReferenceItem & { children: any[] })[];
-    const map = new Map<string, BoqReferenceItem & { children: any[] }>();
-    const roots: (BoqReferenceItem & { children: any[] })[] = [];
 
-    items.forEach(item => {
-        map.set(item.id!, { ...item, children: [] });
-    });
-
-    items.forEach(item => {
-        if (item.parentBoqReferenceItemId && map.has(item.parentBoqReferenceItemId)) {
-            map.get(item.parentBoqReferenceItemId)!.children.push(map.get(item.id!)!);
-        } else {
-            roots.push(map.get(item.id!)!);
+    React.useEffect(() => {
+        if (isBoqView && isPrimaryDialogOpen) {
+            const validTransactionTypeIds = new Set(filteredTransactionTypeOptionsForBoq.map(opt => opt.value));
+            setItemTransactionTypeIds(prev => prev.filter(id => validTransactionTypeIds.has(id)));
         }
-    });
+    }, [itemActivityTypeIdsForBoq, isBoqView, isPrimaryDialogOpen, filteredTransactionTypeOptionsForBoq]);
 
-    const sortRecursive = (nodes: (BoqReferenceItem & { children: any[] })[]) => {
-        nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
-        nodes.forEach(node => {
-            if (node.children.length > 0) {
-                sortRecursive(node.children);
+    const boqRefTree = React.useMemo(() => {
+        if (!primaryItems || primaryCollectionName !== 'boqReferenceItems') return [];
+        const items = primaryItems as (BoqReferenceItem & { children: any[] })[];
+        const map = new Map<string, BoqReferenceItem & { children: any[] }>();
+        const roots: (BoqReferenceItem & { children: any[] })[] = [];
+
+        items.forEach(item => {
+            map.set(item.id!, { ...item, children: [] });
+        });
+
+        items.forEach(item => {
+            if (item.parentBoqReferenceItemId && map.has(item.parentBoqReferenceItemId)) {
+                map.get(item.parentBoqReferenceItemId)!.children.push(map.get(item.id!)!);
+            } else {
+                roots.push(map.get(item.id!)!);
             }
         });
-    };
-    sortRecursive(roots);
 
-    return roots;
-  }, [primaryItems, primaryCollectionName]);
+        const sortRecursive = (nodes: (BoqReferenceItem & { children: any[] })[]) => {
+            nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
+            nodes.forEach(node => {
+                if (node.children.length > 0) {
+                    sortRecursive(node.children);
+                }
+            });
+        };
+        sortRecursive(roots);
 
-  const boqRefOptions = React.useMemo(() => {
-    return (primaryItems as BoqReferenceItem[])
-        .filter(item => item.id !== editingItem?.id)
-        .map(item => ({ value: item.id!, label: item.name }));
-  }, [primaryItems, editingItem]);
+        return roots;
+    }, [primaryItems, primaryCollectionName]);
+
+    const boqRefOptions = React.useMemo(() => {
+        return (primaryItems as BoqReferenceItem[])
+            .filter(item => item.id !== editingItem?.id)
+            .map(item => ({ value: item.id!, label: item.name }));
+    }, [primaryItems, editingItem]);
 
 
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-         <div className="flex items-center gap-3 overflow-hidden">
-            <div className="h-6 w-6 flex-shrink-0 text-primary">{icon}</div>
-            <div className="flex-1 min-w-0">
-                <CardTitle className="whitespace-nowrap truncate">{`إدارة ${primaryTitle}`}{secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
-            </div>
-        </div>
-        <Button onClick={onBack} variant="outline" className="flex-shrink-0"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
-      </CardHeader>
-      <CardContent className={cn("grid grid-cols-1 gap-6", secondaryTitle && "md:grid-cols-2")}>
-        {/* Primary List */}
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="font-semibold">{primaryTitle}</h4>
-            <div className="flex gap-2">
-                 {secondaryCollectionName !== 'workStages' && (
-                    <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={disablePrimaryActions || isImporting}>
-                        {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                        استعادة البيانات
-                    </Button>
-                 )}
-                 <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
-            </div>
-          </div>
-          {primaryCollectionName === 'departments' && (
-              <div className="mb-4">
-                  <Select value={departmentActivityFilter} onValueChange={(v) => setDepartmentActivityFilter(v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="all">كل أنواع الأنشطة</SelectItem>
-                          {(companyActivityTypes || []).map(type => (
-                              <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
-                          ))}
-                      </SelectContent>
-                  </Select>
-              </div>
-          )}
-          <ScrollArea className="h-72 border rounded-md">
-            {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : filteredPrimaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-              isBoqView ? (
-                boqRefTree.map(node => (
-                    <BoqRefItem
-                        key={node.id}
-                        node={node}
-                        level={0}
-                        onEdit={item => openDialog('primary', item)}
-                        onDelete={item => openDeleteDialog(item, 'primary')}
-                        onAddSub={parent => openDialog('primary', null, parent)}
-                        openCategories={openCategories}
-                        setOpenCategories={setOpenCategories}
-                        subTypeMap={subTypeMap}
-                        activityTypeMap={activityTypeMap}
-                        transactionTypeMap={transactionTypeMap}
-                    />
-                ))
-              ) : (
-              filteredPrimaryItems.map((item) => (
-                <div key={item.id} onClick={() => handleSelectPrimary(item)}
-                  className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Input 
-                      type="number"
-                      value={primaryOrderValues[item.id!] ?? item.order ?? ''}
-                      onChange={e => handleOrderChange('primary', item.id, e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className="h-7 w-14"
-                    />
-                    <span>{item.name}</span>
-                     {(item as any).activityTypes && Array.isArray((item as any).activityTypes) && (
-                        <div className="flex flex-wrap gap-1">
-                            {(item as any).activityTypes.map((type: string) => (
-                                <Badge key={type} variant="secondary">{type}</Badge>
-                            ))}
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                 <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="h-6 w-6 flex-shrink-0 text-primary">{icon}</div>
+                    <div className="flex-1 min-w-0">
+                        <CardTitle className="whitespace-nowrap truncate">{`إدارة ${primaryTitle}`}{secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
+                    </div>
+                </div>
+                <Button onClick={onBack} variant="outline" className="flex-shrink-0"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
+            </CardHeader>
+            <CardContent className={cn("grid grid-cols-1 gap-6", secondaryTitle && "md:grid-cols-2")}>
+                {/* Primary List */}
+                <div>
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold">{primaryTitle}</h4>
+                        <div className="flex gap-2">
+                            {secondaryCollectionName !== 'workStages' && (
+                                <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={disablePrimaryActions || isImporting}>
+                                    {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                    استعادة البيانات
+                                </Button>
+                            )}
+                            <Button size="sm" onClick={() => openDialog('primary')} disabled={disablePrimaryActions}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
+                        </div>
+                    </div>
+                    {primaryCollectionName === 'departments' && (
+                        <div className="mb-4">
+                            <Select value={departmentActivityFilter} onValueChange={(v) => setDepartmentActivityFilter(v)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">كل أنواع الأنشطة</SelectItem>
+                                    {(companyActivityTypes || []).map(type => (
+                                        <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }} disabled={disablePrimaryActions}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }} disabled={disablePrimaryActions}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))
-            ))}
-          </ScrollArea>
-           {isPrimaryOrderChanged && !isBoqView && (
-             <div className="flex justify-end mt-2">
-                <Button size="sm" onClick={() => handleSaveOrder('primary')}>
-                    <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
-                </Button>
-            </div>
-           )}
-        </div>
-        
-        {/* Secondary List */}
-        {secondaryTitle && secondaryCollectionName && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold">
-                    {selectedPrimary ? `${secondaryTitle} (${selectedPrimary.name})` : `اختر ${primarySingularTitle} لعرض ${secondaryTitle}`}
-                </h4>
-                 <div className="flex gap-2">
-                    {secondaryCollectionName === 'workStages' && (
-                        <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
-                            {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                            استعادة مراحل العمل
-                        </Button>
-                    )}
-                    <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
-                 </div>
-              </div>
-              <ScrollArea className="h-72 border rounded-md">
-                {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
-                  secondaryItems.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Input
+                    <ScrollArea className="h-72 border rounded-md">
+                        {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : filteredPrimaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+                        isBoqView ? (
+                            boqRefTree.map(node => (
+                                <BoqRefItem
+                                    key={node.id}
+                                    node={node}
+                                    level={0}
+                                    onEdit={item => openDialog('primary', item)}
+                                    onDelete={item => openDeleteDialog(item, 'primary')}
+                                    onAddSub={parent => openDialog('primary', null, parent)}
+                                    openCategories={openCategories}
+                                    setOpenCategories={setOpenCategories}
+                                    subTypeMap={subTypeMap}
+                                    activityTypeMap={activityTypeMap}
+                                    transactionTypeMap={transactionTypeMap}
+                                />
+                            ))
+                        ) : (
+                        filteredPrimaryItems.map((item) => (
+                            <div key={item.id} onClick={() => handleSelectPrimary(item)}
+                            className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Input 
                                 type="number"
-                                value={secondaryOrderValues[item.id!] ?? item.order ?? ''}
-                                onChange={e => handleOrderChange('secondary', item.id, e.target.value)}
+                                value={primaryOrderValues[item.id!] ?? item.order ?? ''}
+                                onChange={e => handleOrderChange('primary', item.id, e.target.value)}
                                 onClick={e => e.stopPropagation()}
                                 className="h-7 w-14"
-                            />
-                            <span>{item.name}</span>
-                            {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
-                            {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
-                            {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
-                            {isWorkStageView && item.enableModificationTracking && <Badge variant="outline" className="bg-orange-100 text-orange-800">تتبع التعديلات</Badge>}
-                            {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
-                                <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
-                            ))}
+                                />
+                                <span>{item.name}</span>
+                                {(item as any).activityTypes && Array.isArray((item as any).activityTypes) && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {(item as any).activityTypes.map((type: string) => (
+                                            <Badge key={type} variant="secondary">{type}</Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }} disabled={disablePrimaryActions}><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }} disabled={disablePrimaryActions}><Trash2 className="h-4 w-4" /></Button>
+                            </div>
+                            </div>
+                        ))
+                        ))}
+                    </ScrollArea>
+                    {isPrimaryOrderChanged && !isBoqView && (
+                        <div className="flex justify-end mt-2">
+                            <Button size="sm" onClick={() => handleSaveOrder('primary')}>
+                                <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                            </Button>
                         </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </ScrollArea>
-              {isSecondaryOrderChanged && (
-                <div className="flex justify-end mt-2">
-                    <Button size="sm" onClick={() => handleSaveOrder('secondary')}>
-                        <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
-                    </Button>
+                    )}
                 </div>
-              )}
-            </div>
-        )}
-      </CardContent>
-
-      <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
-        <DialogContent
-            className={cn("max-w-xl", (isWorkStageView || isBoqView) && !isPrimaryDialogOpen && "max-w-4xl")}
-        >
-          <DialogHeader>
-            <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
-          </DialogHeader>
-           <ScrollArea className="max-h-[70vh]">
-            <div className="py-4 px-2 space-y-6">
-                <div className="px-4 grid gap-2">
-                    <Label htmlFor="item-name">{`اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}`}</Label>
-                    <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
-                </div>
-
-                {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
-                    <div className="px-4 grid gap-2">
-                        <Label>أنواع الأنشطة</Label>
-                        <MultiSelect
-                            options={(companyActivityTypes || []).map(type => ({ value: type.name, label: type.name }))}
-                            selected={itemActivityTypes}
-                            onChange={setItemActivityTypes}
-                            placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                            disabled={loadingCompanyActivityTypes}
-                        />
-                    </div>
-                )}
                 
-                {isBoqView && isPrimaryDialogOpen && (
-                    <div className="px-4 space-y-4">
-                         <div className="grid gap-2">
-                            <Label>البند الأب (اختياري)</Label>
-                            <InlineSearchList 
-                                value={parentBoqItemId || ''}
-                                onSelect={(val) => {
-                                    setParentBoqItemId(val);
-                                    if (val) {
-                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                        if (parent) {
-                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
-                                        }
-                                    } else {
-                                        if (!editingItem) {
-                                            setItemTransactionTypeIds([]);
-                                            setItemSubcontractorTypeIds([]);
-                                            setItemActivityTypeIdsForBoq([]);
-                                        }
-                                    }
-                                }}
-                                options={boqRefOptions}
-                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                            />
+                {/* Secondary List */}
+                {secondaryTitle && secondaryCollectionName && (
+                    <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">
+                            {selectedPrimary ? `${secondaryTitle} (${selectedPrimary.name})` : `اختر ${primarySingularTitle} لعرض ${secondaryTitle}`}
+                        </h4>
+                        <div className="flex gap-2">
+                            {secondaryCollectionName === 'workStages' && (
+                                <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
+                                    {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                    استعادة مراحل العمل
+                                </Button>
+                            )}
+                            <Button size="sm" onClick={() => openDialog('secondary')} disabled={!selectedPrimary}><Plus className="ml-2 h-4 w-4" /> إضافة</Button>
                         </div>
-                        <Separator className="my-4" />
-                        <div className="grid grid-cols-1 gap-4">
-                            <div className="grid gap-2">
-                                <Label>أنواع المعاملات المرتبطة</Label>
-                                <MultiSelect
-                                    options={transactionTypeOptionsForBoq}
-                                    selected={itemTransactionTypeIds}
-                                    onChange={setItemTransactionTypeIds}
-                                    placeholder={transactionTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                    disabled={transactionTypesLoading}
-                                />
+                    </div>
+                    <ScrollArea className="h-72 border rounded-md">
+                        {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+                        secondaryItems.map((item) => (
+                            <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <Input
+                                        type="number"
+                                        value={secondaryOrderValues[item.id!] ?? item.order ?? ''}
+                                        onChange={e => handleOrderChange('secondary', item.id, e.target.value)}
+                                        onClick={e => e.stopPropagation()}
+                                        className="h-7 w-14"
+                                    />
+                                    <span>{item.name}</span>
+                                    {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
+                                    {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
+                                    {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
+                                    {isWorkStageView && item.enableModificationTracking && <Badge variant="outline" className="bg-orange-100 text-orange-800">تتبع التعديلات</Badge>}
+                                    {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
+                                        <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
+                                    ))}
+                                </div>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
                             </div>
-                            <div className="grid gap-2">
-                                <Label>أنواع المقاولين المرتبطة</Label>
-                                <MultiSelect
-                                    options={subcontractorTypeOptions}
-                                    selected={itemSubcontractorTypeIds}
-                                    onChange={setItemSubcontractorTypeIds}
-                                    placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                    disabled={subcontractorTypesLoading}
-                                />
                             </div>
-                            <div className="grid gap-2">
-                                <Label>أنواع الأنشطة المرتبطة</Label>
+                        ))
+                        )}
+                    </ScrollArea>
+                    {isSecondaryOrderChanged && (
+                        <div className="flex justify-end mt-2">
+                            <Button size="sm" onClick={() => handleSaveOrder('secondary')}>
+                                <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                            </Button>
+                        </div>
+                    )}
+                    </div>
+                )}
+            </CardContent>
+
+            <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
+                <DialogContent
+                    className={cn("max-w-xl", (isWorkStageView || isBoqView) && !isPrimaryDialogOpen && "max-w-4xl")}
+                >
+                <DialogHeader>
+                    <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[70vh]">
+                    <div className="py-4 px-2 space-y-6">
+                        <div className="px-4 grid gap-2">
+                            <Label htmlFor="item-name">{`اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}`}</Label>
+                            <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+                        </div>
+
+                        {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
+                            <div className="px-4 grid gap-2">
+                                <Label>أنواع الأنشطة</Label>
                                 <MultiSelect
-                                    options={activityTypeOptions}
-                                    selected={itemActivityTypeIdsForBoq}
-                                    onChange={setItemActivityTypeIdsForBoq}
+                                    options={(companyActivityTypes || []).map(type => ({ value: type.name, label: type.name }))}
+                                    selected={itemActivityTypes}
+                                    onChange={setItemActivityTypes}
                                     placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
                                     disabled={loadingCompanyActivityTypes}
                                 />
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {isWorkStageView && !isPrimaryDialogOpen && (
-                    <div className="grid md:grid-cols-2 gap-6 px-4">
-                        {/* --- Left Column --- */}
-                        <div className="space-y-6 rounded-lg border p-4">
-                             <h3 className="font-semibold text-base mb-2">منطق المرحلة</h3>
-
-                             <div className="grid gap-2">
-                                <Label>نوع المرحلة</Label>
-                                <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="sequential">تسلسلية (خطوة أساسية في سير العمل)</SelectItem>
-                                        <SelectItem value="parallel">موازية (خدمية مثل التعديلات)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            
-                             <div className="grid gap-2">
-                                <Label>نوع التتبع</Label>
-                                <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="duration">بالمدة الزمنية</SelectItem>
-                                        <SelectItem value="occurrence">بعدَد مرات الحدوث</SelectItem>
-                                        <SelectItem value="none">لا شيء (حدث واحد)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">
-                                    {itemTrackingType === 'duration' && 'تتبع المرحلة بالوقت، مفيد للمهام التي تستغرق وقتاً محدداً.'}
-                                    {itemTrackingType === 'occurrence' && 'تتبع المرحلة بعدد المرات التي تكتمل فيها، مثل عدد الزيارات أو التعديلات.'}
-                                    {itemTrackingType === 'none' && 'مرحلة بسيطة تكتمل مرة واحدة فقط وتنتقل للتالية.'}
-                                </p>
-                            </div>
-
-                            {itemTrackingType === 'duration' && (
+                        )}
+                        
+                        {isBoqView && isPrimaryDialogOpen && (
+                            <div className="px-4 space-y-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
-                                    <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
-                                </div>
-                            )}
-                            {itemTrackingType === 'occurrence' && (
-                              <div className="p-3 border rounded-md space-y-4 bg-background">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
-                                    <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Checkbox id="allowManualCompletion" checked={itemAllowManualCompletion} onCheckedChange={(checked) => setItemAllowManualCompletion(!!checked)} />
-                                  <Label htmlFor="allowManualCompletion">السماح بالإكمال اليدوي قبل الوصول للحد الأقصى</Label>
-                                </div>
-                              </div>
-                            )}
-                        </div>
-
-                        {/* --- Right Column --- */}
-                        <div className="space-y-6 rounded-lg border p-4">
-                             <h3 className="font-semibold text-base mb-2">العلاقات والصلاحيات</h3>
-                             
-                             <div className="grid gap-2">
-                                <Label>الأدوار المسؤولة (المسميات الوظيفية)</Label>
-                                <MultiSelect
-                                    options={allJobs}
-                                    selected={itemRoles}
-                                    onChange={setItemRoles}
-                                    placeholder="اتركه فارغًا ليكون متاحًا للجميع"
-                                    disabled={refDataLoading}
-                                />
-                            </div>
-
-                            {itemStageType === 'parallel' && (
-                                 <div className="grid gap-2">
-                                    <Label>يظهر فقط أثناء المراحل التالية (اختياري)</Label>
-                                    <MultiSelect
-                                        options={allSequentialStages.filter(s => s.value !== editingItem?.id)}
-                                        selected={itemAllowedDuringStages}
-                                        onChange={setItemAllowedDuringStages}
-                                        placeholder="اتركه فارغًا ليظهر دائماً..."
-                                        disabled={refDataLoading}
+                                    <Label>البند الأب (اختياري)</Label>
+                                    <InlineSearchList 
+                                        value={parentBoqItemId || ''}
+                                        onSelect={(val) => {
+                                            setParentBoqItemId(val);
+                                            if (val) {
+                                                const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                                if (parent) {
+                                                    setItemTransactionTypeIds(parent.transactionTypeIds || []);
+                                                    setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                                    setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                                }
+                                            } else {
+                                                if (!editingItem) {
+                                                    setItemTransactionTypeIds([]);
+                                                    setItemSubcontractorTypeIds([]);
+                                                    setItemActivityTypeIdsForBoq([]);
+                                                }
+                                            }
+                                        }}
+                                        options={boqRefOptions}
+                                        placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
                                     />
                                 </div>
-                            )}
-                            
-                            <div className="grid gap-2">
-                                <Label>المراحل التالية المحتملة (للربط)</Label>
-                                <MultiSelect
-                                    options={allWorkStages.filter(s => s.value !== editingItem?.id)}
-                                    selected={itemNextStageIds}
-                                    onChange={setItemNextStageIds}
-                                    placeholder="اختر مرحلة أو أكثر للانتقال إليها..."
-                                    disabled={refDataLoading}
-                                />
+                                <Separator className="my-4" />
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label>أنواع الأنشطة المرتبطة</Label>
+                                        <MultiSelect
+                                            options={activityTypeOptions}
+                                            selected={itemActivityTypeIdsForBoq}
+                                            onChange={setItemActivityTypeIdsForBoq}
+                                            placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                            disabled={loadingCompanyActivityTypes}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>أنواع المعاملات المرتبطة</Label>
+                                        <MultiSelect
+                                            options={filteredTransactionTypeOptionsForBoq}
+                                            selected={itemTransactionTypeIds}
+                                            onChange={setItemTransactionTypeIds}
+                                            placeholder={transactionTypesLoading ? "تحميل..." : "اختر بناء على النشاط أولاً..."}
+                                            disabled={transactionTypesLoading}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>أنواع المقاولين المرتبطة</Label>
+                                        <MultiSelect
+                                            options={subcontractorTypeOptions}
+                                            selected={itemSubcontractorTypeIds}
+                                            onChange={setItemSubcontractorTypeIds}
+                                            placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                            disabled={subcontractorTypesLoading}
+                                        />
+                                    </div>
+                                </div>
                             </div>
+                        )}
 
-                             <div className="flex items-center space-x-2 pt-4">
-                               <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} />
-                               <Label htmlFor="enableModificationTracking">تفعيل عداد التعديلات لهذه المرحلة</Label>
+                        {isWorkStageView && !isPrimaryDialogOpen && (
+                            <div className="grid md:grid-cols-2 gap-6 px-4">
+                                {/* --- Left Column --- */}
+                                <div className="space-y-6 rounded-lg border p-4">
+                                    <h3 className="font-semibold text-base mb-2">منطق المرحلة</h3>
+
+                                    <div className="grid gap-2">
+                                        <Label>نوع المرحلة</Label>
+                                        <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="sequential">تسلسلية (خطوة أساسية في سير العمل)</SelectItem>
+                                                <SelectItem value="parallel">موازية (خدمية مثل التعديلات)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    
+                                    <div className="grid gap-2">
+                                        <Label>نوع التتبع</Label>
+                                        <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="duration">بالمدة الزمنية</SelectItem>
+                                                <SelectItem value="occurrence">بعدَد مرات الحدوث</SelectItem>
+                                                <SelectItem value="none">لا شيء (حدث واحد)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            {itemTrackingType === 'duration' && 'تتبع المرحلة بالوقت، مفيد للمهام التي تستغرق وقتاً محدداً.'}
+                                            {itemTrackingType === 'occurrence' && 'تتبع المرحلة بعدد المرات التي تكتمل فيها، مثل عدد الزيارات أو التعديلات.'}
+                                            {itemTrackingType === 'none' && 'مرحلة بسيطة تكتمل مرة واحدة فقط وتنتقل للتالية.'}
+                                        </p>
+                                    </div>
+
+                                    {itemTrackingType === 'duration' && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
+                                            <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
+                                        </div>
+                                    )}
+                                    {itemTrackingType === 'occurrence' && (
+                                    <div className="p-3 border rounded-md space-y-4 bg-background">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
+                                            <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                        <Checkbox id="allowManualCompletion" checked={itemAllowManualCompletion} onCheckedChange={(checked) => setItemAllowManualCompletion(!!checked)} />
+                                        <Label htmlFor="allowManualCompletion">السماح بالإكمال اليدوي قبل الوصول للحد الأقصى</Label>
+                                        </div>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* --- Right Column --- */}
+                                <div className="space-y-6 rounded-lg border p-4">
+                                    <h3 className="font-semibold text-base mb-2">العلاقات والصلاحيات</h3>
+                                    
+                                    <div className="grid gap-2">
+                                        <Label>الأدوار المسؤولة (المسميات الوظيفية)</Label>
+                                        <MultiSelect
+                                            options={allJobs}
+                                            selected={itemRoles}
+                                            onChange={setItemRoles}
+                                            placeholder="اتركه فارغًا ليكون متاحًا للجميع"
+                                            disabled={refDataLoading}
+                                        />
+                                    </div>
+
+                                    {itemStageType === 'parallel' && (
+                                        <div className="grid gap-2">
+                                            <Label>يظهر فقط أثناء المراحل التالية (اختياري)</Label>
+                                            <MultiSelect
+                                                options={allSequentialStages.filter(s => s.value !== editingItem?.id)}
+                                                selected={itemAllowedDuringStages}
+                                                onChange={setItemAllowedDuringStages}
+                                                placeholder="اتركه فارغًا ليظهر دائماً..."
+                                                disabled={refDataLoading}
+                                            />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="grid gap-2">
+                                        <Label>المراحل التالية المحتملة (للربط)</Label>
+                                        <MultiSelect
+                                            options={allWorkStages.filter(s => s.value !== editingItem?.id)}
+                                            selected={itemNextStageIds}
+                                            onChange={setItemNextStageIds}
+                                            placeholder="اختر مرحلة أو أكثر للانتقال إليها..."
+                                            disabled={refDataLoading}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center space-x-2 pt-4">
+                                        <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} />
+                                        <Label htmlFor="enableModificationTracking">تفعيل عداد التعديلات لهذه المرحلة</Label>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
-                )}
-            </div>
-          </ScrollArea>
-          <DialogFooter className="pt-4 border-t">
-            <Button variant="outline" onClick={closeDialog}>إلغاء</Button>
-            <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')}>حفظ</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent dir="rtl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                <AlertDialogDescription>
-                    سيتم حذف العنصر "{itemToDelete?.name}" بشكل دائم. إذا كان هذا العنصر الرئيسي، سيتم حذف جميع العناصر الفرعية التابعة له.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">نعم، حذف</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-        <AlertDialogContent dir="rtl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
-                <AlertDialogDescription>
-                   {secondaryCollectionName === 'workStages' 
-                        ? 'سيتم مسح جميع مراحل العمل الحالية واستبدالها بالقائمة الافتراضية لجميع الأقسام.'
-                        : `سيؤدي هذا الإجراء إلى مسح جميع ${primaryTitle} الحالية واستبدالها بالقائمة الافتراضية. لا يمكن التراجع عن هذا الإجراء.`
-                   }
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={secondaryCollectionName === 'workStages' ? handleImportWorkStages : handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
-                    {isImporting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الاستيراد...</> : 'نعم، قم بالاستيراد'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-    </Card>
-  );
+                </ScrollArea>
+                <DialogFooter className="pt-4 border-t">
+                    <Button variant="outline" onClick={closeDialog}>إلغاء</Button>
+                    <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')}>حفظ</Button>
+                </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيتم حذف العنصر "{itemToDelete?.name}" بشكل دائم. إذا كان هذا العنصر الرئيسي، سيتم حذف جميع العناصر الفرعية التابعة له.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">نعم، حذف</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                        {secondaryCollectionName === 'workStages' 
+                                ? 'سيتم مسح جميع مراحل العمل الحالية واستبدالها بالقائمة الافتراضية لجميع الأقسام.'
+                                : `سيؤدي هذا الإجراء إلى مسح جميع ${primaryTitle} الحالية واستبدالها بالقائمة الافتراضية. لا يمكن التراجع عن هذا الإجراء.`
+                        }
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={secondaryCollectionName === 'workStages' ? handleImportWorkStages : handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
+                            {isImporting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الاستيراد...</> : 'نعم، قم بالاستيراد'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </Card>
+    );
 }
 
 // --- NEW Unified TransactionTypeManager ---
