@@ -437,8 +437,8 @@ export type ClientTransaction = {
     description?: string;
     departmentId?: string;
     transactionTypeId?: string;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
     assignedEngineerId?: string;
+    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
     createdAt: any;
     updatedAt?: any;
     engineerName?: string;
@@ -779,10 +779,12 @@ export type BoqReferenceItem = {
   subcontractorTypeIds?: string[];
   activityTypeIds?: string[];
   order?: number;
+  parentBoqReferenceItemId?: string;
 };
   
 
     
+
 
 
 

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -28,7 +29,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -74,6 +75,85 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
         </button>
     );
 }
+
+function BoqRefItem({
+  node,
+  level,
+  onEdit,
+  onDelete,
+  onAddSub,
+  openCategories,
+  setOpenCategories,
+  subTypeMap,
+  activityTypeMap,
+}: {
+  node: BoqReferenceItem & { children: any[] };
+  level: number;
+  onEdit: (item: any) => void;
+  onDelete: (item: any) => void;
+  onAddSub: (parent: any) => void;
+  openCategories: Set<string>;
+  setOpenCategories: React.Dispatch<React.SetStateAction<Set<string>>>;
+  subTypeMap: Map<string, string>;
+  activityTypeMap: Map<string, string>;
+}) {
+  const isOpen = openCategories.has(node.id!);
+
+  const toggleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(node.id!)) newSet.delete(node.id!);
+      else newSet.add(node.id!);
+      return newSet;
+    });
+  };
+
+  return (
+    <div style={{ paddingRight: `${level * 1.5}rem` }}>
+      <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group">
+        <div className="flex items-center gap-2 cursor-pointer flex-grow min-w-0" onClick={toggleOpen}>
+          {node.children.length > 0 ? (
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            </Button>
+          ) : <span className="w-6 h-6 inline-block" />}
+          <div className="flex flex-col">
+            <span className="font-medium">{node.name}</span>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {node.subcontractorTypeIds?.map((id: string) => (
+                  <Badge key={id} variant="secondary">{subTypeMap.get(id) || '...'}</Badge>
+              ))}
+              {node.activityTypeIds?.map((id: string) => (
+                  <Badge key={id} variant="outline">{activityTypeMap.get(id) || '...'}</Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(node)}><PlusCircle className="h-4 w-4 text-primary" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(node)}><Pencil className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(node)}><Trash2 className="h-4 w-4" /></Button>
+        </div>
+      </div>
+      {isOpen && node.children.map(child => (
+        <BoqRefItem
+          key={child.id}
+          node={child}
+          level={level + 1}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onAddSub={onAddSub}
+          openCategories={openCategories}
+          setOpenCategories={setOpenCategories}
+          subTypeMap={subTypeMap}
+          activityTypeMap={activityTypeMap}
+        />
+      ))}
+    </div>
+  );
+}
+
 
 // Reusable component for the management UI
 function ManagerView<T extends {id: string, name: string, order?: number, subcontractorTypeIds?: string[], activityTypeIds?: string[] }, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
@@ -138,6 +218,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   // New state for BOQ reference item form
   const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = useState<string[]>([]);
   const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = useState<string[]>([]);
+  const [parentBoqItemId, setParentBoqItemId] = useState<string | null>(null);
 
 
   // States for numerical ordering
@@ -177,6 +258,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [allSequentialStages, setAllSequentialStages] = useState<MultiSelectOption[]>([]);
   const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(false);
+
+  const [openCategories, setOpenCategories] = useState(new Set<string>());
 
   const fetchPrimaryItems = useCallback(async () => {
     if (!firestore) return;
@@ -298,7 +381,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchReferenceDataForDialog]);
 
 
-  const openDialog = (type: 'primary' | 'secondary', item: any | null = null) => {
+  const openDialog = (type: 'primary' | 'secondary', item: any | null = null, parent: any | null = null) => {
     setEditingItem(item);
     if (type === 'primary') {
         setItemName(item?.name || '');
@@ -308,6 +391,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         if (isBoqView) {
             setItemSubcontractorTypeIds(item?.subcontractorTypeIds || []);
             setItemActivityTypeIdsForBoq(item?.activityTypeIds || []);
+            setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
         }
         setIsPrimaryDialogOpen(true);
     } else { // Secondary
@@ -345,6 +429,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     // Reset new BOQ item states
     setItemSubcontractorTypeIds([]);
     setItemActivityTypeIdsForBoq([]);
+    setParentBoqItemId(null);
   }
 
   const handleSave = async (type: 'primary' | 'secondary') => {
@@ -362,6 +447,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                 ...dataToSave,
                 subcontractorTypeIds: itemSubcontractorTypeIds,
                 activityTypeIds: itemActivityTypeIdsForBoq,
+                parentBoqReferenceItemId: parentBoqItemId,
            }
        }
        if (isWorkStageView && type === 'secondary') {
@@ -596,6 +682,43 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     [companyActivityTypes]
   );
 
+  const boqRefTree = useMemo(() => {
+    if (!primaryItems || primaryCollectionName !== 'boqReferenceItems') return [];
+    const items = primaryItems as (BoqReferenceItem & { children: any[] })[];
+    const map = new Map<string, BoqReferenceItem & { children: any[] }>();
+    const roots: (BoqReferenceItem & { children: any[] })[] = [];
+
+    items.forEach(item => {
+        map.set(item.id!, { ...item, children: [] });
+    });
+
+    items.forEach(item => {
+        if (item.parentBoqReferenceItemId && map.has(item.parentBoqReferenceItemId)) {
+            map.get(item.parentBoqReferenceItemId)!.children.push(map.get(item.id!)!);
+        } else {
+            roots.push(map.get(item.id!)!);
+        }
+    });
+
+    const sortRecursive = (nodes: (BoqReferenceItem & { children: any[] })[]) => {
+        nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
+        nodes.forEach(node => {
+            if (node.children.length > 0) {
+                sortRecursive(node.children);
+            }
+        });
+    };
+    sortRecursive(roots);
+
+    return roots;
+  }, [primaryItems, primaryCollectionName]);
+
+  const boqRefOptions = useMemo(() => {
+    return (primaryItems as BoqReferenceItem[])
+        .filter(item => item.id !== editingItem?.id)
+        .map(item => ({ value: item.id!, label: item.name }));
+  }, [primaryItems, editingItem]);
+
 
   return (
     <Card>
@@ -638,6 +761,22 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
           )}
           <ScrollArea className="h-72 border rounded-md">
             {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : filteredPrimaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+              isBoqView ? (
+                boqRefTree.map(node => (
+                    <BoqRefItem
+                        key={node.id}
+                        node={node}
+                        level={0}
+                        onEdit={item => openDialog('primary', item)}
+                        onDelete={item => openDeleteDialog(item, 'primary')}
+                        onAddSub={parent => openDialog('primary', null, parent)}
+                        openCategories={openCategories}
+                        setOpenCategories={setOpenCategories}
+                        subTypeMap={subTypeMap}
+                        activityTypeMap={activityTypeMap}
+                    />
+                ))
+              ) : (
               filteredPrimaryItems.map((item) => (
                 <div key={item.id} onClick={() => handleSelectPrimary(item)}
                   className={`flex justify-between items-center p-2 rounded-md cursor-pointer ${selectedPrimary?.id === item.id ? 'bg-accent' : 'hover:bg-muted/50'}`}>
@@ -650,16 +789,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                       className="h-7 w-14"
                     />
                     <span>{item.name}</span>
-                     {isBoqView && (
-                      <div className="flex flex-wrap gap-1">
-                          {(item as any).subcontractorTypeIds?.map((id: string) => (
-                              <Badge key={id} variant="secondary">{subTypeMap.get(id) || '...'}</Badge>
-                          ))}
-                          {(item as any).activityTypeIds?.map((id: string) => (
-                              <Badge key={id} variant="outline">{activityTypeMap.get(id) || '...'}</Badge>
-                          ))}
-                      </div>
-                    )}
                      {(item as any).activityTypes && Array.isArray((item as any).activityTypes) && (
                         <div className="flex flex-wrap gap-1">
                             {(item as any).activityTypes.map((type: string) => (
@@ -674,9 +803,9 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                   </div>
                 </div>
               ))
-            )}
+            ))}
           </ScrollArea>
-           {isPrimaryOrderChanged && (
+           {isPrimaryOrderChanged && !isBoqView && (
              <div className="flex justify-end mt-2">
                 <Button size="sm" onClick={() => handleSaveOrder('primary')}>
                     <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
@@ -770,28 +899,40 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                 )}
                 
                 {isBoqView && isPrimaryDialogOpen && (
-                    <div className="px-4 grid grid-cols-1 gap-4">
-                        <div className="grid gap-2">
-                            <Label>أنواع المقاولين المرتبطة</Label>
-                            <MultiSelect
-                                options={subcontractorTypeOptions}
-                                selected={itemSubcontractorTypeIds}
-                                onChange={setItemSubcontractorTypeIds}
-                                placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                disabled={subcontractorTypesLoading}
+                    <>
+                         <div className="px-4 grid gap-2">
+                            <Label>البند الأب (اختياري)</Label>
+                            <InlineSearchList 
+                                value={parentBoqItemId || ''}
+                                onSelect={setParentBoqItemId}
+                                options={boqRefOptions}
+                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
                             />
                         </div>
-                        <div className="grid gap-2">
-                            <Label>أنواع الأنشطة المرتبطة</Label>
-                            <MultiSelect
-                                options={activityTypeOptions}
-                                selected={itemActivityTypeIdsForBoq}
-                                onChange={setItemActivityTypeIdsForBoq}
-                                placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                disabled={loadingCompanyActivityTypes}
-                            />
+                        <Separator className="my-4" />
+                        <div className="px-4 grid grid-cols-1 gap-4">
+                            <div className="grid gap-2">
+                                <Label>أنواع المقاولين المرتبطة</Label>
+                                <MultiSelect
+                                    options={subcontractorTypeOptions}
+                                    selected={itemSubcontractorTypeIds}
+                                    onChange={setItemSubcontractorTypeIds}
+                                    placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                    disabled={subcontractorTypesLoading}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>أنواع الأنشطة المرتبطة</Label>
+                                <MultiSelect
+                                    options={activityTypeOptions}
+                                    selected={itemActivityTypeIdsForBoq}
+                                    onChange={setItemActivityTypeIdsForBoq}
+                                    placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                    disabled={loadingCompanyActivityTypes}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 {isWorkStageView && !isPrimaryDialogOpen && (

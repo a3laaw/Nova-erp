@@ -1627,7 +1627,7 @@
     },
     "BoqReferenceItem": {
       "title": "BOQ Reference Item",
-      "description": "A master list item for frequently used Bill of Quantities entries.",
+      "description": "A master list of frequently used Bill of Quantities entries.",
       "type": "object",
       "properties": {
         "name": { "type": "string", "description": "The common name or description of the BOQ item." },
@@ -1641,9 +1641,33 @@
             "description": "Links to the business activities this item is relevant to.",
             "items": { "type": "string" }
         },
-        "order": { "type": "number", "description": "The display order of the item in lists." }
+        "order": { "type": "number", "description": "The display order of the item in lists." },
+        "parentBoqReferenceItemId": {
+            "type": "string",
+            "description": "The ID of the parent BOQ reference item, for creating a hierarchy."
+        }
       },
       "required": ["name"]
+    },
+    "SubcontractorType": {
+        "title": "Subcontractor Type",
+        "description": "Defines a type or category for subcontractors (e.g., Electrical, Plumbing).",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "order": { "type": "number" }
+        },
+        "required": ["name"]
+    },
+    "SubcontractorSpecialization": {
+        "title": "Subcontractor Specialization",
+        "description": "Defines a specific specialization within a Subcontractor Type (e.g., High Voltage within Electrical).",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "order": { "type": "number" }
+        },
+        "required": ["name"]
     }
   },
   "auth": {
@@ -1663,6 +1687,14 @@
     "/companyActivityTypes/{typeId}": {
         "schema": { "$ref": "#/entities/CompanyActivityType" },
         "description": "Stores the different types of company business activities."
+    },
+    "/subcontractorTypes/{typeId}": {
+      "schema": { "$ref": "#/entities/SubcontractorType"},
+      "description": "Stores the main categories of subcontractors."
+    },
+    "/subcontractorTypes/{typeId}/specializations/{specializationId}": {
+        "schema": { "$ref": "#/entities/SubcontractorSpecialization" },
+        "description": "Stores specializations within a subcontractor type."
     },
     "/users/{userId}": {
       "schema": {
@@ -1879,6 +1911,14 @@
     "/inventoryAdjustments/{adjustmentId}": {
       "schema": { "$ref": "#/entities/InventoryAdjustment" },
       "description": "Stores stock adjustments like opening balances, damages, etc."
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/ConstructionProject" },
+      "description": "Stores all construction projects."
+    },
+    "/subcontractors/{subcontractorId}": {
+        "schema": { "$ref": "#/entities/Subcontractor" },
+        "description": "Stores information about all subcontractors."
     }
   }
 }
