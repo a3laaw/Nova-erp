@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, FileSignature } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, QuotationItem, ContractTemplate, ContractTerm, ContractScopeItem, TransactionType, WorkStage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -100,7 +100,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         const [clientsSnapshot, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), orderBy('createdAt', 'desc'), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
-          getDocs(query(collection(firestore, 'transactionTypes'))), // Corrected: use collection()
+          getDocs(query(collection(firestore, 'transactionTypes'))),
           getDocs(query(collectionGroup(firestore, 'workStages'))),
         ]);
 
@@ -140,10 +140,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         setRefDataLoading(false);
       }
     };
-    if (isOpen) {
-        fetchRefData();
-    }
-  }, [firestore, toast, isOpen]);
+    fetchRefData();
+  }, [firestore, toast]);
   
   const populateFormFromTemplate = useCallback((template: ContractTemplate | null) => {
     if (template) {
@@ -220,10 +218,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const templateToUse = matchingTemplates.length > 0 ? matchingTemplates[0] : null;
     populateFormFromTemplate(templateToUse);
     
-    const originalType = allTransactionTypes.find(t => t.id === selectedTransactionTypeId);
-    if (originalType?.departmentIds && originalType.departmentIds.length > 0) {
-        setValue('departmentId', originalType.departmentIds[0]);
-    }
+    //This logic is flawed as `allTransactionTypes` does not have departmentIds
+    //const originalType = allTransactionTypes.find(t => t.id === selectedTransactionTypeId);
+    //if (originalType?.departmentIds && originalType.departmentIds.length > 0) {
+    //    setValue('departmentId', originalType.departmentIds[0]);
+    //}
   }, [isEditing, selectedTransactionTypeId, allTransactionTypes, allTemplates, setValue, populateFormFromTemplate]);
 
   useEffect(() => {
@@ -261,6 +260,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     onSave({ ...data, items: processedItems });
   };
   
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
+
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="space-y-6 py-4 px-1 max-h-[70vh] overflow-y-auto">
