@@ -1,4 +1,3 @@
-
 import type { Department, Job, Governorate, Area, TransactionType, WorkStage, ItemCategory } from '@/lib/types';
 
 export const defaultDepartments: Omit<Department, 'id'>[] = [

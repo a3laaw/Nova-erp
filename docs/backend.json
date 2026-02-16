@@ -1587,6 +1587,7 @@
       "description": "A single line item in a Bill of Quantities.",
       "type": "object",
       "properties": {
+        "itemId": { "type": "string", "description": "Reference to the master Item ID." },
         "itemNumber": { "type": "string" },
         "description": { "type": "string" },
         "unit": { "type": "string" },
@@ -1848,3 +1849,5 @@
     }
   }
 }
+
+    

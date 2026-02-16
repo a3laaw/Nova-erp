@@ -101,26 +101,33 @@ export function BoqForm() {
                 };
                 transaction.set(boqRef, boqData);
 
-                const itemsBatch = writeBatch(firestore); // Use a new batch for subcollection writes
+                const itemsBatch = writeBatch(firestore);
                 data.items.forEach(item => {
                     const itemRef = doc(collection(firestore, `boqs/${boqRef.id}/items`));
                     itemsBatch.set(itemRef, { ...item, id: undefined });
                 });
                 
-                // Committing the items batch needs to be handled after the transaction
-                // This is a limitation. A better way is to do this in a server-side function.
-                // For now, we will commit it after.
-                
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+                
+                // This part is problematic inside a transaction if itemsBatch is used.
+                // Firestore transactions require all reads before writes.
+                // A better pattern is to use a server-side function (Cloud Function)
+                // for atomicity across collections if needed, or commit batches separately.
+                // For client-side, we commit the main doc in transaction, and items after.
             });
-            // This is not transactional with the main BOQ creation, but it's the best we can do on the client.
-            const tempBoqRef = doc(collection(firestore, 'boqs')); // Create a temp ref to get an ID for the items path
-            const itemsBatch = writeBatch(firestore);
-             data.items.forEach(item => {
-                const itemRef = doc(collection(firestore, `boqs/${tempBoqRef.id}/items`));
-                 itemsBatch.set(itemRef, { ...item, id: undefined });
-             });
-            await itemsBatch.commit();
+
+            // Let's find the created BOQ to add items to it. This is not ideal but works for client-side.
+            const q = query(collection(firestore, 'boqs'), orderBy('createdAt', 'desc'), limit(1));
+            const boqSnap = await getDocs(q);
+            if (!boqSnap.empty) {
+                const newBoqId = boqSnap.docs[0].id;
+                const itemsBatch = writeBatch(firestore);
+                data.items.forEach(item => {
+                   const itemRef = doc(collection(firestore, `boqs/${newBoqId}/items`));
+                   itemsBatch.set(itemRef, { ...item, id: undefined });
+                });
+                await itemsBatch.commit();
+            }
 
 
             toast({ title: 'نجاح', description: 'تم إنشاء جدول الكميات بنجاح.' });
@@ -181,3 +188,5 @@ export function BoqForm() {
         </form>
     );
 }
+
+    

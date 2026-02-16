@@ -22,7 +22,7 @@ const purchasingFeatures = [
     {
         title: 'الأصناف',
         description: 'إدارة وتصنيف جميع أصناف المخزون والخدمات.',
-        href: '/dashboard/purchasing/items',
+        href: '/dashboard/warehouse/items',
         icon: Package,
         color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
     },
