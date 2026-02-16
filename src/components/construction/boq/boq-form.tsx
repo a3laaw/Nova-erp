@@ -1,12 +1,12 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, doc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { collection, addDoc, doc, serverTimestamp, runTransaction, writeBatch, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,16 +16,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Loader2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
-import type { Boq, BoqItem } from '@/lib/types';
-import Link from 'next/link';
+import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 const itemSchema = z.object({
   id: z.string(),
   itemNumber: z.string(),
   description: z.string().min(1, "الوصف مطلوب."),
   unit: z.string().min(1, "الوحدة مطلوبة."),
-  plannedQuantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
-  plannedUnitPrice: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
+  quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
+  sellingUnitPrice: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
+  notes: z.string().optional(),
+  parentId: z.string().nullable(),
+  level: z.number(),
+  isHeader: z.boolean(),
 });
 
 const boqFormSchema = z.object({
@@ -44,34 +49,62 @@ export function BoqForm() {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
 
-    const { register, handleSubmit, control, watch, formState: { errors } } = useForm<BoqFormValues>({
+    const { data: masterItems, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
+
+    const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<BoqFormValues>({
         resolver: zodResolver(boqFormSchema),
         defaultValues: {
             name: '',
             clientName: '',
             status: 'تقديري',
-            items: [{ id: '1', itemNumber: '1.0', description: '', unit: '', plannedQuantity: 1, plannedUnitPrice: 0 }]
+            items: [{ id: 'root-1', itemNumber: '1.0', description: '', unit: '', quantity: 0, sellingUnitPrice: 0, notes: '', parentId: null, level: 0, isHeader: false }]
         }
     });
 
-    const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+    const { fields, append, remove, update } = useFieldArray({ control, name: 'items' });
     const watchedItems = watch('items');
 
-    const totalValue = useMemo(() =>
-        watchedItems.reduce((sum, item) => sum + (item.plannedQuantity * item.plannedUnitPrice), 0),
-    [watchedItems]);
+    const totalValue = useMemo(() => {
+        return watchedItems.reduce((sum, item) => {
+            if (item.isHeader) return sum;
+            return sum + ((item.quantity || 0) * (item.sellingUnitPrice || 0));
+        }, 0);
+    }, [watchedItems]);
 
-    const addBoqItem = () => {
-        const lastItemNumber = fields.length > 0 ? parseFloat(fields[fields.length - 1].itemNumber) : 0;
-        const newItemNumber = (lastItemNumber + 1).toFixed(1);
+    const handleAddItem = (isHeader: boolean, parentId: string | null = null) => {
+        let level = 0;
+        let parentNumber = '';
+        if (parentId) {
+            const parentIndex = fields.findIndex(f => f.id === parentId);
+            if (parentIndex > -1) {
+                level = fields[parentIndex].level + 1;
+                parentNumber = fields[parentIndex].itemNumber + '.';
+            }
+        }
+        
+        const siblings = fields.filter(f => f.parentId === parentId);
+        const newItemNumber = `${parentNumber}${siblings.length + 1}`;
+
         append({
-            id: new Date().toISOString(),
+            id: new Date().toISOString() + Math.random(),
             itemNumber: newItemNumber,
             description: '',
             unit: '',
-            plannedQuantity: 1,
-            plannedUnitPrice: 0,
+            quantity: 0,
+            sellingUnitPrice: 0,
+            notes: '',
+            parentId,
+            level,
+            isHeader,
         });
+    };
+    
+    const handleMasterItemSelect = (index: number, masterItemId: string) => {
+        const masterItem = masterItems.find(i => i.id === masterItemId);
+        if (masterItem) {
+            setValue(`items.${index}.description`, masterItem.name);
+            setValue(`items.${index}.unit`, masterItem.unit || '');
+        }
     };
 
     const onSubmit = async (data: BoqFormValues) => {
@@ -90,6 +123,13 @@ export function BoqForm() {
                 const boqNumber = `BOQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
                 const boqRef = doc(collection(firestore, 'boqs'));
+                
+                const finalItems = data.items.map(item => ({
+                    ...item,
+                    total: item.isHeader ? 0 : (item.quantity || 0) * (item.sellingUnitPrice || 0)
+                }));
+                const totalValue = finalItems.reduce((sum, item) => sum + item.total, 0);
+
                 const boqData: Omit<Boq, 'id'> = {
                     boqNumber,
                     name: data.name,
@@ -100,35 +140,24 @@ export function BoqForm() {
                     createdAt: serverTimestamp(),
                 };
                 transaction.set(boqRef, boqData);
-
-                const itemsBatch = writeBatch(firestore);
-                data.items.forEach(item => {
-                    const itemRef = doc(collection(firestore, `boqs/${boqRef.id}/items`));
-                    itemsBatch.set(itemRef, { ...item, id: undefined });
-                });
                 
-                transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-                
-                // This part is problematic inside a transaction if itemsBatch is used.
-                // Firestore transactions require all reads before writes.
-                // A better pattern is to use a server-side function (Cloud Function)
-                // for atomicity across collections if needed, or commit batches separately.
-                // For client-side, we commit the main doc in transaction, and items after.
+                // Firestore transactions don't support batched writes to subcollections easily.
+                // We'll write the items after the transaction.
+                // For full atomicity, a Cloud Function would be needed.
             });
 
-            // Let's find the created BOQ to add items to it. This is not ideal but works for client-side.
             const q = query(collection(firestore, 'boqs'), orderBy('createdAt', 'desc'), limit(1));
             const boqSnap = await getDocs(q);
             if (!boqSnap.empty) {
                 const newBoqId = boqSnap.docs[0].id;
                 const itemsBatch = writeBatch(firestore);
                 data.items.forEach(item => {
+                   const { id, ...itemData } = item; // Exclude client-side id
                    const itemRef = doc(collection(firestore, `boqs/${newBoqId}/items`));
-                   itemsBatch.set(itemRef, { ...item, id: undefined });
+                   itemsBatch.set(itemRef, cleanFirestoreData(itemData));
                 });
                 await itemsBatch.commit();
             }
-
 
             toast({ title: 'نجاح', description: 'تم إنشاء جدول الكميات بنجاح.' });
             router.push('/dashboard/construction/boq');
@@ -140,53 +169,81 @@ export function BoqForm() {
             setIsSaving(false);
         }
     };
+    
+    const masterItemOptions = useMemo(() => masterItems.map(i => ({value: i.id!, label: i.name})), [masterItems]);
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div className="grid gap-2"><Label htmlFor="name">اسم/مرجع جدول الكميات *</Label><Input id="name" {...register('name')} /></div>
-                    <div className="grid gap-2"><Label htmlFor="clientName">اسم العميل (المحتمل)</Label><Input id="clientName" {...register('clientName')} /></div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div className="grid gap-2"><Label htmlFor="status">الحالة</Label>
-                        <Controller name="status" control={control} render={({field}) => (
-                             <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>
-                        )}/>
+         <Card>
+            <CardHeader>
+                <CardTitle>إنشاء جدول كميات جديد</CardTitle>
+                <CardDescription>أدخل تفاصيل جدول الكميات. يمكنك ربطه بعميل لاحقًا.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleSubmit(onSubmit)}>
+                    <div className="space-y-6">
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="grid gap-2"><Label htmlFor="name">اسم/مرجع جدول الكميات *</Label><Input id="name" {...register('name')} /></div>
+                            <div className="grid gap-2"><Label htmlFor="clientName">اسم العميل (المحتمل)</Label><Input id="clientName" {...register('clientName')} /></div>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="grid gap-2"><Label htmlFor="status">الحالة</Label>
+                                <Controller name="status" control={control} render={({field}) => (
+                                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>
+                                )}/>
+                            </div>
+                        </div>
+                        
+                        <div className="border rounded-lg">
+                            <Table>
+                                <TableHeader><TableRow><TableHead className="w-1/3">بيان الأعمال</TableHead><TableHead>الوحدة</TableHead><TableHead>الكمية</TableHead><TableHead>سعر الوحدة</TableHead><TableHead className="text-left">الإجمالي</TableHead><TableHead className="w-[100px]">الإجراءات</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {fields.map((field, index) => {
+                                        const item = watchedItems[index] || {};
+                                        const isLumpSum = item.unit === 'مقطوعية';
+                                        const total = isLumpSum ? (item.sellingUnitPrice || 0) : (item.quantity || 0) * (item.sellingUnitPrice || 0);
+
+                                        return (
+                                        <TableRow key={field.id}>
+                                            <TableCell style={{ paddingRight: `${item.level * 2}rem` }}>
+                                                <InlineSearchList 
+                                                    placeholder='اختر بندًا أو اكتب مباشرة...'
+                                                    value={item.id}
+                                                    onSelect={(val) => handleMasterItemSelect(index, val)}
+                                                    options={masterItemOptions}
+                                                />
+                                                 <Textarea {...register(`items.${index}.description`)} rows={2} className="mt-1"/>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Input {...register(`items.${index}.unit`)} placeholder="م3، م2،..." />
+                                            </TableCell>
+                                            <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" disabled={isLumpSum} /></TableCell>
+                                            <TableCell><Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} className="dir-ltr" /></TableCell>
+                                            <TableCell className="text-left font-mono">{formatCurrency(total)}</TableCell>
+                                            <TableCell>
+                                                <div className="flex gap-1">
+                                                    <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => handleAddItem(false, field.id)}><PlusCircle className="h-4 w-4"/></Button>
+                                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )})
+                                }
+                                </TableBody>
+                                <TableFooter><TableRow className="bg-muted text-base font-bold"><TableCell colSpan={4}>الإجمالي</TableCell><TableCell colSpan={2} className="text-left font-mono">{formatCurrency(totalValue)}</TableCell></TableRow></TableFooter>
+                            </Table>
+                        </div>
+                        {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
+                        <Button type="button" variant="outline" onClick={() => handleAddItem(true, null)}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند رئيسي</Button>
                     </div>
-                </div>
-                
-                <div className="border rounded-lg">
-                    <Table>
-                        <TableHeader><TableRow><TableHead>رقم البند</TableHead><TableHead className="w-2/5">وصف البند</TableHead><TableHead>الوحدة</TableHead><TableHead>الكمية</TableHead><TableHead>سعر الوحدة</TableHead><TableHead className="text-left">الإجمالي</TableHead><TableHead/></TableRow></TableHeader>
-                        <TableBody>
-                            {fields.map((field, index) => (
-                                <TableRow key={field.id}>
-                                    <TableCell><Input {...register(`items.${index}.itemNumber`)} className="w-20"/></TableCell>
-                                    <TableCell><Textarea {...register(`items.${index}.description`)} rows={1}/></TableCell>
-                                    <TableCell><Input {...register(`items.${index}.unit`)} className="w-24"/></TableCell>
-                                    <TableCell><Input type="number" step="any" {...register(`items.${index}.plannedQuantity`)} className="dir-ltr"/></TableCell>
-                                    <TableCell><Input type="number" step="0.001" {...register(`items.${index}.plannedUnitPrice`)} className="dir-ltr"/></TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency((watchedItems[index]?.plannedQuantity || 0) * (watchedItems[index]?.plannedUnitPrice || 0))}</TableCell>
-                                    <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter><TableRow className="bg-muted text-base font-bold"><TableCell colSpan={5}>الإجمالي</TableCell><TableCell colSpan={2} className="text-left font-mono">{formatCurrency(totalValue)}</TableCell></TableRow></TableFooter>
-                    </Table>
-                </div>
-                 {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
-                <Button type="button" variant="outline" onClick={addBoqItem}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند</Button>
-            </div>
-             <div className="mt-6 pt-6 border-t flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
-                <Button type="submit" disabled={isSaving}>
-                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                    {isSaving ? 'جاري الحفظ...' : 'حفظ'}
-                </Button>
-            </div>
-        </form>
+                    <div className="mt-6 pt-6 border-t flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                            {isSaving ? 'جاري الحفظ...' : 'حفظ'}
+                        </Button>
+                    </div>
+                </form>
+            </CardContent>
+        </Card>
     );
 }
-
-    

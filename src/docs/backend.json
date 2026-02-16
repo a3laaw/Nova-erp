@@ -1583,29 +1583,21 @@
     },
     "BoqItem": {
       "title": "Bill of Quantities Item",
-      "description": "A single line item in a Bill of Quantities.",
+      "description": "A single line item in a Bill of Quantities, can be nested.",
       "type": "object",
       "properties": {
-        "itemId": { "type": "string", "description": "Reference to the master Item ID from the main inventory." },
         "itemNumber": { "type": "string" },
         "description": { "type": "string" },
-        "classification": {
-          "type": "string",
-          "enum": ["خرسانة", "حديد", "شدات", "أخرى"],
-          "description": "The classification of the BOQ item (e.g., Concrete, Steel, Formwork)."
-        },
         "unit": { "type": "string" },
         "quantity": { "type": "number" },
-        "costUnitPrice": { "type": "number", "description": "The estimated unit cost for the company." },
-        "sellingUnitPrice": { "type": "number", "description": "The unit price presented to the client." },
-        "margin": { "type": "number", "description": "The profit margin percentage for this item." },
-        "executedQuantity": { "type": "number" },
-        "actualCost": { "type": "number" },
-        "deviation": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "sellingUnitPrice": { "type": "number" },
+        "total": { "type": "number", "description": "Calculated total for the item." },
+        "notes": { "type": "string", "description": "Optional notes for this specific item." },
+        "parentId": { "type": ["string", "null"], "description": "The ID of the parent item for nesting." },
+        "level": { "type": "number", "description": "The nesting level of the item." },
+        "isHeader": { "type": "boolean", "description": "True if this item is a non-calculable header." }
       },
-      "required": ["itemNumber", "description", "unit", "quantity", "sellingUnitPrice"]
+      "required": ["itemNumber", "description"]
     },
      "Boq": {
       "title": "Bill of Quantities",
