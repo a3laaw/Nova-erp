@@ -1,6 +1,5 @@
 
 
-
 export interface Company {
     id?: string;
     name: string;
@@ -745,25 +744,25 @@ export type SubcontractorSpecialization = {
 };
 
 export type BoqItem = {
-    id?: string;
-    itemId?: string; // Link to master BoqReferenceItem
-    itemNumber: string;
-    description: string;
-    classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
-    unit: string;
-    quantity: number;
-    costUnitPrice?: number;
-    sellingUnitPrice?: number;
-    margin?: number;
-    executedQuantity?: number;
-    actualCost?: number;
-    deviation?: number;
-    notes?: string;
-    parentId?: string | null;
-    level?: number;
-    isHeader?: boolean;
-    createdAt?: any;
-    updatedAt?: any;
+  id?: string;
+  itemId?: string;
+  itemNumber: string;
+  description: string;
+  classification?: 'خرسانة' | 'حديد' | 'شدات' | 'أخرى';
+  unit: string;
+  quantity: number;
+  costUnitPrice?: number;
+  sellingUnitPrice?: number;
+  margin?: number;
+  executedQuantity?: number;
+  actualCost?: number;
+  deviation?: number;
+  notes?: string;
+  parentId?: string | null;
+  level: number;
+  isHeader: boolean;
+  createdAt?: any;
+  updatedAt?: any;
 };
     
 export type Boq = {
@@ -793,6 +792,7 @@ export type BoqReferenceItem = {
   
 
     
+
 
 
 

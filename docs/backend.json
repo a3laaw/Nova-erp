@@ -1586,18 +1586,17 @@
       "description": "A single line item in a Bill of Quantities.",
       "type": "object",
       "properties": {
-        "itemId": { "type": "string", "description": "Reference to the master Item ID from the main inventory." },
-        "itemNumber": { "type": "string" },
+        "itemId": { "type": "string", "description": "Reference to the master BoqReferenceItem ID." },
+        "itemNumber": { "type": "string", "description": "The hierarchical item number (e.g., '1.1', '1.2.1')." },
         "description": { "type": "string" },
-        "classification": {
-          "type": "string",
-          "enum": ["خرسانة", "حديد", "شدات", "أخرى"],
-          "description": "The classification of the BOQ item (e.g., Concrete, Steel, Formwork)."
-        },
         "unit": { "type": "string" },
         "quantity": { "type": "number" },
-        "costUnitPrice": { "type": "number", "description": "The estimated unit cost for the company." },
         "sellingUnitPrice": { "type": "number", "description": "The unit price presented to the client." },
+        "notes": { "type": "string", "description": "Specific notes for this line item." },
+        "isHeader": { "type": "boolean", "description": "True if this item is a non-calculable header or category title." },
+        "parentId": { "type": ["string", "null"], "description": "The ID of the parent BoqItem in the same collection, for creating a hierarchy." },
+        "level": { "type": "number", "description": "The indentation level for hierarchical display." },
+        "costUnitPrice": { "type": "number", "description": "The estimated unit cost for the company." },
         "margin": { "type": "number", "description": "The profit margin percentage for this item." },
         "executedQuantity": { "type": "number" },
         "actualCost": { "type": "number" },
@@ -1605,7 +1604,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["itemNumber", "description", "unit", "quantity", "sellingUnitPrice"]
+      "required": ["itemNumber", "description"]
     },
      "Boq": {
       "title": "Bill of Quantities",
@@ -1631,6 +1630,7 @@
       "properties": {
         "name": { "type": "string", "description": "The common name or description of the BOQ item." },
         "unit": { "type": "string", "description": "The default unit of measure for this item (e.g., m3, m2, item)." },
+        "isHeader": { "type": "boolean", "description": "True if this item is a non-calculable header or category title." },
         "transactionTypeIds": {
             "type": "array",
             "description": "Links to the specific transaction types this item is relevant to.",
@@ -1927,3 +1927,4 @@
     }
   }
 }
+
