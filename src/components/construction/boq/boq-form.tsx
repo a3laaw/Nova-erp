@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,14 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -47,150 +46,6 @@ export const boqFormSchema = z.object({
 
 export type BoqFormValues = z.infer<typeof boqFormSchema>;
 
-interface BoqItemRowProps {
-  index: number;
-  control: any;
-  register: any;
-  getValues: any;
-  setValue: any;
-  remove: (index: number) => void;
-  insert: (index: number, value: any) => void;
-  masterItemsMap: Map<string, BoqReferenceItem>;
-  masterItemsByParent: Map<string | null, BoqReferenceItem[]>;
-  loadingMasterItems: boolean;
-  fields: any[]; // all fields from useFieldArray
-}
-
-function BoqItemRow({ index, control, register, getValues, setValue, remove, insert, masterItemsMap, masterItemsByParent, loadingMasterItems, fields }: BoqItemRowProps) {
-  const item = useWatch({ control, name: `items.${index}` });
-
-  const selectedMasterItem = useMemo(() => {
-    return item.itemId ? masterItemsMap.get(item.itemId) : null;
-  }, [item.itemId, masterItemsMap]);
-
-  const hasChildrenInMaster = useMemo(() => {
-    if (!selectedMasterItem) return false;
-    return masterItemsByParent.has(selectedMasterItem.id!);
-  }, [selectedMasterItem, masterItemsByParent]);
-
-  const itemOptions = useMemo(() => {
-    const parentId = item.parentId;
-    const parentFormItem = fields.find(f => f.id === parentId);
-    const parentMasterId = parentFormItem?.itemId || null;
-    return (masterItemsByParent.get(parentMasterId) || []).map(i => ({ value: i.id!, label: i.name }));
-  }, [item.parentId, fields, masterItemsByParent]);
-
-  const handleAddItem = (isHeader: boolean) => {
-    let lastDescendantIndex = index;
-    for (let i = index + 1; i < fields.length; i++) {
-        if (fields[i].level > item.level) {
-            lastDescendantIndex = i;
-        } else {
-            break;
-        }
-    }
-    insert(lastDescendantIndex + 1, {
-      id: generateId(),
-      description: '',
-      unit: isHeader ? '' : 'مقطوعية',
-      quantity: 1,
-      sellingUnitPrice: 0,
-      parentId: item.id,
-      level: item.level + 1,
-      isHeader: isHeader,
-    });
-  };
-  
-  const handleRemove = () => {
-    const idsToRemove = new Set<string>([item.id]);
-    const indicesToRemove: number[] = [];
-
-    const findChildrenRecursive = (parentId: string) => {
-        fields.forEach((field, idx) => {
-            if (field.parentId === parentId) {
-                idsToRemove.add(field.id);
-                indicesToRemove.push(idx);
-                findChildrenRecursive(field.id);
-            }
-        });
-    };
-
-    findChildrenRecursive(item.id);
-    indicesToRemove.push(index);
-    
-    // Sort indices in descending order to avoid issues with shifting array
-    indicesToRemove.sort((a,b) => b - a);
-    indicesToRemove.forEach(i => remove(i));
-  };
-
-
-  const lineTotal = useMemo(() => {
-    if (item.isHeader) return 0;
-    const qty = Number(item.quantity) || 0;
-    const price = Number(item.sellingUnitPrice) || 0;
-    return qty * price;
-  }, [item]);
-
-  return (
-    <div className="border-b last:border-b-0 py-2" style={{ paddingRight: `${item.level * 1.5}rem` }}>
-        <div className="flex items-start gap-2">
-            <div className="flex-grow space-y-2">
-                 <div className="flex items-center gap-2">
-                    <div className="w-60">
-                         <Controller
-                            name={`items.${index}.itemId`}
-                            control={control}
-                            render={({ field }) => (
-                                <InlineSearchList
-                                    value={field.value || ''}
-                                    onSelect={(value) => {
-                                        field.onChange(value);
-                                        const selected = masterItemsMap.get(value);
-                                        if (selected) {
-                                            setValue(`items.${index}.description`, selected.name, { shouldValidate: true });
-                                            setValue(`items.${index}.unit`, selected.unit || (selected.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
-                                            setValue(`items.${index}.isHeader`, selected.isHeader || false, { shouldValidate: true });
-                                        }
-                                    }}
-                                    options={itemOptions}
-                                    placeholder="اختر بندًا..."
-                                    disabled={loadingMasterItems}
-                                />
-                            )}
-                        />
-                    </div>
-                     <Input {...register(`items.${index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
-                      <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                         <Checkbox {...register(`items.${index}.isHeader`)} />
-                         <Label>بند رئيسي</Label>
-                      </div>
-                </div>
-                 {!item.isHeader && (
-                    <div className="flex items-center gap-2 pl-8">
-                        <Input {...register(`items.${index}.unit`)} placeholder="الوحدة" className="w-24" />
-                        <Input type="number" step="any" {...register(`items.${index}.quantity`)} placeholder="الكمية" className="w-24" />
-                        <Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} placeholder="سعر الوحدة" className="w-24" />
-                        <div className="font-semibold w-24 text-left font-mono">{formatCurrency(lineTotal)}</div>
-                    </div>
-                 )}
-            </div>
-            <div className="flex items-center">
-                 {item.isHeader && (
-                    <>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم فرعي</Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(false)}><PlusCircle className="ml-1 h-4 w-4"/> بند عمل</Button>
-                    </>
-                 )}
-                <Button type="button" variant="ghost" size="icon" onClick={handleRemove}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-            </div>
-        </div>
-    </div>
-  )
-}
-
-
 interface BoqFormProps {
     onSave: (data: BoqFormValues) => Promise<void>;
     onClose: () => void;
@@ -198,33 +53,161 @@ interface BoqFormProps {
     isSaving?: boolean;
 }
 
+const BoqItemRowRenderer = React.memo(({
+  node,
+  level,
+  control,
+  register,
+  setValue,
+  handleRemoveItem,
+  handleAddItem,
+  masterItemsMap,
+  loadingMasterItems,
+}: {
+  node: BoqFormValues['items'][0] & { _index: number; children: any[] };
+  level: number;
+  control: any;
+  register: any;
+  setValue: any;
+  handleRemoveItem: (index: number) => void;
+  handleAddItem: (parentId: string | null, isHeader: boolean) => void;
+  masterItemsMap: Map<string | null, any[]>;
+  loadingMasterItems: boolean;
+}) => {
+  const { fields, append, remove, insert } = useFieldArray({
+    control,
+    name: `items.${node._index}.children`,
+  });
+
+  const item = useWatch({ control, name: `items.${node._index}` });
+
+  const handleMasterItemSelect = (value: string) => {
+    setValue(`items.${node._index}.itemId`, value, { shouldValidate: true });
+    const selected = masterItemsMap.get(item.parentId || null)?.find(i => i.id === value);
+    if (selected) {
+      setValue(`items.${node._index}.description`, selected.name, { shouldValidate: true });
+      setValue(`items.${node._index}.unit`, selected.unit || (selected.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
+      setValue(`items.${node._index}.isHeader`, selected.isHeader || false, { shouldValidate: true });
+    }
+  };
+
+  const lineTotal = item.isHeader ? 0 : (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
+
+  return (
+    <div style={{ paddingRight: `${level * 1.5}rem` }} className="space-y-2 border-t first:border-t-0 py-2">
+      <div className="flex items-start gap-2">
+        <div className="flex-grow space-y-2">
+          <div className="flex items-center gap-2">
+            <InlineSearchList
+              className="w-60"
+              value={item.itemId || ''}
+              onSelect={handleMasterItemSelect}
+              options={masterItemsMap.get(item.parentId || null) || []}
+              placeholder={loadingMasterItems ? "تحميل..." : "اختر بندًا مرجعيًا..."}
+              disabled={loadingMasterItems}
+            />
+            <Input {...register(`items.${node._index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
+            <div className="flex items-center space-x-2 rtl:space-x-reverse pr-2">
+              <Checkbox {...register(`items.${node._index}.isHeader`)} checked={item.isHeader} onCheckedChange={checked => setValue(`items.${node._index}.isHeader`, !!checked)} />
+              <Label>بند رئيسي</Label>
+            </div>
+          </div>
+          {!item.isHeader && (
+            <div className="flex items-center gap-2 pl-8">
+              <Input {...register(`items.${node._index}.unit`)} placeholder="الوحدة" className="w-24" />
+              <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} placeholder="الكمية" className="w-24" />
+              <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} placeholder="سعر الوحدة" className="w-24" />
+              <div className="font-semibold w-24 text-left font-mono">{formatCurrency(lineTotal)}</div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center">
+            {item.isHeader && (
+                <>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(item.id, true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(item.id, false)}><PlusCircle className="ml-1 h-4 w-4"/> بند</Button>
+                </>
+            )}
+            <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(node._index)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+        </div>
+      </div>
+      {node.children.length > 0 && (
+        <div className="pl-4 border-r pr-4 border-dashed">
+          {node.children.map((childNode) => (
+            <BoqItemRowRenderer
+              key={childNode.id}
+              node={childNode}
+              level={level + 1}
+              control={control}
+              register={register}
+              setValue={setValue}
+              handleRemoveItem={handleRemoveItem}
+              handleAddItem={handleAddItem}
+              masterItemsMap={masterItemsMap}
+              loadingMasterItems={loadingMasterItems}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+BoqItemRowRenderer.displayName = 'BoqItemRowRenderer';
+
+
 export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqFormProps) {
   const isEditing = !!initialData;
   const { firestore } = useFirebase();
+  const { toast } = useToast();
+  
   const { data: masterItems, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
 
-  const methods = useForm<BoqFormValues>({
+  const { control, handleSubmit, register, getValues, watch, reset, setValue, formState: { errors } } = useForm<BoqFormValues>({
     resolver: zodResolver(boqFormSchema),
     defaultValues: initialData || { name: '', clientName: '', status: 'تقديري', items: [] },
   });
 
-  const { control, handleSubmit, register, getValues, watch, reset, setValue, formState: { errors } } = methods;
   const { fields, append, remove, insert } = useFieldArray({ control, name: 'items' });
+  const watchedItems = watch('items');
+
+  const { boqTree, totalValue } = useMemo(() => {
+    const items = watchedItems || [];
+    const map = new Map<string, BoqFormValues['items'][0] & { _index: number; children: any[] }>();
+    const roots: (BoqFormValues['items'][0] & { _index: number; children: any[] })[] = [];
+    let total = 0;
+
+    items.forEach((item, index) => {
+      map.set(item.id, { ...item, _index: index, children: [] });
+      const itemTotal = (item.quantity || 0) * (item.sellingUnitPrice || 0);
+      if (!item.isHeader) {
+          total += itemTotal;
+      }
+    });
+
+    items.forEach(item => {
+      if (item.parentId && map.has(item.parentId)) {
+        const parent = map.get(item.parentId);
+        if (parent) parent.children.push(map.get(item.id)!);
+      } else {
+        roots.push(map.get(item.id)!);
+      }
+    });
+    
+    return { boqTree: roots, totalValue: total };
+  }, [watchedItems]);
 
   const masterItemsMap = useMemo(() => {
-    return new Map((masterItems || []).map(i => [i.id!, i]));
-  }, [masterItems]);
-  
-  const masterItemsByParent = useMemo(() => {
-    const map = new Map<string | null, BoqReferenceItem[]>();
+    const map = new Map<string | null, any[]>();
     (masterItems || []).forEach(item => {
         const parentId = item.parentBoqReferenceItemId || null;
         if (!map.has(parentId)) map.set(parentId, []);
-        map.get(parentId)!.push(item);
+        map.get(parentId)!.push({ value: item.id!, label: item.name, ...item });
     });
     return map;
   }, [masterItems]);
-
+  
   useEffect(() => {
     if (initialData) {
       reset({
@@ -234,22 +217,68 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     }
   }, [initialData, reset]);
 
-  const watchedItems = watch('items');
-  const totalValue = useMemo(() => 
-    (watchedItems || []).reduce((sum, item) => {
-        if(item.isHeader) return sum;
-        const qty = Number(item.quantity) || 0;
-        const price = Number(item.sellingUnitPrice) || 0;
-        return sum + qty * price;
-    }, 0),
-    [watchedItems]
-  );
+  const handleAddItem = (parentId: string | null, isHeader: boolean) => {
+    let parentIndex = -1;
+    if (parentId) {
+      parentIndex = fields.findIndex(f => f.id === parentId);
+    }
+    
+    const parentLevel = parentId ? fields[parentIndex].level : -1;
+
+    let insertAtIndex = fields.length;
+    if (parentId) {
+        let lastChildIndex = parentIndex;
+        for (let i = parentIndex + 1; i < fields.length; i++) {
+            if (fields[i].level > parentLevel) {
+                lastChildIndex = i;
+            } else {
+                break;
+            }
+        }
+        insertAtIndex = lastChildIndex + 1;
+    }
+
+    insert(insertAtIndex, {
+      id: generateId(),
+      description: '',
+      unit: isHeader ? '' : 'مقطوعية',
+      quantity: 1,
+      sellingUnitPrice: 0,
+      parentId: parentId,
+      level: parentLevel + 1,
+      isHeader: isHeader,
+      itemId: '',
+    });
+  };
   
-  const handleAddRootItem = () => {
+  const handleRemoveItem = (index: number) => {
+    const itemToRemove = fields[index];
+    const descendantIndices: number[] = [];
+    const findDescendants = (parentId: string) => {
+        fields.forEach((field, idx) => {
+            if (field.parentId === parentId) {
+                descendantIndices.push(idx);
+                findDescendants(field.id);
+            }
+        });
+    };
+    findDescendants(itemToRemove.id);
+    
+    const indicesToRemove = [index, ...descendantIndices].sort((a,b) => b-a);
+    indicesToRemove.forEach(i => remove(i));
+  };
+  
+  const handleAddRootItem = (isHeader: boolean) => {
     append({
-      id: generateId(), itemNumber: '', description: '', unit: '',
-      quantity: 0, sellingUnitPrice: 0, notes: '',
-      parentId: null, level: 0, isHeader: true, itemId: ''
+        id: generateId(),
+        description: '',
+        unit: isHeader ? '' : 'مقطوعية',
+        quantity: 1,
+        sellingUnitPrice: 0,
+        parentId: null,
+        level: 0,
+        isHeader: isHeader,
+        itemId: '',
     });
   };
 
@@ -274,7 +303,6 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     };
     
     processNode(null, '', 0);
-
     onSave({ ...data, items: finalItems });
   };
 
@@ -303,30 +331,34 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
           </div>
           <Separator />
           <h3 className="font-semibold text-lg">بنود جدول الكميات</h3>
-          <div className="border rounded-lg p-2 space-y-2">
-            {fields.map((field, index) => (
-                <BoqItemRow
-                    key={field.id}
-                    index={index}
-                    control={control}
-                    register={register}
-                    getValues={getValues}
-                    setValue={setValue}
-                    remove={remove}
-                    insert={insert}
-                    masterItemsMap={masterItemsMap}
-                    masterItemsByParent={masterItemsByParent}
-                    loadingMasterItems={masterItemsLoading}
-                    fields={fields}
-                />
-            ))}
-             {errors.items && <p className="text-destructive text-sm mt-2 p-2">{errors.items.root?.message || errors.items.message}</p>}
+          
+          <div className="space-y-4">
+            {boqTree.length === 0 ? (
+                <div className="text-center p-4 text-muted-foreground">ابدأ بإضافة قسم رئيسي.</div>
+            ) : (
+             boqTree.map(node => (
+              <BoqItemRowRenderer
+                key={node.id}
+                node={node}
+                level={0}
+                control={control}
+                register={register}
+                setValue={setValue}
+                handleRemoveItem={handleRemoveItem}
+                handleAddItem={handleAddItem}
+                masterItemsMap={masterItemsMap}
+                loadingMasterItems={masterItemsLoading}
+              />
+            ))
+            )}
           </div>
-           <div className="flex justify-start mt-4 border-t pt-4">
-                <Button type="button" variant="secondary" onClick={handleAddRootItem}>
-                    <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
-                </Button>
-            </div>
+          
+          {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
+          <div className="flex justify-center mt-4 border-t pt-4">
+             <Button type="button" variant="secondary" onClick={() => handleAddRootItem(true)}>
+                  <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
+             </Button>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col items-end gap-4 pt-6 border-t">
           <div className="text-2xl font-bold">
@@ -345,4 +377,4 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     </Card>
   );
 }
-```
+
