@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -7,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, getDocs, query, orderBy, getDoc, doc, addDoc, updateDoc, serverTimestamp, writeBatch, collectionGroup } from 'firebase/firestore';
+import { collection, getDocs, query, collectionGroup, orderBy, getDoc, doc, addDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -95,8 +96,7 @@ function BoqItemsRenderer({ control, register, errors, level, parentId, parentNu
                                     onMasterItemSelect(itemIndex, value);
                                 }}
                                 options={masterItemOptions}
-                                placeholder={masterItemsLoading ? "تحميل..." : masterItemOptions.length === 0 ? "لا توجد بنود مرجعية" : "اختر بندًا مرجعيًا أو اكتب مباشرة..."}
-                                disabled={masterItemsLoading}
+                                placeholder={masterItemsLoading ? "جاري التحميل... (يمكنك الكتابة)" : "اختر بندًا أو اكتب..."}
                             />
                         )}
                     />
@@ -167,7 +167,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         }
     });
 
-    const { control, handleSubmit, formState: { errors }, watch, setValue, reset, getValues, register } = methods;
+    const { control, handleSubmit, watch, setValue, reset, getValues, register, formState: { errors } } = methods;
 
     const { fields, append, remove, update, insert } = useFieldArray({
         control,
@@ -343,4 +343,3 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         </Card>
     );
 }
-    
