@@ -57,8 +57,8 @@ interface BoqFormProps {
     isSaving?: boolean;
 }
 
-function BoqItemsRenderer({ control, register, errors, level, parentId, parentNumber, itemIndex, onAddItem, onMasterItemSelect, masterItems, masterItemsLoading }: any) {
-    const { remove, update } = useFieldArray({ control, name: 'items' });
+function BoqItemsRenderer({ control, register, errors, level, parentId, parentNumber, itemIndex, onAddItem, onMasterItemSelect, masterItems, masterItemsLoading, remove }: any) {
+    
     const watchedItems = useWatch({ control, name: 'items' });
     
     const currentItem = watchedItems[itemIndex];
@@ -142,6 +142,7 @@ function BoqItemsRenderer({ control, register, errors, level, parentId, parentNu
                         onMasterItemSelect={onMasterItemSelect}
                         masterItems={masterItems}
                         masterItemsLoading={masterItemsLoading}
+                        remove={remove}
                      />
                 ))}
                  <Button type="button" variant="ghost" size="sm" onClick={() => onAddItem(currentItem.id, false)} className="mt-2 text-primary"><PlusCircle className="ml-2 h-4"/> إضافة بند عمل</Button>
@@ -179,35 +180,40 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         }
     }, [initialData, reset]);
 
-    const handleAddItem = useCallback((parentId: string | null, isHeader: boolean) => {
-        const currentItems = getValues('items');
-        let newIndex = 0;
-        let lastSiblingIndex = -1;
-
-        if (parentId) {
-            for(let i = currentItems.length - 1; i >= 0; i--) {
-                if (currentItems[i].id === parentId) {
-                    lastSiblingIndex = i;
-                    break;
-                }
-            }
-             for(let i = currentItems.length - 1; i > lastSiblingIndex; i--) {
-                if (currentItems[i].parentId === parentId) {
-                    lastSiblingIndex = i;
-                    break;
-                }
-            }
-        } else {
-            for(let i = currentItems.length - 1; i >= 0; i--) {
-                if (currentItems[i].parentId === null) {
-                    lastSiblingIndex = i;
-                    break;
-                }
+    const findLastIndex = (arr: any[], predicate: (value: any, index: number, obj: any[]) => boolean) => {
+        for (let i = arr.length - 1; i >= 0; i--) {
+            if (predicate(arr[i], i, arr)) {
+                return i;
             }
         }
+        return -1;
+    };
+
+    const handleAddItem = useCallback((parentId: string | null, isHeader: boolean) => {
+        const currentItems = getValues('items');
         
-        newIndex = lastSiblingIndex !== -1 ? lastSiblingIndex + 1 : currentItems.length;
-        
+        let parentIndex = -1;
+        if (parentId) {
+            parentIndex = currentItems.findIndex(item => item.id === parentId);
+        }
+
+        let newIndex = currentItems.length; // Default to end
+        if (parentId) {
+            let lastDescendantIndex = parentIndex;
+            for (let i = parentIndex + 1; i < currentItems.length; i++) {
+                if (currentItems[i].parentId === parentId || currentItems[i].level > currentItems[parentIndex].level) {
+                    lastDescendantIndex = i;
+                } else {
+                    break;
+                }
+            }
+            newIndex = lastDescendantIndex + 1;
+        } else {
+             const lastRootIndex = findLastIndex(currentItems, item => item.parentId === null);
+             newIndex = lastRootIndex !== -1 ? lastRootIndex + 1 : 0;
+        }
+
+
         const parentItem = parentId ? currentItems.find(item => item.id === parentId) : null;
         const level = parentItem ? parentItem.level + 1 : 0;
         
@@ -227,8 +233,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         insert(newIndex, newItem as any);
     
     }, [insert, getValues]);
-
-
+    
     const handleMasterItemSelect = useCallback((index: number, masterItemId: string) => {
         const masterItem = masterItems.find(i => i.id === masterItemId);
         if (masterItem) {
@@ -253,7 +258,32 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     }, [watchedItems]);
 
     const onSubmit = (data: BoqFormValues) => {
-        onSave(data);
+        const updatedItems = data.items.map((item, index) => {
+            // Find parent number
+            const parent = item.parentId ? data.items.find(p => p.id === item.parentId) : null;
+            const parentNumber = parent ? parent.itemNumber : '';
+
+            // Find sibling index
+            const siblings = data.items.filter(s => s.parentId === item.parentId);
+            const siblingIndex = siblings.findIndex(s => s.id === item.id);
+
+            return {
+                ...item,
+                itemNumber: parentNumber ? `${parentNumber}.${siblingIndex + 1}` : `${siblings.findIndex(s => s.id === item.id) + 1}`
+            };
+        });
+        
+        const regenerateNumbers = (items: any[], parentId: string | null = null, parentNumber: string = '') => {
+            const children = items.filter(i => i.parentId === parentId);
+            children.forEach((child, index) => {
+                child.itemNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
+                regenerateNumbers(items, child.id, child.itemNumber);
+            });
+        };
+
+        regenerateNumbers(updatedItems);
+
+        onSave({ ...data, items: updatedItems });
     };
     
     const rootItems = useMemo(() => {
@@ -314,6 +344,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                                     onMasterItemSelect={handleMasterItemSelect}
                                     masterItems={masterItems}
                                     masterItemsLoading={masterItemsLoading}
+                                    remove={remove}
                                 />
                             ))}
                         </div>
@@ -343,323 +374,3 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         </Card>
     );
 }
-
-```
-- src/components/ui/separator.tsx:
-```tsx
-"use client"
-
-import * as React from "react"
-import * as SeparatorPrimitive from "@radix-ui/react-separator"
-
-import { cn } from "@/lib/utils"
-
-const Separator = React.forwardRef<
-  React.ElementRef<typeof SeparatorPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
->(
-  (
-    { className, orientation = "horizontal", decorative = true, ...props },
-    ref
-  ) => (
-    <SeparatorPrimitive.Root
-      ref={ref}
-      decorative={decorative}
-      orientation={orientation}
-      className={cn(
-        "shrink-0 bg-border",
-        orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
-        className
-      )}
-      {...props}
-    />
-  )
-)
-Separator.displayName = SeparatorPrimitive.Root.displayName
-
-export { Separator }
-
-```
-- src/lib/hooks/use-smart-cache.ts:
-```ts
-'use client';
-
-import { useState, useEffect, useCallback, useRef } from 'react';
-import localforage from 'localforage';
-
-interface CacheItem<T> {
-  data: T;
-  timestamp: number;
-}
-
-/**
- * A hook that provides a smart caching layer for asynchronous data fetching.
- * It fetches data, caches it in IndexedDB using localforage, and returns
- * the cached data first while revalidating in the background if the cache is stale.
- * 
- * @param key Unique key to identify the cached data.
- * @param fetcher The asynchronous function that fetches the data.
- * @param ttl Time-to-live for the cache in milliseconds.
- */
-export function useSmartCache<T>(key: string, fetcher: () => Promise<T>, ttl: number) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  // A ref to ensure the fetcher is only called once on mount or when key/ttl changes,
-  // preventing multiple background fetches on re-renders.
-  const isFetching = useRef(false);
-
-  const fetchData = useCallback(async () => {
-    if (isFetching.current) return;
-    isFetching.current = true;
-    setLoading(true);
-
-    try {
-      const cachedItem = await localforage.getItem<CacheItem<T>>(key);
-      const now = Date.now();
-
-      // If we have fresh, valid cached data, use it immediately.
-      if (cachedItem && (now - cachedItem.timestamp < ttl)) {
-        setData(cachedItem.data);
-        setLoading(false); // We have data, so we're not "loading" from the user's perspective.
-      } else if(cachedItem) {
-        // If we have stale data, show it first, then revalidate in the background.
-        setData(cachedItem.data);
-        setLoading(false);
-      } else {
-        // No data at all, so we must show the loading state.
-        setLoading(true);
-      }
-
-      // Revalidate data from the network
-      const freshData = await fetcher();
-      await localforage.setItem(key, { data: freshData, timestamp: Date.now() });
-      setData(freshData);
-    } catch (e) {
-      console.error(`Failed to fetch or cache data for key "${key}":`, e);
-      setError(e as Error);
-    } finally {
-      setLoading(false);
-      isFetching.current = false;
-    }
-  }, [key, fetcher, ttl]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { data, loading, error };
-}
-
-```
-- src/lib/hooks/use-subscription.tsx:
-```tsx
-
-'use client';
-
-import { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  type Firestore,
-  query,
-  collection,
-  onSnapshot,
-  type DocumentData,
-  type QueryConstraint,
-} from 'firebase/firestore';
-
-const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
-
-/**
- * A simplified, stable hook for real-time Firestore collection subscriptions.
- * It uses a memoized query key to prevent re-subscriptions on every render.
- */
-export function useSubscription<T extends { id?: string }>(
-  firestore: Firestore | null,
-  collectionPath: string | null, 
-  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS
-): { data: T[], setData: React.Dispatch<React.SetStateAction<T[]>>, loading: boolean, error: Error | null } {
-    const [data, setData] = useState<T[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-    
-    // Create a stable key from the path and constraints to use in the useEffect dependency array.
-    // This prevents re-subscriptions on every render if the constraints array is a new instance but has the same values.
-    const queryKey = useMemo(() => {
-        if (!collectionPath) return null;
-        try {
-            // A simple string representation for the dependency array.
-            return `${collectionPath}|${JSON.stringify(constraints)}`;
-        } catch (e) {
-            // Fallback for non-serializable constraints, though this should be avoided.
-            return `${collectionPath}|${Date.now()}`;
-        }
-    }, [collectionPath, constraints]);
-
-
-    useEffect(() => {
-        if (!firestore || !collectionPath || !queryKey) {
-            setLoading(false);
-            setData([]); // Ensure data is cleared if there's no query
-            return;
-        }
-
-        setLoading(true);
-
-        const q = query(collection(firestore, collectionPath), ...constraints);
-
-        const unsubscribe = onSnapshot(
-            q,
-            (snapshot) => {
-                const newData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-                setData(newData);
-                setLoading(false);
-                setError(null);
-            },
-            (err) => {
-                console.error(`Error listening to ${collectionPath}:`, err);
-                setError(err);
-                setLoading(false);
-            }
-        );
-
-        return () => unsubscribe();
-    // The key here includes the stringified constraints, so the effect only re-runs when the query truly changes.
-    }, [firestore, queryKey, collectionPath]); // 'constraints' is removed to rely on the stable queryKey
-
-    return { data, setData, loading, error };
-}
-
-```
-- src/lib/placeholder-images.ts:
-```ts
-import data from './placeholder-images.json';
-
-export type ImagePlaceholder = {
-  id: string;
-  description: string;
-  imageUrl: string;
-  imageHint: string;
-};
-
-export const PlaceHolderImages: ImagePlaceholder[] = data.placeholderImages;
-
-```
-- tailwind.config.ts:
-```ts
-import type { Config } from "tailwindcss"
-
-const config = {
-  darkMode: ["class"],
-  content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
-	],
-  prefix: "",
-  theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
-    extend: {
-      fontFamily: {
-        body: ["var(--font-body)", "sans-serif"],
-      },
-      colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
-    },
-  },
-  plugins: [require("tailwindcss-animate")],
-} satisfies Config
-
-export default config
-
-```
-- tsconfig.json:
-```json
-{
-  "compilerOptions": {
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-}
-
-```
