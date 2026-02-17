@@ -6,19 +6,20 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, writeBatch, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, orderBy, runTransaction, getDoc } from 'firebase/firestore';
 import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -34,7 +35,7 @@ const itemSchema = z.object({
   parentId: z.string().nullable(),
   level: z.number(),
   isHeader: z.boolean(),
-  itemId: z.string().optional(),
+  itemId: z.string().optional(), // Link to BoqReferenceItem
 });
 
 export const boqFormSchema = z.object({
@@ -46,77 +47,97 @@ export const boqFormSchema = z.object({
 
 export type BoqFormValues = z.infer<typeof boqFormSchema>;
 
-// --- Recursive Row Renderer ---
-function BoqItemRow({
-  control,
-  register,
-  getValues,
-  index,
-  remove,
-  append,
-  masterItems,
-  masterItemsLoading,
-}: {
+interface BoqItemRowProps {
+  index: number;
   control: any;
   register: any;
   getValues: any;
-  index: number;
+  setValue: any;
   remove: (index: number) => void;
-  append: (item: any) => void;
-  masterItems: BoqReferenceItem[];
-  masterItemsLoading: boolean;
-}) {
-  const currentItem = useWatch({ control, name: `items.${index}` });
-  const allItems = useWatch({ control, name: 'items' });
+  insert: (index: number, value: any) => void;
+  masterItemsMap: Map<string, BoqReferenceItem>;
+  masterItemsByParent: Map<string | null, BoqReferenceItem[]>;
+  loadingMasterItems: boolean;
+  fields: any[]; // all fields from useFieldArray
+}
 
-  const parentFormItem = useMemo(() => 
-    allItems.find((i: any) => i.id === currentItem.parentId),
-    [allItems, currentItem.parentId]
-  );
-  const parentMasterItemId = parentFormItem?.itemId;
-
-  const itemOptions = useMemo(() => {
-    return masterItems
-      .filter(item => item.parentBoqReferenceItemId === (parentMasterItemId || null))
-      .map(item => ({ value: item.id!, label: item.name }));
-  }, [masterItems, parentMasterItemId]);
+function BoqItemRow({ index, control, register, getValues, setValue, remove, insert, masterItemsMap, masterItemsByParent, loadingMasterItems, fields }: BoqItemRowProps) {
+  const item = useWatch({ control, name: `items.${index}` });
 
   const selectedMasterItem = useMemo(() => {
-    return masterItems.find(i => i.id === currentItem.itemId);
-  }, [masterItems, currentItem.itemId]);
-  
+    return item.itemId ? masterItemsMap.get(item.itemId) : null;
+  }, [item.itemId, masterItemsMap]);
+
   const hasChildrenInMaster = useMemo(() => {
-      if(!selectedMasterItem) return false;
-      return masterItems.some(i => i.parentBoqReferenceItemId === selectedMasterItem.id);
-  }, [selectedMasterItem, masterItems]);
+    if (!selectedMasterItem) return false;
+    return masterItemsByParent.has(selectedMasterItem.id!);
+  }, [selectedMasterItem, masterItemsByParent]);
+
+  const itemOptions = useMemo(() => {
+    const parentId = item.parentId;
+    const parentFormItem = fields.find(f => f.id === parentId);
+    const parentMasterId = parentFormItem?.itemId || null;
+    return (masterItemsByParent.get(parentMasterId) || []).map(i => ({ value: i.id!, label: i.name }));
+  }, [item.parentId, fields, masterItemsByParent]);
 
   const handleAddItem = (isHeader: boolean) => {
-    append({
+    let lastDescendantIndex = index;
+    for (let i = index + 1; i < fields.length; i++) {
+        if (fields[i].level > item.level) {
+            lastDescendantIndex = i;
+        } else {
+            break;
+        }
+    }
+    insert(lastDescendantIndex + 1, {
       id: generateId(),
       description: '',
       unit: isHeader ? '' : 'مقطوعية',
       quantity: 1,
       sellingUnitPrice: 0,
-      parentId: currentItem.id,
-      level: currentItem.level + 1,
+      parentId: item.id,
+      level: item.level + 1,
       isHeader: isHeader,
     });
   };
+  
+  const handleRemove = () => {
+    const idsToRemove = new Set<string>([item.id]);
+    const indicesToRemove: number[] = [];
+
+    const findChildrenRecursive = (parentId: string) => {
+        fields.forEach((field, idx) => {
+            if (field.parentId === parentId) {
+                idsToRemove.add(field.id);
+                indicesToRemove.push(idx);
+                findChildrenRecursive(field.id);
+            }
+        });
+    };
+
+    findChildrenRecursive(item.id);
+    indicesToRemove.push(index);
+    
+    // Sort indices in descending order to avoid issues with shifting array
+    indicesToRemove.sort((a,b) => b - a);
+    indicesToRemove.forEach(i => remove(i));
+  };
+
 
   const lineTotal = useMemo(() => {
-    if (currentItem.isHeader) return 0;
-    const qty = currentItem.quantity || 0;
-    const price = currentItem.sellingUnitPrice || 0;
+    if (item.isHeader) return 0;
+    const qty = Number(item.quantity) || 0;
+    const price = Number(item.sellingUnitPrice) || 0;
     return qty * price;
-  }, [currentItem]);
-  
+  }, [item]);
+
   return (
-    <div className="border-b last:border-b-0 py-2" style={{ paddingRight: `${currentItem.level * 1.5}rem` }}>
+    <div className="border-b last:border-b-0 py-2" style={{ paddingRight: `${item.level * 1.5}rem` }}>
         <div className="flex items-start gap-2">
             <div className="flex-grow space-y-2">
                  <div className="flex items-center gap-2">
                     <div className="w-60">
-                        <Controller
+                         <Controller
                             name={`items.${index}.itemId`}
                             control={control}
                             render={({ field }) => (
@@ -124,23 +145,27 @@ function BoqItemRow({
                                     value={field.value || ''}
                                     onSelect={(value) => {
                                         field.onChange(value);
-                                        const selected = masterItems.find(mi => mi.id === value);
+                                        const selected = masterItemsMap.get(value);
                                         if (selected) {
-                                            register(`items.${index}.description`).onChange({ target: { value: selected.name }});
-                                            register(`items.${index}.unit`).onChange({ target: { value: selected.unit || '' }});
-                                            register(`items.${index}.isHeader`).onChange({ target: { value: selected.isHeader || false }});
+                                            setValue(`items.${index}.description`, selected.name, { shouldValidate: true });
+                                            setValue(`items.${index}.unit`, selected.unit || (selected.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
+                                            setValue(`items.${index}.isHeader`, selected.isHeader || false, { shouldValidate: true });
                                         }
                                     }}
                                     options={itemOptions}
                                     placeholder="اختر بندًا..."
-                                    disabled={masterItemsLoading}
+                                    disabled={loadingMasterItems}
                                 />
                             )}
                         />
                     </div>
                      <Input {...register(`items.${index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
+                      <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                         <Checkbox {...register(`items.${index}.isHeader`)} />
+                         <Label>بند رئيسي</Label>
+                      </div>
                 </div>
-                 {!currentItem.isHeader && (
+                 {!item.isHeader && (
                     <div className="flex items-center gap-2 pl-8">
                         <Input {...register(`items.${index}.unit`)} placeholder="الوحدة" className="w-24" />
                         <Input type="number" step="any" {...register(`items.${index}.quantity`)} placeholder="الكمية" className="w-24" />
@@ -150,12 +175,13 @@ function BoqItemRow({
                  )}
             </div>
             <div className="flex items-center">
-                 {hasChildrenInMaster && (
-                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(false)}>
-                        <PlusCircle className="h-4 w-4 text-primary" />
-                    </Button>
-                )}
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                 {item.isHeader && (
+                    <>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم فرعي</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(false)}><PlusCircle className="ml-1 h-4 w-4"/> بند عمل</Button>
+                    </>
+                 )}
+                <Button type="button" variant="ghost" size="icon" onClick={handleRemove}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
             </div>
@@ -164,7 +190,14 @@ function BoqItemRow({
   )
 }
 
-// --- Main Form Component ---
+
+interface BoqFormProps {
+    onSave: (data: BoqFormValues) => Promise<void>;
+    onClose: () => void;
+    initialData?: Partial<BoqFormValues> | null;
+    isSaving?: boolean;
+}
+
 export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqFormProps) {
   const isEditing = !!initialData;
   const { firestore } = useFirebase();
@@ -175,8 +208,22 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     defaultValues: initialData || { name: '', clientName: '', status: 'تقديري', items: [] },
   });
 
-  const { control, handleSubmit, register, getValues, watch, reset, formState: { errors } } = methods;
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const { control, handleSubmit, register, getValues, watch, reset, setValue, formState: { errors } } = methods;
+  const { fields, append, remove, insert } = useFieldArray({ control, name: 'items' });
+
+  const masterItemsMap = useMemo(() => {
+    return new Map((masterItems || []).map(i => [i.id!, i]));
+  }, [masterItems]);
+  
+  const masterItemsByParent = useMemo(() => {
+    const map = new Map<string | null, BoqReferenceItem[]>();
+    (masterItems || []).forEach(item => {
+        const parentId = item.parentBoqReferenceItemId || null;
+        if (!map.has(parentId)) map.set(parentId, []);
+        map.get(parentId)!.push(item);
+    });
+    return map;
+  }, [masterItems]);
 
   useEffect(() => {
     if (initialData) {
@@ -198,11 +245,11 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     [watchedItems]
   );
   
-  const handleAddRootItem = (isHeader: boolean) => {
+  const handleAddRootItem = () => {
     append({
-      id: generateId(), itemNumber: '', description: '', unit: isHeader ? '' : 'مقطوعية',
-      quantity: isHeader ? 0 : 1, sellingUnitPrice: 0, notes: '',
-      parentId: null, level: 0, isHeader, itemId: ''
+      id: generateId(), itemNumber: '', description: '', unit: '',
+      quantity: 0, sellingUnitPrice: 0, notes: '',
+      parentId: null, level: 0, isHeader: true, itemId: ''
     });
   };
 
@@ -230,31 +277,6 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
 
     onSave({ ...data, items: finalItems });
   };
-  
-  // Logic to render items in tree order
-  const renderedTree = useMemo(() => {
-    const itemMap = new Map(fields.map((item, index) => [item.id, { ...item, originalIndex: index, children: [] }]));
-    const roots: any[] = [];
-    
-    fields.forEach((item, index) => {
-        if (item.parentId && itemMap.has(item.parentId)) {
-            itemMap.get(item.parentId)!.children.push(itemMap.get(item.id));
-        } else {
-            roots.push(itemMap.get(item.id));
-        }
-    });
-
-    const result: { item: any, originalIndex: number }[] = [];
-    const flatten = (nodes: any[]) => {
-        for(const node of nodes) {
-            result.push({ item: node, originalIndex: node.originalIndex });
-            flatten(node.children);
-        }
-    }
-    flatten(roots);
-    return result;
-
-  }, [fields]);
 
   return (
     <Card dir="rtl">
@@ -273,7 +295,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
               <Label>الحالة</Label>
               <Controller name="status" control={control} render={({field}) => (
                 <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue/></SelectTrigger>
                   <SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent>
                 </Select>
               )}/>
@@ -282,27 +304,29 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
           <Separator />
           <h3 className="font-semibold text-lg">بنود جدول الكميات</h3>
           <div className="border rounded-lg p-2 space-y-2">
-            {renderedTree.map(({ item, originalIndex }) => (
+            {fields.map((field, index) => (
                 <BoqItemRow
-                    key={item.id}
-                    index={originalIndex}
+                    key={field.id}
+                    index={index}
                     control={control}
                     register={register}
                     getValues={getValues}
+                    setValue={setValue}
                     remove={remove}
-                    append={append}
-                    masterItems={masterItems}
-                    masterItemsLoading={masterItemsLoading}
+                    insert={insert}
+                    masterItemsMap={masterItemsMap}
+                    masterItemsByParent={masterItemsByParent}
+                    loadingMasterItems={masterItemsLoading}
+                    fields={fields}
                 />
             ))}
-            {loadingMasterItems && <p className="text-center p-4">جاري تحميل البنود المرجعية...</p>}
-            {errors.items && <p className="text-destructive text-sm mt-2 p-2">{errors.items.root?.message || errors.items.message}</p>}
+             {errors.items && <p className="text-destructive text-sm mt-2 p-2">{errors.items.root?.message || errors.items.message}</p>}
           </div>
-           <div className="flex justify-start mt-4">
-            <Button type="button" variant="secondary" onClick={() => handleAddRootItem(true)}>
-                <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
-            </Button>
-          </div>
+           <div className="flex justify-start mt-4 border-t pt-4">
+                <Button type="button" variant="secondary" onClick={handleAddRootItem}>
+                    <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
+                </Button>
+            </div>
         </CardContent>
         <CardFooter className="flex flex-col items-end gap-4 pt-6 border-t">
           <div className="text-2xl font-bold">
@@ -321,3 +345,4 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     </Card>
   );
 }
+```
