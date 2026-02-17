@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, X, PlusCircle, Trash2, ArrowUp, ArrowDown, ClipboardCheck } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -23,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
-import { useDebounce } from 'use-debounce';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -269,7 +268,23 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                             <div className="grid gap-2"><Label>اسم العميل (المحتمل)</Label><Input {...register('clientName')} /></div>
                         </div>
                         <div className="grid md:grid-cols-3 gap-4">
-                            <div className="grid gap-2"><Label>الحالة</Label><Controller name="status" control={control} render={({field}) => ( <Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
+                            <div className="grid gap-2">
+                                <Label>الحالة</Label>
+                                <Controller
+                                    name="status"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <SelectTrigger><SelectValue placeholder="اختر الحالة..." /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="تقديري">تقديري</SelectItem>
+                                                <SelectItem value="تعاقدي">تعاقدي</SelectItem>
+                                                <SelectItem value="منفذ">منفذ</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                            </div>
                         </div>
                         
                         <Separator />
