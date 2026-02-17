@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -241,6 +240,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = React.useState<string[]>([]);
   const [itemTransactionTypeIds, setItemTransactionTypeIds] = React.useState<string[]>([]);
   const [parentBoqItemId, setParentBoqItemId] = React.useState<string | null>(null);
+  const [parentCategory, setParentCategory] = React.useState<ItemCategory | null>(null);
 
 
   // States for numerical ordering
@@ -412,23 +412,26 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const openDialog = (type: 'primary' | 'secondary', item: any | null = null, parent: any | null = null) => {
     setEditingItem(item);
     if (type === 'primary') {
+        setParentCategory(parent);
         setItemName(item?.name || '');
         if (primaryCollectionName === 'departments') {
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
         if (isBoqView) {
-            const parentActivityIds = parent ? (parent.activityTypeIds || []) : [];
-            const parentSubcontractorIds = parent ? (parent.subcontractorTypeIds || []) : [];
-            const parentTransactionTypeIds = parent ? (parent.transactionTypeIds || []) : [];
-            setItemActivityTypeIdsForBoq(item?.activityTypeIds || parentActivityIds);
-            setItemSubcontractorTypeIds(item?.subcontractorTypeIds || parentSubcontractorIds);
-            setItemTransactionTypeIds(item?.transactionTypeIds || parentTransactionTypeIds);
-            setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
+            const parentToUse = parent || (item ? primaryItems.find(p => p.id === (item as BoqReferenceItem).parentBoqReferenceItemId) : null);
+            setParentBoqItemId(parentToUse?.id || null);
+            
+            const itemToInheritFrom = item || parentToUse;
+            setItemActivityTypeIdsForBoq(itemToInheritFrom?.activityTypeIds || []);
+            setItemSubcontractorTypeIds(itemToInheritFrom?.subcontractorTypeIds || []);
+            setItemTransactionTypeIds(itemToInheritFrom?.transactionTypeIds || []);
+
             setItemUnit(item?.unit || '');
             setIsHeader(item?.isHeader || false);
         }
         setIsPrimaryDialogOpen(true);
     } else { // Secondary
+        setParentCategory(null); // No parent for secondary items in this UI
         setItemName(item?.name || '');
         if (isWorkStageView) {
             setItemRoles(item?.allowedRoles || []);
@@ -467,6 +470,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     setItemSubcontractorTypeIds([]);
     setItemActivityTypeIdsForBoq([]);
     setParentBoqItemId(null);
+    setParentCategory(null);
   }
 
   const handleSave = async (type: 'primary' | 'secondary') => {
@@ -487,7 +491,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                 transactionTypeIds: itemTransactionTypeIds,
                 subcontractorTypeIds: itemSubcontractorTypeIds,
                 activityTypeIds: itemActivityTypeIdsForBoq,
-                parentBoqReferenceItemId: parentBoqItemId,
+           };
+           // Correctly determine the parent ID
+           if (!editingItem && parentCategory) {
+                dataToSave.parentBoqReferenceItemId = parentCategory.id;
+           } else {
+                dataToSave.parentBoqReferenceItemId = parentBoqItemId;
            }
        }
        if (isWorkStageView && type === 'secondary') {
@@ -594,7 +603,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   };
 
     const handleImportDefaults = async () => {
-        if (!firestore) return;
+        if(!firestore) return;
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
@@ -783,7 +792,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
     const boqRefOptions = React.useMemo(() => {
         return (primaryItems as BoqReferenceItem[])
-            .filter(item => item.id !== editingItem?.id && item.isHeader)
+            .filter(item => item.id !== editingItem?.id)
             .map(item => ({ value: item.id!, label: item.name }));
     }, [primaryItems, editingItem]);
 
@@ -975,38 +984,35 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label>البند الأب</Label>
+                                        {!editingItem && parentCategory ? (
+                                            <Input value={parentCategory.name} readOnly disabled />
+                                        ) : (
+                                            <InlineSearchList
+                                                value={parentBoqItemId || ''}
+                                                onSelect={(val) => {
+                                                    setParentBoqItemId(val);
+                                                    if (val) {
+                                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                                        if (parent && !editingItem) {
+                                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
+                                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                                        }
+                                                    }
+                                                }}
+                                                options={boqRefOptions}
+                                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
+                                            />
+                                        )}
+                                    </div>
                                     {!isHeader && (
                                         <div className="grid gap-2">
                                             <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
                                             <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
                                         </div>
                                     )}
-                                        <div className="grid gap-2">
-                                            <Label>البند الأب (اختياري)</Label>
-                                            <InlineSearchList 
-                                                value={parentBoqItemId || ''}
-                                                onSelect={(val) => {
-                                                    setParentBoqItemId(val);
-                                                    if (val) {
-                                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                                        if (parent) {
-                                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
-                                                        }
-                                                    } else {
-                                                        if (!editingItem) {
-                                                            setItemTransactionTypeIds([]);
-                                                            setItemSubcontractorTypeIds([]);
-                                                            setItemActivityTypeIdsForBoq([]);
-                                                        }
-                                                    }
-                                                }}
-                                                options={boqRefOptions}
-                                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                                disabled={isHeader || !!(editingItem && (editingItem as BoqReferenceItem).parentBoqReferenceItemId)}
-                                            />
-                                        </div>
                                 </div>
 
                                 <Separator className="my-4" />
