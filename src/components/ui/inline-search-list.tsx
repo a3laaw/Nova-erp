@@ -78,6 +78,7 @@ export function InlineSearchList({
       
       {open && (
         <div 
+          data-inline-search-list-options="true"
           className="absolute z-[99999] w-full mt-1 bg-popover border rounded-md shadow-md"
         >
           <div className="p-2 border-b">
@@ -89,7 +90,7 @@ export function InlineSearchList({
               autoFocus
             />
           </div>
-          <div className="max-h-[200px] overflow-y-auto p-1">
+          <div className="max-h-[200px] overflow-y-auto p-1" role="listbox">
             {filteredOptions.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 لا توجد نتائج.
@@ -98,6 +99,8 @@ export function InlineSearchList({
               filteredOptions.map((option) => (
                 <div
                   key={option.value}
+                  role="option"
+                  aria-selected={value === option.value}
                   className={cn(
                     "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
                     value === option.value && "bg-accent"
