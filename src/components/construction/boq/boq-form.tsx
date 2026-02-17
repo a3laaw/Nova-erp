@@ -88,8 +88,8 @@ function BoqItemsRenderer({ control, register, errors, level, parentId, parentNu
                         value={''}
                         onSelect={(val) => onMasterItemSelect(itemIndex, val)}
                         options={masterItemOptions}
-                        placeholder="اختر بندًا مرجعيًا أو اكتب مباشرة..."
-                        disabled={masterItemsLoading}
+                        placeholder={masterItemsLoading ? "تحميل..." : masterItemOptions.length === 0 ? "لا توجد بنود مرجعية" : "اختر بندًا مرجعيًا أو اكتب مباشرة..."}
+                        disabled={masterItemsLoading || masterItemOptions.length === 0}
                     />
                     <Textarea {...register(`items.${itemIndex}.description`)} className="bg-background font-semibold text-base" />
                     {!currentItem.isHeader && <Textarea {...register(`items.${itemIndex}.notes`)} placeholder="ملاحظات على البند..." rows={1} className="bg-background text-sm" />}
@@ -274,7 +274,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                                     name="status"
                                     control={control}
                                     render={({ field }) => (
-                                        <Select onValueChange={field.onChange} value={field.value}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                             <SelectTrigger><SelectValue placeholder="اختر الحالة..." /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="تقديري">تقديري</SelectItem>
