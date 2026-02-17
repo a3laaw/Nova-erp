@@ -19,6 +19,13 @@ interface MultiSelectProps {
 }
 
 export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
+  
   const handleChange = (newSelected: MultiValue<MultiSelectOption>) => {
     const values = newSelected ? newSelected.map(opt => opt.value) : [];
     onChange(values);
@@ -33,7 +40,6 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--border))',
       minHeight: '40px',
       boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
-      cursor: 'pointer',
       '&:hover': {
         borderColor: 'hsl(var(--ring))',
       },
@@ -46,27 +52,15 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
         ...base,
         color: 'hsl(var(--foreground))',
     }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
     menu: (base) => ({
       ...base,
       backgroundColor: 'hsl(var(--card))',
-      zIndex: 9999,
-      position: 'absolute',
-    }),
-    menuList: (base) => ({
-      ...base,
-      maxHeight: '200px',
     }),
     option: (base, state) => ({
       ...base,
-      cursor: 'pointer',
-      backgroundColor: state.isSelected 
-        ? 'hsl(var(--primary))' 
-        : state.isFocused 
-        ? 'hsl(var(--accent))' 
-        : 'transparent',
-      color: state.isSelected 
-        ? 'hsl(var(--primary-foreground))' 
-        : 'hsl(var(--foreground))',
+      backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+      color: state.isSelected ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))',
       '&:active': {
         backgroundColor: 'hsl(var(--primary))',
       },
@@ -82,9 +76,8 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       paddingRight: '6px',
       fontSize: '0.875rem'
     }),
-    multiValueRemove: (base) => ({
+    multiValueRemove: (base, state) => ({
       ...base,
-      cursor: 'pointer',
       color: 'hsl(var(--secondary-foreground))',
       '&:hover': {
         backgroundColor: 'hsl(var(--destructive) / 0.8)',
@@ -110,9 +103,9 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       isSearchable={true}
       noOptionsMessage={() => "لا توجد نتائج"}
       styles={customStyles}
+      menuPortalTarget={portalTarget}
+      menuPosition="fixed"
       menuPlacement="auto"
-      closeMenuOnSelect={false}
-      blurInputOnSelect={false}
       theme={(theme) => ({
         ...theme,
         borderRadius: 6,

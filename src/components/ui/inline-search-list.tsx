@@ -79,7 +79,6 @@ export function InlineSearchList({
       {open && (
         <div 
           className="absolute z-[99999] w-full mt-1 bg-popover border rounded-md shadow-md"
-          style={{ pointerEvents: 'auto' }}
         >
           <div className="p-2 border-b">
             <Input
@@ -99,8 +98,6 @@ export function InlineSearchList({
               filteredOptions.map((option) => (
                 <div
                   key={option.value}
-                  role="option"
-                  aria-selected={value === option.value}
                   className={cn(
                     "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
                     value === option.value && "bg-accent"
@@ -110,7 +107,6 @@ export function InlineSearchList({
                     setOpen(false);
                     setSearch('');
                   }}
-                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                 >
                   <Check
                     className={cn(
