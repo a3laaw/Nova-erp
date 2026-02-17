@@ -2,12 +2,13 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, watch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, getDocs, query, orderBy, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, getDoc, doc, addDoc, updateDoc, serverTimestamp, writeBatch, collectionGroup } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,7 +58,7 @@ interface BoqFormProps {
     isSaving?: boolean;
 }
 
-function BoqItemsRenderer({ control, level, parentId, parentNumber, itemIndex, onAddItem, onMasterItemSelect, masterItems, masterItemsLoading }: any) {
+function BoqItemsRenderer({ control, register, errors, level, parentId, parentNumber, itemIndex, onAddItem, onMasterItemSelect, masterItems, masterItemsLoading }: any) {
     const { remove, update } = useFieldArray({ control, name: 'items' });
     const watchedItems = watch({ control, name: 'items' });
     
@@ -124,6 +125,8 @@ function BoqItemsRenderer({ control, level, parentId, parentNumber, itemIndex, o
                      <BoqItemsRenderer 
                         key={field.id}
                         control={control}
+                        register={register}
+                        errors={errors}
                         level={level + 1}
                         parentId={currentItem.id}
                         parentNumber={currentItem.itemNumber}
@@ -156,9 +159,9 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         }
     });
 
-    const { control, handleSubmit, formState: { errors }, watch, setValue, reset, getValues } = methods;
+    const { control, handleSubmit, formState: { errors }, watch, setValue, reset, getValues, register } = methods;
 
-    const { fields, append, remove, update } = useFieldArray({
+    const { fields, append, remove, update, insert } = useFieldArray({
         control,
         name: "items"
     });
@@ -212,10 +215,10 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             level: level,
             isHeader: isHeader,
         };
-
-        append(newItem);
-
-    }, [append, getValues]);
+        
+        insert(newIndex, newItem as any);
+    
+    }, [insert, getValues]);
 
 
     const handleMasterItemSelect = useCallback((index: number, masterItemId: string) => {
@@ -311,6 +314,8 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                                 <BoqItemsRenderer 
                                     key={field.id}
                                     control={control}
+                                    register={register}
+                                    errors={errors}
                                     level={0}
                                     parentId={null}
                                     parentNumber=""
@@ -323,7 +328,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                             ))}
                         </div>
 
-                         {errors.items && <p className="text-destructive text-sm mt-2">{errors.items?.root?.message || errors.items?.message}</p>}
+                         {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
                         <div className="flex justify-center mt-4">
                            <Button type="button" variant="secondary" onClick={() => handleAddItem(null, true)}>
                                 <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
@@ -348,4 +353,3 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         </Card>
     );
 }
-
