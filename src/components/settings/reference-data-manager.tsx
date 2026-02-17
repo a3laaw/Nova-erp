@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/table';
 import { defaultDepartments, defaultJobs, defaultGovernorates, defaultAreas, defaultTransactionTypes, defaultWorkStages } from '@/lib/default-reference-data';
 import { InlineSearchList } from '../ui/inline-search-list';
+import type { ItemCategory } from '@/lib/types';
 
 // --- Reusable Components ---
 
@@ -239,8 +240,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = React.useState<string[]>([]);
   const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = React.useState<string[]>([]);
   const [itemTransactionTypeIds, setItemTransactionTypeIds] = React.useState<string[]>([]);
-  const [parentBoqItemId, setParentBoqItemId] = React.useState<string | null>(null);
-  const [parentCategory, setParentCategory] = React.useState<ItemCategory | null>(null);
+  const [parentCategory, setParentCategory] = React.useState<any | null>(null);
 
 
   // States for numerical ordering
@@ -419,7 +419,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         }
         if (isBoqView) {
             const parentToUse = parent || (item ? primaryItems.find(p => p.id === (item as BoqReferenceItem).parentBoqReferenceItemId) : null);
-            setParentBoqItemId(parentToUse?.id || null);
+            setParentCategory(parentToUse);
             
             const itemToInheritFrom = item || parentToUse;
             setItemActivityTypeIdsForBoq(itemToInheritFrom?.activityTypeIds || []);
@@ -469,7 +469,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     setItemTransactionTypeIds([]);
     setItemSubcontractorTypeIds([]);
     setItemActivityTypeIdsForBoq([]);
-    setParentBoqItemId(null);
     setParentCategory(null);
   }
 
@@ -491,13 +490,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                 transactionTypeIds: itemTransactionTypeIds,
                 subcontractorTypeIds: itemSubcontractorTypeIds,
                 activityTypeIds: itemActivityTypeIdsForBoq,
+                parentBoqReferenceItemId: parentCategory?.id || null,
            };
-           // Correctly determine the parent ID
-           if (!editingItem && parentCategory) {
-                dataToSave.parentBoqReferenceItemId = parentCategory.id;
-           } else {
-                dataToSave.parentBoqReferenceItemId = parentBoqItemId;
-           }
        }
        if (isWorkStageView && type === 'secondary') {
           dataToSave.stageType = itemStageType;
@@ -790,13 +784,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         return roots;
     }, [primaryItems, primaryCollectionName]);
 
-    const boqRefOptions = React.useMemo(() => {
-        return (primaryItems as BoqReferenceItem[])
-            .filter(item => item.id !== editingItem?.id)
-            .map(item => ({ value: item.id!, label: item.name }));
-    }, [primaryItems, editingItem]);
-
-
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -892,7 +879,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                     )}
                 </div>
                 
-                {/* Secondary List */}
                 {secondaryTitle && secondaryCollectionName && (
                     <div>
                     <div className="flex items-center justify-between mb-2">
@@ -977,43 +963,24 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                         )}
                         
                         {isBoqView && isPrimaryDialogOpen && (
-                            <div className="px-4 space-y-4">
-                                <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
-                                    <Checkbox id="isHeader" checked={isHeader} onCheckedChange={(checked) => setIsHeader(!!checked)} />
-                                    <Label htmlFor="isHeader">بند رئيسي (عنوان فقط)</Label>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label>البند الأب</Label>
-                                        {!editingItem && parentCategory ? (
-                                            <Input value={parentCategory.name} readOnly disabled />
-                                        ) : (
-                                            <InlineSearchList
-                                                value={parentBoqItemId || ''}
-                                                onSelect={(val) => {
-                                                    setParentBoqItemId(val);
-                                                    if (val) {
-                                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                                        if (parent && !editingItem) {
-                                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
-                                                        }
-                                                    }
-                                                }}
-                                                options={boqRefOptions}
-                                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                            />
-                                        )}
-                                    </div>
-                                    {!isHeader && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
-                                            <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
-                                        </div>
-                                    )}
-                                </div>
+                           <div className="px-4 space-y-4">
+                               <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
+                                   <Checkbox id="isHeader" checked={isHeader} onCheckedChange={(checked) => setIsHeader(!!checked)} />
+                                   <Label htmlFor="isHeader">بند رئيسي (عنوان فقط)</Label>
+                               </div>
+                               
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                   <div className="grid gap-2">
+                                       <Label>البند الأب</Label>
+                                       <Input value={parentCategory?.name || 'بند رئيسي'} readOnly disabled />
+                                   </div>
+                                   {!isHeader && (
+                                       <div className="grid gap-2">
+                                           <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
+                                           <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
+                                       </div>
+                                   )}
+                               </div>
 
                                 <Separator className="my-4" />
                                 <div className="grid grid-cols-1 gap-4">
