@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -803,7 +804,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                         <div className="flex gap-2">
                             {secondaryCollectionName !== 'workStages' && (
                                 <Button size="sm" variant="outline" onClick={() => setIsImportConfirmOpen(true)} disabled={disablePrimaryActions || isImporting}>
-                                    {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                    {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4" />}
                                     استعادة البيانات
                                 </Button>
                             )}
