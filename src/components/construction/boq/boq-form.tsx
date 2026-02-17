@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller, watch } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -18,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Loader2, Save, X, PlusCircle, Trash2, ArrowUp, ArrowDown, ClipboardCheck } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import type { Boq, BoqItem, BoqReferenceItem, TransactionType, CompanyActivityType, SubcontractorType } from '@/lib/types';
-import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -60,7 +59,7 @@ interface BoqFormProps {
 
 function BoqItemsRenderer({ control, register, errors, level, parentId, parentNumber, itemIndex, onAddItem, onMasterItemSelect, masterItems, masterItemsLoading }: any) {
     const { remove, update } = useFieldArray({ control, name: 'items' });
-    const watchedItems = watch({ control, name: 'items' });
+    const watchedItems = useWatch({ control, name: 'items' });
     
     const currentItem = watchedItems[itemIndex];
     if (!currentItem) return null;
@@ -143,6 +142,7 @@ function BoqItemsRenderer({ control, register, errors, level, parentId, parentNu
         </Card>
     );
 }
+
 
 export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqFormProps) {
     const isEditing = !!initialData;
@@ -252,40 +252,6 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         return fields.map((field, index) => ({ field, index })).filter(({ field }) => field.parentId === null);
     }, [fields]);
     
-    useEffect(() => {
-        const items = getValues('items');
-        if (!items) return;
-
-        const itemMap = new Map(items.map((item, index) => [item.id, { ...item, originalIndex: index }]));
-        const childrenMap = new Map<string, string[]>();
-        const newOrder: any[] = [];
-        
-        items.forEach(item => {
-            if (item.parentId) {
-                if (!childrenMap.has(item.parentId)) childrenMap.set(item.parentId, []);
-                childrenMap.get(item.parentId)!.push(item.id);
-            }
-        });
-
-        function processNode(itemId: string) {
-            const item = itemMap.get(itemId);
-            if (!item) return;
-
-            newOrder.push(items[item.originalIndex]);
-
-            const children = childrenMap.get(itemId);
-            if (children) {
-                children.forEach(childId => processNode(childId));
-            }
-        }
-        
-        items.forEach(item => {
-            if (!item.parentId) {
-                processNode(item.id);
-            }
-        });
-
-    }, [fields, getValues]);
 
     return (
         <Card dir="rtl">
