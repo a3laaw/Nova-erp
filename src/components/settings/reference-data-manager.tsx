@@ -402,6 +402,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     }
   }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchReferenceDataForDialog]);
 
+  React.useEffect(() => {
+    if (isHeader) {
+      setParentBoqItemId(null);
+    }
+  }, [isHeader]);
+
 
   const openDialog = (type: 'primary' | 'secondary', item: any | null = null, parent: any | null = null) => {
     setEditingItem(item);
@@ -717,11 +723,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         [companyActivityTypes]
     );
 
-    const transactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() =>
-        (transactionTypes || []).map(t => ({ value: t.id!, label: t.name })),
-        [transactionTypes]
-    );
-
     const filteredTransactionTypeOptionsForBoq = React.useMemo(() => {
         if (!transactionTypes || !companyActivityTypes) return [];
 
@@ -941,7 +942,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
                 <DialogContent
-                    className={cn("max-w-xl", (isWorkStageView || isBoqView) && !isPrimaryDialogOpen && "max-w-4xl")}
+                    className={cn("max-w-xl", (isWorkStageView || isBoqView) && isPrimaryDialogOpen && "max-w-4xl")}
                 >
                 <DialogHeader>
                     <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
@@ -972,74 +973,79 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                     <Checkbox id="isHeader" checked={isHeader} onCheckedChange={(checked) => setIsHeader(!!checked)} />
                                     <Label htmlFor="isHeader">بند رئيسي (عنوان فقط)</Label>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                   {!isHeader && (
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
-                                        <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
-                                    </div>
-                                    )}
-                                    <div className="grid gap-2">
-                                        <Label>البند الأب (اختياري)</Label>
-                                        <InlineSearchList 
-                                            value={parentBoqItemId || ''}
-                                            onSelect={(val) => {
-                                                setParentBoqItemId(val);
-                                                if (val) {
-                                                    const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                                    if (parent) {
-                                                        setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                                        setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                                        setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
-                                                    }
-                                                } else {
-                                                    if (!editingItem) {
-                                                        setItemTransactionTypeIds([]);
-                                                        setItemSubcontractorTypeIds([]);
-                                                        setItemActivityTypeIdsForBoq([]);
-                                                    }
-                                                }
-                                            }}
-                                            options={boqRefOptions}
-                                            placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                        />
-                                    </div>
-                                </div>
-                                <Separator className="my-4" />
-                                <div className="grid grid-cols-1 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label>أنواع الأنشطة المرتبطة</Label>
-                                        <MultiSelect
-                                            options={activityTypeOptions}
-                                            selected={itemActivityTypeIdsForBoq}
-                                            onChange={setItemActivityTypeIdsForBoq}
-                                            placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                            disabled={loadingCompanyActivityTypes}
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>أنواع المعاملات المرتبطة</Label>
-                                        <MultiSelect
-                                            options={filteredTransactionTypeOptionsForBoq}
-                                            selected={itemTransactionTypeIds}
-                                            onChange={setItemTransactionTypeIds}
-                                            placeholder={transactionTypesLoading ? "تحميل..." : "اختر بناء على النشاط أولاً..."}
-                                            disabled={transactionTypesLoading}
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>أنواع المقاولين المرتبطة</Label>
-                                        <MultiSelect
-                                            options={subcontractorTypeOptions}
-                                            selected={itemSubcontractorTypeIds}
-                                            onChange={setItemSubcontractorTypeIds}
-                                            placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                            disabled={subcontractorTypesLoading}
-                                        />
-                                    </div>
-                                </div>
+                                
+                                {!isHeader && (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
+                                                <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label>البند الأب (اختياري)</Label>
+                                                <InlineSearchList 
+                                                    value={parentBoqItemId || ''}
+                                                    onSelect={(val) => {
+                                                        setParentBoqItemId(val);
+                                                        if (val) {
+                                                            const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                                            if (parent) {
+                                                                setItemTransactionTypeIds(parent.transactionTypeIds || []);
+                                                                setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                                                setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                                            }
+                                                        } else {
+                                                            if (!editingItem) {
+                                                                setItemTransactionTypeIds([]);
+                                                                setItemSubcontractorTypeIds([]);
+                                                                setItemActivityTypeIdsForBoq([]);
+                                                            }
+                                                        }
+                                                    }}
+                                                    options={boqRefOptions}
+                                                    placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <Separator className="my-4" />
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div className="grid gap-2">
+                                                <Label>أنواع الأنشطة المرتبطة</Label>
+                                                <MultiSelect
+                                                    options={activityTypeOptions}
+                                                    selected={itemActivityTypeIdsForBoq}
+                                                    onChange={setItemActivityTypeIdsForBoq}
+                                                    placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                                    disabled={loadingCompanyActivityTypes}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label>أنواع المعاملات المرتبطة</Label>
+                                                <MultiSelect
+                                                    options={filteredTransactionTypeOptionsForBoq}
+                                                    selected={itemTransactionTypeIds}
+                                                    onChange={setItemTransactionTypeIds}
+                                                    placeholder={transactionTypesLoading ? "تحميل..." : "اختر بناء على النشاط أولاً..."}
+                                                    disabled={transactionTypesLoading}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label>أنواع المقاولين المرتبطة</Label>
+                                                <MultiSelect
+                                                    options={subcontractorTypeOptions}
+                                                    selected={itemSubcontractorTypeIds}
+                                                    onChange={setItemSubcontractorTypeIds}
+                                                    placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
+                                                    disabled={subcontractorTypesLoading}
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
+
 
                         {isWorkStageView && !isPrimaryDialogOpen && (
                             <div className="grid md:grid-cols-2 gap-6 px-4">
