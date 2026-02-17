@@ -103,7 +103,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         }
         
         const siblings = fields.filter(f => f.parentId === parentId);
-        const newItemNumber = parentId ? `${parentNumber}.${siblings.length + 1}` : `${siblings.length + 1}.0`;
+        const newItemNumber = parentId ? `${parentNumber}.${siblings.length + 1}` : `${siblings.length + 1}`;
 
         append({
             id: new Date().toISOString() + Math.random(),
@@ -118,14 +118,14 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             isHeader,
         });
     };
-    
+
     const handleMasterItemSelect = (index: number, masterItemId: string) => {
         const masterItem = masterItems.find(i => i.id === masterItemId);
         if (masterItem) {
             update(index, {
                 ...watchedItems[index],
                 description: masterItem.name,
-                unit: masterItem.unit || '',
+                unit: masterItem.unit || (masterItem.isHeader ? '' : 'مقطوعية'),
                 isHeader: masterItem.isHeader || false,
             });
         }
@@ -136,7 +136,8 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     };
     
     const masterItemOptions = useMemo(() => (masterItems || []).map(i => ({value: i.id!, label: i.name})), [masterItems]);
-    
+    const subItemOptions = useMemo(() => (masterItems || []).filter(i => !i.isHeader).map(i => ({value: i.id!, label: i.name})), [masterItems]);
+
     return (
         <Card dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
@@ -185,7 +186,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                                             <div className="flex-grow space-y-2">
                                                 <InlineSearchList 
                                                     placeholder='اختر بندًا أو اكتب مباشرة...'
-                                                    value={watchedItems[rootIndex].id}
+                                                    value={''}
                                                     onSelect={(val) => handleMasterItemSelect(rootIndex, val)}
                                                     options={masterItemOptions}
                                                     disabled={masterItemsLoading}
@@ -207,7 +208,15 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                                                              return (
                                                                 <TableRow key={childItem.id}>
                                                                     <TableCell><Input {...register(`items.${childIndex}.itemNumber`)} className="font-mono"/></TableCell>
-                                                                    <TableCell><Textarea {...register(`items.${childIndex}.description`)} rows={1}/></TableCell>
+                                                                    <TableCell>
+                                                                        <InlineSearchList 
+                                                                            value={''}
+                                                                            onSelect={(val) => handleMasterItemSelect(childIndex, val)}
+                                                                            options={subItemOptions}
+                                                                            placeholder="بحث..."
+                                                                        />
+                                                                        <Textarea {...register(`items.${childIndex}.description`)} rows={1} className="mt-1 bg-background" />
+                                                                    </TableCell>
                                                                     <TableCell><Input {...register(`items.${childIndex}.unit`)}/></TableCell>
                                                                     <TableCell><Input type="number" step="any" {...register(`items.${childIndex}.quantity`)} disabled={isLumpSum} className="dir-ltr"/></TableCell>
                                                                     <TableCell><Input type="number" step="0.001" {...register(`items.${childIndex}.sellingUnitPrice`)} className="dir-ltr"/></TableCell>
