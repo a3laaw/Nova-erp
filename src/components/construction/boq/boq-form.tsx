@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -122,8 +123,7 @@ const BoqItemRowRenderer = React.memo(({
               value={item.itemId || ''}
               onSelect={handleMasterItemSelect}
               options={masterItemsMap.get(item.parentId || null) || []}
-              placeholder={masterItemsLoading ? "تحميل..." : "اختر بندًا مرجعيًا..."}
-              disabled={masterItemsLoading}
+              placeholder={masterItemsLoading ? "جاري التحميل... (يمكنك الكتابة)" : "اختر بندًا مرجعيًا..."}
             />
             <Input {...register(`items.${node._index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
             <div className="flex items-center space-x-2 rtl:space-x-reverse pr-2">
