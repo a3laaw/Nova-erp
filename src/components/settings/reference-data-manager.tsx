@@ -400,8 +400,7 @@ function ManagerView({
 
   React.useEffect(() => {
     if (isHeader) {
-        // ✅ FIX: `setParentBoqItemId` was a ReferenceError, replaced with correct state setter
-        setParentCategory(null);
+      setParentCategory(null);
     }
   }, [isHeader]);
 
@@ -934,6 +933,12 @@ function ManagerView({
                 >
                 <DialogHeader>
                     <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}</DialogTitle>
+                    <DialogDescription>
+                        {editingItem 
+                            ? `تعديل بيانات ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}` 
+                            : `إضافة ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle} جديد`
+                        }
+                    </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[70vh]">
                     <div className="py-4 px-2 space-y-6">
@@ -1160,7 +1165,7 @@ function ManagerView({
     );
 }
 
-// --- Unified TransactionTypeManager ---
+// --- UnifiedTransactionTypeManager ---
 function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCompanyActivityTypes }: { onBack: () => void, companyActivityTypes: CompanyActivityType[], loadingCompanyActivityTypes: boolean }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1285,7 +1290,7 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
                     <DialogHeader>
                         <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} نوع معاملة</DialogTitle>
                         <DialogDescription>
-                          {editingItem ? 'تعديل بيانات نوع المعاملة' : 'إضافة نوع معاملة جديد'}
+                            {editingItem ? 'تعديل بيانات نوع المعاملة' : 'إضافة نوع معاملة جديد'}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
