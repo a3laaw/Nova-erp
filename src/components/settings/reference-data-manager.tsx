@@ -404,7 +404,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
   React.useEffect(() => {
     if (isHeader) {
-      setParentBoqItemId(null);
+      setParentCategory(null);
     }
   }, [isHeader]);
 
@@ -793,7 +793,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                         <CardTitle className="whitespace-nowrap truncate">{`إدارة ${primaryTitle}`}{secondaryTitle && ` و ${secondaryTitle}`}</CardTitle>
                     </div>
                 </div>
-                <Button onClick={onBack} variant="outline" className="flex-shrink-0"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
+                <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
             </CardHeader>
             <CardContent className={cn("grid grid-cols-1 gap-6", secondaryTitle && "md:grid-cols-2")}>
                 {/* Primary List */}
@@ -945,6 +945,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                 <ScrollArea className="max-h-[70vh]">
                     <div className="py-4 px-2 space-y-6">
                         <div className="px-4 grid gap-2">
+                             {parentCategory && isPrimaryDialogOpen && (
+                                <div className="grid gap-2 mb-4">
+                                    <Label>البند الأب</Label>
+                                    <Input value={parentCategory.name} disabled readOnly />
+                                </div>
+                             )}
                             <Label htmlFor="item-name">{`اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}`}</Label>
                             <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
                         </div>
@@ -970,10 +976,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                </div>
                                
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                   <div className="grid gap-2">
-                                       <Label>البند الأب</Label>
-                                       <Input value={parentCategory?.name || 'بند رئيسي'} readOnly disabled />
-                                   </div>
                                    {!isHeader && (
                                        <div className="grid gap-2">
                                            <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
