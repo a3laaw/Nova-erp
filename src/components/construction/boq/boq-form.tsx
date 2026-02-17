@@ -84,12 +84,21 @@ function BoqItemsRenderer({ control, register, errors, level, parentId, parentNu
            <div className="flex items-start gap-4">
                <div className="font-bold text-lg pt-2">{parentNumber ? `${parentNumber}.${itemIndex + 1}` : itemIndex + 1}</div>
                <div className="flex-grow space-y-2">
-                    <InlineSearchList 
-                        value={''}
-                        onSelect={(val) => onMasterItemSelect(itemIndex, val)}
-                        options={masterItemOptions}
-                        placeholder={masterItemsLoading ? "تحميل..." : masterItemOptions.length === 0 ? "لا توجد بنود مرجعية" : "اختر بندًا مرجعيًا أو اكتب مباشرة..."}
-                        disabled={masterItemsLoading || masterItemOptions.length === 0}
+                    <Controller
+                        name={`items.${itemIndex}.itemId`}
+                        control={control}
+                        render={({ field }) => (
+                            <InlineSearchList 
+                                value={field.value || ''}
+                                onSelect={(value) => {
+                                    field.onChange(value);
+                                    onMasterItemSelect(itemIndex, value);
+                                }}
+                                options={masterItemOptions}
+                                placeholder={masterItemsLoading ? "تحميل..." : masterItemOptions.length === 0 ? "لا توجد بنود مرجعية" : "اختر بندًا مرجعيًا أو اكتب مباشرة..."}
+                                disabled={masterItemsLoading}
+                            />
+                        )}
                     />
                     <Textarea {...register(`items.${itemIndex}.description`)} className="bg-background font-semibold text-base" />
                     {!currentItem.isHeader && <Textarea {...register(`items.${itemIndex}.notes`)} placeholder="ملاحظات على البند..." rows={1} className="bg-background text-sm" />}
@@ -334,3 +343,4 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         </Card>
     );
 }
+    
