@@ -1,6 +1,7 @@
-
 'use client';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+
+import * as React from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,12 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -62,7 +64,9 @@ const BoqItemRowRenderer = React.memo(({
   handleRemoveItem,
   handleAddItem,
   masterItemsMap,
-  loadingMasterItems,
+  masterItemsLoading,
+  fields,
+  insert,
 }: {
   node: BoqFormValues['items'][0] & { _index: number; children: any[] };
   level: number;
@@ -70,14 +74,12 @@ const BoqItemRowRenderer = React.memo(({
   register: any;
   setValue: any;
   handleRemoveItem: (index: number) => void;
-  handleAddItem: (parentId: string | null, isHeader: boolean) => void;
+  handleAddItem: (parentId: string | null, isHeader: boolean, insertAtIndex: number) => void;
   masterItemsMap: Map<string | null, any[]>;
-  loadingMasterItems: boolean;
+  masterItemsLoading: boolean;
+  fields: any[];
+  insert: any;
 }) => {
-  const { fields, append, remove, insert } = useFieldArray({
-    control,
-    name: `items.${node._index}.children`,
-  });
 
   const item = useWatch({ control, name: `items.${node._index}` });
 
@@ -90,6 +92,25 @@ const BoqItemRowRenderer = React.memo(({
       setValue(`items.${node._index}.isHeader`, selected.isHeader || false, { shouldValidate: true });
     }
   };
+  
+  const findLastDescendantIndex = (parentIndex: number): number => {
+    let lastIndex = parentIndex;
+    for (let i = parentIndex + 1; i < fields.length; i++) {
+        if (fields[i].parentId === fields[parentIndex].id) {
+            lastIndex = findLastDescendantIndex(i);
+        } else if (fields[i].level <= fields[parentIndex].level) {
+            break;
+        }
+    }
+    return lastIndex;
+  };
+  
+  const handleAddClick = (isHeader: boolean) => {
+    const parentIndex = node._index;
+    const lastDescendantIndex = findLastDescendantIndex(parentIndex);
+    handleAddItem(node.id, isHeader, lastDescendantIndex + 1);
+  };
+
 
   const lineTotal = item.isHeader ? 0 : (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
 
@@ -103,8 +124,8 @@ const BoqItemRowRenderer = React.memo(({
               value={item.itemId || ''}
               onSelect={handleMasterItemSelect}
               options={masterItemsMap.get(item.parentId || null) || []}
-              placeholder={loadingMasterItems ? "تحميل..." : "اختر بندًا مرجعيًا..."}
-              disabled={loadingMasterItems}
+              placeholder={masterItemsLoading ? "تحميل..." : "اختر بندًا مرجعيًا..."}
+              disabled={masterItemsLoading}
             />
             <Input {...register(`items.${node._index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
             <div className="flex items-center space-x-2 rtl:space-x-reverse pr-2">
@@ -124,8 +145,8 @@ const BoqItemRowRenderer = React.memo(({
         <div className="flex items-center">
             {item.isHeader && (
                 <>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(item.id, true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(item.id, false)}><PlusCircle className="ml-1 h-4 w-4"/> بند</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(false)}><PlusCircle className="ml-1 h-4 w-4"/> بند</Button>
                 </>
             )}
             <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(node._index)}>
@@ -146,7 +167,9 @@ const BoqItemRowRenderer = React.memo(({
               handleRemoveItem={handleRemoveItem}
               handleAddItem={handleAddItem}
               masterItemsMap={masterItemsMap}
-              loadingMasterItems={loadingMasterItems}
+              masterItemsLoading={masterItemsLoading}
+              fields={fields}
+              insert={insert}
             />
           ))}
         </div>
@@ -160,7 +183,6 @@ BoqItemRowRenderer.displayName = 'BoqItemRowRenderer';
 export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqFormProps) {
   const isEditing = !!initialData;
   const { firestore } = useFirebase();
-  const { toast } = useToast();
   
   const { data: masterItems, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
 
@@ -197,7 +219,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     
     return { boqTree: roots, totalValue: total };
   }, [watchedItems]);
-
+  
   const masterItemsMap = useMemo(() => {
     const map = new Map<string | null, any[]>();
     (masterItems || []).forEach(item => {
@@ -216,28 +238,9 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
       });
     }
   }, [initialData, reset]);
-
-  const handleAddItem = (parentId: string | null, isHeader: boolean) => {
-    let parentIndex = -1;
-    if (parentId) {
-      parentIndex = fields.findIndex(f => f.id === parentId);
-    }
-    
-    const parentLevel = parentId ? fields[parentIndex].level : -1;
-
-    let insertAtIndex = fields.length;
-    if (parentId) {
-        let lastChildIndex = parentIndex;
-        for (let i = parentIndex + 1; i < fields.length; i++) {
-            if (fields[i].level > parentLevel) {
-                lastChildIndex = i;
-            } else {
-                break;
-            }
-        }
-        insertAtIndex = lastChildIndex + 1;
-    }
-
+  
+  const handleAddItem = (parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
+    const parentLevel = parentId ? fields.find(f => f.id === parentId)?.level ?? -1 : -1;
     insert(insertAtIndex, {
       id: generateId(),
       description: '',
@@ -329,6 +332,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
               )}/>
             </div>
           </div>
+          
           <Separator />
           <h3 className="font-semibold text-lg">بنود جدول الكميات</h3>
           
@@ -347,7 +351,9 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                 handleRemoveItem={handleRemoveItem}
                 handleAddItem={handleAddItem}
                 masterItemsMap={masterItemsMap}
-                loadingMasterItems={masterItemsLoading}
+                masterItemsLoading={masterItemsLoading}
+                fields={fields}
+                insert={insert}
               />
             ))
             )}
@@ -377,4 +383,3 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     </Card>
   );
 }
-
