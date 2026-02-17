@@ -417,7 +417,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
         if (isBoqView) {
-            setParentCategory(parent);
             const parentActivityIds = parent ? (parent.activityTypeIds || []) : [];
             const parentSubcontractorIds = parent ? (parent.subcontractorTypeIds || []) : [];
             const parentTransactionTypeIds = parent ? (parent.transactionTypeIds || []) : [];
@@ -1005,7 +1004,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                                 }}
                                                 options={boqRefOptions}
                                                 placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                                disabled={isHeader || (!editingItem && !!parentCategory)}
+                                                disabled={isHeader || !!(editingItem && (editingItem as BoqReferenceItem).parentBoqReferenceItemId)}
                                             />
                                         </div>
                                 </div>
