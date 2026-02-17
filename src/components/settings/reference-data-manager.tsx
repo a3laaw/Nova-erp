@@ -783,7 +783,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
     const boqRefOptions = React.useMemo(() => {
         return (primaryItems as BoqReferenceItem[])
-            .filter(item => item.id !== editingItem?.id)
+            .filter(item => item.id !== editingItem?.id && item.isHeader)
             .map(item => ({ value: item.id!, label: item.name }));
     }, [primaryItems, editingItem]);
 
@@ -981,32 +981,34 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                             <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
                                         </div>
                                     )}
-                                    <div className="grid gap-2">
-                                        <Label>البند الأب (اختياري)</Label>
-                                        <InlineSearchList 
-                                            value={parentBoqItemId || ''}
-                                            onSelect={(val) => {
-                                                setParentBoqItemId(val);
-                                                if (val) {
-                                                    const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                                    if (parent) {
-                                                        setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                                        setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                                        setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                    {!isHeader && (
+                                        <div className="grid gap-2">
+                                            <Label>البند الأب (اختياري)</Label>
+                                            <InlineSearchList 
+                                                value={parentBoqItemId || ''}
+                                                onSelect={(val) => {
+                                                    setParentBoqItemId(val);
+                                                    if (val) {
+                                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                                        if (parent) {
+                                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
+                                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
+                                                        }
+                                                    } else {
+                                                        if (!editingItem) {
+                                                            setItemTransactionTypeIds([]);
+                                                            setItemSubcontractorTypeIds([]);
+                                                            setItemActivityTypeIdsForBoq([]);
+                                                        }
                                                     }
-                                                } else {
-                                                    if (!editingItem) {
-                                                        setItemTransactionTypeIds([]);
-                                                        setItemSubcontractorTypeIds([]);
-                                                        setItemActivityTypeIdsForBoq([]);
-                                                    }
-                                                }
-                                            }}
-                                            options={boqRefOptions}
-                                            placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                            disabled={isHeader}
-                                        />
-                                    </div>
+                                                }}
+                                                options={boqRefOptions}
+                                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
+                                                disabled={isHeader}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <Separator className="my-4" />
