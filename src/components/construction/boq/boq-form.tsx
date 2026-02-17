@@ -194,7 +194,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
   const { fields, append, remove, insert } = useFieldArray({ control, name: 'items' });
   const watchedItems = watch('items');
 
-  const { boqTree, totalValue } = useMemo(() => {
+  const { boqTree, totalValue } = React.useMemo(() => {
     const items = watchedItems || [];
     const map = new Map<string, BoqFormValues['items'][0] & { _index: number; children: any[] }>();
     const roots: (BoqFormValues['items'][0] & { _index: number; children: any[] })[] = [];
@@ -220,7 +220,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     return { boqTree: roots, totalValue: total };
   }, [watchedItems]);
   
-  const masterItemsMap = useMemo(() => {
+  const masterItemsMap = React.useMemo(() => {
     const map = new Map<string | null, any[]>();
     (masterItems || []).forEach(item => {
         const parentId = item.parentBoqReferenceItemId || null;
@@ -230,7 +230,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     return map;
   }, [masterItems]);
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (initialData) {
       reset({
         ...initialData,
