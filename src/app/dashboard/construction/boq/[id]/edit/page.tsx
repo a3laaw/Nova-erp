@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirebase, useDocument } from '@/firebase';
-import { collection, doc, updateDoc, writeBatch, serverTimestamp, getDocs, query } from 'firebase/firestore';
+import { collection, doc, updateDoc, writeBatch, serverTimestamp, getDocs, query, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
@@ -132,13 +132,11 @@ export default function EditBoqPage() {
     }
 
     return (
-        <div className="container mx-auto py-8">
-            <BoqForm 
-                initialData={initialData}
-                onSave={handleSave}
-                onClose={() => router.push(`/dashboard/construction/boq/${id}`)}
-                isSaving={isSaving}
-            />
-        </div>
+        <BoqForm 
+            initialData={initialData}
+            onSave={handleSave}
+            onClose={() => router.push(`/dashboard/construction/boq/${id}`)}
+            isSaving={isSaving}
+        />
     );
 }

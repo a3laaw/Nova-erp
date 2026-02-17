@@ -21,7 +21,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -43,7 +43,8 @@ const DialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('.react-select__menu-portal') || target.closest('[data-inline-search-list-options]')) {
+        // The selector should cover all dropdown-like components that might be used inside a dialog.
+        if (target.closest('[cmdk-root], [data-radix-popper-content-wrapper], .react-select__menu-portal, [data-inline-search-list-options], [role="menu"]')) {
           e.preventDefault();
         }
       }}

@@ -58,7 +58,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             name: '',
             clientName: '',
             status: 'تقديري',
-            items: [{ id: 'root-1', itemNumber: '1.0', description: '', unit: '', quantity: 0, sellingUnitPrice: 0, notes: '', parentId: null, level: 0, isHeader: false }]
+            items: []
         }
     });
 
@@ -82,6 +82,14 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             return sum + (quantity * (item.sellingUnitPrice || 0));
         }, 0);
     }, [watchedItems]);
+    
+    const rootItemsWithIndices = useMemo(() => fields
+        .map((field, index) => ({ field, index }))
+        .filter(({ field }) => field.parentId === null), [fields]);
+
+    const getChildrenWithIndices = (parentId: string) => fields
+        .map((field, index) => ({ field, index }))
+        .filter(({ field }) => field.parentId === parentId);
 
     const handleAddItem = (isHeader: boolean, parentId: string | null = null) => {
         let level = 0;
@@ -114,9 +122,12 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     const handleMasterItemSelect = (index: number, masterItemId: string) => {
         const masterItem = masterItems.find(i => i.id === masterItemId);
         if (masterItem) {
-            setValue(`items.${index}.description`, masterItem.name);
-            setValue(`items.${index}.unit`, masterItem.unit || '');
-            setValue(`items.${index}.isHeader`, masterItem.isHeader || false);
+            update(index, {
+                ...watchedItems[index],
+                description: masterItem.name,
+                unit: masterItem.unit || '',
+                isHeader: masterItem.isHeader || false,
+            });
         }
     };
     
@@ -164,64 +175,78 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                             </div>
                         </div>
                         
-                        <div className="border rounded-lg">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-2/5">بيان الأعمال</TableHead>
-                                        <TableHead>الوحدة</TableHead>
-                                        <TableHead>الكمية</TableHead>
-                                        <TableHead>سعر الوحدة</TableHead>
-                                        <TableHead className="text-left">الإجمالي</TableHead>
-                                        <TableHead className="w-[100px]">الإجراءات</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {fields.map((field, index) => {
-                                        const item = watchedItems[index] || {};
-                                        const isLumpSum = item.unit === 'مقطوعية';
-                                        const total = isLumpSum ? (item.sellingUnitPrice || 0) : (item.quantity || 0) * (item.sellingUnitPrice || 0);
-
-                                        return (
-                                        <TableRow key={field.id} className={item.isHeader ? 'bg-muted/30' : ''}>
-                                            <TableCell style={{ paddingRight: `${item.level * 2}rem` }}>
+                        <div className="space-y-6">
+                            {rootItemsWithIndices.map(({ field: rootItem, index: rootIndex }) => {
+                                const childrenWithIndices = getChildrenWithIndices(rootItem.id);
+                                return (
+                                    <Card key={rootItem.id} className="bg-muted/30">
+                                        <CardHeader className="flex flex-row items-start gap-4">
+                                            <div className="font-bold text-lg">{rootItem.itemNumber}</div>
+                                            <div className="flex-grow space-y-2">
                                                 <InlineSearchList 
                                                     placeholder='اختر بندًا أو اكتب مباشرة...'
-                                                    value={item.id}
-                                                    onSelect={(val) => handleMasterItemSelect(index, val)}
+                                                    value={watchedItems[rootIndex].id}
+                                                    onSelect={(val) => handleMasterItemSelect(rootIndex, val)}
                                                     options={masterItemOptions}
                                                     disabled={masterItemsLoading}
                                                 />
-                                                <Textarea {...register(`items.${index}.description`)} rows={2} className="mt-1"/>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input {...register(`items.${index}.unit`)} placeholder="م3، م2،..." disabled={item.isHeader} />
-                                            </TableCell>
-                                            <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" disabled={isLumpSum || item.isHeader} /></TableCell>
-                                            <TableCell><Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} className="dir-ltr" disabled={item.isHeader} /></TableCell>
-                                            <TableCell className="text-left font-mono">{formatCurrency(total)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-1">
-                                                    <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => handleAddItem(false, field.id)}><PlusCircle className="h-4 w-4"/></Button>
-                                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    )})}
-                                </TableBody>
-                                <TableFooter><TableRow className="bg-muted text-base font-bold"><TableCell colSpan={4}>الإجمالي</TableCell><TableCell colSpan={2} className="text-left font-mono">{formatCurrency(totalValue)}</TableCell></TableRow></TableFooter>
-                            </Table>
+                                                <Input {...register(`items.${rootIndex}.description`)} className="bg-background font-semibold text-base" />
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(rootIndex)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {childrenWithIndices.length > 0 && (
+                                                <Table>
+                                                    <TableHeader><TableRow><TableHead className="w-[80px]">البند</TableHead><TableHead className="w-2/5">الوصف</TableHead><TableHead>الوحدة</TableHead><TableHead>الكمية</TableHead><TableHead>السعر</TableHead><TableHead>الإجمالي</TableHead><TableHead/></TableRow></TableHeader>
+                                                    <TableBody>
+                                                        {childrenWithIndices.map(({ field: childItem, index: childIndex }) => {
+                                                             const item = watchedItems[childIndex] || {};
+                                                             const isLumpSum = item.unit === 'مقطوعية';
+                                                             const total = isLumpSum ? (item.sellingUnitPrice || 0) : (item.quantity || 0) * (item.sellingUnitPrice || 0);
+
+                                                             return (
+                                                                <TableRow key={childItem.id}>
+                                                                    <TableCell><Input {...register(`items.${childIndex}.itemNumber`)} className="font-mono"/></TableCell>
+                                                                    <TableCell><Textarea {...register(`items.${childIndex}.description`)} rows={1}/></TableCell>
+                                                                    <TableCell><Input {...register(`items.${childIndex}.unit`)}/></TableCell>
+                                                                    <TableCell><Input type="number" step="any" {...register(`items.${childIndex}.quantity`)} disabled={isLumpSum} className="dir-ltr"/></TableCell>
+                                                                    <TableCell><Input type="number" step="0.001" {...register(`items.${childIndex}.sellingUnitPrice`)} className="dir-ltr"/></TableCell>
+                                                                    <TableCell className="font-mono">{formatCurrency(total)}</TableCell>
+                                                                    <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => remove(childIndex)}><Trash2 className="h-4 w-4 text-destructive"/></Button></TableCell>
+                                                                </TableRow>
+                                                             )
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
+                                            )}
+                                            <Button type="button" variant="ghost" size="sm" onClick={() => handleAddItem(false, rootItem.id)} className="mt-2 text-primary">
+                                                <PlusCircle className="ml-2 h-4 w-4"/> إضافة بند عمل
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                )
+                            })}
                         </div>
-                        {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
-                        <Button type="button" variant="outline" onClick={() => handleAddItem(true, null)}><PlusCircle className="ml-2 h-4 w-4"/> إضافة بند رئيسي</Button>
+                         {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
+                        <div className="flex justify-center mt-4">
+                           <Button type="button" variant="secondary" onClick={() => handleAddItem(true, null)}>
+                                <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                        {isEditing ? 'حفظ التعديلات' : 'حفظ'}
-                    </Button>
+                <CardFooter className="flex flex-col items-end gap-4 pt-6 border-t">
+                    <div className="text-2xl font-bold">
+                        <span>الإجمالي العام: </span>
+                        <span className="font-mono">{formatCurrency(totalValue)}</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
+                            {isEditing ? 'حفظ التعديلات' : 'حفظ'}
+                        </Button>
+                    </div>
                 </CardFooter>
             </form>
         </Card>
