@@ -13,13 +13,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, X, PlusCircle, Trash2, Folder, FolderOpen } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -46,18 +48,27 @@ export const boqFormSchema = z.object({
 
 export type BoqFormValues = z.infer<typeof boqFormSchema>;
 
+
 // --- Recursive Renderer Component ---
-function BoqItemRowRenderer({ control, register, setValue, getValues, remove, insert, index, masterItemsMap, loadingMasterItems }: any) {
+function BoqItemRowRenderer({
+  index,
+  control,
+  register,
+  getValues,
+  remove,
+  insert,
+  masterItemsMap,
+  loadingMasterItems,
+}: any) {
   const { fields } = useFieldArray({ control, name: 'items' });
   const currentItem = fields[index] as BoqFormValues['items'][number];
-
+  
   const handleAddItem = useCallback((isHeader: boolean) => {
     const allItems = getValues('items');
     let lastDescendantIndex = index;
     
-    // Find the last index of all children and their children, recursively
     const findLastDescendant = (parentId: string) => {
-      const children = allItems.map((item, i) => ({item, i})).filter(({item}) => item.parentId === parentId);
+      const children = allItems.map((item: any, i: number) => ({item, i})).filter(({item}: any) => item.parentId === parentId);
       for (const { i } of children) {
           lastDescendantIndex = Math.max(lastDescendantIndex, i);
           findLastDescendant(allItems[i].id);
@@ -80,7 +91,7 @@ function BoqItemRowRenderer({ control, register, setValue, getValues, remove, in
       isHeader,
     });
   }, [getValues, index, currentItem, insert]);
-  
+
   const handleRemove = () => {
     const allItems = getValues('items');
     const itemToRemove = allItems[index];
@@ -88,7 +99,7 @@ function BoqItemRowRenderer({ control, register, setValue, getValues, remove, in
 
     const indicesToRemove: number[] = [index];
     const findDescendants = (parentId: string) => {
-        allItems.forEach((item, i) => {
+        allItems.forEach((item: any, i: number) => {
             if (item.parentId === parentId) {
                 indicesToRemove.push(i);
                 findDescendants(item.id);
@@ -97,87 +108,54 @@ function BoqItemRowRenderer({ control, register, setValue, getValues, remove, in
     };
     
     findDescendants(itemToRemove.id);
-    remove(indicesToRemove.sort((a,b) => b-a)); // Remove from the end to avoid index shifts
-  };
-
-
-  const masterItemOptions = useMemo(() => {
-    const parentMasterId = currentItem.parentId ? getValues('items').find((i: BoqItem) => i.id === currentItem.parentId)?.itemId : null;
-    return masterItemsMap.get(parentMasterId || 'root') || [];
-  }, [masterItemsMap, currentItem.parentId, getValues]);
-
-  const onMasterItemSelect = (masterItemId: string) => {
-    const masterItem = masterItemsMap.get(currentItem.parentId || 'root')?.find(i => i.value === masterItemId);
-    if (masterItem) {
-        setValue(`items.${index}.itemId`, masterItemId);
-        setValue(`items.${index}.description`, masterItem.label);
-        setValue(`items.${index}.isHeader`, masterItem.isHeader || false);
-        setValue(`items.${index}.unit`, masterItem.unit || (masterItem.isHeader ? '' : 'مقطوعية'));
-    }
+    remove(indicesToRemove.sort((a,b) => b-a));
   };
   
-  const hasChildrenInMaster = useMemo(() => {
-      return currentItem.isHeader && masterItemsMap.has(currentItem.itemId || '');
-  }, [currentItem.isHeader, currentItem.itemId, masterItemsMap]);
-
-
   const childFields = useMemo(() => {
     const allFields = getValues('items');
     return allFields
       .map((field: any, i: number) => ({ field, index: i }))
       .filter(({ field }: any) => field.parentId === currentItem.id);
-  }, [getValues, currentItem.id]);
+  }, [getValues, currentItem.id, fields]); // depends on fields to re-render
 
   return (
-    <Card className="p-4 space-y-4 bg-muted/30" style={{ paddingRight: `${currentItem.level * 1.5 + 1}rem`}}>
-      <div className="flex items-start gap-2">
-        <div className="flex-grow space-y-2">
+    <div className="space-y-2 pl-4 border-r-2 border-primary/20" style={{ paddingRight: `${currentItem.level * 0.5}rem`}}>
+      <Card className="p-4 bg-muted/30">
+        <div className="flex items-start gap-2">
+          <div className="flex-grow space-y-2">
+             <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..." className="bg-background"/>
+          </div>
+           <Button type="button" variant="ghost" size="icon" onClick={handleRemove}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+        </div>
+
+        <div className="flex items-center space-x-2 rtl:space-x-reverse mt-2">
           <Controller
-            name={`items.${index}.itemId`}
+            name={`items.${index}.isHeader`}
             control={control}
             render={({ field }) => (
-              <InlineSearchList
-                value={field.value || ''}
-                onSelect={(value) => { field.onChange(value); onMasterItemSelect(value); }}
-                options={masterItemOptions}
-                placeholder={loadingMasterItems ? 'جاري التحميل...' : 'اختر بندًا من المكتبة أو اكتب يدويًا...'}
-                disabled={loadingMasterItems}
-              />
+              <Checkbox id={`isHeader-${index}`} checked={field.value} onCheckedChange={field.onChange} />
             )}
           />
-          <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..." className="bg-background"/>
+          <Label htmlFor={`isHeader-${index}`}>هذا البند هو قسم رئيسي (عنوان)</Label>
         </div>
-        <Button type="button" variant="ghost" size="icon" onClick={handleRemove}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-      </div>
 
-      <div className="flex items-center space-x-2 rtl:space-x-reverse">
-        <Controller
-          name={`items.${index}.isHeader`}
-          control={control}
-          render={({ field }) => (
-            <Checkbox id={`isHeader-${index}`} checked={field.value} onCheckedChange={field.onChange} />
-          )}
-        />
-        <Label htmlFor={`isHeader-${index}`}>هذا البند هو قسم رئيسي (عنوان)</Label>
-      </div>
-
-      {!currentItem.isHeader && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-            <div className="grid gap-1"><Label>الوحدة</Label><Input {...register(`items.${index}.unit`)} /></div>
-            <div className="grid gap-1"><Label>الكمية</Label><Input type="number" step="any" {...register(`items.${index}.quantity`)} /></div>
-            <div className="grid gap-1"><Label>سعر الوحدة</Label><Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} /></div>
-        </div>
-      )}
-
-      {currentItem.isHeader && (
-        <div className="pl-6 border-r-2 border-primary/20 space-y-2">
+        {!currentItem.isHeader && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center mt-2">
+              <div className="grid gap-1"><Label>الوحدة</Label><Input {...register(`items.${index}.unit`)} /></div>
+              <div className="grid gap-1"><Label>الكمية</Label><Input type="number" step="any" {...register(`items.${index}.quantity`)} /></div>
+              <div className="grid gap-1"><Label>سعر الوحدة</Label><Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} /></div>
+          </div>
+        )}
+      </Card>
+      
+       {currentItem.isHeader && (
+        <div className="pl-4 border-r-2 border-primary/20 space-y-2">
           {childFields.map(({ field, index: childIndex }: any) => (
              <BoqItemRowRenderer 
                 key={field.id}
                 index={childIndex}
                 control={control}
                 register={register}
-                setValue={setValue}
                 getValues={getValues}
                 remove={remove}
                 insert={insert}
@@ -191,10 +169,17 @@ function BoqItemRowRenderer({ control, register, setValue, getValues, remove, in
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
+
+interface BoqFormProps {
+    onSave: (data: BoqFormValues) => void;
+    onClose: () => void;
+    initialData?: Partial<BoqFormValues> | null;
+    isSaving?: boolean;
+}
 
 export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqFormProps) {
     const isEditing = !!initialData;
@@ -349,7 +334,6 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                                 index={index}
                                 control={control}
                                 register={register}
-                                setValue={setValue}
                                 getValues={getValues}
                                 remove={remove}
                                 insert={insert}
@@ -373,7 +357,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                     </div>
                     <div className="flex gap-2">
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || loadingMasterItems}>
+                        <Button type="submit" disabled={isSaving || masterItemsLoading}>
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
                             {isEditing ? 'حفظ التعديلات' : 'حفظ'}
                         </Button>
