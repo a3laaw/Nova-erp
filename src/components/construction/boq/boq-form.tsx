@@ -1,6 +1,5 @@
 
 'use client';
-
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
@@ -8,19 +7,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, X, PlusCircle, Trash2, Folder, FolderOpen } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
-import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -109,7 +108,7 @@ function BoqItemRowRenderer({
     findDescendants(itemToRemove.id);
     remove(indicesToRemove.sort((a, b) => b - a));
   };
-
+  
   const childFields = useMemo(() => {
     const allFields = getValues('items');
     return allFields
@@ -122,7 +121,28 @@ function BoqItemRowRenderer({
       <Card className="p-4 bg-muted/30">
         <div className="flex items-start gap-2">
           <div className="flex-grow space-y-2">
-            <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..." className="bg-background" />
+            <Controller
+                name={`items.${index}.itemId`}
+                control={control}
+                render={({ field }) => (
+                    <InlineSearchList
+                        value={field.value || ''}
+                        onSelect={(value) => {
+                            field.onChange(value);
+                            const selectedItem = masterItemsMap.get(value);
+                            if (selectedItem) {
+                                register(`items.${index}.description`).onChange({ target: { value: selectedItem.label }});
+                                register(`items.${index}.unit`).onChange({ target: { value: selectedItem.unit || '' }});
+                                register(`items.${index}.isHeader`).onChange({ target: { value: selectedItem.isHeader || false }});
+                            }
+                        }}
+                        options={Array.from(masterItemsMap.values()).flat()}
+                        placeholder="ابحث أو اختر بندًا..."
+                        disabled={loadingMasterItems}
+                    />
+                )}
+            />
+            <Textarea {...register(`items.${index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." className="bg-background" />
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={handleRemove}><Trash2 className="h-4 w-4 text-destructive" /></Button>
         </div>
@@ -208,21 +228,18 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
   }, [initialData, reset]);
 
   const masterItemsMap = useMemo(() => {
-    const map = new Map<string, any[]>();
+    const map = new Map<string, { value: string; label: string; unit?: string; isHeader?: boolean; }>();
     if (!masterItems) return map;
-    map.set('root', []);
     masterItems.forEach(item => {
-      if (item.parentBoqReferenceItemId) {
-        if (!map.has(item.parentBoqReferenceItemId)) {
-          map.set(item.parentBoqReferenceItemId, []);
-        }
-        map.get(item.parentBoqReferenceItemId)!.push({ value: item.id, label: item.name, isHeader: item.isHeader, unit: item.unit });
-      } else {
-        map.get('root')!.push({ value: item.id, label: item.name, isHeader: item.isHeader, unit: item.unit });
-      }
+        map.set(item.id!, {
+            value: item.id!,
+            label: item.name,
+            unit: item.unit,
+            isHeader: item.isHeader,
+        });
     });
     return map;
-  }, [masterItems]);
+}, [masterItems]);
 
 
   const handleAddRootItem = (isHeader: boolean) => {
@@ -336,16 +353,16 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                 remove={remove}
                 insert={insert}
                 masterItemsMap={masterItemsMap}
-                loadingMasterItems={loadingMasterItems}
+                loadingMasterItems={masterItemsLoading}
               />
             ))}
           </div>
 
           {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
           <div className="flex justify-center mt-4 border-t pt-4">
-            <Button type="button" variant="secondary" onClick={() => handleAddRootItem(true)}>
-              <PlusCircle className="ml-2 h-4 w-4" /> إضافة قسم رئيسي
-            </Button>
+             <Button type="button" variant="secondary" onClick={() => handleAddRootItem(true)}>
+                  <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
+              </Button>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-end gap-4 pt-6 border-t">
@@ -365,5 +382,3 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     </Card>
   );
 }
-
-    
