@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { Boq } from '@/lib/types';
 import {
   Table,
