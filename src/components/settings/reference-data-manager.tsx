@@ -417,6 +417,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemActivityTypes((item as any)?.activityTypes || []);
         }
         if (isBoqView) {
+            setParentCategory(parent);
             const parentActivityIds = parent ? (parent.activityTypeIds || []) : [];
             const parentSubcontractorIds = parent ? (parent.subcontractorTypeIds || []) : [];
             const parentTransactionTypeIds = parent ? (parent.transactionTypeIds || []) : [];
@@ -981,7 +982,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                             <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
                                         </div>
                                     )}
-                                    {!isHeader && (
                                         <div className="grid gap-2">
                                             <Label>البند الأب (اختياري)</Label>
                                             <InlineSearchList 
@@ -1005,10 +1005,9 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                                 }}
                                                 options={boqRefOptions}
                                                 placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                                disabled={isHeader}
+                                                disabled={isHeader || (!editingItem && !!parentCategory)}
                                             />
                                         </div>
-                                    )}
                                 </div>
 
                                 <Separator className="my-4" />
