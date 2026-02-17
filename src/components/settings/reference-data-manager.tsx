@@ -1,7 +1,7 @@
 
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where } from 'firebase/firestore';
 import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType, BoqReferenceItem, SubcontractorType } from '@/lib/types';
@@ -171,8 +171,7 @@ function BoqRefItem({
 }
 
 
-// Reusable component for the management UI
-function ManagerView<T extends {id: string, name: string, order?: number, subcontractorTypeIds?: string[], activityTypeIds?: string[] }, S extends {id: string, name: string, allowedRoles?: string[], expectedDurationDays?: number, trackingType?: 'duration' | 'occurrence' | 'none', maxOccurrences?: number, order?: number, nextStageIds?: string[], allowedDuringStages?: string[], stageType?: 'sequential' | 'parallel', enableModificationTracking?: boolean;}>({
+function ManagerView({
   primaryTitle,
   primarySingularTitle,
   primaryCollectionName,
@@ -208,9 +207,9 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  const [primaryItems, setPrimaryItems] = React.useState<T[]>([]);
-  const [secondaryItems, setSecondaryItems] = React.useState<S[]>([]);
-  const [selectedPrimary, setSelectedPrimary] = React.useState<T | null>(null);
+  const [primaryItems, setPrimaryItems] = React.useState<any[]>([]);
+  const [secondaryItems, setSecondaryItems] = React.useState<any[]>([]);
+  const [selectedPrimary, setSelectedPrimary] = React.useState<any | null>(null);
   
   const [loadingPrimary, setLoadingPrimary] = React.useState(true);
   const [loadingSecondary, setLoadingSecondary] = React.useState(false);
@@ -236,7 +235,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [itemNextStageIds, setItemNextStageIds] = React.useState<string[]>([]);
   const [itemAllowedDuringStages, setItemAllowedDuringStages] = React.useState<string[]>([]);
   
-  // New state for BOQ reference item form
   const [isHeader, setIsHeader] = React.useState(false);
   const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = React.useState<string[]>([]);
   const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = React.useState<string[]>([]);
@@ -244,13 +242,11 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [parentCategory, setParentCategory] = React.useState<any | null>(null);
 
 
-  // States for numerical ordering
   const [primaryOrderValues, setPrimaryOrderValues] = React.useState<Record<string, string>>({});
   const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = React.useState(false);
   const [secondaryOrderValues, setSecondaryOrderValues] = React.useState<Record<string, string>>({});
   const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = React.useState(false);
 
-  // States for import
   const [isImporting, setIsImporting] = React.useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = React.useState(false);
 
@@ -261,7 +257,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     }
   }, []);
 
-  // Filter state for departments view
   const [departmentActivityFilter, setDepartmentActivityFilter] = React.useState('all');
 
   const filteredPrimaryItems = React.useMemo(() => {
@@ -290,8 +285,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     try {
         const snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
         let items = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as T))
-            .filter(item => item && typeof item.name === 'string'); // Filter out items without a name
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+            .filter(item => item && typeof item.name === 'string');
         
         items.sort((a, b) => {
             const orderA = a.order ?? Infinity;
@@ -322,8 +317,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         const collectionPath = `${primaryCollectionName}/${selectedPrimary.id}/${secondaryCollectionName}`;
         const snapshot = await getDocs(query(collection(firestore, collectionPath)));
         let items = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as S))
-            .filter(item => item && typeof item.name === 'string'); // Filter out items without a name
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+            .filter(item => item && typeof item.name === 'string');
         
         items.sort((a, b) => {
             const orderA = a.order ?? Infinity;
@@ -342,7 +337,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   }, [selectedPrimary, firestore, primaryCollectionName, secondaryCollectionName, secondaryTitle, toast]);
 
 
-  const handleSelectPrimary = (item: T) => {
+  const handleSelectPrimary = (item: any) => {
     setSelectedPrimary(item);
   };
   
@@ -366,8 +361,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     try {
         const jobsSnapshot = await getDocs(query(collectionGroup(firestore, 'jobs')));
         const uniqueJobs = new Map<string, { value: string; label: string }>();
-        jobsSnapshot.forEach(doc => {
-            const jobName = doc.data().name;
+        jobsSnapshot.forEach(docSnap => {
+            const jobName = docSnap.data().name;
             if (jobName && typeof jobName === 'string') {
                 const trimmedName = jobName.trim();
                 if (trimmedName && !uniqueJobs.has(trimmedName)) {
@@ -379,10 +374,10 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
         const stagesSnapshot = await getDocs(query(collectionGroup(firestore, 'workStages')));
         const uniqueStages = new Map<string, WorkStage>();
-        stagesSnapshot.forEach(doc => {
-            const stageId = doc.id;
+        stagesSnapshot.forEach(docSnap => {
+            const stageId = docSnap.id;
             if (!uniqueStages.has(stageId)) {
-                 uniqueStages.set(stageId, {id: stageId, ...doc.data()} as WorkStage);
+                 uniqueStages.set(stageId, {id: stageId, ...docSnap.data()} as WorkStage);
             }
         });
         const allStagesData = Array.from(uniqueStages.values());
@@ -405,7 +400,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
   React.useEffect(() => {
     if (isHeader) {
-      setParentCategory(null);
+        // ✅ FIX: `setParentBoqItemId` was a ReferenceError, replaced with correct state setter
+        setParentCategory(null);
     }
   }, [isHeader]);
 
@@ -431,8 +427,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setIsHeader(item?.isHeader || false);
         }
         setIsPrimaryDialogOpen(true);
-    } else { // Secondary
-        setParentCategory(null); // No parent for secondary items in this UI
+    } else {
+        setParentCategory(null);
         setItemName(item?.name || '');
         if (isWorkStageView) {
             setItemRoles(item?.allowedRoles || []);
@@ -465,7 +461,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     setItemEnableModificationTracking(false);
     setItemNextStageIds([]);
     setItemAllowedDuringStages([]);
-    // Reset new BOQ item states
     setIsHeader(false);
     setItemTransactionTypeIds([]);
     setItemSubcontractorTypeIds([]);
@@ -509,18 +504,18 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
           } else if (itemTrackingType === 'occurrence') {
               dataToSave.maxOccurrences = Number(itemMaxOccurrences) || null;
               dataToSave.expectedDurationDays = null;
-          } else { // for 'none'
+          } else {
               dataToSave.expectedDurationDays = null;
               dataToSave.maxOccurrences = null;
           }
       }
 
-      if (editingItem) { // Update
+      if (editingItem) {
         const itemRef = doc(firestore, collectionPath, editingItem.id);
         const { order, ...updateData } = dataToSave as any;
         await updateDoc(itemRef, updateData);
         toast({ title: 'نجاح', description: 'تم تحديث العنصر.' });
-      } else { // Create
+      } else {
         const collectionRef = collection(firestore, collectionPath);
         const currentList = type === 'primary' ? primaryItems : secondaryItems;
         const newOrder = currentList.length;
@@ -604,12 +599,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             const batch = writeBatch(firestore);
             
             const primarySnap = await getDocs(query(collection(firestore, primaryCollectionName)));
-            for (const doc of primarySnap.docs) {
+            for (const docSnap of primarySnap.docs) {
                 if (secondaryCollectionName) {
-                    const secondarySnap = await getDocs(query(collection(firestore, `${primaryCollectionName}/${doc.id}/${secondaryCollectionName}`)));
+                    const secondarySnap = await getDocs(query(collection(firestore, `${primaryCollectionName}/${docSnap.id}/${secondaryCollectionName}`)));
                     secondarySnap.forEach(secDoc => batch.delete(secDoc.ref));
                 }
-                batch.delete(doc.ref);
+                batch.delete(docSnap.ref);
             }
 
             switch(primaryCollectionName) {
@@ -663,7 +658,6 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             const allNewStagesByName = new Map<string, { id: string, ref: any }>();
             const allDeptsToProcess: { deptDoc: any; stages: any[] }[] = [];
 
-            // Pre-calculate all new stage IDs and references across all departments first
             for (const deptDoc of deptsSnapshot.docs) {
                 const deptName = deptDoc.data().name;
                 const stagesForDept = defaultWorkStages[deptName as keyof typeof defaultWorkStages];
@@ -678,11 +672,9 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             
             const batch = writeBatch(firestore);
             
-            // Delete all existing work stages
             const allExistingStagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages')));
-            allExistingStagesSnap.forEach(doc => batch.delete(doc.ref));
+            allExistingStagesSnap.forEach(docSnap => batch.delete(docSnap.ref));
 
-            // Create new stages with resolved links
             for (const { stages } of allDeptsToProcess) {
                 for (const stage of stages) {
                     const { nextStageNames, allowedDuringStagesNames, ...stageData } = stage as any;
@@ -703,7 +695,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             await batch.commit();
             
             toast({ title: 'نجاح', description: 'تم استيراد/تحديث مراحل العمل الافتراضية لجميع الأقسام.' });
-            fetchSecondaryItems(); // Refresh the view
+            fetchSecondaryItems();
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد مراحل العمل.' });
@@ -1168,7 +1160,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     );
 }
 
-// --- NEW Unified TransactionTypeManager ---
+// --- Unified TransactionTypeManager ---
 function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCompanyActivityTypes }: { onBack: () => void, companyActivityTypes: CompanyActivityType[], loadingCompanyActivityTypes: boolean }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1228,8 +1220,15 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     };
     
     const handleDelete = async () => {
-      //... implementation similar to ManagerView
-    }
+        if (!firestore || !itemToDelete) return;
+        try {
+            await deleteDoc(doc(firestore, 'transactionTypes', itemToDelete.id!));
+            toast({ title: 'نجاح', description: 'تم حذف نوع المعاملة.' });
+            setItemToDelete(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف نوع المعاملة.' });
+        }
+    };
 
     return (
         <Card>
@@ -1283,7 +1282,12 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
             
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent dir="rtl">
-                    <DialogHeader><DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} نوع معاملة</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} نوع معاملة</DialogTitle>
+                        <DialogDescription>
+                          {editingItem ? 'تعديل بيانات نوع المعاملة' : 'إضافة نوع معاملة جديد'}
+                        </DialogDescription>
+                    </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2"><Label>اسم نوع المعاملة</Label><Input value={itemName} onChange={(e) => setItemName(e.target.value)} /></div>
                         <div className="grid gap-2">
@@ -1335,7 +1339,6 @@ export function ReferenceDataManager() {
     const { data: transactionTypes, loading: transactionTypesLoading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
 
 
-    // Fetch counts for the dashboard
     React.useEffect(() => {
         if (!firestore) return;
 
