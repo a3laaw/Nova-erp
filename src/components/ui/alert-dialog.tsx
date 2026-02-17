@@ -23,7 +23,6 @@ const AlertDialogOverlay = React.forwardRef<
       className
     )}
     {...props}
-    ref={ref}
   />
 ))
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
@@ -42,8 +41,14 @@ const AlertDialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('.react-select__menu-portal') || target.closest('[data-inline-search-list-options]')) {
-          e.preventDefault();
+        if (
+            target.closest('[cmdk-root]') ||
+            target.closest('[data-radix-popper-content-wrapper]') ||
+            target.closest('.react-select__menu-portal') ||
+            target.closest('[data-radix-select-content]') ||
+            target.closest('[data-inline-search-list-options]')
+        ) {
+            e.preventDefault();
         }
       }}
       {...props}
