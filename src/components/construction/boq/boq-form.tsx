@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,13 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, PlusCircle, Trash2, Folder, FolderOpen } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -35,7 +34,7 @@ const itemSchema = z.object({
   parentId: z.string().nullable(),
   level: z.number(),
   isHeader: z.boolean(),
-  itemId: z.string().optional(), // Link to master BoqReferenceItem
+  itemId: z.string().optional(),
 });
 
 export const boqFormSchema = z.object({
@@ -47,159 +46,125 @@ export const boqFormSchema = z.object({
 
 export type BoqFormValues = z.infer<typeof boqFormSchema>;
 
-// --- Recursive Renderer Component ---
-function BoqItemRowRenderer({
-  index,
+// --- Recursive Row Renderer ---
+function BoqItemRow({
   control,
   register,
   getValues,
+  index,
   remove,
-  insert,
-  masterItemsMap,
-  loadingMasterItems,
-}: any) {
-  const { fields } = useFieldArray({ control, name: 'items' });
-  const currentItem = fields[index] as BoqFormValues['items'][number];
+  append,
+  masterItems,
+  masterItemsLoading,
+}: {
+  control: any;
+  register: any;
+  getValues: any;
+  index: number;
+  remove: (index: number) => void;
+  append: (item: any) => void;
+  masterItems: BoqReferenceItem[];
+  masterItemsLoading: boolean;
+}) {
+  const currentItem = useWatch({ control, name: `items.${index}` });
+  const allItems = useWatch({ control, name: 'items' });
 
-  const handleAddItem = useCallback((isHeader: boolean) => {
-    const allItems = getValues('items');
-    let lastDescendantIndex = index;
+  const parentFormItem = useMemo(() => 
+    allItems.find((i: any) => i.id === currentItem.parentId),
+    [allItems, currentItem.parentId]
+  );
+  const parentMasterItemId = parentFormItem?.itemId;
 
-    const findLastDescendant = (parentId: string) => {
-      const children = allItems.map((item: any, i: number) => ({ item, i })).filter(({ item }: any) => item.parentId === parentId);
-      for (const { i } of children) {
-        lastDescendantIndex = Math.max(lastDescendantIndex, i);
-        findLastDescendant(allItems[i].id);
-      }
-    };
-    findLastDescendant(currentItem.id);
+  const itemOptions = useMemo(() => {
+    return masterItems
+      .filter(item => item.parentBoqReferenceItemId === (parentMasterItemId || null))
+      .map(item => ({ value: item.id!, label: item.name }));
+  }, [masterItems, parentMasterItemId]);
 
-    const insertIndex = lastDescendantIndex + 1;
+  const selectedMasterItem = useMemo(() => {
+    return masterItems.find(i => i.id === currentItem.itemId);
+  }, [masterItems, currentItem.itemId]);
+  
+  const hasChildrenInMaster = useMemo(() => {
+      if(!selectedMasterItem) return false;
+      return masterItems.some(i => i.parentBoqReferenceItemId === selectedMasterItem.id);
+  }, [selectedMasterItem, masterItems]);
 
-    insert(insertIndex, {
+  const handleAddItem = (isHeader: boolean) => {
+    append({
       id: generateId(),
-      itemNumber: 'TEMP',
       description: '',
       unit: isHeader ? '' : 'مقطوعية',
-      quantity: isHeader ? 0 : 1,
+      quantity: 1,
       sellingUnitPrice: 0,
-      notes: '',
       parentId: currentItem.id,
       level: currentItem.level + 1,
-      isHeader,
+      isHeader: isHeader,
     });
-  }, [getValues, index, currentItem, insert]);
-
-  const handleRemove = () => {
-    const allItems = getValues('items');
-    const itemToRemove = allItems[index];
-    if (!itemToRemove) return;
-
-    const indicesToRemove: number[] = [index];
-    const findDescendants = (parentId: string) => {
-      allItems.forEach((item: any, i: number) => {
-        if (item.parentId === parentId) {
-          indicesToRemove.push(i);
-          findDescendants(item.id);
-        }
-      });
-    };
-
-    findDescendants(itemToRemove.id);
-    remove(indicesToRemove.sort((a, b) => b - a));
   };
+
+  const lineTotal = useMemo(() => {
+    if (currentItem.isHeader) return 0;
+    const qty = currentItem.quantity || 0;
+    const price = currentItem.sellingUnitPrice || 0;
+    return qty * price;
+  }, [currentItem]);
   
-  const childFields = useMemo(() => {
-    const allFields = getValues('items');
-    return allFields
-      .map((field: any, i: number) => ({ field, index: i }))
-      .filter(({ field }: any) => field.parentId === currentItem.id);
-  }, [getValues, currentItem.id, fields]);
-
   return (
-    <div className="space-y-2 pl-4 border-r-2 border-primary/20" style={{ paddingRight: `${currentItem.level * 0.5}rem` }}>
-      <Card className="p-4 bg-muted/30">
+    <div className="border-b last:border-b-0 py-2" style={{ paddingRight: `${currentItem.level * 1.5}rem` }}>
         <div className="flex items-start gap-2">
-          <div className="flex-grow space-y-2">
-            <Controller
-                name={`items.${index}.itemId`}
-                control={control}
-                render={({ field }) => (
-                    <InlineSearchList
-                        value={field.value || ''}
-                        onSelect={(value) => {
-                            field.onChange(value);
-                            const selectedItem = masterItemsMap.get(value);
-                            if (selectedItem) {
-                                register(`items.${index}.description`).onChange({ target: { value: selectedItem.label }});
-                                register(`items.${index}.unit`).onChange({ target: { value: selectedItem.unit || '' }});
-                                register(`items.${index}.isHeader`).onChange({ target: { value: selectedItem.isHeader || false }});
-                            }
-                        }}
-                        options={Array.from(masterItemsMap.values()).flat()}
-                        placeholder="ابحث أو اختر بندًا..."
-                        disabled={loadingMasterItems}
-                    />
+            <div className="flex-grow space-y-2">
+                 <div className="flex items-center gap-2">
+                    <div className="w-60">
+                        <Controller
+                            name={`items.${index}.itemId`}
+                            control={control}
+                            render={({ field }) => (
+                                <InlineSearchList
+                                    value={field.value || ''}
+                                    onSelect={(value) => {
+                                        field.onChange(value);
+                                        const selected = masterItems.find(mi => mi.id === value);
+                                        if (selected) {
+                                            register(`items.${index}.description`).onChange({ target: { value: selected.name }});
+                                            register(`items.${index}.unit`).onChange({ target: { value: selected.unit || '' }});
+                                            register(`items.${index}.isHeader`).onChange({ target: { value: selected.isHeader || false }});
+                                        }
+                                    }}
+                                    options={itemOptions}
+                                    placeholder="اختر بندًا..."
+                                    disabled={masterItemsLoading}
+                                />
+                            )}
+                        />
+                    </div>
+                     <Input {...register(`items.${index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
+                </div>
+                 {!currentItem.isHeader && (
+                    <div className="flex items-center gap-2 pl-8">
+                        <Input {...register(`items.${index}.unit`)} placeholder="الوحدة" className="w-24" />
+                        <Input type="number" step="any" {...register(`items.${index}.quantity`)} placeholder="الكمية" className="w-24" />
+                        <Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} placeholder="سعر الوحدة" className="w-24" />
+                        <div className="font-semibold w-24 text-left font-mono">{formatCurrency(lineTotal)}</div>
+                    </div>
+                 )}
+            </div>
+            <div className="flex items-center">
+                 {hasChildrenInMaster && (
+                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddItem(false)}>
+                        <PlusCircle className="h-4 w-4 text-primary" />
+                    </Button>
                 )}
-            />
-            <Textarea {...register(`items.${index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." className="bg-background" />
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={handleRemove}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+            </div>
         </div>
-
-        <div className="flex items-center space-x-2 rtl:space-x-reverse mt-2">
-          <Controller
-            name={`items.${index}.isHeader`}
-            control={control}
-            render={({ field }) => (
-              <Checkbox id={`isHeader-${index}`} checked={field.value} onCheckedChange={field.onChange} />
-            )}
-          />
-          <Label htmlFor={`isHeader-${index}`}>هذا البند هو قسم رئيسي (عنوان)</Label>
-        </div>
-
-        {!currentItem.isHeader && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center mt-2">
-            <div className="grid gap-1"><Label>الوحدة</Label><Input {...register(`items.${index}.unit`)} /></div>
-            <div className="grid gap-1"><Label>الكمية</Label><Input type="number" step="any" {...register(`items.${index}.quantity`)} /></div>
-            <div className="grid gap-1"><Label>سعر الوحدة</Label><Input type="number" step="0.001" {...register(`items.${index}.sellingUnitPrice`)} /></div>
-          </div>
-        )}
-      </Card>
-
-      {currentItem.isHeader && (
-        <div className="pl-4 border-r-2 border-primary/20 space-y-2">
-          {childFields.map(({ field, index: childIndex }: any) => (
-            <BoqItemRowRenderer
-              key={field.id}
-              index={childIndex}
-              control={control}
-              register={register}
-              getValues={getValues}
-              remove={remove}
-              insert={insert}
-              masterItemsMap={masterItemsMap}
-              loadingMasterItems={loadingMasterItems}
-            />
-          ))}
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => handleAddItem(true)}><PlusCircle className="ml-2 h-4" /> إضافة قسم فرعي</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => handleAddItem(false)}><PlusCircle className="ml-2 h-4" /> إضافة بند عمل</Button>
-          </div>
-        </div>
-      )}
     </div>
-  );
+  )
 }
 
-
-interface BoqFormProps {
-  onSave: (data: BoqFormValues) => void;
-  onClose: () => void;
-  initialData?: Partial<BoqFormValues> | null;
-  isSaving?: boolean;
-}
-
+// --- Main Form Component ---
 export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqFormProps) {
   const isEditing = !!initialData;
   const { firestore } = useFirebase();
@@ -207,102 +172,88 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
 
   const methods = useForm<BoqFormValues>({
     resolver: zodResolver(boqFormSchema),
-    defaultValues: initialData || {
-      name: '',
-      clientName: '',
-      status: 'تقديري',
-      items: []
-    }
+    defaultValues: initialData || { name: '', clientName: '', status: 'تقديري', items: [] },
   });
 
-  const { control, handleSubmit, register, setValue, getValues, watch, reset, formState: { errors } } = methods;
-  const { fields, append, remove, insert } = useFieldArray({ control, name: 'items' });
+  const { control, handleSubmit, register, getValues, watch, reset, formState: { errors } } = methods;
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
   useEffect(() => {
     if (initialData) {
       reset({
         ...initialData,
-        items: initialData.items?.map(item => ({ ...item, id: item.id || generateId() }))
+        items: initialData.items?.map(item => ({ ...item, id: item.id || generateId() })),
       });
     }
   }, [initialData, reset]);
 
-  const masterItemsMap = useMemo(() => {
-    const map = new Map<string, { value: string; label: string; unit?: string; isHeader?: boolean; }>();
-    if (!masterItems) return map;
-    masterItems.forEach(item => {
-        map.set(item.id!, {
-            value: item.id!,
-            label: item.name,
-            unit: item.unit,
-            isHeader: item.isHeader,
-        });
-    });
-    return map;
-}, [masterItems]);
-
-
+  const watchedItems = watch('items');
+  const totalValue = useMemo(() => 
+    (watchedItems || []).reduce((sum, item) => {
+        if(item.isHeader) return sum;
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.sellingUnitPrice) || 0;
+        return sum + qty * price;
+    }, 0),
+    [watchedItems]
+  );
+  
   const handleAddRootItem = (isHeader: boolean) => {
     append({
-      id: generateId(),
-      itemNumber: '',
-      description: '',
-      unit: isHeader ? '' : 'مقطوعية',
-      quantity: isHeader ? 0 : 1,
-      sellingUnitPrice: 0,
-      notes: '',
-      parentId: null,
-      level: 0,
-      isHeader,
+      id: generateId(), itemNumber: '', description: '', unit: isHeader ? '' : 'مقطوعية',
+      quantity: isHeader ? 0 : 1, sellingUnitPrice: 0, notes: '',
+      parentId: null, level: 0, isHeader, itemId: ''
     });
   };
 
   const onSubmit = (data: BoqFormValues) => {
-    const items = data.items;
-
+    const finalItems: BoqFormValues['items'] = [];
     const childMap = new Map<string | null, string[]>();
-    items.forEach(item => {
-      if (!childMap.has(item.parentId)) {
-        childMap.set(item.parentId, []);
-      }
+    data.items.forEach(item => {
+      if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
       childMap.get(item.parentId)!.push(item.id);
     });
 
-    const sortedRootIds = childMap.get(null) || [];
-
-    const finalItems: BoqFormValues['items'] = [];
-    const assignNumbers = (parentId: string | null, parentNumber: string, level: number) => {
+    const processNode = (parentId: string | null, parentNumber: string, level: number) => {
       const childrenIds = childMap.get(parentId) || [];
       childrenIds.forEach((childId, index) => {
-        const childItem = items.find(i => i.id === childId);
-        if (childItem) {
+        const item = data.items.find(i => i.id === childId);
+        if (item) {
           const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
-          const updatedItem = { ...childItem, itemNumber: newNumber, level };
-          finalItems.push(updatedItem);
-          assignNumbers(childId, newNumber, level + 1);
+          finalItems.push({ ...item, itemNumber: newNumber, level });
+          processNode(childId, newNumber, level + 1);
         }
       });
     };
-
-    assignNumbers(null, '', 0);
+    
+    processNode(null, '', 0);
 
     onSave({ ...data, items: finalItems });
   };
   
-    const watchedItems = watch('items');
-    const totalValue = useMemo(() => {
-        return (watchedItems || []).reduce((sum, item) => {
-            if (item.isHeader) return sum;
-            const isLumpSum = item.unit === 'مقطوعية';
-            const quantity = isLumpSum ? 1 : (Number(item.quantity) || 0);
-            return sum + (quantity * (Number(item.sellingUnitPrice) || 0));
-        }, 0);
-    }, [watchedItems]);
+  // Logic to render items in tree order
+  const renderedTree = useMemo(() => {
+    const itemMap = new Map(fields.map((item, index) => [item.id, { ...item, originalIndex: index, children: [] }]));
+    const roots: any[] = [];
+    
+    fields.forEach((item, index) => {
+        if (item.parentId && itemMap.has(item.parentId)) {
+            itemMap.get(item.parentId)!.children.push(itemMap.get(item.id));
+        } else {
+            roots.push(itemMap.get(item.id));
+        }
+    });
 
-  const rootItemIndices = useMemo(() => {
-    return fields
-      .map((field, index) => ({ field, index }))
-      .filter(({ field }) => field.parentId === null);
+    const result: { item: any, originalIndex: number }[] = [];
+    const flatten = (nodes: any[]) => {
+        for(const node of nodes) {
+            result.push({ item: node, originalIndex: node.originalIndex });
+            flatten(node.children);
+        }
+    }
+    flatten(roots);
+    return result;
+
   }, [fields]);
 
   return (
@@ -310,9 +261,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardHeader>
           <CardTitle>{isEditing ? 'تعديل جدول الكميات' : 'إنشاء جدول كميات جديد'}</CardTitle>
-          <CardDescription>
-            {isEditing ? `تعديل جدول: ${initialData?.name}` : 'أدخل تفاصيل جدول الكميات لإنشاءه.'}
-          </CardDescription>
+          <CardDescription>{isEditing ? `تعديل جدول: ${initialData?.name}` : 'أدخل تفاصيل جدول الكميات لإنشاءه.'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid md:grid-cols-2 gap-4">
@@ -322,47 +271,37 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
           <div className="grid md:grid-cols-3 gap-4">
             <div className="grid gap-2">
               <Label>الحالة</Label>
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="اختر الحالة..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="تقديري">تقديري</SelectItem>
-                      <SelectItem value="تعاقدي">تعاقدي</SelectItem>
-                      <SelectItem value="منفذ">منفذ</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
+              <Controller name="status" control={control} render={({field}) => (
+                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent>
+                </Select>
+              )}/>
             </div>
           </div>
-
           <Separator />
           <h3 className="font-semibold text-lg">بنود جدول الكميات</h3>
-
-          <div className="space-y-4">
-            {rootItemIndices.map(({ field, index }) => (
-              <BoqItemRowRenderer
-                key={field.id}
-                index={index}
-                control={control}
-                register={register}
-                getValues={getValues}
-                remove={remove}
-                insert={insert}
-                masterItemsMap={masterItemsMap}
-                loadingMasterItems={masterItemsLoading}
-              />
+          <div className="border rounded-lg p-2 space-y-2">
+            {renderedTree.map(({ item, originalIndex }) => (
+                <BoqItemRow
+                    key={item.id}
+                    index={originalIndex}
+                    control={control}
+                    register={register}
+                    getValues={getValues}
+                    remove={remove}
+                    append={append}
+                    masterItems={masterItems}
+                    masterItemsLoading={masterItemsLoading}
+                />
             ))}
+            {loadingMasterItems && <p className="text-center p-4">جاري تحميل البنود المرجعية...</p>}
+            {errors.items && <p className="text-destructive text-sm mt-2 p-2">{errors.items.root?.message || errors.items.message}</p>}
           </div>
-
-          {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
-          <div className="flex justify-center mt-4 border-t pt-4">
-             <Button type="button" variant="secondary" onClick={() => handleAddRootItem(true)}>
-                  <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
-              </Button>
+           <div className="flex justify-start mt-4">
+            <Button type="button" variant="secondary" onClick={() => handleAddRootItem(true)}>
+                <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم رئيسي
+            </Button>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-end gap-4 pt-6 border-t">
