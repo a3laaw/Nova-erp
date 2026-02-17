@@ -128,7 +128,7 @@ function BoqRefItem({
           ) : <span className="w-6 h-6 inline-block" />}
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <span className="font-medium">{node.name}</span>
+              <span className={cn("font-medium", node.isHeader && "font-bold")}>{node.name}</span>
               {node.unit && <Badge variant="secondary">{node.unit}</Badge>}
             </div>
             <div className="flex flex-wrap gap-1 mt-1">
@@ -236,6 +236,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [itemAllowedDuringStages, setItemAllowedDuringStages] = React.useState<string[]>([]);
   
   // New state for BOQ reference item form
+  const [isHeader, setIsHeader] = React.useState(false);
   const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = React.useState<string[]>([]);
   const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = React.useState<string[]>([]);
   const [itemTransactionTypeIds, setItemTransactionTypeIds] = React.useState<string[]>([]);
@@ -418,6 +419,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
             setItemTransactionTypeIds(item?.transactionTypeIds || parentTransactionTypeIds);
             setParentBoqItemId(parent?.id || item?.parentBoqReferenceItemId || null);
             setItemUnit(item?.unit || '');
+            setIsHeader(item?.isHeader || false);
         }
         setIsPrimaryDialogOpen(true);
     } else { // Secondary
@@ -454,6 +456,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
     setItemNextStageIds([]);
     setItemAllowedDuringStages([]);
     // Reset new BOQ item states
+    setIsHeader(false);
     setItemTransactionTypeIds([]);
     setItemSubcontractorTypeIds([]);
     setItemActivityTypeIdsForBoq([]);
@@ -473,7 +476,8 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
        if (isBoqView && type === 'primary') {
            dataToSave = {
                 ...dataToSave,
-                unit: itemUnit,
+                isHeader: isHeader,
+                unit: isHeader ? '' : itemUnit,
                 transactionTypeIds: itemTransactionTypeIds,
                 subcontractorTypeIds: itemSubcontractorTypeIds,
                 activityTypeIds: itemActivityTypeIdsForBoq,
@@ -713,7 +717,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         [companyActivityTypes]
     );
 
-    const transactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() => 
+    const transactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() =>
         (transactionTypes || []).map(t => ({ value: t.id!, label: t.name })),
         [transactionTypes]
     );
@@ -964,11 +968,17 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                         
                         {isBoqView && isPrimaryDialogOpen && (
                             <div className="px-4 space-y-4">
+                                <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
+                                    <Checkbox id="isHeader" checked={isHeader} onCheckedChange={(checked) => setIsHeader(!!checked)} />
+                                    <Label htmlFor="isHeader">بند رئيسي (عنوان فقط)</Label>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                   {!isHeader && (
                                     <div className="grid gap-2">
                                         <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
                                         <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
                                     </div>
+                                    )}
                                     <div className="grid gap-2">
                                         <Label>البند الأب (اختياري)</Label>
                                         <InlineSearchList 
