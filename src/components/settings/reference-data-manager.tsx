@@ -219,41 +219,41 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   
   const [editingItem, setEditingItem] = React.useState<any | null>(null);
-  const [itemToDelete, setItemToDelete<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
+  const [itemToDelete, setItemToDelete] = React.useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   
   // Form state
   const [itemName, setItemName] = React.useState('');
   const [itemUnit, setItemUnit] = React.useState('');
-  const [itemActivityTypes, setItemActivityTypes<string[]>([]);
-  const [itemRoles, setItemRoles<string[]>([]);
-  const [itemStageType, setItemStageType<'sequential' | 'parallel'>('sequential');
-  const [itemTrackingType, setItemTrackingType<'duration' | 'occurrence' | 'none'>('duration');
-  const [itemDuration, setItemDuration<number | ''>('');
-  const [itemMaxOccurrences, setItemMaxOccurrences<number | ''>('');
-  const [itemAllowManualCompletion, setItemAllowManualCompletion(false);
-  const [itemEnableModificationTracking, setItemEnableModificationTracking(false);
-  const [itemNextStageIds, setItemNextStageIds<string[]>([]);
-  const [itemAllowedDuringStages, setItemAllowedDuringStages<string[]>([]);
+  const [itemActivityTypes, setItemActivityTypes] = React.useState<string[]>([]);
+  const [itemRoles, setItemRoles] = React.useState<string[]>([]);
+  const [itemStageType, setItemStageType] = React.useState<'sequential' | 'parallel'>('sequential');
+  const [itemTrackingType, setItemTrackingType] = React.useState<'duration' | 'occurrence' | 'none'>('duration');
+  const [itemDuration, setItemDuration] = React.useState<number | ''>('');
+  const [itemMaxOccurrences, setItemMaxOccurrences] = React.useState<number | ''>('');
+  const [itemAllowManualCompletion, setItemAllowManualCompletion] = React.useState(false);
+  const [itemEnableModificationTracking, setItemEnableModificationTracking] = React.useState(false);
+  const [itemNextStageIds, setItemNextStageIds] = React.useState<string[]>([]);
+  const [itemAllowedDuringStages, setItemAllowedDuringStages] = React.useState<string[]>([]);
   
   // New state for BOQ reference item form
-  const [isHeader, setIsHeader(false);
-  const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds<string[]>([]);
-  const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq<string[]>([]);
-  const [itemTransactionTypeIds, setItemTransactionTypeIds<string[]>([]);
-  const [parentBoqItemId, setParentBoqItemId<string | null>(null);
+  const [isHeader, setIsHeader] = React.useState(false);
+  const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = React.useState<string[]>([]);
+  const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = React.useState<string[]>([]);
+  const [itemTransactionTypeIds, setItemTransactionTypeIds] = React.useState<string[]>([]);
+  const [parentBoqItemId, setParentBoqItemId] = React.useState<string | null>(null);
 
 
   // States for numerical ordering
-  const [primaryOrderValues, setPrimaryOrderValues<Record<string, string>>({});
-  const [isPrimaryOrderChanged, setIsPrimaryOrderChanged(false);
-  const [secondaryOrderValues, setSecondaryOrderValues<Record<string, string>>({});
-  const [isSecondaryOrderChanged, setIsSecondaryOrderChanged(false);
+  const [primaryOrderValues, setPrimaryOrderValues] = React.useState<Record<string, string>>({});
+  const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = React.useState(false);
+  const [secondaryOrderValues, setSecondaryOrderValues] = React.useState<Record<string, string>>({});
+  const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = React.useState(false);
 
   // States for import
-  const [isImporting, setIsImporting(false);
-  const [isImportConfirmOpen, setIsImportConfirmOpen(false);
+  const [isImporting, setIsImporting] = React.useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = React.useState(false);
 
-  const [portalTarget, setPortalTarget<HTMLElement | null>(null);
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       setPortalTarget(document.body);
@@ -261,7 +261,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
   }, []);
 
   // Filter state for departments view
-  const [departmentActivityFilter, setDepartmentActivityFilter('all');
+  const [departmentActivityFilter, setDepartmentActivityFilter] = React.useState('all');
 
   const filteredPrimaryItems = React.useMemo(() => {
     let items = primaryItems;
@@ -276,12 +276,12 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const isBoqView = primaryCollectionName === 'boqReferenceItems';
-  const [allWorkStages, setAllWorkStages<MultiSelectOption[]>([]);
-  const [allSequentialStages, setAllSequentialStages<MultiSelectOption[]>([]);
-  const [allJobs, setAllJobs<{ value: string; label: string }[]>([]);
-  const [refDataLoading, setRefDataLoading(false);
+  const [allWorkStages, setAllWorkStages] = React.useState<MultiSelectOption[]>([]);
+  const [allSequentialStages, setAllSequentialStages] = React.useState<MultiSelectOption[]>([]);
+  const [allJobs, setAllJobs] = React.useState<{ value: string; label: string }[]>([]);
+  const [refDataLoading, setRefDataLoading] = React.useState(false);
 
-  const [openCategories, setOpenCategories<Set<string>>(new Set<string>());
+  const [openCategories, setOpenCategories] = React.useState<Set<string>>(new Set<string>());
 
   const fetchPrimaryItems = React.useCallback(async () => {
     if (!firestore) return;
@@ -723,7 +723,7 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
         [companyActivityTypes]
     );
 
-    const filteredTransactionTypeOptionsForBoq = React.useMemo(() => {
+    const filteredTransactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() => {
         if (!transactionTypes || !companyActivityTypes) return [];
 
         if (!itemActivityTypeIdsForBoq || itemActivityTypeIdsForBoq.length === 0) {
@@ -974,39 +974,40 @@ function ManagerView<T extends {id: string, name: string, order?: number, subcon
                                     <Label htmlFor="isHeader">بند رئيسي (عنوان فقط)</Label>
                                 </div>
                                 
-                                {!isHeader && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {!isHeader && (
                                         <div className="grid gap-2">
                                             <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
                                             <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
                                         </div>
-                                        <div className="grid gap-2">
-                                            <Label>البند الأب (اختياري)</Label>
-                                            <InlineSearchList 
-                                                value={parentBoqItemId || ''}
-                                                onSelect={(val) => {
-                                                    setParentBoqItemId(val);
-                                                    if (val) {
-                                                        const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
-                                                        if (parent) {
-                                                            setItemTransactionTypeIds(parent.transactionTypeIds || []);
-                                                            setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
-                                                            setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
-                                                        }
-                                                    } else {
-                                                        if (!editingItem) {
-                                                            setItemTransactionTypeIds([]);
-                                                            setItemSubcontractorTypeIds([]);
-                                                            setItemActivityTypeIdsForBoq([]);
-                                                        }
+                                    )}
+                                    <div className="grid gap-2">
+                                        <Label>البند الأب (اختياري)</Label>
+                                        <InlineSearchList 
+                                            value={parentBoqItemId || ''}
+                                            onSelect={(val) => {
+                                                setParentBoqItemId(val);
+                                                if (val) {
+                                                    const parent = primaryItems.find(item => item.id === val) as BoqReferenceItem | undefined;
+                                                    if (parent) {
+                                                        setItemTransactionTypeIds(parent.transactionTypeIds || []);
+                                                        setItemSubcontractorTypeIds(parent.subcontractorTypeIds || []);
+                                                        setItemActivityTypeIdsForBoq(parent.activityTypeIds || []);
                                                     }
-                                                }}
-                                                options={boqRefOptions}
-                                                placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
-                                            />
-                                        </div>
+                                                } else {
+                                                    if (!editingItem) {
+                                                        setItemTransactionTypeIds([]);
+                                                        setItemSubcontractorTypeIds([]);
+                                                        setItemActivityTypeIdsForBoq([]);
+                                                    }
+                                                }
+                                            }}
+                                            options={boqRefOptions}
+                                            placeholder="اتركه فارغًا ليكون بندًا رئيسيًا"
+                                            disabled={isHeader}
+                                        />
                                     </div>
-                                )}
+                                </div>
 
                                 <Separator className="my-4" />
                                 <div className="grid grid-cols-1 gap-4">
@@ -1199,16 +1200,16 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     const { data: transactionTypes, loading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
     const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments');
 
-    const [isDialogOpen, setIsDialogOpen(false);
-    const [editingItem, setEditingItem<TransactionType | null>(null);
-    const [itemToDelete, setItemToDelete<TransactionType | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    const [editingItem, setEditingItem] = React.useState<TransactionType | null>(null);
+    const [itemToDelete, setItemToDelete] = React.useState<TransactionType | null>(null);
     
-    const [itemName, setItemName('');
-    const [itemActivityType, setItemActivityType('');
-    const [selectedDepartments, setSelectedDepartments<string[]>([]);
+    const [itemName, setItemName] = React.useState('');
+    const [itemActivityType, setItemActivityType] = React.useState('');
+    const [selectedDepartments, setSelectedDepartments] = React.useState<string[]>([]);
     
-    const [isSaving, setIsSaving(false);
-    const [searchQuery, setSearchQuery('');
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [searchQuery, setSearchQuery] = React.useState('');
     
     const departmentsMap = React.useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
     const departmentOptions = React.useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
@@ -1346,10 +1347,10 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems'>('dashboard');
+    const [view, setView] = React.useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems'>('dashboard');
 
-    const [counts, setCounts({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0 });
-    const [loadingCounts, setLoadingCounts(true);
+    const [counts, setCounts] = React.useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0 });
+    const [loadingCounts, setLoadingCounts] = React.useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
