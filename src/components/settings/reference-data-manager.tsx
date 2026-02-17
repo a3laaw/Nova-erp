@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -241,7 +240,6 @@ function ManagerView({
   const [itemTransactionTypeIds, setItemTransactionTypeIds] = React.useState<string[]>([]);
   const [parentCategory, setParentCategory] = React.useState<any | null>(null);
 
-
   const [primaryOrderValues, setPrimaryOrderValues] = React.useState<Record<string, string>>({});
   const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = React.useState(false);
   const [secondaryOrderValues, setSecondaryOrderValues] = React.useState<Record<string, string>>({});
@@ -286,9 +284,9 @@ function ManagerView({
         const snapshot = await getDocs(query(collection(firestore, primaryCollectionName)));
         let items = snapshot.docs
             .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
-            .filter(item => item && typeof item.name === 'string');
+            .filter(item => item && typeof (item as any).name === 'string');
         
-        items.sort((a, b) => {
+        items.sort((a: any, b: any) => {
             const orderA = a.order ?? Infinity;
             const orderB = b.order ?? Infinity;
             if (orderA !== orderB) return orderA - orderB;
@@ -318,9 +316,9 @@ function ManagerView({
         const snapshot = await getDocs(query(collection(firestore, collectionPath)));
         let items = snapshot.docs
             .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
-            .filter(item => item && typeof item.name === 'string');
+            .filter(item => item && typeof (item as any).name === 'string');
         
-        items.sort((a, b) => {
+        items.sort((a: any, b: any) => {
             const orderA = a.order ?? Infinity;
             const orderB = b.order ?? Infinity;
             if (orderA !== orderB) return orderA - orderB;
@@ -575,7 +573,7 @@ function ManagerView({
     const batch = writeBatch(firestore);
     list.forEach(item => {
         const newOrder = orders[item.id!];
-        if (newOrder !== undefined && Number(newOrder) !== item.order) {
+        if (newOrder !== undefined && Number(newOrder) !== (item as any).order) {
             const docRef = doc(firestore, collectionPath, item.id!);
             batch.update(docRef, { order: Number(newOrder) });
         }
@@ -756,8 +754,8 @@ function ManagerView({
         });
 
         items.forEach(item => {
-            if (item.parentBoqReferenceItemId && map.has(item.parentBoqReferenceItemId)) {
-                map.get(item.parentBoqReferenceItemId)!.children.push(map.get(item.id!)!);
+            if ((item as any).parentBoqReferenceItemId && map.has((item as any).parentBoqReferenceItemId)) {
+                map.get((item as any).parentBoqReferenceItemId)!.children.push(map.get(item.id!)!);
             } else {
                 roots.push(map.get(item.id!)!);
             }
@@ -900,11 +898,11 @@ function ManagerView({
                                         className="h-7 w-14"
                                     />
                                     <span>{item.name}</span>
-                                    {isWorkStageView && item.trackingType === 'duration' && item.expectedDurationDays != null && <Badge variant="outline">{item.expectedDurationDays} أيام</Badge>}
-                                    {isWorkStageView && item.trackingType === 'occurrence' && item.maxOccurrences && <Badge variant="outline">تكرار {item.maxOccurrences}x</Badge>}
-                                    {isWorkStageView && item.trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
-                                    {isWorkStageView && item.enableModificationTracking && <Badge variant="outline" className="bg-orange-100 text-orange-800">تتبع التعديلات</Badge>}
-                                    {isWorkStageView && item.allowedRoles && item.allowedRoles.map(role => (
+                                    {isWorkStageView && (item as any).trackingType === 'duration' && (item as any).expectedDurationDays != null && <Badge variant="outline">{(item as any).expectedDurationDays} أيام</Badge>}
+                                    {isWorkStageView && (item as any).trackingType === 'occurrence' && (item as any).maxOccurrences && <Badge variant="outline">تكرار {(item as any).maxOccurrences}x</Badge>}
+                                    {isWorkStageView && (item as any).trackingType === 'none' && <Badge variant="outline" className='bg-gray-100'>حدث</Badge>}
+                                    {isWorkStageView && (item as any).enableModificationTracking && <Badge variant="outline" className="bg-orange-100 text-orange-800">تتبع التعديلات</Badge>}
+                                    {isWorkStageView && (item as any).allowedRoles && (item as any).allowedRoles.map((role: string) => (
                                         <Badge key={role} variant="secondary" className="font-normal">{role}</Badge>
                                     ))}
                                 </div>
@@ -1133,7 +1131,7 @@ function ManagerView({
                     <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيتم حذف العنصر "{itemToDelete?.name}" بشكل دائم. إذا كان هذا العنصر الرئيسي، سيتم حذف جميع العناصر الفرعية التابعة له.
+                            سيتم حذف العنصر &quot;{itemToDelete?.name}&quot; بشكل دائم. إذا كان هذا العنصر الرئيسي، سيتم حذف جميع العناصر الفرعية التابعة له.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
