@@ -6,12 +6,12 @@ import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, writeBatch, serverTimestamp, getDocs, query, orderBy, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
-import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
+import type { Boq, BoqItem, BoqReferenceItem, CompanyActivityType, SubcontractorType, TransactionType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, ArrowUp, ArrowDown, FolderOpen, Folder } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -19,26 +19,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-    TableFooter
-} from '@/components/ui/table';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -65,18 +48,12 @@ export const boqFormSchema = z.object({
 
 export type BoqFormValues = z.infer<typeof boqFormSchema>;
 
-interface BoqFormProps {
-    onSave: (data: BoqFormValues) => Promise<void>;
-    onClose: () => void;
-    initialData?: Partial<BoqFormValues> | null;
-    isSaving?: boolean;
-}
-
 type BoqItemWithChildren = BoqFormValues['items'][number] & {
     _index: number;
     children: BoqItemWithChildren[];
     total: number;
 };
+
 
 const BoqItemRowRenderer = React.memo(({
     node, level, wbs, parentReferenceId, control, register, setValue, onDelete, onAdd, fields, masterItemsMap, masterItemsLoading
@@ -132,28 +109,36 @@ const BoqItemRowRenderer = React.memo(({
         <React.Fragment>
             <TableRow className={cn(item.isHeader && "bg-muted/50")}>
                 <TableCell className="font-mono text-xs text-muted-foreground">{wbs}</TableCell>
-                <TableCell style={{ paddingRight: `${level * 1.5 + 1}rem` }}>
-                    <InlineSearchList
-                        value={item.itemId || ''}
-                        onSelect={handleMasterItemSelect}
-                        options={masterItemsMap.get(parentReferenceId) || []}
-                        placeholder={masterItemsLoading ? "جاري التحميل... (يمكنك الكتابة)" : "اختر بندًا أو اكتب..."}
-                    />
+                <TableCell style={{ paddingRight: `${level * 0.5}rem` }}>
+                     <div className="flex flex-col gap-2 min-w-[300px]">
+                        <InlineSearchList
+                            value={item.itemId || ''}
+                            onSelect={handleMasterItemSelect}
+                            options={masterItemsMap.get(parentReferenceId) || []}
+                            placeholder={masterItemsLoading ? "تحميل..." : "اختر بندًا أو اكتب..."}
+                        />
+                        <Textarea
+                            {...register(`items.${node._index}.description`)}
+                            placeholder="الوصف التفصيلي للبند..."
+                            rows={1}
+                            className="text-sm mt-1"
+                        />
+                    </div>
                 </TableCell>
                 <TableCell><Input {...register(`items.${node._index}.unit`)} className="min-w-[80px]" disabled={item.isHeader} /></TableCell>
-                <TableCell><Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="min-w-[80px]" disabled={item.isHeader} /></TableCell>
-                <TableCell><Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="min-w-[100px]" disabled={item.isHeader} /></TableCell>
+                <TableCell><Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="min-w-[80px] dir-ltr" disabled={item.isHeader} /></TableCell>
+                <TableCell><Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="min-w-[100px] dir-ltr" disabled={item.isHeader} /></TableCell>
                 <TableCell className="text-left font-mono font-semibold">{formatCurrency(node.total)}</TableCell>
                 <TableCell>
                     <Textarea {...register(`items.${node._index}.notes`)} placeholder="ملاحظات..." className="min-w-[150px]" rows={1} />
                 </TableCell>
                 <TableCell>
                     <div className="flex items-center">
-                        {item.isHeader && level === 0 && (
-                            <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
+                        {item.isHeader && (level === 0 || !item.parentId) && (
+                            <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(true)} title="إضافة قسم فرعي"><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
                         )}
                         {item.isHeader && (
-                            <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(false)}><PlusCircle className="ml-1 h-4 w-4"/> بند</Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(false)} title="إضافة بند عمل"><PlusCircle className="ml-1 h-4 w-4"/> بند</Button>
                         )}
                         <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(node._index)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -218,11 +203,11 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         map.forEach(value => value.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.label.localeCompare(b.label, 'ar')));
         return map;
     }, [masterItemsData]);
-    
+
     const totalDependencies = React.useMemo(() => {
         return (watchedItems || []).map(i => `${i.quantity || 0}-${i.sellingUnitPrice || 0}-${i.isHeader}`).join(',');
     }, [watchedItems]);
-    
+
     const { boqTree, grandTotal } = React.useMemo(() => {
         const items = watchedItems || [];
         const itemsWithChildren: BoqItemWithChildren[] = items.map((item, index) => ({
@@ -253,11 +238,11 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             return node.total;
         }
 
-        const grandTotal = roots.reduce((sum, rootNode) => sum + calculateNodeTotal(rootNode), 0);
+        const grandTotalValue = roots.reduce((sum, rootNode) => sum + calculateNodeTotal(rootNode), 0);
         
-        return { boqTree: roots, grandTotal };
+        return { boqTree: roots, grandTotal: grandTotalValue };
     }, [watchedItems, totalDependencies]);
-
+    
     const handleAddItem = (parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
         const parentLevel = parentId ? fields.find(f => f.id === parentId)?.level ?? -1 : -1;
         insert(insertAtIndex, {
@@ -345,8 +330,8 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="font-bold text-lg bg-muted/50">
-                                    <TableCell colSpan={6}>الإجمالي العام</TableCell>
-                                    <TableCell colSpan={2} className="text-left font-mono">{formatCurrency(grandTotal)}</TableCell>
+                                    <TableCell colSpan={7}>الإجمالي العام</TableCell>
+                                    <TableCell colSpan={1} className="text-left font-mono">{formatCurrency(grandTotal)}</TableCell>
                                 </TableRow>
                             </TableFooter>
                         </Table>
