@@ -97,7 +97,7 @@ runConfig:
 - **الوصف:** يمكنك إنشاء قيود يدوية أو الاعتماد على القيود التلقائية التي ينشئها النظام (مثل عند إنشاء عقد). تتبع القيود دورة عمل (مسودة -> مرحّل).
 - **المساعد المحاسبي الذكي:**
     - **المصدر:** `src/app/dashboard/accounting/assistant/page.tsx`
-    - **الوصف:** مساعد ذكاء اصطناعي يفهم الأوامر المحاسبية باللغة العربية ويحولها إلى قيود يومية جاهزة للحفظ.
+    - **الوصف:** مساعد ذكاء اصطناعي يفهم الأوامر المحاسبية باللغة العربية (الفصحى واللهجات العامية المختلفة) ويحولها إلى قيود يومية جاهزة للحفظ.
 
 ### 3. السندات (Vouchers)
 - **سندات القبض:**
@@ -140,6 +140,7 @@ runConfig:
 ### 7. التنبؤ المالي (Financial Forecast)
 - **المصدر:** `src/app/dashboard/accounting/financial-forecast/page.tsx`
 - **الوصف:** أداة تعتمد على بيانات العقود والمصاريف الثابتة لتقديم توقعات مستقبلية للإيرادات والمصروفات.
+
 ```
 
 ---
@@ -651,6 +652,14 @@ runConfig:
                     "financialsType": { "type": "string", "enum": ["fixed", "percentage"] }
                 },
                 "required": ["clauses", "totalAmount"]
+            },
+            "boqItemCount": {
+                "type": "number",
+                "description": "A summary field holding the total number of items in the BOQ subcollection."
+            },
+            "boqTotalValue": {
+                "type": "number",
+                "description": "A summary field holding the total planned value of the BOQ subcollection."
             }
         },
         "required": ["transactionNumber", "clientId", "transactionType", "status", "createdAt"]
@@ -1051,8 +1060,7 @@ runConfig:
             "type": "array",
             "description": "The business activities this department belongs to.",
             "items": {
-                "type": "string",
-                "enum": ["consulting", "construction", "sales"]
+                "type": "string"
             }
         }
       },
@@ -1117,8 +1125,7 @@ runConfig:
         },
         "activityType": {
             "type": "string",
-            "description": "The business activity this transaction type belongs to.",
-            "enum": ["consulting", "construction", "sales"]
+            "description": "The business activity this transaction type belongs to."
         },
         "departmentIds": {
             "type": "array",
@@ -1849,6 +1856,99 @@ runConfig:
             }
         },
         "required": ["adjustmentNumber", "date", "type", "items"]
+    },
+    "BoqItem": {
+      "title": "Bill of Quantities Item",
+      "description": "A single line item in a Bill of Quantities.",
+      "type": "object",
+      "properties": {
+        "itemId": { "type": "string", "description": "Reference to the master BoqReferenceItem ID." },
+        "itemNumber": { "type": "string", "description": "The hierarchical item number (e.g., '1.1', '1.2.1')." },
+        "description": { "type": "string" },
+        "unit": { "type": "string" },
+        "quantity": { "type": "number" },
+        "sellingUnitPrice": { "type": "number", "description": "The unit price presented to the client." },
+        "notes": { "type": "string", "description": "Specific notes for this line item." },
+        "isHeader": { "type": "boolean", "description": "True if this item is a non-calculable header or category title." },
+        "parentId": { "type": ["string", "null"], "description": "The ID of the parent BoqItem in the same collection, for creating a hierarchy." },
+        "level": { "type": "number", "description": "The indentation level for hierarchical display." },
+        "costUnitPrice": { "type": "number", "description": "The estimated unit cost for the company." },
+        "margin": { "type": "number", "description": "The profit margin percentage for this item." },
+        "executedQuantity": { "type": "number" },
+        "actualCost": { "type": "number" },
+        "deviation": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itemNumber", "description"]
+    },
+     "Boq": {
+      "title": "Bill of Quantities",
+      "description": "A standalone Bill of Quantities document, can be linked to a project or quotation.",
+      "type": "object",
+      "properties": {
+        "boqNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["تقديري", "تعاقدي", "منفذ"] },
+        "clientId": { "type": "string", "description": "Optional link to a registered client" },
+        "clientName": { "type": "string", "description": "Stored client name for display (can be a prospective client)" },
+        "transactionId": { "type": "string", "description": "Optional link to a transaction" },
+        "totalValue": { "type": "number" },
+        "itemCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["boqNumber", "name", "status"]
+    },
+    "BoqReferenceItem": {
+      "title": "BOQ Reference Item",
+      "description": "A master list of frequently used Bill of Quantities entries.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The common name or description of the BOQ item." },
+        "unit": { "type": "string", "description": "The default unit of measure for this item (e.g., m3, m2, item)." },
+        "isHeader": { "type": "boolean", "description": "True if this item is a non-calculable header or category title." },
+        "transactionTypeIds": {
+            "type": "array",
+            "description": "Links to the specific transaction types this item is relevant to.",
+            "items": { "type": "string" }
+        },
+        "subcontractorTypeIds": {
+            "type": "array",
+            "description": "Links to the types of subcontractors related to this item.",
+            "items": { "type": "string" }
+        },
+        "activityTypeIds": {
+            "type": "array",
+            "description": "Links to the business activities this item is relevant to.",
+            "items": { "type": "string" }
+        },
+        "order": { "type": "number", "description": "The display order of the item in lists." },
+        "parentBoqReferenceItemId": {
+            "type": "string",
+            "description": "The ID of the parent BOQ reference item, for creating a hierarchy."
+        }
+      },
+      "required": ["name"]
+    },
+    "SubcontractorType": {
+        "title": "Subcontractor Type",
+        "description": "Defines a type or category for subcontractors (e.g., Electrical, Plumbing).",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "order": { "type": "number" }
+        },
+        "required": ["name"]
+    },
+    "SubcontractorSpecialization": {
+        "title": "Subcontractor Specialization",
+        "description": "Defines a specific specialization within a Subcontractor Type (e.g., High Voltage within Electrical).",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "order": { "type": "number" }
+        },
+        "required": ["name"]
     }
   },
   "auth": {
@@ -1869,6 +1969,14 @@ runConfig:
         "schema": { "$ref": "#/entities/CompanyActivityType" },
         "description": "Stores the different types of company business activities."
     },
+    "/subcontractorTypes/{typeId}": {
+      "schema": { "$ref": "#/entities/SubcontractorType"},
+      "description": "Stores the main categories of subcontractors."
+    },
+    "/subcontractorTypes/{typeId}/specializations/{specializationId}": {
+        "schema": { "$ref": "#/entities/SubcontractorSpecialization" },
+        "description": "Stores specializations within a subcontractor type."
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "#/entities/UserProfile"
@@ -1886,6 +1994,22 @@ runConfig:
             "$ref": "#/entities/ClientTransaction"
         },
         "description": "Stores internal transactions/services for a specific client."
+    },
+    "/clients/{clientId}/transactions/{transactionId}/boq/{boqItemId}": {
+        "schema": { "$ref": "#/entities/BoqItem" },
+        "description": "Stores the Bill of Quantities for a specific transaction."
+    },
+    "/boqs/{boqId}": {
+      "schema": { "$ref": "#/entities/Boq" },
+      "description": "Stores all standalone Bill of Quantities documents."
+    },
+    "/boqs/{boqId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/BoqItem" },
+      "description": "Stores the individual line items for a BOQ."
+    },
+    "/boqReferenceItems/{itemId}": {
+      "schema": { "$ref": "#/entities/BoqReferenceItem" },
+      "description": "Stores a master list of reusable Bill of Quantities items."
     },
     "/transaction_assignments/{assignmentId}": {
         "schema": {
@@ -2068,6 +2192,14 @@ runConfig:
     "/inventoryAdjustments/{adjustmentId}": {
       "schema": { "$ref": "#/entities/InventoryAdjustment" },
       "description": "Stores stock adjustments like opening balances, damages, etc."
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/ConstructionProject" },
+      "description": "Stores all construction projects."
+    },
+    "/subcontractors/{subcontractorId}": {
+        "schema": { "$ref": "#/entities/Subcontractor" },
+        "description": "Stores information about all subcontractors."
     }
   }
 }
@@ -3345,7 +3477,6 @@ erDiagram
     transaction_types {
         string id PK
         string name
-        string activityType
         array departmentIds "FKs"
     }
     work_stages {
@@ -3473,73 +3604,24 @@ erDiagram
     4.  **عرض الفرصة:** إذا وجد النظام أن العميل لم يبدأ أي معاملة تحتوي على أي من الكلمات المفتاحية للخدمات المتوقعة، يتم إضافته إلى هذا التقرير مع قائمة بالخدمات الناقصة.
     5.  **المرونة:** تم تصميم هذا المنطق ليكون مرنًا. في المستقبل، يمكننا بسهولة تعديل قوائم الكلمات المفتاحية (سواء للمحفزات أو للخدمات المتوقعة) لتتناسب مع أي تغييرات في إجراءات عملك.
 
-  
-```
-
 ---
-## File: `docs/system_overview_ar.md`
-```md
-# نظرة شاملة على النظام: شرح تفصيلي للمميزات والترابط
+### 5. منطق مراكز الربحية والتكلفة (Profit & Cost Centers)
 
-إليك شرح مفصل لجميع المميزات والعمليات المترابطة التي قمنا ببنائها معًا في هذا النظام المتكامل لإدارة شركتك الهندسية.
+**نعم، النظام مبني بالكامل على مفهوم مراكز الربحية والتكلفة.**
 
----
+*   **ما هو مركز الربحية؟** في نظامنا، كل **معاملة (مشروع)** تعتبر تلقائيًا **مركز ربحية مستقل**.
 
-### 1. إدارة العملاء والعقود: قلب العمليات
+*   **كيف يعمل تلقائيًا؟**
+    1.  **تتبع الإيرادات:** عند إنشاء أي **سند قبض** مرتبط بمعاملة، يقوم النظام بربط الإيراد مباشرة بمركز الربحية (المشروع).
+    2.  **تتبع التكاليف المباشرة:** عند إنشاء **سند صرف** أو **قيد يومية** واختيار حساب من "تكلفة الإيرادات" (مثل أتعاب مقاول باطن، رسوم تراخيص)، وربطه بمعاملة، يقوم النظام بربط المصروف مباشرة بمركز الربحية (المشروع).
+    3.  **التحليل على مستوى السطر:** الأهم من ذلك، أن هذا الربط يتم **على مستوى كل سطر محاسبي** داخل القيد. هذا يعني أنه لو كان لديك قيد واحد يحتوي على مصاريف تخص 3 مشاريع مختلفة، سيقوم النظام بتوزيع تكلفة كل سطر على المشروع الصحيح.
 
-هذا هو المحور المركزي الذي تبدأ منه جميع المشاريع والعمليات المالية.
+*   **أين تظهر النتائج؟**
+    *   تظهر نتائج هذا التحليل الدقيق في صفحة **[التقارير التحليلية](/dashboard/accounting/reports)**، حيث يمكنك رؤية:
+        *   **ربحية كل مشروع:** الإيرادات مقابل التكاليف المباشرة.
+        *   **إنتاجية كل مهندس:** بناءً على المشاريع التي يشرف عليها.
+        *   **أداء كل قسم.**
 
-*   **ملفات العملاء:** يمكنك إنشاء ملف فريد لكل عميل، ويقوم النظام تلقائيًا بإنشاء رقم ملف تسلسلي. جميع بيانات العميل، من معلومات الاتصال إلى العنوان وسجل التغييرات، تُدار من مكان واحد.
-*   **المعاملات الداخلية:** لكل عميل، يمكنك إنشاء "معاملات داخلية" متعددة. كل معاملة تمثل خدمة معينة (مثل "تصميم بلدية")، وتحتوي على مراحل عملها وعقدها الخاص.
-*   **إنشاء العقود الديناميكي:** من أي معاملة، يمكنك إنشاء عقد مفصل. يمكنك استخدام نماذج عقود جاهزة أو تخصيص العقد بالكامل، بما في ذلك نطاق العمل، الشروط، والدفعات المالية.
-
-> 🔗 **للتفاصيل الكاملة عن إدارة عروض الأسعار وتحويلها لعقود، راجع [ملف المحاسبة](accounting-features.md).**
-
----
-
-### 2. نظام المواعيد الذكي: وداعًا لتعارض الحجوزات
-
-تم تصميم تقويم المواعيد ليكون ذكيًا ويمنع أي أخطاء بشرية في الحجوزات.
-
-*   **تقويم مزدوج متخصص:** فصل تام بين مواعيد القسم المعماري وحجوزات قاعات الاجتماعات للأقسام الأخرى.
-*   **منع التعارض الفوري (Real-time):** يتحقق النظام من أي تعارض في وقت المهندس، العميل، أو القاعة قبل حفظ أي موعد.
-*   **أوقات دوام مخصصة:** من الإعدادات، يمكنك التحكم الكامل في أوقات العمل الرسمية، العطلات الأسبوعية، أيام نصف الدوام، وفترات الراحة بين المواعيد.
-*   **التتبع الذكي لزيارات القسم المعماري:** يقوم النظام تلقائيًا بتلوين وترقيم الزيارات ليعكس حالتها (زيارة أولى، متابعة قبل العقد، متابعة بعد العقد) ويقوم بالتصحيح التلقائي عند إلغاء أي موعد.
-*   **إجراءات الزيارة:** مركز تحكم لكل زيارة، يسمح بربطها بمعاملة، تحديث سير العمل، تسجيل التعديلات، وكتابة محاضر الاجتماع.
-
-> 🔗 **للتفاصيل الكاملة عن التقويم، راجع [ملف المواعيد](appointments-features.md).**
-> 🔗 **للتفاصيل الكاملة عن الإجراءات داخل الزيارة، راجع [ملف تفاصيل الزيارة](appointment-details-features.md).**
-
----
-
-### 3. وحدة المحاسبة المتكاملة
-
-هذا القسم هو العمود الفقري المالي للنظام، وهو متصل مباشرة بأنشطة العملاء والعقود.
-
-*   **التكامل التلقائي:** عند إنشاء **أول عقد** لعميل، يقوم النظام تلقائيًا بإنشاء حساب فرعي له في شجرة الحسابات وإنشاء قيد يومية يسجل قيمة العقد كمديونية.
-*   **سير عمل محاسبي كامل:** من شجرة الحسابات، وقيود اليومية (مع مساعد ذكاء اصطناعي)، إلى السندات والقوائم المالية المتوافقة مع معايير IFRS.
-
-> 🔗 **للتفاصيل الكاملة عن كل جزء في المحاسبة، راجع [ملف المحاسبة](accounting-features.md).**
-
----
-
-### 4. إدارة الموارد البشرية (HR)
-
-وحدة شاملة لإدارة فريق عملك، مصممة وفقًا لقانون العمل الكويتي.
-
-*   **ملفات الموظفين:** سجل كامل لكل موظف، مع تتبع التغييرات وإنهاء الخدمة وإعادة التعيين.
-*   **إدارة الإجازات والرواتب:** نظام لتقديم طلبات الإجازة مع حساب تلقائي لأيام العمل، بالإضافة إلى نظام لمعالجة سجلات الحضور وإنشاء كشوف الرواتب.
-*   **حاسبة نهاية الخدمة:** أداة دقيقة لتقدير مكافأة نهاية الخدمة وبدل الإجازات وفقًا للقانون.
-
-> 🔗 **للتفاصيل الكاملة، راجع [ملف الموارد البشرية](hr-features.md).**
-
----
-
-### 5. مميزات على مستوى النظام
-
-*   **إدارة المستخدمين والصلاحيات:** من صفحة "الإعدادات"، يمكن لمدير النظام إنشاء حسابات للمستخدمين وربطها بملفات الموظفين وتعيين "دور" يحدد صلاحياتهم.
-*   **البيانات المرجعية:** إدارة مركزية للقوائم الأساسية (مثل الأقسام، الوظائف، المناطق) لضمان توحيد البيانات.
-*   **الإشعارات التلقائية:** يقوم النظام بإبقاء الجميع على اطلاع بالأحداث الهامة المتعلقة بعملهم.
 ```
 
 ---
