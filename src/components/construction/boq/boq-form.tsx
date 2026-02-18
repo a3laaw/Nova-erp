@@ -39,6 +39,7 @@ import {
     TableFooter
 } from '@/components/ui/table';
 
+
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 const itemSchema = z.object({
@@ -75,7 +76,6 @@ type BoqItemWithChildren = BoqFormValues['items'][number] & {
     _index: number;
     children: BoqItemWithChildren[];
     total: number;
-    parentReferenceId: string | null;
 };
 
 const BoqItemRowRenderer = React.memo(({
@@ -144,6 +144,9 @@ const BoqItemRowRenderer = React.memo(({
                 <TableCell><Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="min-w-[80px]" disabled={item.isHeader} /></TableCell>
                 <TableCell><Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="min-w-[100px]" disabled={item.isHeader} /></TableCell>
                 <TableCell className="text-left font-mono font-semibold">{formatCurrency(node.total)}</TableCell>
+                <TableCell>
+                    <Textarea {...register(`items.${node._index}.notes`)} placeholder="ملاحظات..." className="min-w-[150px]" rows={1} />
+                </TableCell>
                 <TableCell>
                     <div className="flex items-center">
                         {item.isHeader && level === 0 && (
@@ -215,7 +218,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         map.forEach(value => value.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.label.localeCompare(b.label, 'ar')));
         return map;
     }, [masterItemsData]);
-
+    
     const totalDependencies = React.useMemo(() => {
         return (watchedItems || []).map(i => `${i.quantity || 0}-${i.sellingUnitPrice || 0}-${i.isHeader}`).join(',');
     }, [watchedItems]);
@@ -227,7 +230,6 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             _index: index,
             children: [],
             total: 0,
-            parentReferenceId: null
         }));
         
         const map = new Map(itemsWithChildren.map(item => [item.id, item]));
@@ -237,9 +239,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             const parent = item.parentId ? map.get(item.parentId) : null;
             if (parent) {
                 parent.children.push(item);
-                item.parentReferenceId = parent.itemId || null;
             } else {
-                item.parentReferenceId = null;
                 roots.push(item);
             }
         });
@@ -263,7 +263,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         insert(insertAtIndex, {
           id: generateId(), description: '', unit: isHeader ? '' : 'مقطوعية',
           quantity: 1, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1,
-          isHeader: isHeader, itemId: '',
+          isHeader: isHeader, itemId: '', notes: '',
         });
     };
     
@@ -289,12 +289,12 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     const handleAddRootItem = () => {
         append({
             id: generateId(), description: '', unit: '', quantity: 1,
-            sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '',
+            sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: ''
         });
     };
 
     const onSubmit = (data: BoqFormValues) => { onSave(data); };
-    
+
     return (
         <Card dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
@@ -313,17 +313,18 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-12">م</TableHead>
-                                    <TableHead className="w-2/5">بيان الأعمال</TableHead>
+                                    <TableHead className="w-1/3">بيان الأعمال</TableHead>
                                     <TableHead>الوحدة</TableHead>
                                     <TableHead>الكمية</TableHead>
                                     <TableHead>سعر الوحدة</TableHead>
                                     <TableHead className="text-left">الإجمالي</TableHead>
-                                    <TableHead className="w-24">إجراءات</TableHead>
+                                    <TableHead>الملاحظات</TableHead>
+                                    <TableHead className="w-24">الإجراءات</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {boqTree.length === 0 ? (
-                                    <TableRow><TableCell colSpan={7} className="text-center h-24">ابدأ بإضافة قسم رئيسي.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={8} className="text-center h-24">ابدأ بإضافة قسم رئيسي.</TableCell></TableRow>
                                 ) : boqTree.map((node, index) => (
                                     <BoqItemRowRenderer 
                                         key={node.id} 
@@ -344,7 +345,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="font-bold text-lg bg-muted/50">
-                                    <TableCell colSpan={5}>الإجمالي العام</TableCell>
+                                    <TableCell colSpan={6}>الإجمالي العام</TableCell>
                                     <TableCell colSpan={2} className="text-left font-mono">{formatCurrency(grandTotal)}</TableCell>
                                 </TableRow>
                             </TableFooter>
@@ -364,10 +365,16 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                     </Button>
                 </CardFooter>
             </form>
-            <AlertDialog open={itemIndexToDelete !== null} onOpenChange={() => setItemIndexToDelete(null)}>
+             <AlertDialog open={itemIndexToDelete !== null} onOpenChange={() => setItemIndexToDelete(null)}>
                 <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف هذا البند وجميع البنود الفرعية التابعة له.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90">نعم، قم بالحذف</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                        <AlertDialogDescription>سيتم حذف هذا البند وجميع البنود الفرعية التابعة له.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90">نعم، قم بالحذف</AlertDialogAction>
+                    </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </Card>
