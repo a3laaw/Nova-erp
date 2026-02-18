@@ -1,5 +1,4 @@
 'use client';
-
 import * as React from 'react';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +16,7 @@ import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -52,73 +52,6 @@ interface BoqFormProps {
     isSaving?: boolean;
 }
 
-const CascadingBoqSelect = ({
-  masterItemsByParent,
-  onSelectItem,
-  disabled,
-}: {
-  masterItemsByParent: Map<string | null, BoqReferenceItem[]>;
-  onSelectItem: (item: BoqReferenceItem) => void;
-  disabled?: boolean;
-}) => {
-  const [selectionPath, setSelectionPath] = React.useState<(string | null)[]>([]);
-
-  const handleSelect = (level: number, value: string) => {
-    const newPath = selectionPath.slice(0, level);
-    newPath.push(value);
-
-    const parentId = level === 0 ? null : selectionPath[level - 1];
-    const selectedItem = masterItemsByParent.get(parentId)?.find(item => item.id === value);
-      
-    const children = masterItemsByParent.get(value);
-
-    if (children && children.length > 0) {
-      setSelectionPath(newPath);
-    } else if (selectedItem) {
-      onSelectItem(selectedItem);
-      setSelectionPath([]); // Reset after selection
-    }
-  };
-
-  const columns = React.useMemo(() => {
-    const cols: { level: number; parentId: string | null; options: BoqReferenceItem[] }[] = [];
-    cols.push({ level: 0, parentId: null, options: masterItemsByParent.get(null) || [] });
-
-    selectionPath.forEach((parentId, index) => {
-      const children = masterItemsByParent.get(parentId);
-      if (children && children.length > 0) {
-        cols.push({ level: index + 1, parentId: parentId, options: children });
-      }
-    });
-
-    return cols;
-  }, [selectionPath, masterItemsByParent]);
-
-  return (
-    <div className="flex gap-2 items-start">
-      {columns.map(({ level, parentId, options }) => (
-        <Select
-          key={parentId || 'root'}
-          onValueChange={(value) => handleSelect(level, value)}
-          disabled={disabled || options.length === 0}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="اختر بندًا..." />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map(item => (
-              <SelectItem key={item.id} value={item.id!}>
-                {item.name} {masterItemsByParent.has(item.id!) ? '(...)' : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ))}
-    </div>
-  );
-};
-
-
 const BoqItemRowRenderer = React.memo(({
   node,
   level,
@@ -127,7 +60,7 @@ const BoqItemRowRenderer = React.memo(({
   setValue,
   handleRemoveItem,
   handleAddItem,
-  masterItemsByParent,
+  masterItems,
   masterItemsLoading,
   fields,
   insert,
@@ -139,29 +72,31 @@ const BoqItemRowRenderer = React.memo(({
   setValue: any;
   handleRemoveItem: (index: number) => void;
   handleAddItem: (parentId: string | null, isHeader: boolean, insertAtIndex: number) => void;
-  masterItemsByParent: Map<string | null, BoqReferenceItem[]>;
+  masterItems: (SearchOption & { unit?: string, isHeader?: boolean })[];
   masterItemsLoading: boolean;
   fields: any[];
   insert: any;
 }) => {
-
   const item = useWatch({ control, name: `items.${node._index}` });
-  
-  const handleMasterItemSelect = (selectedItem: BoqReferenceItem) => {
-    setValue(`items.${node._index}.itemId`, selectedItem.id, { shouldValidate: true });
-    setValue(`items.${node._index}.description`, selectedItem.name, { shouldValidate: true });
-    setValue(`items.${node._index}.unit`, selectedItem.unit || (selectedItem.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
-    setValue(`items.${node._index}.isHeader`, selectedItem.isHeader || false, { shouldValidate: true });
+
+  const handleMasterItemSelect = (itemId: string) => {
+    const selectedItem = masterItems.find(i => i.value === itemId);
+    if (selectedItem) {
+        setValue(`items.${node._index}.itemId`, itemId, { shouldValidate: true });
+        setValue(`items.${node._index}.description`, selectedItem.label.trim().replace(/—/g, ''), { shouldValidate: true });
+        setValue(`items.${node._index}.unit`, selectedItem.unit || (selectedItem.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
+        setValue(`items.${node._index}.isHeader`, selectedItem.isHeader || false, { shouldValidate: true });
+    }
   };
-  
+
   const findLastDescendantIndex = (parentIndex: number): number => {
     let lastIndex = parentIndex;
     for (let i = parentIndex + 1; i < fields.length; i++) {
-        if (fields[i].parentId === fields[parentIndex].id) {
-            lastIndex = findLastDescendantIndex(i);
-        } else if (fields[i].level <= fields[parentIndex].level) {
-            break;
-        }
+      if (fields[i].parentId === fields[parentIndex].id) {
+        lastIndex = findLastDescendantIndex(i);
+      } else if (fields[i].level <= fields[parentIndex].level) {
+        break;
+      }
     }
     return lastIndex;
   };
@@ -180,10 +115,12 @@ const BoqItemRowRenderer = React.memo(({
       <div className="flex items-start gap-2">
         <div className="flex-grow space-y-2">
           <div className="flex items-center gap-2">
-            <CascadingBoqSelect
-              masterItemsByParent={masterItemsByParent}
-              onSelectItem={handleMasterItemSelect}
-              disabled={masterItemsLoading}
+             <InlineSearchList
+                className="w-60"
+                value={item.itemId || ''}
+                onSelect={handleMasterItemSelect}
+                options={masterItems}
+                placeholder={masterItemsLoading ? "جاري التحميل... (يمكنك الكتابة)" : "اختر بندًا مرجعيًا..."}
             />
             <Input {...register(`items.${node._index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
             <div className="flex items-center space-x-2 rtl:space-x-reverse pr-2">
@@ -224,7 +161,7 @@ const BoqItemRowRenderer = React.memo(({
               setValue={setValue}
               handleRemoveItem={handleRemoveItem}
               handleAddItem={handleAddItem}
-              masterItemsByParent={masterItemsByParent}
+              masterItems={masterItems}
               masterItemsLoading={masterItemsLoading}
               fields={fields}
               insert={insert}
@@ -242,7 +179,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
   const isEditing = !!initialData;
   const { firestore } = useFirebase();
   
-  const { data: masterItems, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
+  const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
 
   const { control, handleSubmit, register, getValues, watch, reset, setValue, formState: { errors } } = useForm<BoqFormValues>({
     resolver: zodResolver(boqFormSchema),
@@ -251,6 +188,36 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
 
   const { fields, append, remove, insert } = useFieldArray({ control, name: 'items' });
   const watchedItems = watch('items');
+  
+  const flatMasterItems = React.useMemo(() => {
+    if (!masterItemsData) return [];
+    
+    const itemsMap = new Map(masterItemsData.map(item => [item.id, item]));
+    const buildLabel = (item: BoqReferenceItem, level: number): string => {
+        const prefix = '  '.repeat(level);
+        return `${prefix}${item.name}`;
+    };
+    
+    const sortedItems: BoqReferenceItem[] = [];
+    const buildSortedList = (parentId: string | null, level: number) => {
+        const children = masterItemsData.filter(item => (item.parentBoqReferenceItemId || null) === parentId)
+            .sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
+        
+        children.forEach(child => {
+            (child as any)._level = level; // temp property for sorting/indenting
+            sortedItems.push(child);
+            buildSortedList(child.id!, level + 1);
+        });
+    };
+    buildSortedList(null, 0);
+
+    return sortedItems.map(item => ({
+        value: item.id!,
+        label: buildLabel(item, (item as any)._level),
+        unit: item.unit,
+        isHeader: item.isHeader,
+    }));
+  }, [masterItemsData]);
 
   const { boqTree, totalValue } = React.useMemo(() => {
     const items = watchedItems || [];
@@ -278,27 +245,6 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     return { boqTree: roots, totalValue: total };
   }, [watchedItems]);
   
-  const masterItemsByParent = React.useMemo(() => {
-    const map = new Map<string | null, BoqReferenceItem[]>();
-    if (!masterItems) return map;
-    
-    map.set(null, []);
-
-    masterItems.forEach(item => {
-        const parentId = item.parentBoqReferenceItemId || null;
-        if (!map.has(parentId)) {
-            map.set(parentId, []);
-        }
-        map.get(parentId)!.push(item);
-    });
-
-    map.forEach(value => {
-        value.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
-    });
-
-    return map;
-  }, [masterItems]);
-  
   React.useEffect(() => {
     if (initialData) {
       reset({
@@ -311,15 +257,9 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
   const handleAddItem = (parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
     const parentLevel = parentId ? fields.find(f => f.id === parentId)?.level ?? -1 : -1;
     insert(insertAtIndex, {
-      id: generateId(),
-      description: '',
-      unit: isHeader ? '' : 'مقطوعية',
-      quantity: 1,
-      sellingUnitPrice: 0,
-      parentId: parentId,
-      level: parentLevel + 1,
-      isHeader: isHeader,
-      itemId: '',
+      id: generateId(), description: '', unit: isHeader ? '' : 'مقطوعية',
+      quantity: 1, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1,
+      isHeader: isHeader, itemId: '',
     });
   };
   
@@ -342,22 +282,16 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
   
   const handleAddRootItem = (isHeader: boolean) => {
     append({
-        id: generateId(),
-        description: '',
-        unit: isHeader ? '' : 'مقطوعية',
-        quantity: 1,
-        sellingUnitPrice: 0,
-        parentId: null,
-        level: 0,
-        isHeader: isHeader,
-        itemId: '',
+        id: generateId(), description: '', unit: isHeader ? '' : 'مقطوعية',
+        quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0,
+        isHeader: isHeader, itemId: '',
     });
   };
 
   const onSubmit = (data: BoqFormValues) => {
     onSave(data);
   };
-
+  
   return (
     <Card dir="rtl">
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -399,7 +333,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                 setValue={setValue}
                 handleRemoveItem={handleRemoveItem}
                 handleAddItem={handleAddItem}
-                masterItemsByParent={masterItemsByParent}
+                masterItems={flatMasterItems}
                 masterItemsLoading={masterItemsLoading}
                 fields={fields}
                 insert={insert}
