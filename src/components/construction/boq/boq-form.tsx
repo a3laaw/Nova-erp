@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, writeBatch, serverTimestamp, getDocs, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, orderBy, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
 import type { Boq, BoqItem, BoqReferenceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +38,6 @@ import {
     TableRow,
     TableFooter
 } from '@/components/ui/table';
-
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -79,7 +78,6 @@ type BoqItemWithChildren = BoqFormValues['items'][number] & {
     parentReferenceId: string | null;
 };
 
-
 const BoqItemRowRenderer = React.memo(({
     node, level, wbs, parentReferenceId, control, register, setValue, onDelete, onAdd, fields, masterItemsMap, masterItemsLoading
 }: {
@@ -102,12 +100,13 @@ const BoqItemRowRenderer = React.memo(({
     const allMasterItems = Array.from(masterItemsMap.values()).flat();
     const selectedItem = allMasterItems.find(i => i.value === value);
     if (selectedItem) {
-        setValue(`items.${node._index}.itemId`, value, { shouldValidate: true });
-        setValue(`items.${node._index}.description`, selectedItem.label, { shouldValidate: true });
+        setValue(`items.${node._index}.itemId`, value, { shouldValidate: true, shouldDirty: true });
+        setValue(`items.${node._index}.description`, selectedItem.label, { shouldValidate: true, shouldDirty: true });
+        
         const hasChildren = masterItemsMap.has(value);
         const isHeader = selectedItem.isHeader || hasChildren;
-        setValue(`items.${node._index}.isHeader`, isHeader, { shouldValidate: true });
-        setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldValidate: true });
+        setValue(`items.${node._index}.isHeader`, isHeader, { shouldValidate: true, shouldDirty: true });
+        setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldValidate: true, shouldDirty: true });
     }
   };
     
@@ -216,6 +215,10 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         map.forEach(value => value.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.label.localeCompare(b.label, 'ar')));
         return map;
     }, [masterItemsData]);
+
+    const totalDependencies = React.useMemo(() => {
+        return (watchedItems || []).map(i => `${i.quantity || 0}-${i.sellingUnitPrice || 0}-${i.isHeader}`).join(',');
+    }, [watchedItems]);
     
     const { boqTree, grandTotal } = React.useMemo(() => {
         const items = watchedItems || [];
@@ -231,8 +234,8 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
         const roots: BoqItemWithChildren[] = [];
 
         itemsWithChildren.forEach(item => {
-            if (item.parentId && map.has(item.parentId)) {
-                const parent = map.get(item.parentId)!;
+            const parent = item.parentId ? map.get(item.parentId) : null;
+            if (parent) {
                 parent.children.push(item);
                 item.parentReferenceId = parent.itemId || null;
             } else {
@@ -241,23 +244,19 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             }
         });
 
-        function calculateTotals(nodes: BoqItemWithChildren[]): number {
-            let total = 0;
-            for (const node of nodes) {
-                if (node.isHeader) {
-                    node.total = calculateTotals(node.children);
-                } else {
-                    node.total = (Number(node.quantity) || 0) * (Number(node.sellingUnitPrice) || 0);
-                }
-                total += node.total;
+        function calculateNodeTotal(node: BoqItemWithChildren): number {
+            if (node.isHeader) {
+                node.total = node.children.reduce((sum, child) => sum + calculateNodeTotal(child), 0);
+            } else {
+                node.total = (Number(node.quantity) || 0) * (Number(node.sellingUnitPrice) || 0);
             }
-            return total;
+            return node.total;
         }
 
-        const grandTotal = calculateTotals(roots);
+        const grandTotal = roots.reduce((sum, rootNode) => sum + calculateNodeTotal(rootNode), 0);
         
         return { boqTree: roots, grandTotal };
-    }, [watchedItems]);
+    }, [watchedItems, totalDependencies]);
 
     const handleAddItem = (parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
         const parentLevel = parentId ? fields.find(f => f.id === parentId)?.level ?? -1 : -1;
@@ -281,6 +280,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
             });
         };
         findDescendants(itemToRemove.id);
+        
         const indicesToRemove = [itemIndexToDelete, ...descendantIndices].sort((a,b) => b-a);
         indicesToRemove.forEach(i => remove(i));
         setItemIndexToDelete(null);
