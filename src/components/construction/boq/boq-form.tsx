@@ -55,40 +55,45 @@ interface BoqFormProps {
 const BoqItemRowRenderer = React.memo(({
   node,
   level,
+  parentReferenceId,
   control,
   register,
   setValue,
   handleRemoveItem,
   handleAddItem,
   masterItems,
+  masterItemsMap,
   masterItemsLoading,
   fields,
   insert,
 }: {
   node: BoqFormValues['items'][0] & { _index: number; children: any[] };
   level: number;
+  parentReferenceId: string | null;
   control: any;
   register: any;
   setValue: any;
   handleRemoveItem: (index: number) => void;
   handleAddItem: (parentId: string | null, isHeader: boolean, insertAtIndex: number) => void;
   masterItems: (SearchOption & { unit?: string, isHeader?: boolean })[];
+  masterItemsMap: Map<string | null, any[]>;
   masterItemsLoading: boolean;
   fields: any[];
   insert: any;
 }) => {
+
   const item = useWatch({ control, name: `items.${node._index}` });
 
   const handleMasterItemSelect = (itemId: string) => {
     const selectedItem = masterItems.find(i => i.value === itemId);
     if (selectedItem) {
         setValue(`items.${node._index}.itemId`, itemId, { shouldValidate: true });
-        setValue(`items.${node._index}.description`, selectedItem.label.trim().replace(/—/g, ''), { shouldValidate: true });
+        setValue(`items.${node._index}.description`, selectedItem.label.replace(/^(\s|—)+/, '').trim(), { shouldValidate: true });
         setValue(`items.${node._index}.unit`, selectedItem.unit || (selectedItem.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
         setValue(`items.${node._index}.isHeader`, selectedItem.isHeader || false, { shouldValidate: true });
     }
   };
-
+  
   const findLastDescendantIndex = (parentIndex: number): number => {
     let lastIndex = parentIndex;
     for (let i = parentIndex + 1; i < fields.length; i++) {
@@ -119,7 +124,7 @@ const BoqItemRowRenderer = React.memo(({
                 className="w-60"
                 value={item.itemId || ''}
                 onSelect={handleMasterItemSelect}
-                options={masterItems}
+                options={masterItemsMap.get(parentReferenceId) || []}
                 placeholder={masterItemsLoading ? "جاري التحميل... (يمكنك الكتابة)" : "اختر بندًا مرجعيًا..."}
             />
             <Input {...register(`items.${node._index}.description`)} placeholder="أو اكتب وصفًا مخصصًا..." />
@@ -156,12 +161,14 @@ const BoqItemRowRenderer = React.memo(({
               key={childNode.id}
               node={childNode}
               level={level + 1}
+              parentReferenceId={item.itemId || null}
               control={control}
               register={register}
               setValue={setValue}
               handleRemoveItem={handleRemoveItem}
               handleAddItem={handleAddItem}
               masterItems={masterItems}
+              masterItemsMap={masterItemsMap}
               masterItemsLoading={masterItemsLoading}
               fields={fields}
               insert={insert}
@@ -194,7 +201,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     
     const itemsMap = new Map(masterItemsData.map(item => [item.id, item]));
     const buildLabel = (item: BoqReferenceItem, level: number): string => {
-        const prefix = '  '.repeat(level);
+        const prefix = '— '.repeat(level);
         return `${prefix}${item.name}`;
     };
     
@@ -219,6 +226,20 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
     }));
   }, [masterItemsData]);
 
+  const masterItemsMap = React.useMemo(() => {
+    const map = new Map<string | null, any[]>();
+    (masterItemsData || []).forEach(item => {
+        const parentId = item.parentBoqReferenceItemId || null;
+        if (!map.has(parentId)) map.set(parentId, []);
+        map.get(parentId)!.push({ value: item.id!, label: item.name, ...item });
+    });
+    // Ensure root items are sorted
+    if (map.has(null)) {
+        map.get(null)!.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
+    }
+    return map;
+  }, [masterItemsData]);
+  
   const { boqTree, totalValue } = React.useMemo(() => {
     const items = watchedItems || [];
     const map = new Map<string, BoqFormValues['items'][0] & { _index: number; children: any[] }>();
@@ -328,12 +349,14 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
                 key={node.id}
                 node={node}
                 level={0}
+                parentReferenceId={null}
                 control={control}
                 register={register}
                 setValue={setValue}
                 handleRemoveItem={handleRemoveItem}
                 handleAddItem={handleAddItem}
                 masterItems={flatMasterItems}
+                masterItemsMap={masterItemsMap}
                 masterItemsLoading={masterItemsLoading}
                 fields={fields}
                 insert={insert}
