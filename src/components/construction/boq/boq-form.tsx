@@ -17,7 +17,6 @@ import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -245,7 +244,7 @@ export function BoqForm({ onSave, onClose, initialData, isSaving = false }: BoqF
   
   const { data: masterItems, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
 
-  const { control, handleSubmit, register, getValues, watch, reset, setValue } = useForm<BoqFormValues>({
+  const { control, handleSubmit, register, getValues, watch, reset, setValue, formState: { errors } } = useForm<BoqFormValues>({
     resolver: zodResolver(boqFormSchema),
     defaultValues: initialData || { name: '', clientName: '', status: 'تقديري', items: [] },
   });
