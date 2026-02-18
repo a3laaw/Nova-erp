@@ -59,6 +59,30 @@
       "description": "Image for Dubai Marina Kiosk",
       "imageUrl": "https://images.unsplash.com/photo-1613652072912-526703fcbfc4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxmb29kJTIwa2lvc2t8ZW58MHx8fHwxNzY3MjUwMjg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "food kiosk"
+    },
+    {
+      "id": "feature-accounting",
+      "description": "Image for the accounting feature section",
+      "imageUrl": "https://images.unsplash.com/photo-1554224155-83e8a4a5f0e3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxhY2NvdW50aW5nJTIwZmluYW5jZXxlbnwwfHx8fDE3NjcyNTUwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "accounting finance"
+    },
+    {
+      "id": "feature-hr",
+      "description": "Image for the HR feature section",
+      "imageUrl": "https://images.unsplash.com/photo-1521791136064-7986c2920216?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxodW1hbiUyMHJlc291cmNlc3xlbnwwfHx8fDE3NjcyNTUwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "team human-resources"
+    },
+    {
+      "id": "feature-appointments",
+      "description": "Image for the appointments feature section",
+      "imageUrl": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxjYWxlbmRhciUyMHNjaGVkdWxlfGVufDB8fHx8MTc2NzI1NTAwMXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "calendar schedule"
+    },
+    {
+      "id": "feature-projects",
+      "description": "Image for the projects feature section",
+      "imageUrl": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxjb25zdHJ1Y3Rpb24lMjBwcm9qZWN0fGVufDB8fHx8MTc2NzI1NTAwMXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "construction project"
     }
   ]
 }
