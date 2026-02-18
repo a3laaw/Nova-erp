@@ -89,8 +89,12 @@ const BoqItemRowRenderer = React.memo(({
     if (selectedItem) {
         setValue(`items.${node._index}.itemId`, itemId, { shouldValidate: true });
         setValue(`items.${node._index}.description`, selectedItem.label.replace(/^(\s|—)+/, '').trim(), { shouldValidate: true });
-        setValue(`items.${node._index}.unit`, selectedItem.unit || (selectedItem.isHeader ? '' : 'مقطوعية'), { shouldValidate: true });
-        setValue(`items.${node._index}.isHeader`, selectedItem.isHeader || false, { shouldValidate: true });
+
+        const hasChildren = masterItemsMap.has(itemId);
+        const isHeader = selectedItem.isHeader || hasChildren;
+        
+        setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldValidate: true });
+        setValue(`items.${node._index}.isHeader`, isHeader, { shouldValidate: true });
     }
   };
   
@@ -145,7 +149,9 @@ const BoqItemRowRenderer = React.memo(({
         <div className="flex items-center">
             {item.isHeader && (
                 <>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
+                    {level === 0 && (
+                        <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(true)}><PlusCircle className="ml-1 h-4 w-4 text-primary"/> قسم</Button>
+                    )}
                     <Button type="button" size="sm" variant="ghost" onClick={() => handleAddClick(false)}><PlusCircle className="ml-1 h-4 w-4"/> بند</Button>
                 </>
             )}
