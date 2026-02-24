@@ -1,82 +1,23 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { BoqForm, boqFormSchema, type BoqFormValues } from '@/components/construction/boq/boq-form';
-import { useFirebase, useSubscription } from '@/firebase';
+import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-form';
+import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, runTransaction, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, doc, runTransaction, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { cleanFirestoreData } from '@/lib/utils';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import type { BoqReferenceItem } from '@/lib/types';
-
-const generateId = () => Math.random().toString(36).substring(2, 9);
 
 export default function NewBoqPage() {
     const { firestore } = useFirebase();
-    const { user: currentUser, loading: authLoading } = useAuth();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const searchParams = useSearchParams();
 
     const [isSaving, setIsSaving] = useState(false);
 
-    const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
-
-    const {
-        control,
-        handleSubmit,
-        register,
-        watch,
-        setValue,
-        formState: { errors },
-        reset,
-    } = useForm<BoqFormValues>({
-        resolver: zodResolver(boqFormSchema),
-        defaultValues: {
-            name: '',
-            clientName: '',
-            status: 'تقديري',
-            items: [
-                {
-                    id: '', // Will be assigned by processNode
-                    uid: generateId(),
-                    description: '',
-                    unit: '',
-                    quantity: 1,
-                    sellingUnitPrice: 0,
-                    parentId: null,
-                    level: 0,
-                    isHeader: true,
-                    itemId: '',
-                    notes: '',
-                },
-            ],
-        },
-    });
-
-    useEffect(() => {
-        const copiedDataString = sessionStorage.getItem('copiedBoqData');
-        if (copiedDataString) {
-            try {
-                const copiedData = JSON.parse(copiedDataString);
-                reset(copiedData);
-                toast({ title: 'تم النسخ', description: 'تم ملء النموذج ببيانات النسخة.' });
-            } catch (error) {
-                console.error("Failed to parse copied BOQ data:", error);
-            } finally {
-                sessionStorage.removeItem('copiedBoqData');
-            }
-        }
-    }, [reset, toast]);
-
-
-    const loading = !firestore || authLoading || masterItemsLoading;
-
-    const onSubmit = async (data: BoqFormValues) => {
+    const handleSave = async (data: BoqFormValues) => {
         if (!firestore || !currentUser) return;
 
         setIsSaving(true);
@@ -108,7 +49,7 @@ export default function NewBoqPage() {
                     boqNumber,
                     name: data.name,
                     status: data.status,
-                    clientName: data.clientName,
+                    clientName: data.clientName || null,
                     totalValue,
                     itemCount: data.items.length,
                     createdBy: currentUser.uid,
@@ -177,36 +118,11 @@ export default function NewBoqPage() {
         }
     };
 
-    if (loading) {
-        return (
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader><CardTitle>إنشاء جدول كميات جديد</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="flex justify-center items-center h-64">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="mr-4">جاري تحميل البيانات المرجعية...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-    
     return (
-        <form onSubmit={handleSubmit(onSubmit)}>
-            <Card dir="rtl">
-                <BoqForm
-                    onClose={() => router.back()}
-                    isSaving={isSaving}
-                    isEditing={false}
-                    control={control}
-                    register={register}
-                    errors={errors}
-                    setValue={setValue}
-                    watch={watch}
-                    masterItemsData={masterItemsData}
-                    masterItemsLoading={masterItemsLoading}
-                />
-            </Card>
-        </form>
+        <BoqForm
+            onSave={handleSave}
+            onClose={() => router.back()}
+            isSaving={isSaving}
+        />
     );
 }

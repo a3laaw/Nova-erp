@@ -4,18 +4,20 @@ import * as React from 'react';
 import { useFieldArray, Controller, useWatch, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useFirebase, useSubscription } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
+import { collection, doc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { BoqItem, BoqReferenceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, X, PlusCircle, Trash2, Loader2, ListTree, Calculator } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, ListTree, Calculator } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 
@@ -23,18 +25,18 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // --- Schema Definitions ---
 export const itemSchema = z.object({
-  id: z.string(), // DB ID
-  uid: z.string(), // Client-side unique ID for tree mapping
+  id: z.string(),
+  uid: z.string(),
   itemNumber: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب."),
   unit: z.string().optional(),
   quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   sellingUnitPrice: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   notes: z.string().optional(),
-  parentId: z.string().nullable(), // Refers to UID
+  parentId: z.string().nullable(),
   level: z.number(),
   isHeader: z.boolean(),
-  itemId: z.string().optional(), // Reference to Master BOQ Item ID
+  itemId: z.string().optional(),
 });
 
 export const boqFormSchema = z.object({
@@ -69,22 +71,20 @@ const BoqItemRowRenderer = React.memo(({
     masterItemsMap: Map<string | null, any[]>;
     masterItemsLoading: boolean;
 }) => {
-  // Watch row-specific values for immediate UI feedback
   const item = useWatch({ control, name: `items.${node._index}` });
 
   const handleMasterItemSelect = (value: string) => {
     const allMasterItems = Array.from(masterItemsMap.values()).flat();
     const selectedItem = allMasterItems.find(i => i.value === value);
     if (selectedItem) {
-        setValue(`items.${node._index}.itemId`, value, { shouldValidate: true, shouldDirty: true });
-        setValue(`items.${node._index}.description`, selectedItem.label, { shouldValidate: true, shouldDirty: true });
+        setValue(`items.${node._index}.itemId`, value, { shouldDirty: true });
+        setValue(`items.${node._index}.description`, selectedItem.label, { shouldDirty: true });
         
-        // Auto-detect if it's a header based on reference data or if it has sub-items
         const hasChildrenInMaster = masterItemsMap.has(value);
         const isHeader = selectedItem.isHeader || hasChildrenInMaster;
         
-        setValue(`items.${node._index}.isHeader`, isHeader, { shouldValidate: true, shouldDirty: true });
-        setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldValidate: true, shouldDirty: true });
+        setValue(`items.${node._index}.isHeader`, isHeader, { shouldDirty: true });
+        setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldDirty: true });
     }
   };
     
@@ -167,7 +167,7 @@ const BoqItemRowRenderer = React.memo(({
                     register={register}
                     setValue={setValue}
                     onDelete={onDelete}
-                    onAdd={handleAddItem}
+                    onAdd={onAdd}
                     fields={fields}
                     masterItemsMap={masterItemsMap}
                     masterItemsLoading={masterItemsLoading}
@@ -179,11 +179,34 @@ const BoqItemRowRenderer = React.memo(({
 BoqItemRowRenderer.displayName = 'BoqItemRowRenderer';
 
 // --- Main Form Component ---
-export function BoqForm({ onClose, isSaving, isEditing, control, register, errors, setValue, watch, masterItemsData, masterItemsLoading }: any) {
-    const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
-    
-    // Watch all items to trigger immediate reactive updates
+export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialData?: Partial<BoqFormValues> | null, onSave: (data: BoqFormValues) => Promise<void>, onClose: () => void, isSaving: boolean }) {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+
+    const masterItemsConstraints = React.useMemo(() => [orderBy('name')], []);
+    const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', masterItemsConstraints);
+
+    const { control, handleSubmit, register, watch, reset, setValue, formState: { errors } } = useForm<BoqFormValues>({
+        resolver: zodResolver(boqFormSchema),
+        defaultValues: {
+            name: '',
+            clientName: '',
+            status: 'تقديري',
+            items: [{ id: '', uid: generateId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: '' }],
+        },
+    });
+
+    const { fields, remove, insert, append, replace } = useFieldArray({ control, name: 'items' });
     const watchedItems = watch('items');
+
+    React.useEffect(() => {
+        if (initialData) {
+            reset({
+                ...initialData,
+                items: initialData.items?.map(item => ({ ...item, id: item.id || '', uid: item.uid || generateId() })) || [],
+            });
+        }
+    }, [initialData, reset]);
 
     const masterItemsMap = React.useMemo(() => {
         const map = new Map<string | null, any[]>();
@@ -195,7 +218,6 @@ export function BoqForm({ onClose, isSaving, isEditing, control, register, error
         return map;
     }, [masterItemsData]);
 
-    // --- Core Tree & Roll-up Logic ---
     const { boqTree, grandTotal } = React.useMemo(() => {
         const items = watchedItems || [];
         const itemsWithChildren: BoqItemWithChildren[] = items.map((item: any, index: number) => ({
@@ -210,35 +232,25 @@ export function BoqForm({ onClose, isSaving, isEditing, control, register, error
 
         itemsWithChildren.forEach(item => {
             const parent = item.parentId ? map.get(item.parentId) : null;
-            if (parent) {
-                parent.children.push(item);
-            } else {
-                roots.push(item);
-            }
+            if (parent) parent.children.push(item);
+            else roots.push(item);
         });
 
-        // Recursive function to calculate totals from bottom up
         function calculateNodeTotal(node: BoqItemWithChildren): number {
             if (node.isHeader) {
-                // Total of header is the sum of its direct children's calculated totals
                 node.total = node.children.reduce((sum, child) => sum + calculateNodeTotal(child), 0);
             } else {
-                // Total of leaf is qty * price
                 node.total = (Number(node.quantity) || 0) * (Number(node.sellingUnitPrice) || 0);
             }
             return node.total;
         }
 
         const grandTotalValue = roots.reduce((sum, rootNode) => sum + calculateNodeTotal(rootNode), 0);
-        
         return { boqTree: roots, grandTotal: grandTotalValue };
     }, [watchedItems]);
 
     const handleAddRootSection = () => {
-        append({
-            id: '', uid: generateId(), description: '', unit: '', quantity: 1,
-            sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: ''
-        });
+        append({ id: '', uid: generateId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: '' });
     };
 
     const handleAddItem = React.useCallback((parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
@@ -251,123 +263,98 @@ export function BoqForm({ onClose, isSaving, isEditing, control, register, error
         });
     }, [fields, insert]);
 
+    if (masterItemsLoading && !initialData) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 gap-4">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p>جاري تحميل البيانات المرجعية...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-6">
-            <CardHeader className="border-b bg-muted/20 pb-6">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-full text-primary">
-                            <ListTree className="h-6 w-6" />
+        <form onSubmit={handleSubmit(onSave)}>
+            <div className="space-y-6">
+                <CardHeader className="border-b bg-muted/20 pb-6">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-full text-primary"><ListTree className="h-6 w-6" /></div>
+                            <div>
+                                <CardTitle className="text-2xl">تحرير جدول كميات هندسي</CardTitle>
+                                <CardDescription>إدارة البنود، الحصر، والتسعير بنظام الهيكل الإنشائي (WBS).</CardDescription>
+                            </div>
                         </div>
-                        <div>
-                            <CardTitle className="text-2xl">{isEditing ? 'تعديل جدول كميات' : 'تحرير جدول كميات هندسي'}</CardTitle>
-                            <CardDescription>إدارة البنود، الحصر، والتسعير بنظام الهيكل الإنشائي (WBS).</CardDescription>
-                        </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <Label className="text-xs text-muted-foreground mb-1">الإجمالي العام</Label>
-                        <div className="text-3xl font-extrabold text-primary font-mono tracking-tighter">
-                            {formatCurrency(grandTotal)}
+                        <div className="flex flex-col items-end">
+                            <Label className="text-xs text-muted-foreground mb-1">الإجمالي العام</Label>
+                            <div className="text-3xl font-extrabold text-primary font-mono tracking-tighter">{formatCurrency(grandTotal)}</div>
                         </div>
                     </div>
-                </div>
-            </CardHeader>
+                </CardHeader>
 
-            <CardContent className="p-0">
-                <div className="grid md:grid-cols-3 gap-6 p-6 bg-background">
-                    <div className="grid gap-2">
-                        <Label className="font-semibold">اسم / مرجع الجدول *</Label>
-                        <Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد - الهيكل الأسود" />
-                        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                <CardContent className="p-0">
+                    <div className="grid md:grid-cols-3 gap-6 p-6 bg-background">
+                        <div className="grid gap-2"><Label className="font-semibold">اسم / مرجع الجدول *</Label><Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" /></div>
+                        <div className="grid gap-2"><Label className="font-semibold">العميل (المحتمل)</Label><Input {...register('clientName')} /></div>
+                        <div className="grid gap-2">
+                            <Label className="font-semibold">الحالة التعاقدية</Label>
+                            <Controller name="status" control={control} render={({field}) => (
+                                <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue/></SelectTrigger>
+                                    <SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent>
+                                </Select>
+                            )}/>
+                        </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label className="font-semibold">العميل (المحتمل)</Label>
-                        <Input {...register('clientName')} placeholder="اسم العميل للبحث السريع..." />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label className="font-semibold">الحالة التعاقدية</Label>
-                        <Controller name="status" control={control} render={({field}) => (
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="تقديري">تقديري (قبل التعاقد)</SelectItem>
-                                    <SelectItem value="تعاقدي">تعاقدي (معتمد)</SelectItem>
-                                    <SelectItem value="منفذ">منفذ (مطابق للواقع)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        )}/>
-                    </div>
-                </div>
 
-                <div className="border-y overflow-x-auto">
-                    <Table>
-                        <TableHeader className="bg-muted/50">
-                            <TableRow>
-                                <TableHead className="w-16">م (WBS)</TableHead>
-                                <TableHead className="min-w-[350px]">بيان الأعمال (البند المرجعي والتفاصيل)</TableHead>
-                                <TableHead className="w-24">الوحدة</TableHead>
-                                <TableHead className="w-24 text-center">الكمية</TableHead>
-                                <TableHead className="w-32 text-center">سعر الوحدة</TableHead>
-                                <TableHead className="w-32 text-left">الإجمالي</TableHead>
-                                <TableHead className="min-w-[200px]">ملاحظات فنية</TableHead>
-                                <TableHead className="w-24 text-center">إجراءات</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {boqTree.length === 0 ? (
+                    <div className="border-y overflow-x-auto">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Calculator className="h-12 w-12 opacity-20" />
-                                            <p>ابدأ ببناء جدولك بإضافة أول قسم رئيسي (مثل: أعمال الحفر، الأعمال الخرسانية...)</p>
-                                            <Button type="button" variant="outline" onClick={handleAddRootSection} className="mt-4">
-                                                <PlusCircle className="ml-2 h-4 w-4"/> إضافة قسم جديد
-                                            </Button>
-                                        </div>
-                                    </TableCell>
+                                    <TableHead className="w-16">م</TableHead>
+                                    <TableHead className="min-w-[350px]">بيان الأعمال</TableHead>
+                                    <TableHead className="w-24">الوحدة</TableHead>
+                                    <TableHead className="w-24 text-center">الكمية</TableHead>
+                                    <TableHead className="w-32 text-center">سعر الوحدة</TableHead>
+                                    <TableHead className="w-32 text-left">الإجمالي</TableHead>
+                                    <TableHead className="min-w-[200px]">ملاحظات</TableHead>
+                                    <TableHead className="w-24 text-center">إجراءات</TableHead>
                                 </TableRow>
-                            ) : boqTree.map((node, index) => (
-                                <BoqItemRowRenderer 
-                                    key={node.uid} 
-                                    node={node} 
-                                    level={0} 
-                                    wbs={`${index + 1}`}
-                                    parentReferenceId={null}
-                                    control={control}
-                                    register={register}
-                                    setValue={setValue}
-                                    onDelete={(idx) => remove(idx)}
-                                    onAdd={handleAddItem}
-                                    fields={fields}
-                                    masterItemsMap={masterItemsMap}
-                                    masterItemsLoading={masterItemsLoading}
-                                />
-                            ))}
-                        </TableBody>
-                        <TableFooter className="bg-primary/5">
-                            <TableRow className="font-extrabold text-lg">
-                                <TableCell colSpan={5} className="text-right py-6">الإجمالي العام لجدول الكميات:</TableCell>
-                                <TableCell className="text-left font-mono text-primary py-6">{formatCurrency(grandTotal)}</TableCell>
-                                <TableCell colSpan={2}></TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </div>
-                
-                <div className="flex justify-center p-6 bg-muted/5">
-                    <Button type="button" variant="secondary" onClick={handleAddRootSection} className="h-12 px-8">
-                        <PlusCircle className="ml-2 h-5 w-5 text-primary"/> إضافة قسم رئيسي جديد (جذر)
-                    </Button>
-                </div>
-            </CardContent>
+                            </TableHeader>
+                            <TableBody>
+                                {boqTree.map((node, index) => (
+                                    <BoqItemRowRenderer 
+                                        key={node.uid} 
+                                        node={node} 
+                                        level={0} 
+                                        wbs={`${index + 1}`}
+                                        parentReferenceId={null}
+                                        control={control}
+                                        register={register}
+                                        setValue={setValue}
+                                        onDelete={(idx) => remove(idx)}
+                                        onAdd={handleAddItem}
+                                        fields={fields}
+                                        masterItemsMap={masterItemsMap}
+                                        masterItemsLoading={masterItemsLoading}
+                                    />
+                                ))}
+                            </TableBody>
+                            <TableFooter className="bg-primary/5">
+                                <TableRow className="font-extrabold text-lg">
+                                    <TableCell colSpan={5} className="text-right py-6">الإجمالي العام:</TableCell>
+                                    <TableCell className="text-left font-mono text-primary py-6">{formatCurrency(grandTotal)}</TableCell>
+                                    <TableCell colSpan={2}></TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
+                    </div>
+                    <div className="flex justify-center p-6 bg-muted/5"><Button type="button" variant="secondary" onClick={handleAddRootSection} className="h-12 px-8"><PlusCircle className="ml-2 h-5 w-5 text-primary"/> إضافة قسم جديد</Button></div>
+                </CardContent>
 
-            <CardFooter className="flex justify-end gap-3 border-t p-6 bg-background sticky bottom-0 z-20 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} size="lg">إلغاء</Button>
-                <Button type="submit" disabled={isSaving} size="lg" className="px-10">
-                    {isSaving ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Save className="ml-2 h-5 w-5" />}
-                    {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول النهائي'}
-                </Button>
-            </CardFooter>
-        </div>
+                <CardFooter className="flex justify-end gap-3 border-t p-6 bg-background sticky bottom-0 z-20 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+                    <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} size="lg">إلغاء</Button>
+                    <Button type="submit" disabled={isSaving} size="lg" className="px-10">{isSaving ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Save className="ml-2 h-5 w-5" />} حفظ الجدول</Button>
+                </CardFooter>
+            </div>
+        </form>
     );
 }
