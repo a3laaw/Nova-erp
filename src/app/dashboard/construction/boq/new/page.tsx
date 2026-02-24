@@ -1,26 +1,90 @@
 'use client';
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-form';
-import { useFirebase, useAuth } from '@/firebase';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { BoqForm, boqFormSchema, type BoqFormValues } from '@/components/construction/boq/boq-form';
+import { useFirebase, useSubscription } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, runTransaction, writeBatch, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, runTransaction, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
 import { cleanFirestoreData } from '@/lib/utils';
-import type { Boq } from '@/lib/types';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+import type { BoqReferenceItem } from '@/lib/types';
 
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 export default function NewBoqPage() {
     const { firestore } = useFirebase();
-    const { user } = useAuth();
+    const { user: currentUser, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const searchParams = useSearchParams();
+
     const [isSaving, setIsSaving] = useState(false);
-    
-    const handleSave = useCallback(async (data: BoqFormValues) => {
-        if (!firestore || !user) return;
+
+    const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
+
+    const {
+        control,
+        handleSubmit,
+        register,
+        watch,
+        setValue,
+        formState: { errors },
+        reset,
+    } = useForm<BoqFormValues>({
+        resolver: zodResolver(boqFormSchema),
+        defaultValues: {
+            name: '',
+            clientName: '',
+            status: 'تقديري',
+            items: [
+                {
+                    id: '', // Will be assigned by processNode
+                    uid: generateId(),
+                    description: '',
+                    unit: '',
+                    quantity: 1,
+                    sellingUnitPrice: 0,
+                    parentId: null,
+                    level: 0,
+                    isHeader: true,
+                    itemId: '',
+                    notes: '',
+                },
+            ],
+        },
+    });
+
+    useEffect(() => {
+        const copiedDataString = sessionStorage.getItem('copiedBoqData');
+        if (copiedDataString) {
+            try {
+                const copiedData = JSON.parse(copiedDataString);
+                reset(copiedData);
+                toast({ title: 'تم النسخ', description: 'تم ملء النموذج ببيانات النسخة.' });
+            } catch (error) {
+                console.error("Failed to parse copied BOQ data:", error);
+            } finally {
+                sessionStorage.removeItem('copiedBoqData');
+            }
+        }
+    }, [reset, toast]);
+
+
+    const loading = !firestore || authLoading || masterItemsLoading;
+
+    const onSubmit = async (data: BoqFormValues) => {
+        if (!firestore || !currentUser) return;
+
         setIsSaving(true);
         try {
             let newBoqId: string | null = null;
+            const clientId = searchParams.get('clientId');
+            const transactionId = searchParams.get('transactionId');
+
             await runTransaction(firestore, async (transaction) => {
                 const counterRef = doc(firestore, 'counters', 'boqs');
                 const counterDoc = await transaction.get(counterRef);
@@ -34,53 +98,115 @@ export default function NewBoqPage() {
 
                 const boqRef = doc(collection(firestore, 'boqs'));
                 newBoqId = boqRef.id;
-                
+
                 const totalValue = data.items.reduce((sum, item) => {
                     if (item.isHeader) return sum;
-                    const isLumpSum = item.unit === 'مقطوعية';
-                    const quantity = isLumpSum ? 1 : (item.quantity || 0);
-                    return sum + (quantity * (item.sellingUnitPrice || 0));
+                    return sum + ((item.quantity || 0) * (item.sellingUnitPrice || 0));
                 }, 0);
 
-                const boqData: Omit<Boq, 'id'> = {
+                const boqData = {
                     boqNumber,
                     name: data.name,
                     status: data.status,
                     clientName: data.clientName,
                     totalValue,
                     itemCount: data.items.length,
+                    createdBy: currentUser.uid,
                     createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    clientId: clientId || null,
+                    transactionId: transactionId || null,
                 };
                 transaction.set(boqRef, boqData);
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+
+                if (clientId && transactionId) {
+                    const transactionRef = doc(firestore, `clients/${clientId}/transactions/${transactionId}`);
+                    transaction.update(transactionRef, { boqId: newBoqId });
+                }
             });
 
             if (newBoqId) {
-                const itemsBatch = writeBatch(firestore);
-                data.items.forEach(item => {
-                   const { id, ...itemData } = item; 
-                   const itemRef = doc(collection(firestore, `boqs/${newBoqId}/items`));
-                   itemsBatch.set(itemRef, cleanFirestoreData(itemData));
+                const finalItems: any[] = [];
+                const childMap = new Map<string | null, string[]>();
+
+                data.items.forEach((item) => {
+                    if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
+                    childMap.get(item.parentId)!.push(item.uid);
                 });
-                await itemsBatch.commit();
+
+                const processNode = (parentId: string | null, parentNumber: string, level: number) => {
+                    const childrenUids = childMap.get(parentId) || [];
+                    childrenUids.forEach((childUid, index) => {
+                        const item = data.items.find((i) => i.uid === childUid);
+                        if (item) {
+                            const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
+                            finalItems.push({ ...item, itemNumber: newNumber, level });
+                            processNode(childUid, newNumber, level + 1);
+                        }
+                    });
+                };
+                processNode(null, '', 0);
+
+                const batch = writeBatch(firestore);
+                finalItems.forEach((item) => {
+                    const { uid, ...itemData } = item;
+                    const itemRef = doc(collection(firestore, `boqs/${newBoqId}/items`));
+                    batch.set(itemRef, cleanFirestoreData(itemData));
+                });
+                await batch.commit();
             }
 
             toast({ title: 'نجاح', description: 'تم إنشاء جدول الكميات بنجاح.' });
-            router.push('/dashboard/construction/boq');
+            
+            if (transactionId && clientId) {
+                router.push(`/dashboard/clients/${clientId}/transactions/${transactionId}`);
+            } else {
+                router.push('/dashboard/construction/boq');
+            }
 
-        } catch (error) {
-            console.error("Error creating BOQ:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء جدول الكميات.' });
+        } catch (error: any) {
+            console.error('❌ Save failed:', error);
+            toast({
+                variant: 'destructive',
+                title: 'خطأ في الحفظ',
+                description: error?.message || 'حدث خطأ أثناء الحفظ.',
+            });
         } finally {
             setIsSaving(false);
         }
-    }, [firestore, user, toast, router]);
+    };
 
+    if (loading) {
+        return (
+            <Card className="max-w-4xl mx-auto" dir="rtl">
+                <CardHeader><CardTitle>إنشاء جدول كميات جديد</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="flex justify-center items-center h-64">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="mr-4">جاري تحميل البيانات المرجعية...</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+    
     return (
-        <BoqForm 
-            onSave={handleSave}
-            onClose={() => router.back()}
-            isSaving={isSaving}
-        />
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <Card dir="rtl">
+                <BoqForm
+                    onClose={() => router.back()}
+                    isSaving={isSaving}
+                    isEditing={false}
+                    control={control}
+                    register={register}
+                    errors={errors}
+                    setValue={setValue}
+                    watch={watch}
+                    masterItemsData={masterItemsData}
+                    masterItemsLoading={masterItemsLoading}
+                />
+            </Card>
+        </form>
     );
 }
