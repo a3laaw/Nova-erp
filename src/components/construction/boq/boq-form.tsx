@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -55,7 +56,6 @@ type BoqItemWithChildren = BoqFormValues['items'][number] & {
 };
 
 // --- Optimized Row Renderer ---
-// Using localized useWatch to prevent full table re-renders on keystroke
 const BoqItemRowRenderer = React.memo(({
     node, level, wbs, parentReferenceId, control, register, setValue, onDelete, onAdd, fields, masterItemsMap, masterItemsLoading
 }: {
@@ -72,7 +72,6 @@ const BoqItemRowRenderer = React.memo(({
     masterItemsMap: Map<string | null, any[]>;
     masterItemsLoading: boolean;
 }) => {
-  // Localized watch for this specific row only
   const itemData = useWatch({
     control,
     name: `items.${node._index}`,
@@ -225,10 +224,8 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
         },
     });
 
-    const { fields, remove, insert, append, replace } = useFieldArray({ control, name: 'items' });
+    const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
     
-    // We only watch 'items' when we really need to rebuild the whole tree (add/delete/init)
-    // For typing lag, we rely on row-level watches
     const watchedItems = watch('items');
 
     React.useEffect(() => {
