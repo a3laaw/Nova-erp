@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, PlusCircle, Trash2, ListTree, Calculator, Info } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, ListTree, Calculator, Info } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -72,10 +72,17 @@ const BoqItemRowRenderer = React.memo(({
     masterItemsMap: Map<string | null, any[]>;
     masterItemsLoading: boolean;
 }) => {
+  // Local watch for high reactivity within the row
   const itemData = useWatch({
     control,
     name: `items.${node._index}`,
   });
+
+  // Calculate row total locally for instant feedback
+  const lineTotal = React.useMemo(() => {
+    if (itemData.isHeader) return node.total; // For headers, use the tree-calculated total
+    return (Number(itemData.quantity) || 0) * (Number(itemData.sellingUnitPrice) || 0);
+  }, [itemData.isHeader, itemData.quantity, itemData.sellingUnitPrice, node.total]);
 
   const handleMasterItemSelect = (value: string) => {
     const allMasterItems = Array.from(masterItemsMap.values()).flat();
@@ -160,7 +167,7 @@ const BoqItemRowRenderer = React.memo(({
                         "px-2 py-1 text-base tracking-tight",
                         itemData.isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
                     )}>
-                        {formatCurrency(node.total)}
+                        {formatCurrency(lineTotal)}
                     </div>
                 </TableCell>
                 <TableCell className="min-w-[250px]">
@@ -226,7 +233,8 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
 
     const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
     
-    const watchedItems = watch('items');
+    // Watch items deeply to trigger tree recalculations on any change
+    const watchedItems = useWatch({ control, name: 'items' });
 
     React.useEffect(() => {
         if (initialData) {
