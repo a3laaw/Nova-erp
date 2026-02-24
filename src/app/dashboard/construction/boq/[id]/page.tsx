@@ -14,6 +14,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 
 export default function BoqDetailsPage() {
     const params = useParams();
@@ -22,14 +23,18 @@ export default function BoqDetailsPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const boqRef = useMemo(() => firestore && id ? doc(firestore, 'boqs', id) : null, [firestore, id]);
-    const { data: boq, loading: boqLoading } = useDocument<Boq>(firestore, boqRef?.path);
+    const { data: boq, loading: boqLoading } = useDocument<Boq>(firestore, boqRef?.path || null);
 
     const itemsQuery = useMemo(() => {
         if (!boqRef) return null;
         return [orderBy('itemNumber')];
     }, [boqRef]);
 
-    const { data: items, loading: itemsLoading } = useSubscription<BoqItem>(firestore, `${boqRef?.path}/items`, itemsQuery || []);
+    const { data: items, loading: itemsLoading } = useSubscription<BoqItem>(
+        firestore, 
+        boqRef ? `${boqRef.path}/items` : null, 
+        itemsQuery || []
+    );
 
     const loading = boqLoading || itemsLoading;
 
@@ -72,7 +77,7 @@ export default function BoqDetailsPage() {
                         <TableBody>
                             {items.map(item => (
                                 <TableRow key={item.id} className={item.isHeader ? 'bg-muted font-bold' : ''}>
-                                    <TableCell style={{ paddingRight: `${item.level * 2}rem` }}>{item.description}</TableCell>
+                                    <TableCell style={{ paddingRight: `${(item.level || 0) * 2}rem` }}>{item.description}</TableCell>
                                     <TableCell>{item.isHeader ? '-' : item.unit}</TableCell>
                                     <TableCell>{item.isHeader ? '-' : item.quantity}</TableCell>
                                     <TableCell>{item.isHeader ? '-' : formatCurrency(item.sellingUnitPrice || 0)}</TableCell>
