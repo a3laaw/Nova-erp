@@ -16,6 +16,7 @@ import {
   query,
   orderBy,
   doc,
+  deleteDoc,
   getDocs,
   where,
   writeBatch,
@@ -78,8 +79,7 @@ export function RfqsList() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [itemToDelete, setItemToDelete] =
-    useState<RequestForQuotation | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<RequestForQuotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -104,21 +104,12 @@ export function RfqsList() {
       if (!date) return '-';
       return format(date, 'dd/MM/yyyy');
     } catch (err) {
-      console.error("Date formatting error:", err);
       return '-';
     }
   }, []);
 
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
-    
-    // منع حذف الطلبات المغلقة
-    if (itemToDelete.status === 'closed') {
-        toast({ variant: 'destructive', title: 'إجراء غير مسموح', description: 'لا يمكن حذف طلبات التسعير المغلقة التي تحت المقارنة.' });
-        setItemToDelete(null);
-        return;
-    }
-
     setIsDeleting(true);
     try {
       const rfqId = itemToDelete.id!;
@@ -128,12 +119,9 @@ export function RfqsList() {
 
       const batch = writeBatch(firestore);
       batch.delete(doc(firestore, 'rfqs', rfqId));
-      
-      // حذف كافة عروض الأسعار المرتبطة لضمان نظافة البيانات
       quotesSnap.docs.forEach((quoteDoc) => {
         batch.delete(quoteDoc.ref);
       });
-      
       await batch.commit();
 
       toast({
@@ -193,9 +181,7 @@ export function RfqsList() {
               <TableHead className="text-center">الموردين</TableHead>
               <TableHead className="text-center">الأصناف</TableHead>
               <TableHead>الحالة</TableHead>
-              <TableHead className="w-[100px] text-center">
-                الإجراءات
-              </TableHead>
+              <TableHead className="w-[100px] text-center">الإجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -204,60 +190,36 @@ export function RfqsList() {
                 <TableCell colSpan={6}>
                   <div className="p-12 text-center border-2 border-dashed rounded-2xl bg-muted/10 m-4">
                     <ClipboardList className="mx-auto h-16 w-16 text-muted-foreground/30" />
-                    <h3 className="mt-4 text-xl font-black">
-                      لا توجد طلبات تسعير بعد
-                    </h3>
+                    <h3 className="mt-4 text-xl font-black">لا توجد طلبات تسعير بعد</h3>
                     <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto">
-                      ابدأ بإنشاء طلب تسعير جديد لإرساله لمورديك والمفاضلة
-                      بين أسعارهم.
+                      ابدأ بإنشاء طلب تسعير جديد لإرساله لمورديك والمفاضلة بين أسعارهم.
                     </p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : filteredRfqs.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-32 text-center text-muted-foreground font-bold"
-                >
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground font-bold">
                   لا توجد نتائج تطابق بحثك الحالي.
                 </TableCell>
               </TableRow>
             ) : (
               filteredRfqs.map((rfq) => (
-                <TableRow
-                  key={rfq.id}
-                  className="group hover:bg-muted/30 transition-colors"
-                >
+                <TableRow key={rfq.id} className="group hover:bg-muted/30 transition-colors">
                   <TableCell className="font-mono font-bold text-primary">
-                    <Link
-                      href={`/dashboard/purchasing/rfqs/${rfq.id}`}
-                      className="hover:underline"
-                    >
+                    <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="hover:underline">
                       {rfq.rfqNumber}
                     </Link>
                   </TableCell>
-                  <TableCell className="font-medium text-foreground/70">
-                    {formatDate(rfq.date)}
+                  <TableCell className="font-medium text-foreground/70">{formatDate(rfq.date)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary">{rfq.vendorIds?.length || 0}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="secondary">
-                      {rfq.vendorIds?.length || 0}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline">
-                      {rfq.items?.length || 0}
-                    </Badge>
+                    <Badge variant="outline">{rfq.items?.length || 0}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        'px-2 font-bold',
-                        statusColors[rfq.status]
-                      )}
-                    >
+                    <Badge variant="outline" className={cn('px-2 font-bold', statusColors[rfq.status])}>
                       {statusTranslations[rfq.status]}
                     </Badge>
                   </TableCell>
@@ -271,11 +233,7 @@ export function RfqsList() {
                       <DropdownMenuContent align="end" dir="rtl">
                         <DropdownMenuLabel>خيارات الطلب</DropdownMenuLabel>
                         <DropdownMenuItem
-                          onClick={() =>
-                            router.push(
-                              `/dashboard/purchasing/rfqs/${rfq.id}`
-                            )
-                          }
+                          onClick={() => router.push(`/dashboard/purchasing/rfqs/${rfq.id}`)}
                         >
                           <Eye className="ml-2 h-4 w-4" /> إدارة العروض
                         </DropdownMenuItem>
@@ -297,10 +255,7 @@ export function RfqsList() {
         </Table>
       </div>
 
-      <AlertDialog
-        open={!!itemToDelete}
-        onOpenChange={() => setItemToDelete(null)}
-      >
+      <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive font-black text-xl">
@@ -323,11 +278,7 @@ export function RfqsList() {
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold"
             >
-              {isDeleting ? (
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-              ) : (
-                'نعم، حذف نهائي'
-              )}
+              {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'نعم، حذف نهائي'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

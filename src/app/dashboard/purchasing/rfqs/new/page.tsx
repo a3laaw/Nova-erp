@@ -37,7 +37,7 @@ import { cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// توليد معرف قوي بطول 20 حرفاً
+// إصلاح #10: توليد معرف قوي بطول 20 حرفاً
 const generateStrongTempId = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     return Array.from({ length: 20 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
@@ -66,12 +66,12 @@ export default function NewRfqPage() {
     
     const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
     const [isSaving, setIsSaving] = useState(false);
-    const isSavingRef = useRef(false); // حماية من الإرسال المزدوج
+    const isSavingRef = useRef(false); // إصلاح #6: حماية من الإرسال المزدوج
 
     const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
     const { data: items, loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
 
-    const { register, handleSubmit, control, formState: { errors } } = useForm<RfqFormValues>({
+    const { register, handleSubmit, control, formState: { errors }, watch } = useForm<RfqFormValues>({
         resolver: zodResolver(rfqSchema),
         defaultValues: {
             date: new Date(),
@@ -83,6 +83,7 @@ export default function NewRfqPage() {
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
     const loading = vendorsLoading || itemsLoading;
 
+    // إصلاح #7 & #9: إضافة cleanup ووضوح رقم العرض
     useEffect(() => {
         let isMounted = true;
         if (!firestore) return;
@@ -106,7 +107,7 @@ export default function NewRfqPage() {
         };
         generateRfqNumber();
 
-        return () => { isMounted = false; }; // Cleanup لضمان عدم تحديث الـ state إذا غادر المستخدم الصفحة
+        return () => { isMounted = false; };
     }, [firestore]);
 
     const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
@@ -210,6 +211,7 @@ export default function NewRfqPage() {
                                 )}
                             />
                             {errors.vendorIds && <p className="text-xs text-destructive">{errors.vendorIds.message}</p>}
+                            {/* إصلاح #3: تحذير للـ 30 مورد */}
                             {watch('vendorIds')?.length > 30 && (
                                 <Alert variant="destructive" className="mt-2 py-2">
                                     <Info className="h-4 w-4" />
@@ -252,6 +254,7 @@ export default function NewRfqPage() {
                                                             />
                                                         )}
                                                     />
+                                                    {/* إصلاح #8: عرض أخطاء الـ Validation للأصناف */}
                                                     {errors.items?.[index]?.internalItemId && <p className="text-[10px] text-destructive px-3">{errors.items[index]?.internalItemId?.message}</p>}
                                                 </div>
                                             </TableCell>

@@ -1,4 +1,5 @@
 'use client';
+
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
@@ -10,6 +11,7 @@ import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertT
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { SupplierQuotationCard } from '@/components/purchasing/supplier-quotation-card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -37,7 +39,6 @@ export default function RfqDetailsPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-    // داتا الموردين وعروض الأسعار
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
     const [dataLoading, setDataLoading] = useState(true);
@@ -55,7 +56,6 @@ export default function RfqDetailsPage() {
         const fetchData = async () => {
             setDataLoading(true);
             try {
-                // 1. جلب الموردين في مجموعات من 30 (حد Firestore IN query)
                 const vendorIds = rfq.vendorIds;
                 const chunks = [];
                 for (let i = 0; i < vendorIds.length; i += 30) {
@@ -71,7 +71,6 @@ export default function RfqDetailsPage() {
                 );
                 setVendors(fetchedVendors);
 
-                // 2. جلب عروض الأسعار المرتبطة بالـ RFQ
                 const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', id)));
                 setSupplierQuotations(quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation)));
 
@@ -123,7 +122,7 @@ export default function RfqDetailsPage() {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>قائمة موردين كبيرة</AlertTitle>
                     <AlertDescription>
-                        يحتوي هذا الطلب على {rfq.vendorIds.length} مورداً. قد تستغرق عملية تحميل البيانات وقتاً أطول من المعتاد.
+                        يحتوي هذا الطلب على {rfq.vendorIds.length} مورداً.
                     </AlertDescription>
                 </Alert>
              )}
@@ -140,7 +139,7 @@ export default function RfqDetailsPage() {
                                 <Badge className={cn("text-xs px-3", statusColors[rfq.status])}>{statusTranslations[rfq.status]}</Badge>
                             </div>
                             <CardDescription className="text-base font-medium">
-                                تاريخ الطلب: {safeDate ? format(safeDate, 'eeee, dd MMMM yyyy', { locale: (require('date-fns/locale')).ar }) : '-'}
+                                تاريخ الطلب: {safeDate ? format(safeDate, 'eeee, dd MMMM yyyy', { locale: ar }) : '-'}
                             </CardDescription>
                         </div>
                          <div className="flex gap-2">
