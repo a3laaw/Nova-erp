@@ -1,4 +1,3 @@
-
 'use client';
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -13,7 +12,7 @@ import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardLis
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
@@ -49,13 +48,13 @@ export default function ProjectDetailPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const projectRef = useMemo(() => firestore && id ? doc(firestore, 'projects', id) : null, [firestore, id]);
-    const { data: project, loading: projectLoading } = useDocument<ConstructionProject>(firestore, projectRef?.path);
+    const { data: project, loading: projectLoading } = useDocument<ConstructionProject>(firestore, projectRef?.path || null);
     
     const clientRef = useMemo(() => firestore && project?.clientId ? doc(firestore, 'clients', project.clientId) : null, [firestore, project?.clientId]);
-    const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientRef?.path);
+    const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientRef?.path || null);
 
     const engineerRef = useMemo(() => firestore && project?.mainEngineerId ? doc(firestore, 'employees', project.mainEngineerId) : null, [firestore, project?.mainEngineerId]);
-    const { data: engineer, loading: engineerLoading } = useDocument<Employee>(firestore, engineerRef?.path);
+    const { data: engineer, loading: engineerLoading } = useDocument<Employee>(firestore, engineerRef?.path || null);
 
     const loading = projectLoading || clientLoading || engineerLoading;
     
