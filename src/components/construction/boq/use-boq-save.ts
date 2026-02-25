@@ -31,7 +31,7 @@ export const generateStableId = (): string => {
   return id;
 };
 
-const MAX_BATCH_OPS = 490; // تحت حد الـ 500 بقليل للأمان
+const MAX_BATCH_OPS = 490;
 
 // ─── معالجة الهيكل الشجري وحساب الإجمالي ───
 function processItemsHierarchy(items: BoqFormValues['items']): {
@@ -61,7 +61,7 @@ function processItemsHierarchy(items: BoqFormValues['items']): {
 
   processNode(null, '', 0);
 
-  // كشف البنود اليتيمة وإعادة ربطها بالجذر (لضمان عدم ضياع أي بند)
+  // كشف البنود اليتيمة وإعادة ربطها بالجذر
   const processedUids = new Set(finalItems.map((i) => i.uid));
   const orphans = items.filter((i) => !processedUids.has(i.uid));
 
@@ -86,7 +86,6 @@ function processItemsHierarchy(items: BoqFormValues['items']): {
   return { finalItems, totalValue };
 }
 
-// ─── تنفيذ العمليات في دفعات مقسمة ───
 async function commitInChunks(
   firestore: any,
   operations: Array<(batch: ReturnType<typeof writeBatch>) => void>
@@ -147,7 +146,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ─── تحميل البيانات في وضع التعديل ───
   useEffect(() => {
     if (mode !== 'edit' || !firestore || !boqId) return;
     let cancelled = false;
@@ -212,7 +210,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { cancelled = true; };
   }, [mode, firestore, boqId, router, toast, form]);
 
-  // ─── التعامل مع النسخ ───
   useEffect(() => {
     if (mode !== 'create') return;
     const copiedDataString = sessionStorage.getItem('copiedBoqData');
@@ -296,7 +293,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
           }
         });
       } else {
-        // تحديث في وضع التعديل مع التحقق من التعارض
         const boqRef = doc(firestore, 'boqs', boqId!);
         await updateDoc(boqRef, {
           name: data.name,
@@ -308,7 +304,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
         });
       }
 
-      // حفظ البنود في دفعات (Batch)
       const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
       
       if (mode === 'edit') {
