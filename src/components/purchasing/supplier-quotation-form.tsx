@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -139,7 +140,16 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" dir="rtl">
+            <DialogContent 
+                className="max-w-2xl max-h-[90vh] flex flex-col" 
+                dir="rtl"
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[role="dialog"]') || target.closest('.react-select__menu-portal')) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="text-xl font-black flex items-center gap-2">
                         <Save className="h-5 w-5 text-primary"/>
