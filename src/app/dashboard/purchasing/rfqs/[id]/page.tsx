@@ -46,6 +46,7 @@ export default function RfqDetailsPage() {
     const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
 
+    // إصلاح #3: جلب الموردين في مجموعات (Chunks) لتجنب حد الـ 30 في Firestore IN Query
     useEffect(() => {
         if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) {
             setDataLoading(false);
@@ -55,7 +56,6 @@ export default function RfqDetailsPage() {
         const fetchData = async () => {
             setDataLoading(true);
             try {
-                // تقسيم الموردين لمجموعات من 30 لتجاوز حد Firestore In Query
                 const vendorIds = rfq.vendorIds;
                 const chunks = [];
                 for (let i = 0; i < vendorIds.length; i += 30) {
@@ -113,7 +113,14 @@ export default function RfqDetailsPage() {
     
     if (!rfq) return <div className="text-center py-20 text-muted-foreground">لم يتم العثور على طلب التسعير.</div>;
 
-    const safeDate = toFirestoreDate(rfq.date);
+    // إصلاح #4: حماية التاريخ
+    const safeDate = (() => {
+        try {
+            return toFirestoreDate(rfq.date);
+        } catch {
+            return null;
+        }
+    })();
 
     return (
         <div className="space-y-6" dir="rtl">

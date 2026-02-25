@@ -33,9 +33,10 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 
+// إصلاح #10: توليد معرف طويل (20 حرفاً)
 const generateStrongTempId = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     return Array.from({ length: 20 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
@@ -62,8 +63,11 @@ export default function NewRfqPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
+    // إصلاح #9: توضيح أن الرقم تقريبي
     const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
     const [isSaving, setIsSaving] = useState(false);
+    
+    // إصلاح #6: منع الإرسال المزدوج
     const isSavingRef = useRef(false);
 
     const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
@@ -104,6 +108,7 @@ export default function NewRfqPage() {
         };
         generateRfqNumber();
 
+        // إصلاح #7: إضافة Cleanup
         return () => { isMounted = false; };
     }, [firestore]);
 
@@ -240,6 +245,7 @@ export default function NewRfqPage() {
                                                             />
                                                         )}
                                                     />
+                                                    {/* إصلاح #8: عرض أخطاء validation على البنود */}
                                                     {errors.items?.[index]?.internalItemId && <p className="text-[10px] text-destructive px-3">{errors.items[index]?.internalItemId?.message}</p>}
                                                 </div>
                                             </TableCell>

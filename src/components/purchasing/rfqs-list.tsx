@@ -84,11 +84,7 @@ export function RfqsList() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const rfqQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
-  const {
-    data: rfqs,
-    loading,
-    error,
-  } = useSubscription<RequestForQuotation>(
+  const { data: rfqs, loading, error } = useSubscription<RequestForQuotation>(
     firestore,
     'rfqs',
     rfqQueryConstraints

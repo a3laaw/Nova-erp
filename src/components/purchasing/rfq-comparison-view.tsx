@@ -37,6 +37,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
+  // إصلاح #3: تقسيم جلب الموردين لتجنب قيود IN Query
   useEffect(() => {
     if (!firestore || !rfq.id || !rfq.vendorIds || rfq.vendorIds.length === 0) {
       setLoadingData(false);
@@ -46,10 +47,12 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     const fetchData = async () => {
       setLoadingData(true);
       try {
+        // جلب العروض أولاً
         const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', rfq.id)));
         const fetchedQuotes = quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation));
         setSupplierQuotations(fetchedQuotes);
 
+        // جلب الموردين في مجموعات
         const vendorIds = rfq.vendorIds;
         const chunks = [];
         for (let i = 0; i < vendorIds.length; i += 30) {
