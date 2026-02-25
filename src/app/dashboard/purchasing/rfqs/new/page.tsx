@@ -43,7 +43,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 
-// مخطط التحقق من البيانات
 const itemSchema = z.object({
   id: z.string().optional(),
   internalItemId: z.string().min(1, 'الصنف مطلوب.'),
@@ -62,7 +61,6 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
-// مولد معرفات مؤقتة قوية (20 حرفاً)
 const generateTempId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -79,21 +77,23 @@ export default function NewRfqPage() {
   const { toast } = useToast();
 
   const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
+  const [rfqNumberLoaded, setRfqNumberLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // مرجع لمنع الإرسال المزدوج
   const savingRef = useRef(false);
 
-  // جلب البيانات المرجعية
+  // تثبيت constraints في useMemo لمنع إعادة الاشتراك كل render
+  const vendorConstraints = useMemo(() => [orderBy('name')], []);
+  const itemConstraints = useMemo(() => [orderBy('name')], []);
+
   const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
     firestore,
     'vendors',
-    [orderBy('name')]
+    vendorConstraints
   );
   const { data: items, loading: itemsLoading } = useSubscription<Item>(
     firestore,
     'items',
-    [orderBy('name')]
+    itemConstraints
   );
 
   const {
@@ -111,11 +111,10 @@ export default function NewRfqPage() {
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
-  const loading = vendorsLoading || itemsLoading;
 
-  // توليد رقم الطلب مع cleanup لتجنب الـ memory leaks
+  // توليد رقم الطلب مرة واحدة فقط مع cleanup
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || rfqNumberLoaded) return;
     let cancelled = false;
 
     const generateRfqNumber = async () => {
@@ -130,10 +129,12 @@ export default function NewRfqPage() {
         }
         if (!cancelled) {
           setRfqNumber(`RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+          setRfqNumberLoaded(true);
         }
       } catch {
         if (!cancelled) {
           setRfqNumber('سيتم التوليد عند الحفظ');
+          setRfqNumberLoaded(true);
         }
       }
     };
@@ -142,27 +143,37 @@ export default function NewRfqPage() {
     return () => {
       cancelled = true;
     };
-  }, [firestore]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firestore, rfqNumberLoaded]);
 
+  // تحويل الخيارات مع حماية من null
   const vendorOptions: MultiSelectOption[] = useMemo(
-    () => (vendors || []).map((v) => ({ value: v.id!, label: v.name })),
+    () =>
+      (vendors || [])
+        .filter((v) => v.id)
+        .map((v) => ({ value: v.id!, label: v.name || 'بدون اسم' })),
     [vendors]
   );
+
   const itemOptions = useMemo(
-    () => (items || []).map((i) => ({ value: i.id!, label: i.name, searchKey: i.sku })),
+    () =>
+      (items || [])
+        .filter((i) => i.id)
+        .map((i) => ({
+          value: i.id!,
+          label: i.name || 'بدون اسم',
+          searchKey: i.sku || '',
+        })),
     [items]
   );
 
   const onSubmit = async (data: RfqFormValues) => {
-    if (!firestore || !currentUser || loading) return;
-    
-    // حماية من الإرسال المزدوج
+    if (!firestore || !currentUser) return;
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
 
     try {
-      // نسخة محلية لضمان توفر البيانات داخل الـ Transaction
       const currentItems = items || [];
 
       await runTransaction(firestore, async (transaction) => {
@@ -175,7 +186,6 @@ export default function NewRfqPage() {
           nextNumber = (counts[currentYear] || 0) + 1;
         }
         const newRfqNumber = `RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-
         const newRfqRef = doc(collection(firestore, 'rfqs'));
 
         const processedItems = data.items.map((item) => {
@@ -206,9 +216,9 @@ export default function NewRfqPage() {
     } catch (error) {
       console.error('Error creating RFQ:', error);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
-      // إعادة تفعيل الزر في حالة الفشل
-      savingRef.current = false;
+    } finally {
       setIsSaving(false);
+      savingRef.current = false;
     }
   };
 
@@ -224,7 +234,7 @@ export default function NewRfqPage() {
             <div className="text-right">
               <Label>رقم الطلب المتوقع</Label>
               <div className="font-mono text-lg font-semibold h-7 text-primary">
-                {loading ? <Skeleton className="h-6 w-24" /> : rfqNumber}
+                {!rfqNumberLoaded ? <Skeleton className="h-6 w-32" /> : rfqNumber}
                 <span className="text-[10px] text-muted-foreground block font-normal">(يتأكد عند الحفظ)</span>
               </div>
             </div>
@@ -255,8 +265,14 @@ export default function NewRfqPage() {
                     options={vendorOptions}
                     selected={field.value}
                     onChange={field.onChange}
-                    placeholder={loading ? 'جاري التحميل...' : 'اختر موردًا أو أكثر...'}
-                    disabled={loading}
+                    placeholder={
+                      vendorsLoading && !vendors
+                        ? 'جاري تحميل الموردين...'
+                        : vendorOptions.length === 0
+                          ? 'لا يوجد موردين — أضف من إدارة الموردين'
+                          : 'اختر موردًا أو أكثر...'
+                    }
+                    disabled={vendorsLoading && !vendors}
                   />
                 )}
               />
@@ -286,13 +302,19 @@ export default function NewRfqPage() {
                         <Controller
                           name={`items.${index}.internalItemId`}
                           control={control}
-                          render={({ field }) => (
+                          render={({ field: controllerField }) => (
                             <InlineSearchList
-                              value={field.value}
-                              onSelect={field.onChange}
+                              value={controllerField.value}
+                              onSelect={controllerField.onChange}
                               options={itemOptions}
-                              placeholder={loading ? 'تحميل...' : 'اختر صنفًا من المخزون...'}
-                              disabled={loading}
+                              placeholder={
+                                itemsLoading && !items
+                                  ? 'جاري تحميل الأصناف...'
+                                  : itemOptions.length === 0
+                                    ? 'لا توجد أصناف — أضف من المخزون'
+                                    : 'اختر صنفًا من المخزون...'
+                              }
+                              disabled={itemsLoading && !items}
                               className="border-none shadow-none focus-visible:ring-0"
                             />
                           )}
@@ -363,7 +385,7 @@ export default function NewRfqPage() {
           </Button>
           <Button
             type="submit"
-            disabled={isSaving || loading}
+            disabled={isSaving}
             className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20"
           >
             {isSaving ? (
@@ -371,7 +393,7 @@ export default function NewRfqPage() {
             ) : (
               <Save className="ml-3 h-5 w-5" />
             )}
-            {isSaving ? 'جاري الحفظ...' : 'حفظ كمسودة وإرسال'}
+            {isSaving ? 'جاري الحفظ...' : 'حفظ كمسودة'}
           </Button>
         </CardFooter>
       </form>
