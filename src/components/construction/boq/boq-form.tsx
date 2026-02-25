@@ -72,15 +72,13 @@ const BoqItemRowRenderer = React.memo(({
     masterItemsMap: Map<string | null, any[]>;
     masterItemsLoading: boolean;
 }) => {
-  // Local watch for high reactivity within the row
   const itemData = useWatch({
     control,
     name: `items.${node._index}`,
   });
 
-  // Calculate row total locally for instant feedback
   const lineTotal = React.useMemo(() => {
-    if (itemData.isHeader) return node.total; // For headers, use the tree-calculated total
+    if (itemData.isHeader) return node.total;
     return (Number(itemData.quantity) || 0) * (Number(itemData.sellingUnitPrice) || 0);
   }, [itemData.isHeader, itemData.quantity, itemData.sellingUnitPrice, node.total]);
 
@@ -90,10 +88,7 @@ const BoqItemRowRenderer = React.memo(({
     if (selectedItem) {
         setValue(`items.${node._index}.itemId`, value, { shouldDirty: true });
         setValue(`items.${node._index}.description`, selectedItem.label, { shouldDirty: true });
-        
-        const hasChildrenInMaster = masterItemsMap.has(value);
-        const isHeader = selectedItem.isHeader || hasChildrenInMaster;
-        
+        const isHeader = selectedItem.isHeader || masterItemsMap.has(value);
         setValue(`items.${node._index}.isHeader`, isHeader, { shouldDirty: true });
         setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldDirty: true });
     }
@@ -237,15 +232,26 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
     });
 
     const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
-    
-    // Watch items deeply to trigger tree recalculations on any change
     const watchedItems = useWatch({ control, name: 'items' });
 
     React.useEffect(() => {
         if (initialData) {
+            // Transform Firestore items to form items with stable UIDs
+            const idToUid = new Map<string, string>();
+            const items = initialData.items || [];
+            
+            items.forEach(item => {
+                if (item.id) idToUid.set(item.id, generateId());
+            });
+
             reset({
                 ...initialData,
-                items: initialData.items?.map(item => ({ ...item, id: item.id || '', uid: item.uid || generateId() })) || [],
+                items: items.map(item => ({
+                    ...item,
+                    id: item.id || '',
+                    uid: (item.id && idToUid.get(item.id)) || generateId(),
+                    parentId: (item.parentId && idToUid.get(item.parentId)) || null,
+                })),
             });
         }
     }, [initialData, reset]);
@@ -305,6 +311,32 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
         });
     }, [fields, insert]);
 
+    // Handle form submission properly
+    const onSubmit = (data: BoqFormValues) => {
+        // Recalculate everything before passing to parent
+        const finalItems: any[] = [];
+        const childMap = new Map<string | null, string[]>();
+        data.items.forEach(item => {
+            if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
+            childMap.get(item.parentId)!.push(item.uid);
+        });
+
+        const processNode = (parentId: string | null, parentNumber: string, level: number) => {
+            const childrenUids = childMap.get(parentId) || [];
+            childrenUids.forEach((childUid, index) => {
+                const item = data.items.find(i => i.uid === childUid);
+                if (item) {
+                    const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
+                    finalItems.push({ ...item, itemNumber: newNumber, level });
+                    processNode(childUid, newNumber, level + 1);
+                }
+            });
+        };
+        processNode(null, '', 0);
+
+        onSave({ ...data, items: finalItems });
+    };
+
     if (masterItemsLoading && !initialData) {
         return (
             <div className="flex flex-col items-center justify-center h-96 gap-4">
@@ -315,7 +347,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
     }
 
     return (
-        <form onSubmit={handleSubmit(onSave)} className="bg-background">
+        <form onSubmit={handleSubmit(onSubmit)} className="bg-background">
             <div className="space-y-0">
                 <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-6">
                     <div className="flex justify-between items-center max-w-full px-4 mx-auto">
@@ -450,7 +482,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                     <div className="max-w-7xl mx-auto flex justify-between items-center p-6 px-10">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border">
                             <Calculator className="h-4 w-4" />
-                            تم حفظ جميع التغييرات في مسودة الجلسة
+                            تم حساب {fields.length} بنود بدقة هندسية
                         </div>
                         <div className="flex gap-4">
                             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>

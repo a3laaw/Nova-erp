@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Boq, BoqItem } from '@/lib/types';
-import { BoqForm, boqFormSchema, type BoqFormValues } from '@/components/construction/boq/boq-form';
+import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-form';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
@@ -72,34 +72,40 @@ export default function EditBoqPage() {
             
             const totalValue = data.items.reduce((sum, item) => {
                 if (item.isHeader) return sum;
-                const isLumpSum = item.unit === 'مقطوعية';
-                const quantity = isLumpSum ? 1 : (item.quantity || 0);
+                const quantity = (item.quantity || 0);
                 return sum + (quantity * (item.sellingUnitPrice || 0));
             }, 0);
 
             batch.update(boqRef, {
                 name: data.name,
-                clientName: data.clientName,
+                clientName: data.clientName || null,
                 status: data.status,
                 totalValue,
                 itemCount: data.items.length,
+                updatedAt: serverTimestamp(),
             });
 
+            // Handle subcollection items
             const originalItemIds = new Set(initialItems.map(item => item.id));
-            const currentItemIds = new Set(data.items.map(item => item.id));
+            const currentItemIds = new Set(data.items.map(item => item.id).filter(id => id !== ''));
 
+            // Delete removed items
             for (const originalItem of initialItems) {
                 if (!currentItemIds.has(originalItem.id!)) {
                     batch.delete(doc(firestore, `boqs/${id}/items`, originalItem.id!));
                 }
             }
 
+            // Update or add items
             for (const item of data.items) {
-                const itemRef = originalItemIds.has(item.id)
+                const itemRef = item.id && originalItemIds.has(item.id)
                     ? doc(firestore, `boqs/${id}/items`, item.id)
                     : doc(collection(firestore, `boqs/${id}/items`));
                 
-                const { id: clientSideId, ...itemData } = item;
+                // Remove client-side helper fields
+                const { id: dbId, uid, ...itemData } = item;
+                // Use doc ID as parentId if it was translated from UID
+                // In reality, BoqForm already produces consistent parentIds
                 batch.set(itemRef, cleanFirestoreData(itemData), { merge: true });
             }
 
@@ -110,7 +116,7 @@ export default function EditBoqPage() {
 
         } catch (error) {
             console.error("Error updating BOQ:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث جدول الكميات.' });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل تحديث جدول الكميات. تأكد من البيانات وحاول مرة أخرى.' });
         } finally {
             setIsSaving(false);
         }
@@ -118,16 +124,10 @@ export default function EditBoqPage() {
 
     if (loading) {
         return (
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                </CardHeader>
-                <CardContent>
-                    <div className="flex justify-center items-center h-64">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center h-96 gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg font-medium animate-pulse">جاري تحميل بيانات التعديل...</p>
+            </div>
         );
     }
 

@@ -5,12 +5,12 @@ import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-f
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, runTransaction, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, runTransaction, writeBatch, serverTimestamp, getDocs, query } from 'firebase/firestore';
 import { cleanFirestoreData } from '@/lib/utils';
 
 export default function NewBoqPage() {
     const { firestore } = useFirebase();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -34,7 +34,10 @@ export default function NewBoqPage() {
     }, [toast]);
 
     const handleSave = async (data: BoqFormValues) => {
-        if (!firestore || !currentUser) return;
+        if (!firestore || !currentUser) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'المستخدم او قاعده البيانات غير متاحه.' });
+            return;
+        }
 
         setIsSaving(true);
         try {
@@ -84,30 +87,10 @@ export default function NewBoqPage() {
             });
 
             if (newBoqId) {
-                const finalItems: any[] = [];
-                const childMap = new Map<string | null, string[]>();
-
-                data.items.forEach((item) => {
-                    if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
-                    childMap.get(item.parentId)!.push(item.uid);
-                });
-
-                const processNode = (parentId: string | null, parentNumber: string, level: number) => {
-                    const childrenUids = childMap.get(parentId) || [];
-                    childrenUids.forEach((childUid, index) => {
-                        const item = data.items.find((i) => i.uid === childUid);
-                        if (item) {
-                            const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
-                            finalItems.push({ ...item, itemNumber: newNumber, level });
-                            processNode(childUid, newNumber, level + 1);
-                        }
-                    });
-                };
-                processNode(null, '', 0);
-
+                // Now, commit the processed items
                 const batch = writeBatch(firestore);
-                finalItems.forEach((item) => {
-                    const { uid, ...itemData } = item;
+                data.items.forEach((item) => {
+                    const { uid, id, ...itemData } = item;
                     const itemRef = doc(collection(firestore, `boqs/${newBoqId}/items`));
                     batch.set(itemRef, cleanFirestoreData(itemData));
                 });
