@@ -43,12 +43,14 @@ const DialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
+        // Aggressive check for all portal types to prevent accidental close
         if (
             target.closest('[cmdk-root]') ||
             target.closest('[data-radix-popper-content-wrapper]') ||
             target.closest('.react-select__menu-portal') ||
             target.closest('[data-radix-select-content]') ||
-            target.closest('[data-inline-search-list-options]')
+            target.closest('[data-inline-search-list-options]') ||
+            target.closest('[role="listbox"]')
         ) {
             e.preventDefault();
         }
@@ -97,14 +99,16 @@ const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
-    ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className
-    )}
-    {...props}
-  />
+  <div className="flex flex-col space-y-1">
+    <DialogPrimitive.Title
+      ref={ref}
+      className={cn(
+        "text-lg font-semibold leading-none tracking-tight",
+        className
+      )}
+      {...props}
+    />
+  </div>
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 

@@ -79,7 +79,8 @@ export function InlineSearchList({
       {open && (
         <div 
           data-inline-search-list-options="true"
-          className="absolute z-[99999] w-full mt-1 bg-popover border rounded-md shadow-md"
+          className="absolute z-[999999] w-full mt-1 bg-popover border rounded-md shadow-md"
+          style={{ pointerEvents: 'auto' }}
         >
           <div className="p-2 border-b">
             <Input
@@ -110,6 +111,7 @@ export function InlineSearchList({
                     setOpen(false);
                     setSearch('');
                   }}
+                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                 >
                   <Check
                     className={cn(

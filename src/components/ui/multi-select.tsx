@@ -16,10 +16,12 @@ interface MultiSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  menuPortalTarget?: HTMLElement | null;
 }
 
-export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
+export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false, menuPortalTarget }: MultiSelectProps) {
   const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       setPortalTarget(document.body);
@@ -52,10 +54,11 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
         ...base,
         color: 'hsl(var(--foreground))',
     }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    menuPortal: (base) => ({ ...base, zIndex: 999999 }), // Extremely high z-index
     menu: (base) => ({
       ...base,
       backgroundColor: 'hsl(var(--card))',
+      zIndex: 999999,
     }),
     option: (base, state) => ({
       ...base,
@@ -103,7 +106,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       isSearchable={true}
       noOptionsMessage={() => "لا توجد نتائج"}
       styles={customStyles}
-      menuPortalTarget={portalTarget}
+      menuPortalTarget={menuPortalTarget || portalTarget}
       menuPosition="fixed"
       menuPlacement="auto"
       theme={(theme) => ({
