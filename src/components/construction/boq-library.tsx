@@ -57,7 +57,7 @@ export function BoqLibrary() {
 
     const { data: boqs, loading: boqsLoading } = useSubscription<Boq>(firestore, 'boqs', boqsQuery || []);
     
-    // Fetch all projects to map them by ID
+    // Fetch all projects to map them by ID for display in the library
     const { data: projects } = useSubscription<ConstructionProject>(firestore, 'projects');
     const projectsMap = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
 
@@ -95,6 +95,7 @@ export function BoqLibrary() {
         toast({ title: 'جاري استنساخ جدول الكميات...' });
         
         try {
+            // Get all items for the source BOQ
             const itemsQuery = query(collection(firestore, `boqs/${boqToCopy.id}/items`));
             const itemsSnap = await getDocs(itemsQuery);
             
@@ -103,11 +104,15 @@ export function BoqLibrary() {
                 return { ...data, uid: d.id }; 
             });
 
+            // Create copied data - NOTICE: We explicitly clear projectId and transactionId
+            // and reset status to 'تقديري' to ensure the copy is a fresh standalone template.
             const copiedData = {
                 name: `${boqToCopy.name} (نسخة)`,
                 clientName: boqToCopy.clientName || '',
-                status: 'تقديري',
+                status: 'تقديري', // Reset to draft/estimate status
                 items: items,
+                projectId: null, // Clear project link
+                transactionId: null, // Clear transaction link
             };
 
             sessionStorage.setItem('copiedBoqData', JSON.stringify(copiedData));
@@ -179,9 +184,9 @@ export function BoqLibrary() {
                                     </TableCell>
                                     <TableCell>
                                         {linkedProject ? (
-                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 w-fit">
-                                                <Building2 className="h-3 w-3" />
-                                                {linkedProject.projectName}
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 w-fit max-w-[150px]">
+                                                <Building2 className="h-3 w-3 shrink-0" />
+                                                <span className="truncate">{linkedProject.projectName}</span>
                                             </Badge>
                                         ) : (
                                             <span className="text-xs text-muted-foreground italic">غير مرتبط بمشروع</span>
