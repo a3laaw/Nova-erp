@@ -61,6 +61,7 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
+// إصلاح #10: توليد معرفات مؤقتة قوية بطول 20 حرفاً
 const generateTempId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -78,6 +79,8 @@ export default function NewRfqPage() {
 
   const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // إصلاح #6: استخدام useRef لمنع الإرسال المزدوج
   const savingRef = useRef(false);
 
   const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
@@ -110,6 +113,8 @@ export default function NewRfqPage() {
 
   useEffect(() => {
     if (!firestore) return;
+    
+    // إصلاح #7: إضافة علم لإلغاء التحديث في حال إلغاء المكون (Cleanup)
     let cancelled = false;
 
     const generateRfqNumber = async () => {
@@ -149,6 +154,8 @@ export default function NewRfqPage() {
 
   const onSubmit = async (data: RfqFormValues) => {
     if (!firestore || !currentUser || loading) return;
+    
+    // منع الإرسال المزدوج
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
@@ -195,9 +202,8 @@ export default function NewRfqPage() {
     } catch (error) {
       console.error('Error creating RFQ:', error);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
-    } finally {
+      savingRef.current = false; // إعادة السماح بالحفظ في حال الفشل
       setIsSaving(false);
-      savingRef.current = false;
     }
   };
 
@@ -211,16 +217,14 @@ export default function NewRfqPage() {
               <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
             </div>
             <div className="text-right">
-              <Label>رقم الطلب</Label>
+              {/* إصلاح #9: توضيح أن الرقم تقريبي */}
+              <Label>رقم الطلب (تقريبي)</Label>
               <div className="font-mono text-lg font-semibold h-7">
                 {loading ? (
                   <Skeleton className="h-6 w-24" />
                 ) : (
                   <span className="text-muted-foreground text-sm">
                     {rfqNumber}
-                    <span className="text-[10px] text-muted-foreground/60 block">
-                      (تقريبي — يتأكد عند الحفظ)
-                    </span>
                   </span>
                 )}
               </div>
@@ -294,9 +298,10 @@ export default function NewRfqPage() {
                             />
                           )}
                         />
+                        {/* إصلاح #8: عرض خطأ الصنف في الجدول */}
                         {errors.items?.[index]?.internalItemId && (
                           <p className="text-xs text-destructive mt-1 px-2">
-                            {errors.items[index]!.internalItemId!.message}
+                            {errors.items[index]?.internalItemId?.message}
                           </p>
                         )}
                       </TableCell>
@@ -307,9 +312,10 @@ export default function NewRfqPage() {
                           {...register(`items.${index}.quantity`)}
                           className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold"
                         />
+                        {/* إصلاح #8: عرض خطأ الكمية في الجدول */}
                         {errors.items?.[index]?.quantity && (
                           <p className="text-xs text-destructive mt-1">
-                            {errors.items[index]!.quantity!.message}
+                            {errors.items[index]?.quantity?.message}
                           </p>
                         )}
                       </TableCell>
