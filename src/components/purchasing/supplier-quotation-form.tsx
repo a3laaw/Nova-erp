@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -86,7 +85,6 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
     const handleAnalyzePdf = async () => {
         if (!selectedFile) return;
         setIsAnalyzing(true);
-        // Placeholder for future Genkit Flow implementation
         setTimeout(() => {
             toast({
                 title: 'ميزة ذكية قيد التنفيذ',

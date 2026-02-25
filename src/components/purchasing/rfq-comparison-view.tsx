@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useMemo } from 'react';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useSubscription } from '@/firebase';
 import { useFirebase } from '@/firebase';
 import { query, where } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem } from '@/lib/types';
