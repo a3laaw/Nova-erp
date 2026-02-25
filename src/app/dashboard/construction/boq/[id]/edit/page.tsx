@@ -20,7 +20,7 @@ export default function EditBoqPage() {
     
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [initialItems, setInitialItems] = useState<BoqItem[]>([]);
+    const [originalItemIds, setOriginalItemIds] = useState<Set<string>>(new Set());
 
     const {
         control,
@@ -54,11 +54,13 @@ export default function EditBoqPage() {
                 }
 
                 const boqData = boqSnap.data() as Boq;
-                const boqItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem));
+                const boqItems = itemsSnap.docs.map(d => ({ ...d.data(), id: d.id } as BoqItem));
                 
-                // Sort items by itemNumber to maintain visual order
+                // Map original Firestore IDs to Set for deletion tracking
+                setOriginalItemIds(new Set(boqItems.map(i => i.id!)));
+
+                // Sort items by itemNumber to maintain structure
                 const sortedItems = boqItems.sort((a, b) => (a.itemNumber || '').localeCompare(b.itemNumber || '', undefined, { numeric: true }));
-                setInitialItems(sortedItems);
                 
                 reset({
                     name: boqData.name,
@@ -66,7 +68,7 @@ export default function EditBoqPage() {
                     status: boqData.status,
                     items: sortedItems.map(item => ({
                         ...item,
-                        uid: item.id!, 
+                        uid: item.id!, // Use Firestore ID as stable UID
                     })),
                 });
             } catch(e) {
@@ -86,12 +88,7 @@ export default function EditBoqPage() {
             const batch = writeBatch(firestore);
             const boqRef = doc(firestore, 'boqs', id);
             
-            const totalValue = data.items.reduce((sum, item) => {
-                if (item.isHeader) return sum;
-                return sum + ((item.quantity || 0) * (item.sellingUnitPrice || 0));
-            }, 0);
-
-            // Re-calculate hierarchical numbering and levels for data integrity
+            // 1. Calculate Hierarchy & Order
             const finalItems: any[] = [];
             const childMap = new Map<string | null, string[]>();
             data.items.forEach(item => {
@@ -105,13 +102,20 @@ export default function EditBoqPage() {
                     const item = data.items.find(i => i.uid === childUid);
                     if (item) {
                         const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
-                        finalItems.push({ ...item, itemNumber: newNumber, level });
+                        finalItems.push({ ...item, itemNumber: newNumber, level, order: index });
                         processNode(childUid, newNumber, level + 1);
                     }
                 });
             };
             processNode(null, '', 0);
 
+            // 2. Calculate Totals
+            const totalValue = finalItems.reduce((sum, item) => {
+                if (item.isHeader) return sum;
+                return sum + ((item.quantity || 0) * (item.sellingUnitPrice || 0));
+            }, 0);
+
+            // 3. Update main BOQ doc
             batch.update(boqRef, {
                 name: data.name,
                 clientName: data.clientName || null,
@@ -121,20 +125,21 @@ export default function EditBoqPage() {
                 updatedAt: serverTimestamp(),
             });
 
+            // 4. Handle Items (Delete missing ones, update/add current ones)
             const currentUids = new Set(finalItems.map(item => item.uid));
-
-            // 1. Delete removed items
-            for (const originalItem of initialItems) {
-                if (!currentUids.has(originalItem.id!)) {
-                    batch.delete(doc(firestore, `boqs/${id}/items`, originalItem.id!));
+            
+            // Delete removed items
+            originalItemIds.forEach(oldId => {
+                if (!currentUids.has(oldId)) {
+                    batch.delete(doc(firestore, `boqs/${id}/items`, oldId));
                 }
-            }
+            });
 
-            // 2. Update or add items
+            // Set/Update all current items
             for (const item of finalItems) {
-                const itemRef = doc(firestore, `boqs/${id}/items`, item.uid);
+                const itemDocRef = doc(firestore, `boqs/${id}/items`, item.uid);
                 const { uid, ...itemData } = item;
-                batch.set(itemRef, cleanFirestoreData(itemData), { merge: true });
+                batch.set(itemDocRef, cleanFirestoreData(itemData), { merge: true });
             }
 
             await batch.commit();
@@ -153,7 +158,7 @@ export default function EditBoqPage() {
         return (
             <div className="flex flex-col items-center justify-center h-screen gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-lg font-medium animate-pulse">جاري تحميل بيانات التعديل وتحليل الهيكل...</p>
+                <p className="text-lg font-medium animate-pulse">جاري تحميل البيانات وتحليل الهيكل...</p>
             </div>
         );
     }

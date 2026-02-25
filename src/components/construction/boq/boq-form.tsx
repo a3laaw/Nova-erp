@@ -51,7 +51,6 @@ export type BoqFormValues = z.infer<typeof boqFormSchema>;
 type BoqItemWithChildren = BoqFormValues['items'][number] & {
     _index: number;
     children: BoqItemWithChildren[];
-    total: number;
 };
 
 // --- Row Renderer ---
@@ -71,15 +70,16 @@ const BoqItemRowRenderer = React.memo(({
     masterItemsMap: Map<string | null, any[]>;
     masterItemsLoading: boolean;
 }) => {
-  const itemData = useWatch({
-    control,
-    name: `items.${node._index}`,
-  });
+  // Watch individual fields for real-time local row calculation
+  const quantity = useWatch({ control, name: `items.${node._index}.quantity` });
+  const price = useWatch({ control, name: `items.${node._index}.sellingUnitPrice` });
+  const isHeader = useWatch({ control, name: `items.${node._index}.isHeader` });
+  const itemId = useWatch({ control, name: `items.${node._index}.itemId` });
 
   const lineTotal = React.useMemo(() => {
-    if (itemData.isHeader) return node.total;
-    return (Number(itemData.quantity) || 0) * (Number(itemData.sellingUnitPrice) || 0);
-  }, [itemData.isHeader, itemData.quantity, itemData.sellingUnitPrice, node.total]);
+    if (isHeader) return 0; // Header totals are calculated by summing children in the parent logic
+    return (Number(quantity) || 0) * (Number(price) || 0);
+  }, [isHeader, quantity, price]);
 
   const handleMasterItemSelect = (value: string) => {
     const allMasterItems = Array.from(masterItemsMap.values()).flat();
@@ -87,9 +87,9 @@ const BoqItemRowRenderer = React.memo(({
     if (selectedItem) {
         setValue(`items.${node._index}.itemId`, value, { shouldDirty: true });
         setValue(`items.${node._index}.description`, selectedItem.label, { shouldDirty: true });
-        const isHeader = selectedItem.isHeader || masterItemsMap.has(value);
-        setValue(`items.${node._index}.isHeader`, isHeader, { shouldDirty: true });
-        setValue(`items.${node._index}.unit`, isHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldDirty: true });
+        const shouldBeHeader = selectedItem.isHeader || masterItemsMap.has(value);
+        setValue(`items.${node._index}.isHeader`, shouldBeHeader, { shouldDirty: true });
+        setValue(`items.${node._index}.unit`, shouldBeHeader ? '' : (selectedItem.unit || 'مقطوعية'), { shouldDirty: true });
     }
   };
     
@@ -105,71 +105,71 @@ const BoqItemRowRenderer = React.memo(({
     return lastIndex;
   };
   
-  const handleAddClick = (isHeader: boolean) => {
+  const handleAddClick = (headerMode: boolean) => {
     const parentIndex = node._index;
     const lastDescendantIndex = findLastDescendantIndex(parentIndex);
-    onAdd(node.uid, isHeader, lastDescendantIndex + 1);
+    onAdd(node.uid, headerMode, lastDescendantIndex + 1);
   };
     
     return (
         <React.Fragment>
             <TableRow className={cn(
                 "transition-colors",
-                itemData.isHeader ? "bg-muted/40 font-bold border-b-2" : "hover:bg-muted/20"
+                isHeader ? "bg-muted/40 font-bold border-b-2" : "hover:bg-muted/20"
             )}>
-                <TableCell className="font-mono text-xs text-muted-foreground w-12 text-center border-l px-1">{wbs}</TableCell>
-                <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="min-w-[300px] px-2">
+                <TableCell className="font-mono text-xs text-muted-foreground text-center border-l px-1">{wbs}</TableCell>
+                <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="px-2">
                      <div className="flex flex-col gap-2 py-1">
                         <InlineSearchList
-                            value={itemData.itemId || ''}
+                            value={itemId || ''}
                             onSelect={handleMasterItemSelect}
                             options={masterItemsMap.get(parentReferenceId) || []}
-                            placeholder={masterItemsLoading ? "تحميل..." : "ابحث عن بند مرجعي..."}
+                            placeholder={masterItemsLoading ? "تحميل..." : "ابحث عن بند..."}
                             className="bg-background shadow-sm h-9"
                         />
                         <Textarea
                             {...register(`items.${node._index}.description`)}
-                            placeholder="بيان الأعمال التفصيلي..."
+                            placeholder="بيان الأعمال..."
                             rows={1}
                             className="text-sm mt-1 min-h-[38px] border-muted focus:border-primary transition-all"
                         />
                     </div>
                 </TableCell>
-                <TableCell className="min-w-[100px] px-1">
+                <TableCell className="px-1">
                     <Input 
                         {...register(`items.${node._index}.unit`)} 
-                        className="h-10 text-center bg-background text-sm font-semibold px-1" 
-                        disabled={itemData.isHeader} 
+                        className="h-10 text-center bg-background text-sm font-semibold" 
+                        disabled={isHeader} 
                         placeholder="الوحدة" 
                     />
                 </TableCell>
-                <TableCell className="min-w-[120px] px-1">
+                <TableCell className="px-1">
                     <Input 
                         type="number" 
                         step="any" 
                         {...register(`items.${node._index}.quantity`)} 
-                        className="h-10 dir-ltr text-center font-mono text-lg font-bold px-1" 
-                        disabled={itemData.isHeader} 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold" 
+                        disabled={isHeader} 
                     />
                 </TableCell>
-                <TableCell className="min-w-[150px] px-1">
+                <TableCell className="px-1">
                     <Input 
                         type="number" 
                         step="0.001" 
                         {...register(`items.${node._index}.sellingUnitPrice`)} 
-                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary px-1" 
-                        disabled={itemData.isHeader} 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary" 
+                        disabled={isHeader} 
                     />
                 </TableCell>
-                <TableCell className="text-left font-mono font-bold min-w-[180px] border-r bg-muted/10 px-2">
+                <TableCell className="text-left font-mono font-bold border-r bg-muted/10 px-3">
                     <div className={cn(
                         "py-1 text-lg tracking-tight truncate",
-                        itemData.isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
+                        isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
                     )}>
-                        {formatCurrency(lineTotal)}
+                        {isHeader ? '-' : formatCurrency(lineTotal)}
                     </div>
                 </TableCell>
-                <TableCell className="min-w-[180px] px-2">
+                <TableCell className="px-2">
                     <Textarea 
                         {...register(`items.${node._index}.notes`)} 
                         placeholder="ملاحظات..." 
@@ -177,9 +177,9 @@ const BoqItemRowRenderer = React.memo(({
                         rows={1} 
                     />
                 </TableCell>
-                <TableCell className="w-20 text-center border-r px-1">
+                <TableCell className="text-center border-r px-1">
                     <div className="flex items-center justify-center gap-1">
-                        {itemData.isHeader && (
+                        {isHeader && (
                             <Button type="button" size="icon" variant="outline" className="h-8 w-8 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل">
                                 <PlusCircle className="h-4 w-4"/>
                             </Button>
@@ -196,7 +196,7 @@ const BoqItemRowRenderer = React.memo(({
                     node={childNode}
                     level={level + 1}
                     wbs={`${wbs}.${childIndex + 1}`}
-                    parentReferenceId={itemData.itemId || null}
+                    parentReferenceId={itemId || null}
                     control={control}
                     register={register}
                     setValue={setValue}
@@ -243,20 +243,19 @@ export function BoqForm({
     const masterItemsMap = React.useMemo(() => {
         const map = new Map<string | null, any[]>();
         (masterItemsData || []).forEach((item: BoqReferenceItem) => {
-            const parentId = item.parentBoqReferenceItemId || null;
-            if (!map.has(parentId)) map.set(parentId, []);
-            map.get(parentId)!.push({ value: item.id!, label: item.name, ...item });
+            const pId = item.parentBoqReferenceItemId || null;
+            if (!map.has(pId)) map.set(pId, []);
+            map.get(pId)!.push({ value: item.id!, label: item.name, ...item });
         });
         return map;
     }, [masterItemsData]);
 
     const { boqTree, grandTotal } = React.useMemo(() => {
         const items = watchedItems || [];
-        const itemsWithChildren: BoqItemWithChildren[] = items.map((item: any, index: number) => ({
+        const itemsWithChildren: (BoqItemWithChildren)[] = items.map((item: any, index: number) => ({
             ...item,
             _index: index,
             children: [],
-            total: 0,
         }));
         
         const map = new Map(itemsWithChildren.map(item => [item.uid, item]));
@@ -268,17 +267,14 @@ export function BoqForm({
             else roots.push(item);
         });
 
-        function calculateNodeTotal(node: BoqItemWithChildren): number {
-            if (node.isHeader) {
-                node.total = node.children.reduce((sum, child) => sum + calculateNodeTotal(child), 0);
-            } else {
-                node.total = (Number(node.quantity) || 0) * (Number(node.sellingUnitPrice) || 0);
+        let totalSum = 0;
+        items.forEach((item: any) => {
+            if (!item.isHeader) {
+                totalSum += (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
             }
-            return node.total;
-        }
+        });
 
-        const grandTotalValue = roots.reduce((sum, rootNode) => sum + calculateNodeTotal(rootNode), 0);
-        return { boqTree: roots, grandTotal: grandTotalValue };
+        return { boqTree: roots, grandTotal: totalSum };
     }, [watchedItems]);
 
     const handleAddRootSection = () => {
@@ -286,7 +282,7 @@ export function BoqForm({
     };
 
     const handleAddItem = React.useCallback((parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
-        const parent = fields.find(f => f.uid === parentId);
+        const parent = fields.find((f: any) => f.uid === parentId);
         const parentLevel = parent ? (parent as any).level : -1;
         insert(insertAtIndex, {
           uid: generateId(), description: '', unit: isHeader ? '' : 'مقطوعية',
@@ -337,7 +333,7 @@ export function BoqForm({
                     </div>
                 </div>
 
-                <CardContent className="p-0 max-w-full mx-auto mt-6 px-4">
+                <CardContent className="p-0 max-w-full mx-auto mt-6 px-4 pb-32">
                     <div className="grid md:grid-cols-3 gap-8 p-8 mb-6 border rounded-3xl bg-card shadow-sm">
                         <div className="grid gap-2">
                             <Label className="font-bold text-sm text-foreground/70">اسم / مرجع الجدول *</Label>
@@ -365,17 +361,27 @@ export function BoqForm({
 
                     <div className="border rounded-3xl overflow-hidden shadow-xl bg-card">
                         <div className="overflow-x-auto">
-                            <Table className="w-full border-collapse">
+                            <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                                <colgroup>
+                                    <col className="w-12" /> {/* WBS */}
+                                    <col className="min-w-[350px]" /> {/* Description */}
+                                    <col className="w-32" /> {/* Unit */}
+                                    <col className="w-36" /> {/* Quantity */}
+                                    <col className="w-44" /> {/* Unit Price */}
+                                    <col className="w-48" /> {/* Total */}
+                                    <col className="min-w-[200px]" /> {/* Notes */}
+                                    <col className="w-24" /> {/* Actions */}
+                                </colgroup>
                                 <TableHeader className="bg-muted/80 backdrop-blur-sm">
-                                    <TableRow className="hover:bg-transparent border-b-2">
-                                        <TableHead className="w-12 text-center font-bold text-xs uppercase px-1">م</TableHead>
-                                        <TableHead className="min-w-[300px] font-bold py-4 px-2">بيان الأعمال التفصيلي</TableHead>
-                                        <TableHead className="min-w-[100px] text-center font-bold px-1">الوحدة</TableHead>
-                                        <TableHead className="min-w-[120px] text-center font-bold px-1">الكمية</TableHead>
-                                        <TableHead className="min-w-[150px] text-center font-bold px-1">سعر الوحدة</TableHead>
-                                        <TableHead className="min-w-[180px] text-left font-bold border-r px-2">الإجمالي</TableHead>
-                                        <TableHead className="min-w-[180px] font-bold px-2">ملاحظات</TableHead>
-                                        <TableHead className="w-20 text-center font-bold border-r px-1">إجراءات</TableHead>
+                                    <TableRow className="hover:bg-transparent border-b-2 h-14">
+                                        <TableHead className="text-center font-bold text-xs uppercase px-1">م</TableHead>
+                                        <TableHead className="font-bold px-2">بيان الأعمال التفصيلي</TableHead>
+                                        <TableHead className="text-center font-bold px-1">الوحدة</TableHead>
+                                        <TableHead className="text-center font-bold px-1">الكمية</TableHead>
+                                        <TableHead className="text-center font-bold px-1">سعر الوحدة</TableHead>
+                                        <TableHead className="text-left font-bold border-r px-3">الإجمالي</TableHead>
+                                        <TableHead className="font-bold px-2">ملاحظات</TableHead>
+                                        <TableHead className="text-center font-bold border-r px-1">إجراءات</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -411,7 +417,7 @@ export function BoqForm({
                                 <TableFooter className="bg-primary/5">
                                     <TableRow className="font-black text-xl hover:bg-transparent">
                                         <TableCell colSpan={5} className="text-right py-8 px-8">الإجمالي العام لجدول الكميات:</TableCell>
-                                        <TableCell className="text-left font-mono text-primary py-8 border-r bg-primary/5 px-2">
+                                        <TableCell className="text-left font-mono text-primary py-8 border-r bg-primary/5 px-3">
                                             <div className="flex flex-col">
                                                 <span className="text-2xl">{formatCurrency(grandTotal)}</span>
                                                 <span className="text-[10px] font-normal text-muted-foreground mt-1">فقط لا غير</span>
@@ -424,7 +430,7 @@ export function BoqForm({
                         </div>
                     </div>
                     
-                    <div className="flex justify-center p-12 mb-24">
+                    <div className="flex justify-center p-12">
                         <Button 
                             type="button" 
                             variant="secondary" 
@@ -441,7 +447,7 @@ export function BoqForm({
                     <div className="max-w-7xl mx-auto flex justify-between items-center p-6 px-10">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border">
                             <Calculator className="h-4 w-4" />
-                            تم حساب {fields.length} بنود بدقة هندسية
+                            تم حساب {fields.length} بنود بدقة
                         </div>
                         <div className="flex gap-4">
                             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
