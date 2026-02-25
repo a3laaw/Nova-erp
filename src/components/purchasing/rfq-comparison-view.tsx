@@ -8,7 +8,7 @@ import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem } from '@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Award, Info, AlertCircle } from 'lucide-react';
+import { Award, AlertCircle } from 'lucide-react';
 
 interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
@@ -46,7 +46,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             return { data: [], vendors: [], totals: {} };
         }
 
-        // Only include vendors who have actually submitted a quote
         const participatingVendors = vendors.filter(v => supplierQuotations.some(q => q.vendorId === v.id));
         const totals: Record<string, number> = {};
         participatingVendors.forEach(v => totals[v.id!] = 0);

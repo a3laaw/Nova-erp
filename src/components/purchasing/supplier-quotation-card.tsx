@@ -9,7 +9,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '../ui/button';
-import { PlusCircle, CheckCircle, FileText, ExternalLink, Calendar } from 'lucide-react';
+import { PlusCircle, CheckCircle, FileText, Pencil, Calendar } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { SupplierQuotationForm } from './supplier-quotation-form';
 import { formatCurrency, cn } from '@/lib/utils';

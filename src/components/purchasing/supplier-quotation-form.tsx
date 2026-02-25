@@ -12,7 +12,7 @@ import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
-import { Separator } from '../ui/separator';
+import { Badge } from '../ui/badge';
 
 interface SupplierQuotationFormProps {
     isOpen: boolean;
