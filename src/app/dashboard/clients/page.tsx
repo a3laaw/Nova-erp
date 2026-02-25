@@ -19,7 +19,7 @@ export default function ClientsPage() {
     const searchParams = useSearchParams();
     const [view, setView] = useState<'registered' | 'prospective'>('registered');
 
-    // Handle initial view from URL params (e.g., ?view=prospective)
+    // Handle initial view and changes from URL params (e.g., ?view=prospective)
     useEffect(() => {
         const viewParam = searchParams.get('view');
         if (viewParam === 'prospective') {

@@ -70,36 +70,35 @@ const navItems = {
     { 
       label: 'إدارة علاقات العملاء (CRM)', 
       icon: LineChart, 
-      roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
+      roles: ['Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard',
       children: [
-        { href: '/dashboard/clients?view=prospective', label: 'إدارة العملاء المحتملين', icon: UserSearch },
+        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
+        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
         { 
-          label: 'تقارير المتابعة',
+          label: 'تقارير المتابعة والأداء',
           children: [
             { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة' },
             { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة' },
-            { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين (تقرير)' },
+            { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين' },
             { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية' },
           ]
         },
       ]
     },
-    { href: '/dashboard/clients', label: 'ملفات العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
     { 
       label: 'المقاولات',
       icon: Construction,
       roles: ['Admin', 'Engineer'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/construction/projects', label: 'المشاريع' },
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية' },
         { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات' },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين' },
       ]
     },
-    { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Building, roles: ['Admin', 'Accountant'] },
     { 
-      label: 'المحاسبة', 
+      label: 'المحاسبة والمالية', 
       icon: Wallet, 
       roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
       hrefPrefix: '/dashboard/accounting',
@@ -108,7 +107,7 @@ const navItems = {
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
         { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي' },
         {
-          label: 'قيود وسندات',
+          label: 'العمليات المالية',
           children: [
             { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
             { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
@@ -117,25 +116,15 @@ const navItems = {
           ]
         },
         {
-          label: 'التقارير المالية',
+          label: 'التقارير والقوائم',
           children: [
-            { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير المالي اليومي' },
+            { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير اليومي' },
             { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية' },
-            { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام' },
+            { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ' },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
-            { href: '/dashboard/accounting/client-statements', label: 'كشوفات حسابات العملاء' },
             { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية' },
-          ]
-        },
-        {
-          label: 'القوائم المالية',
-          children: [
             { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل' },
-            { href: '/dashboard/accounting/balance-sheet', label: 'قائمة المركز المالي' },
-            { href: '/dashboard/accounting/cash-flow', label: 'قائمة التدفقات النقدية' },
-            { href: '/dashboard/accounting/equity-statement', label: 'قائمة التغير في حقوق الملكية' },
-            { href: '/dashboard/accounting/financial-statement-notes', label: 'الإيضاحات المتممة' },
-            { href: '/dashboard/accounting/financial-forecast', label: 'التنبؤات المالية' },
+            { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي' },
           ]
         }
       ]
@@ -150,32 +139,20 @@ const navItems = {
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات' },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان' },
         { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب' },
-        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة' },
-        { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية' },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموظفين' },
       ]
     },
     { 
-      label: 'المشتريات',
-      icon: ShoppingCart,
-      roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/purchasing',
-      children: [
-        { href: '/dashboard/purchasing', label: 'لوحة المعلومات' },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير' },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
-      ]
-    },
-    { 
-      label: 'المخازن',
+      label: 'المخازن والمشتريات',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/warehouse',
+      hrefPrefix: '/dashboard',
       children: [
-        { href: '/dashboard/warehouse/items', label: 'الأصناف' },
-        { href: '/dashboard/warehouse/categories', label: 'التصنيفات' },
-        { href: '/dashboard/warehouse/opening-balances', label: 'أرصدة افتتاحية' },
-        { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية' },
-        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون' },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)' },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
+        { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف' },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع' },
+        { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
       ]
     },
     { 
@@ -186,7 +163,7 @@ const navItems = {
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة' },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات' },
-        { href: '/dashboard/contracts', label: 'العقود والنماذج' },
+        { href: '/dashboard/contracts', label: 'نماذج العقود' },
         { href: '/dashboard/settings/classifications', label: 'التصنيفات' },
       ]
     },
@@ -196,9 +173,10 @@ const navItems = {
     { 
       label: 'CRM', 
       icon: LineChart, 
-      roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
+      roles: ['Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard',
       children: [
+        { href: '/dashboard/clients?view=registered', label: 'Client Files', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'Lead Management', icon: UserSearch },
         { 
           label: 'Follow-up Reports',
@@ -211,7 +189,6 @@ const navItems = {
         },
       ]
     },
-    { href: '/dashboard/clients', label: 'Client Files', icon: Users, roles: ['Admin', 'Secretary'] },
     { 
       label: 'Construction',
       icon: Construction,
@@ -223,7 +200,6 @@ const navItems = {
         { href: '/dashboard/construction/subcontractors', label: 'Subcontractors' },
       ]
     },
-    { href: '/dashboard/purchasing/vendors', label: 'Vendors', icon: Building, roles: ['Admin', 'Accountant'] },
     { 
       label: 'Accounting', 
       icon: Wallet, 
@@ -232,36 +208,20 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/quotations', label: 'Quotations' },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' },
-        { href: '/dashboard/accounting/assistant', label: 'AI Assistant' },
         {
-          label: 'Journals & Vouchers',
+          label: 'Finances',
           children: [
             { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries' },
             { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts' },
             { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers' },
-            { href: '/dashboard/accounting/invoices', label: 'Invoices' },
           ]
         },
         {
-          label: 'Financial Reports',
-          children: [
-            { href: '/dashboard/accounting/reports/daily-summary', label: 'Daily Financial Report' },
-            { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation' },
-            { href: '/dashboard/accounting/general-ledger', label: 'General Ledger' },
-            { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance' },
-            { href: '/dashboard/accounting/client-statements', label: 'Client Statements' },
-            { href: '/dashboard/accounting/reports', label: 'Analytical Reports' },
-          ]
-        },
-        {
-          label: 'Financial Statements',
+          label: 'Reports',
           children: [
             { href: '/dashboard/accounting/income-statement', label: 'Income Statement' },
             { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet' },
-            { href: '/dashboard/accounting/cash-flow', label: 'Cash Flow Statement' },
-            { href: '/dashboard/accounting/equity-statement', label: 'Statement of Equity' },
-            { href: '/dashboard/accounting/financial-statement-notes', label: 'Notes to Financial Statements' },
-            { href: '/dashboard/accounting/financial-forecast', label: 'Financial Forecast' },
+            { href: '/dashboard/accounting/reports', label: 'Analytical Reports' },
           ]
         }
       ]
@@ -272,36 +232,22 @@ const navItems = {
       roles: ['Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'Employee Files' },
-        { href: '/dashboard/hr/leaves', label: 'Leave Requests' },
-        { href: '/dashboard/hr/permissions', label: 'Permission Requests' },
+        { href: '/dashboard/hr/employees', label: 'Employees' },
+        { href: '/dashboard/hr/leaves', label: 'Leaves' },
         { href: '/dashboard/hr/payroll', label: 'Payroll' },
-        { href: '/dashboard/hr/gratuity-calculator', label: 'Gratuity Calculator' },
         { href: '/dashboard/hr/reports', label: 'HR Reports' },
       ]
     },
     { 
-      label: 'Purchasing',
-      icon: ShoppingCart,
-      roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/purchasing',
-      children: [
-        { href: '/dashboard/purchasing', label: 'Dashboard' },
-        { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
-      ]
-    },
-    { 
-      label: 'Inventory',
+      label: 'Warehouse',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/warehouse',
+      hrefPrefix: '/dashboard',
       children: [
-        { href: '/dashboard/warehouse/items', label: 'Items' },
-        { href: '/dashboard/warehouse/categories', label: 'Categories' },
-        { href: '/dashboard/warehouse/opening-balances', label: 'Opening Balances' },
-        { href: '/dashboard/warehouse/transfers', label: 'Stock Transfers' },
-        { href: '/dashboard/warehouse/reports', label: 'Inventory Reports' },
+        { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
+        { href: '/dashboard/warehouse/items', label: 'Inventory' },
+        { href: '/dashboard/warehouse/material-issue', label: 'Material Issue' },
       ]
     },
     { 
@@ -310,10 +256,9 @@ const navItems = {
       roles: ['Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
-        { href: '/dashboard/settings', label: 'General Settings' },
-        { href: '/dashboard/settings/companies', label: 'Company Management' },
-        { href: '/dashboard/contracts', label: 'Contract Templates' },
-        { href: '/dashboard/settings/classifications', label: 'Classifications' },
+        { href: '/dashboard/settings', label: 'General' },
+        { href: '/dashboard/settings/companies', label: 'Companies' },
+        { href: '/dashboard/contracts', label: 'Contracts' },
       ]
     },
   ]
