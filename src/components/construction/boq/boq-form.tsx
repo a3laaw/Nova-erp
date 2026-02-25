@@ -18,8 +18,6 @@ import {
   ListTree,
   Calculator,
   Info,
-  ArrowUp,
-  ArrowDown,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -244,7 +242,16 @@ const BoqItemRowRenderer = React.memo(
 );
 BoqItemRowRenderer.displayName = 'BoqItemRowRenderer';
 
-export function BoqForm({ onClose, isSaving, isEditing, control, register, setValue, watch, errors }: {
+export function BoqForm({
+  onClose,
+  isSaving,
+  isEditing,
+  control,
+  register,
+  setValue,
+  watch,
+  errors,
+}: {
   onClose: () => void;
   isSaving: boolean;
   isEditing: boolean;
@@ -255,7 +262,8 @@ export function BoqForm({ onClose, isSaving, isEditing, control, register, setVa
   errors: FieldErrors<BoqFormValues>;
 }) {
   const { firestore } = useFirebase();
-  const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
+  const masterItemsConstraints = React.useMemo(() => [orderBy('name')], []);
+  const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', masterItemsConstraints);
 
   const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
   const watchedItems = watch('items');
@@ -325,7 +333,7 @@ export function BoqForm({ onClose, isSaving, isEditing, control, register, setVa
             <div className="flex items-center gap-8 bg-muted/30 px-6 py-3 rounded-2xl border">
               <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">إجمالي المشروع</Label><div className="text-3xl font-black text-primary font-mono">{formatCurrency(grandTotal)}</div></div>
               <Separator orientation="vertical" className="h-10 mx-4" />
-              <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">عدد البنود</Label><div className="text-2xl font-bold font-mono">{fields.length}</div></div>
+              <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">عدد البنود</Label><div className="text-2xl font-bold font-mono text-foreground/80">{fields.length}</div></div>
             </div>
           </div>
         </div>
