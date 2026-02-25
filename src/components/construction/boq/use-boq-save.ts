@@ -13,7 +13,7 @@ import {
   getDoc,
   getDocs,
   query,
-  updateDoc, // تم إضافة الاستيراد الناقص هنا
+  updateDoc,
 } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -22,7 +22,7 @@ import { cleanFirestoreData } from '@/lib/utils';
 import { boqFormSchema, type BoqFormValues } from './boq-form';
 import type { Boq, BoqItem } from '@/lib/types';
 
-// ─── مولد ID آمن ───
+// ─── مولد ID آمن ومستقر ───
 export const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -128,6 +128,7 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { mountedRef.current = false; };
   }, []);
 
+  // ─── تحميل البيانات الأصلية (وضع التعديل) ───
   useEffect(() => {
     if (mode !== 'edit' || !firestore || !boqId) return;
     let cancelled = false;
@@ -190,6 +191,43 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     fetchData();
     return () => { cancelled = true; };
   }, [mode, firestore, boqId, router, toast, form]);
+
+  // ─── منطق النسخ الاستراتيجي: إعادة ربط الشجرة بالمعرفات الجديدة ───
+  useEffect(() => {
+    if (mode !== 'create') return;
+
+    const copiedDataString = sessionStorage.getItem('copiedBoqData');
+    if (!copiedDataString) return;
+
+    try {
+      const copiedData = JSON.parse(copiedDataString);
+      const oldToNewUid = new Map<string, string>();
+
+      // 1. توليد معرفات جديدة لكل البنود
+      const itemsWithNewUids = (copiedData.items || []).map((item: any) => {
+        const newUid = generateStableId();
+        oldToNewUid.set(item.uid, newUid);
+        return { ...item, uid: newUid };
+      });
+
+      // 2. إعادة تعيين parentId ليرتبط بالمعرفات الجديدة (Remapping)
+      const remappedItems = itemsWithNewUids.map((item: any) => ({
+        ...item,
+        parentId: item.parentId ? (oldToNewUid.get(item.parentId) || null) : null
+      }));
+
+      form.reset({
+        ...copiedData,
+        items: remappedItems,
+      });
+
+      toast({ title: 'تم النسخ بنجاح', description: 'تم استنساخ الجدول مع الحفاظ على الهيكل الشجري.' });
+    } catch (error) {
+      console.error('Failed to reconstruct copied BOQ:', error);
+    } finally {
+      sessionStorage.removeItem('copiedBoqData');
+    }
+  }, [mode, form, toast]);
 
   const onSubmit = async (data: BoqFormValues) => {
     if (!firestore || !currentUser) return;

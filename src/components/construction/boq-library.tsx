@@ -86,32 +86,36 @@ export function BoqLibrary() {
         }
     };
     
-    const generateId = () => Math.random().toString(36).substring(2, 9);
-
+    // --- منطق النسخ الذكي ---
     const handleCopy = async (boqToCopy: Boq) => {
         if (!firestore) return;
-        toast({ title: 'جاري نسخ جدول الكميات...' });
+        toast({ title: 'جاري استنساخ جدول الكميات...' });
+        
         try {
+            // 1. جلب كافة بنود الجدول الأصلي
             const itemsQuery = query(collection(firestore, `boqs/${boqToCopy.id}/items`));
             const itemsSnap = await getDocs(itemsQuery);
+            
+            // 2. تحضير البيانات مع الاحتفاظ بالمعرفات الحالية للمرحلة الثانية (Remapping)
             const items = itemsSnap.docs.map(d => {
                 const data = d.data();
-                const { id, ...rest } = data;
-                return { ...rest, uid: generateId() }; // Create new UID
+                return { ...data, uid: d.id }; 
             });
 
             const copiedData = {
-                name: `نسخة من - ${boqToCopy.name}`,
+                name: `${boqToCopy.name} (نسخة)`,
                 clientName: boqToCopy.clientName || '',
-                status: boqToCopy.status,
+                status: 'تقديري',
                 items: items,
             };
 
+            // 3. التخزين المؤقت في الجلسة والتوجه لصفحة الإنشاء
             sessionStorage.setItem('copiedBoqData', JSON.stringify(copiedData));
             router.push('/dashboard/construction/boq/new');
+            
         } catch (error) {
             console.error("Error copying BOQ:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل نسخ جدول الكميات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استنساخ جدول الكميات.' });
         }
     };
 
@@ -192,7 +196,7 @@ export function BoqLibrary() {
                                                     <Pencil className="ml-2 h-4 w-4" /> تعديل
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleCopy(boq)}>
-                                                    <Copy className="ml-2 h-4 w-4" /> نسخ
+                                                    <Copy className="ml-2 h-4 w-4" /> استنساخ (نسخ)
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem onClick={() => setItemToDelete(boq)} className="text-destructive focus:text-destructive">
