@@ -6,15 +6,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
-import type { BoqItem, BoqReferenceItem, SubcontractorType, CompanyActivityType, TransactionType } from '@/lib/types';
+import { collection, doc, orderBy } from 'firebase/firestore';
+import type { BoqReferenceItem, WorkStage } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, PlusCircle, Trash2, ListTree, Calculator, Info, Minus, Plus } from 'lucide-react';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
-import { CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { Loader2, Save, PlusCircle, Trash2, ListTree, Calculator, Info, Minus, Plus, Search } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+import { CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -70,14 +70,13 @@ const BoqItemRowRenderer = React.memo(({
     masterItemsMap: Map<string | null, any[]>;
     masterItemsLoading: boolean;
 }) => {
-  // Watch individual fields for real-time local row calculation
   const quantity = useWatch({ control, name: `items.${node._index}.quantity` });
   const price = useWatch({ control, name: `items.${node._index}.sellingUnitPrice` });
   const isHeader = useWatch({ control, name: `items.${node._index}.isHeader` });
   const itemId = useWatch({ control, name: `items.${node._index}.itemId` });
 
   const lineTotal = React.useMemo(() => {
-    if (isHeader) return 0; // Header totals are calculated by summing children in the parent logic
+    if (isHeader) return 0;
     return (Number(quantity) || 0) * (Number(price) || 0);
   }, [isHeader, quantity, price]);
 
@@ -148,7 +147,7 @@ const BoqItemRowRenderer = React.memo(({
                         type="number" 
                         step="any" 
                         {...register(`items.${node._index}.quantity`)} 
-                        className="h-10 dir-ltr text-center font-mono text-lg font-bold" 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold min-w-[80px]" 
                         disabled={isHeader} 
                     />
                 </TableCell>
@@ -157,13 +156,13 @@ const BoqItemRowRenderer = React.memo(({
                         type="number" 
                         step="0.001" 
                         {...register(`items.${node._index}.sellingUnitPrice`)} 
-                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary" 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary min-w-[120px]" 
                         disabled={isHeader} 
                     />
                 </TableCell>
                 <TableCell className="text-left font-mono font-bold border-r bg-muted/10 px-3">
                     <div className={cn(
-                        "py-1 text-lg tracking-tight truncate",
+                        "py-1 text-lg tracking-tight truncate min-w-[140px]",
                         isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
                     )}>
                         {isHeader ? '-' : formatCurrency(lineTotal)}
@@ -212,7 +211,6 @@ const BoqItemRowRenderer = React.memo(({
 });
 BoqItemRowRenderer.displayName = 'BoqItemRowRenderer';
 
-// --- Main Form Component ---
 export function BoqForm({ 
     onClose, 
     isSaving, 
@@ -363,14 +361,14 @@ export function BoqForm({
                         <div className="overflow-x-auto">
                             <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                                 <colgroup>
-                                    <col className="w-12" /> {/* WBS */}
-                                    <col className="min-w-[350px]" /> {/* Description */}
-                                    <col className="w-32" /> {/* Unit */}
-                                    <col className="w-36" /> {/* Quantity */}
-                                    <col className="w-44" /> {/* Unit Price */}
-                                    <col className="w-48" /> {/* Total */}
-                                    <col className="min-w-[200px]" /> {/* Notes */}
-                                    <col className="w-24" /> {/* Actions */}
+                                    <col className="w-12" />
+                                    <col className="min-w-[350px]" />
+                                    <col className="w-32" />
+                                    <col className="w-40" />
+                                    <col className="w-48" />
+                                    <col className="w-52" />
+                                    <col className="min-w-[200px]" />
+                                    <col className="w-24" />
                                 </colgroup>
                                 <TableHeader className="bg-muted/80 backdrop-blur-sm">
                                     <TableRow className="hover:bg-transparent border-b-2 h-14">

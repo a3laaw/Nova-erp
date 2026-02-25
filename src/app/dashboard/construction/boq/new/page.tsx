@@ -92,7 +92,7 @@ export default function NewBoqPage() {
                 const currentYear = new Date().getFullYear();
                 let nextNumber = 1;
                 if (counterDoc.exists()) {
-                    const counts = counterDoc.data().counts || {};
+                    const counts = counterDoc.data()?.counts || {};
                     nextNumber = (counts[currentYear] || 0) + 1;
                 }
                 const boqNumber = `BOQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
