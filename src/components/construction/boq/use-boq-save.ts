@@ -21,7 +21,6 @@ import { cleanFirestoreData } from '@/lib/utils';
 import { boqFormSchema, type BoqFormValues } from './boq-form';
 import type { Boq, BoqItem } from '@/lib/types';
 
-// ─── مولد ID آمن ومستقر ───
 export const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -33,7 +32,6 @@ export const generateStableId = (): string => {
 
 const MAX_BATCH_OPS = 490;
 
-// ─── معالجة الهيكل الشجري وحساب الإجمالي ───
 function processItemsHierarchy(items: BoqFormValues['items']): {
   finalItems: (BoqFormValues['items'][number] & {
     itemNumber: string;
@@ -60,23 +58,6 @@ function processItemsHierarchy(items: BoqFormValues['items']): {
   };
 
   processNode(null, '', 0);
-
-  // كشف البنود اليتيمة وإعادة ربطها بالجذر
-  const processedUids = new Set(finalItems.map((i) => i.uid));
-  const orphans = items.filter((i) => !processedUids.has(i.uid));
-
-  if (orphans.length > 0) {
-    orphans.forEach((orphan, idx) => {
-      const nextNum = finalItems.filter(fi => fi.level === 0).length + 1;
-      finalItems.push({
-        ...orphan,
-        parentId: null,
-        itemNumber: `${nextNum}`,
-        level: 0,
-        order: finalItems.length + idx,
-      });
-    });
-  }
 
   const totalValue = finalItems.reduce((sum, item) => {
     if (item.isHeader) return sum;
@@ -114,8 +95,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
   const [isLoading, setIsLoading] = useState(mode === 'edit');
 
   const originalItemIdsRef = useRef<Set<string>>(new Set());
-  const loadedAtRef = useRef<Date | null>(null);
-  const savingRef = useRef(false);
   const mountedRef = useRef(true);
 
   const form = useForm<BoqFormValues>({
@@ -173,7 +152,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
         const boqItems = itemsSnap.docs.map((d) => ({ ...d.data(), id: d.id }) as BoqItem);
 
         originalItemIdsRef.current = new Set(boqItems.map((i) => i.id!));
-        loadedAtRef.current = boqData.updatedAt?.toDate() || new Date();
 
         const sortedItems = [...boqItems].sort((a, b) =>
           (a.itemNumber || '').localeCompare(b.itemNumber || '', undefined, { numeric: true })
@@ -210,42 +188,8 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { cancelled = true; };
   }, [mode, firestore, boqId, router, toast, form]);
 
-  useEffect(() => {
-    if (mode !== 'create') return;
-    const copiedDataString = sessionStorage.getItem('copiedBoqData');
-    if (!copiedDataString) return;
-
-    try {
-      const copiedData = JSON.parse(copiedDataString);
-      const oldToNewUid = new Map<string, string>();
-
-      const items = (copiedData.items || []).map((item: any) => {
-        const newUid = generateStableId();
-        oldToNewUid.set(item.uid, newUid);
-        return { ...item, uid: newUid };
-      });
-
-      const remappedItems = items.map((item: any) => ({
-        ...item,
-        parentId: item.parentId ? (oldToNewUid.get(item.parentId) ?? null) : null,
-      }));
-
-      form.reset({
-        ...copiedData,
-        name: `${copiedData.name} (نسخة)`,
-        items: remappedItems,
-      });
-      toast({ title: 'تم النسخ', description: 'تم ملء النموذج ببيانات النسخة.' });
-    } catch (error) {
-      console.error('Failed to parse copied BOQ data:', error);
-    } finally {
-      sessionStorage.removeItem('copiedBoqData');
-    }
-  }, [mode, form, toast]);
-
   const onSubmit = async (data: BoqFormValues) => {
-    if (savingRef.current || !firestore || !currentUser) return;
-    savingRef.current = true;
+    if (!firestore || !currentUser) return;
     setIsSaving(true);
 
     try {
@@ -334,7 +278,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
       toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'حدث خطأ غير متوقع.' });
     } finally {
       if (mountedRef.current) setIsSaving(false);
-      savingRef.current = false;
     }
   };
 
