@@ -1,3 +1,4 @@
+
 'use client';
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -8,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList } from 'lucide-react';
+import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -18,6 +19,7 @@ import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { ProjectBoqTab } from '@/components/construction/project-boq-tab';
+import { ProjectProcurementTab } from '@/components/construction/project-procurement-tab';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -143,13 +145,17 @@ export default function ProjectDetailPage() {
                 <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
                     <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> جداول الكميات</TabsTrigger>
                     <TabsTrigger value="overview" className="gap-2 py-3 rounded-lg">نظرة عامة</TabsTrigger>
+                    <TabsTrigger value="procurement" className="gap-2 py-3 rounded-lg"><ShoppingCart className="h-4 w-4"/> المشتريات</TabsTrigger>
                     <TabsTrigger value="subcontracts" disabled className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
-                    <TabsTrigger value="procurement" disabled className="gap-2 py-3 rounded-lg">المشتريات</TabsTrigger>
                     <TabsTrigger value="financials" disabled className="gap-2 py-3 rounded-lg">المالية</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="boq">
                     <ProjectBoqTab project={project} client={client} />
+                </TabsContent>
+
+                <TabsContent value="procurement">
+                    <ProjectProcurementTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="overview">

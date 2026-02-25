@@ -674,6 +674,8 @@ export type PurchaseOrder = {
     orderDate: any;
     vendorId: string;
     vendorName: string;
+    projectId?: string; // NEW: Link to construction project
+    warehouseId?: string; // NEW: Target site warehouse
     supplierQuotationId?: string;
     items: {
       internalItemId?: string;
@@ -783,4 +785,12 @@ export type BoqReferenceItem = {
   activityTypeIds?: string[];
   order?: number;
   parentBoqReferenceItemId?: string;
+};
+
+export type Warehouse = {
+    id?: string;
+    name: string;
+    location?: string;
+    isDefault?: boolean;
+    projectId?: string; // NEW: If it's a project-specific store
 };
