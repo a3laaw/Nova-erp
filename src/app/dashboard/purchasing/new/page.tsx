@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,8 +27,8 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Building2 } from 'lucide-react';
-import { useFirebase, useSubscription } from '@/firebase';
+import { Save, X, Loader2, PlusCircle, Trash2, Building2, Target } from 'lucide-react';
+import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, PurchaseOrder, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -103,12 +103,11 @@ export default function NewPurchaseOrderPage() {
                 const currentYear = new Date().getFullYear();
                 let nextNumber = 1;
                 if (counterSnap.exists()) {
-                    const counts = counterSnap.data()?.counts || {};
+                    const counts = counterDoc.data()?.counts || {};
                     nextNumber = (counts[currentYear] || 0) + 1;
                 }
                 setPoNumber(`PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
 
-                // Pre-fill project if coming from project page
                 const preselectedProjectId = searchParams.get('projectId');
                 if (preselectedProjectId) {
                     setValue('projectId', preselectedProjectId);
@@ -191,7 +190,7 @@ export default function NewPurchaseOrderPage() {
                     <div className="flex justify-between items-start">
                         <div>
                             <CardTitle>أمر شراء جديد</CardTitle>
-                            <CardDescription>أدخل تفاصيل أمر الشراء للمورد وحدد المشروع المستهدف.</CardDescription>
+                            <CardDescription>أدخل تفاصيل أمر الشراء للمورد وحدد مركز التكلفة المراد التحميل عليه.</CardDescription>
                         </div>
                         <div className="text-right">
                             <Label>رقم أمر الشراء</Label>
@@ -232,9 +231,9 @@ export default function NewPurchaseOrderPage() {
                     </div>
 
                     <div className="p-4 border rounded-xl bg-primary/5 flex items-center gap-4">
-                        <div className="bg-primary/10 p-2 rounded-lg"><Building2 className="text-primary h-5 w-5" /></div>
+                        <div className="bg-primary/10 p-2 rounded-lg"><Target className="text-primary h-5 w-5" /></div>
                         <div className="grid gap-2 flex-grow">
-                            <Label className="font-bold">تخصيص لمشروع (اختياري)</Label>
+                            <Label className="font-bold">مركز التكلفة المستهدف (مشروع)</Label>
                             <Controller
                                 control={control}
                                 name="projectId"
@@ -243,7 +242,7 @@ export default function NewPurchaseOrderPage() {
                                         value={field.value || ''} 
                                         onSelect={field.onChange} 
                                         options={projectOptions}
-                                        placeholder="اختر المشروع لربط التكاليف والمخزون..."
+                                        placeholder="اختر المشروع لربط التكاليف مستقبلاً..."
                                         disabled={loadingRefs}
                                     />
                                 )}
@@ -270,7 +269,7 @@ export default function NewPurchaseOrderPage() {
                                         const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
                                         return (
                                         <TableRow key={field.id}>
-                                            <TableCell><Input {...register(`items.${index}.description`)} placeholder="وصف البند (مثال: حديد تسليح 12 ملم)..." className="border-none shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell><Input {...register(`items.${index}.description`)} placeholder="وصف البند..." className="border-none shadow-none focus-visible:ring-0" /></TableCell>
                                             <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr text-center border-none shadow-none focus-visible:ring-0" /></TableCell>
                                             <TableCell><Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr text-center border-none shadow-none focus-visible:ring-0" /></TableCell>
                                             <TableCell className="text-left font-mono font-bold">{formatCurrency(lineTotal)}</TableCell>
@@ -303,11 +302,11 @@ export default function NewPurchaseOrderPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
                         <div className="grid gap-2">
                             <Label htmlFor="paymentTerms">شروط الدفع</Label>
-                            <Input id="paymentTerms" {...register('paymentTerms')} placeholder="مثال: 50% مقدم، 50% عند التوريد" />
+                            <Input id="paymentTerms" {...register('paymentTerms')} placeholder="مثال: آجل 30 يوم" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="notes">ملاحظات إضافية</Label>
-                            <Textarea id="notes" {...register('notes')} rows={3} placeholder="أي تعليمات خاصة للمورد أو الموقع..." />
+                            <Textarea id="notes" {...register('notes')} rows={3} placeholder="أي تعليمات خاصة للمورد..." />
                         </div>
                     </div>
                 </CardContent>

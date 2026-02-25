@@ -818,3 +818,23 @@ export interface Item {
     description?: string;
     createdAt?: any;
 }
+
+export type InventoryAdjustment = {
+    id?: string;
+    adjustmentNumber: string;
+    date: any;
+    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'other';
+    notes?: string;
+    journalEntryId?: string;
+    projectId?: string; // NEW: Link to cost center
+    items: {
+        itemId: string;
+        itemName: string;
+        quantity: number;
+        unitCost: number;
+        totalCost: number;
+        expiryDate?: any;
+    }[];
+    createdAt?: any;
+    createdBy?: string;
+};
