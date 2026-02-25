@@ -33,10 +33,9 @@ import {
   Trash2, 
   ShoppingCart, 
   Target, 
-  Calendar,
-  Building2,
   Calculator,
-  X
+  X,
+  Box
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import {
@@ -48,7 +47,7 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore';
-import type { Vendor, PurchaseOrder, ConstructionProject } from '@/lib/types';
+import type { Vendor, PurchaseOrder, ConstructionProject, Item } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,6 +58,7 @@ import { Separator } from '@/components/ui/separator';
 
 const itemSchema = z.object({
   uid: z.string(),
+  internalItemId: z.string().min(1, 'يجب اختيار مادة.'),
   description: z.string().min(1, 'الوصف مطلوب.'),
   quantity: z.preprocess(
     (v) => parseFloat(String(v || '0')),
@@ -70,6 +70,8 @@ const itemSchema = z.object({
   ),
 });
 
+type PoFormValues = z.infer<typeof poSchema>;
+
 const poSchema = z.object({
   orderDate: z.date({ required_error: 'التاريخ مطلوب.' }),
   vendorId: z.string().min(1, 'المورد مطلوب.'),
@@ -78,8 +80,6 @@ const poSchema = z.object({
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
 });
-
-type PoFormValues = z.infer<typeof poSchema>;
 
 const generateStableId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -102,8 +102,10 @@ export default function NewPurchaseOrderPage() {
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
+  // السجلات المرجعية
   const vendorConstraints = useMemo(() => [orderBy('name')], []);
   const projectConstraints = useMemo(() => [orderBy('projectName')], []);
+  const itemConstraints = useMemo(() => [orderBy('name')], []);
 
   const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
     firestore,
@@ -114,6 +116,11 @@ export default function NewPurchaseOrderPage() {
     firestore,
     'projects',
     projectConstraints
+  );
+  const { data: items, loading: itemsLoading } = useSubscription<Item>(
+    firestore,
+    'items',
+    itemConstraints
   );
 
   const {
@@ -128,7 +135,7 @@ export default function NewPurchaseOrderPage() {
       orderDate: new Date(),
       vendorId: '',
       projectId: searchParams.get('projectId') || null,
-      items: [{ uid: generateStableId(), description: '', quantity: 1, unitPrice: 0 }],
+      items: [{ uid: generateStableId(), internalItemId: '', description: '', quantity: 1, unitPrice: 0 }],
     },
   });
 
@@ -183,6 +190,11 @@ export default function NewPurchaseOrderPage() {
     [projects]
   );
 
+  const itemOptions = useMemo(
+    () => (items || []).map((i) => ({ value: i.id!, label: i.name, searchKey: i.sku })),
+    [items]
+  );
+
   const onSubmit = async (data: PoFormValues) => {
     if (!firestore || !currentUser) return;
     if (savingRef.current) return;
@@ -205,6 +217,7 @@ export default function NewPurchaseOrderPage() {
         const vendor = vendors.find(v => v.id === data.vendorId);
 
         const processedItems = data.items.map((item) => ({
+          internalItemId: item.internalItemId,
           itemName: item.description,
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
@@ -240,6 +253,8 @@ export default function NewPurchaseOrderPage() {
     }
   };
 
+  const fullLoading = vendorsLoading || itemsLoading || projectsLoading;
+
   return (
     <Card className="max-w-5xl mx-auto rounded-3xl border-none shadow-xl overflow-hidden" dir="rtl">
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -252,7 +267,7 @@ export default function NewPurchaseOrderPage() {
                 </div>
                 <CardTitle className="text-3xl font-black tracking-tight text-foreground">أمر شراء جديد</CardTitle>
               </div>
-              <CardDescription className="text-base font-medium pr-11">أدخل تفاصيل التوريد وحدد المورد لإنشاء أمر شراء رسمي.</CardDescription>
+              <CardDescription className="text-base font-medium pr-11">حدد المورد والمواد المطلوبة لإنشاء أمر شراء رسمي وربطه بالمشروع.</CardDescription>
             </div>
             <div className="text-left bg-background/50 px-4 py-2 rounded-2xl border shadow-inner">
               <Label className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">رقم الأمر (تقريبي)</Label>
@@ -341,7 +356,7 @@ export default function NewPurchaseOrderPage() {
                 <TableHeader className="bg-muted/50">
                   <TableRow className="h-14 border-b-2">
                     <TableHead className="w-[60px] text-center font-bold text-xs uppercase">إجراء</TableHead>
-                    <TableHead className="w-2/5 font-bold text-base">وصف البند</TableHead>
+                    <TableHead className="w-2/5 font-bold text-base">اسم المادة / الصنف المطلوب</TableHead>
                     <TableHead className="text-center font-bold text-base">الكمية</TableHead>
                     <TableHead className="text-center font-bold text-base">سعر الوحدة</TableHead>
                     <TableHead className="text-left font-bold text-base px-6">الإجمالي</TableHead>
@@ -366,11 +381,34 @@ export default function NewPurchaseOrderPage() {
                           </Button>
                         </TableCell>
                         <TableCell className="py-2">
-                          <Input
-                            {...register(`items.${index}.description`)}
-                            placeholder="مثال: أسمنت بورتلاندي 50 كجم..."
-                            className="border-none shadow-none focus-visible:ring-0 text-lg font-medium"
+                          <Controller
+                            name={`items.${index}.internalItemId`}
+                            control={control}
+                            render={({ field: controllerField }) => (
+                              <InlineSearchList
+                                value={controllerField.value || ''}
+                                onSelect={(val) => {
+                                  controllerField.onChange(val);
+                                  const selectedMaterial = items?.find(i => i.id === val);
+                                  if (selectedMaterial) {
+                                    setValue(`items.${index}.description`, selectedMaterial.name);
+                                    if (selectedMaterial.costPrice) {
+                                      setValue(`items.${index}.unitPrice`, selectedMaterial.costPrice);
+                                    }
+                                  }
+                                }}
+                                options={itemOptions}
+                                placeholder={itemsLoading ? "جاري التحميل..." : "اختر مادة من المخزون..."}
+                                disabled={itemsLoading}
+                                className="border-none shadow-none focus-visible:ring-0 text-lg font-bold bg-transparent"
+                              />
+                            )}
                           />
+                          {errors.items?.[index]?.internalItemId && (
+                            <p className="text-[10px] text-destructive px-3 font-bold">
+                              {errors.items[index]?.internalItemId?.message}
+                            </p>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input
@@ -411,7 +449,7 @@ export default function NewPurchaseOrderPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => append({ uid: generateStableId(), description: '', quantity: 1, unitPrice: 0 })}
+                onClick={() => append({ uid: generateStableId(), internalItemId: '', description: '', quantity: 1, unitPrice: 0 })}
                 className="h-14 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold transition-all gap-2 group"
               >
                 <PlusCircle className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -455,7 +493,7 @@ export default function NewPurchaseOrderPage() {
           </Button>
           <Button
             type="submit"
-            disabled={isSaving || vendorsLoading}
+            disabled={isSaving || fullLoading}
             className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all min-w-[240px]"
           >
             {isSaving ? (
