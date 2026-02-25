@@ -43,6 +43,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 
+// مخطط التحقق من البيانات
 const itemSchema = z.object({
   id: z.string().optional(),
   internalItemId: z.string().min(1, 'الصنف مطلوب.'),
@@ -61,7 +62,7 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
-// إصلاح #10: توليد معرفات مؤقتة قوية بطول 20 حرفاً لضمان عدم التكرار
+// مولد معرفات مؤقتة قوية (20 حرفاً)
 const generateTempId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -80,9 +81,10 @@ export default function NewRfqPage() {
   const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
   const [isSaving, setIsSaving] = useState(false);
   
-  // إصلاح #6: استخدام useRef لمنع الإرسال المزدوج (Double Submission)
+  // مرجع لمنع الإرسال المزدوج
   const savingRef = useRef(false);
 
+  // جلب البيانات المرجعية
   const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
     firestore,
     'vendors',
@@ -111,10 +113,9 @@ export default function NewRfqPage() {
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
   const loading = vendorsLoading || itemsLoading;
 
+  // توليد رقم الطلب مع cleanup لتجنب الـ memory leaks
   useEffect(() => {
     if (!firestore) return;
-    
-    // إصلاح #7: إضافة علم لإلغاء التحديث في حال إلغاء المكون (Cleanup)
     let cancelled = false;
 
     const generateRfqNumber = async () => {
@@ -155,13 +156,13 @@ export default function NewRfqPage() {
   const onSubmit = async (data: RfqFormValues) => {
     if (!firestore || !currentUser || loading) return;
     
-    // منع الإرسال المزدوج
+    // حماية من الإرسال المزدوج
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
 
     try {
-      // أخذ نسخة محلية من الأصناف لضمان توفرها داخل الـ Transaction
+      // نسخة محلية لضمان توفر البيانات داخل الـ Transaction
       const currentItems = items || [];
 
       await runTransaction(firestore, async (transaction) => {
@@ -205,7 +206,7 @@ export default function NewRfqPage() {
     } catch (error) {
       console.error('Error creating RFQ:', error);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
-      // إعادة السماح بالحفظ في حال الفشل
+      // إعادة تفعيل الزر في حالة الفشل
       savingRef.current = false;
       setIsSaving(false);
     }
@@ -221,17 +222,10 @@ export default function NewRfqPage() {
               <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
             </div>
             <div className="text-right">
-              {/* إصلاح #9: توضيح أن الرقم تقريبي قبل الحفظ الفعلي */}
-              <Label>رقم الطلب (تقريبي)</Label>
-              <div className="font-mono text-lg font-semibold h-7">
-                {loading ? (
-                  <Skeleton className="h-6 w-24" />
-                ) : (
-                  <div className="flex flex-col items-end">
-                    <span className="text-primary">{rfqNumber}</span>
-                    <span className="text-[10px] text-muted-foreground font-normal">يتأكد عند الحفظ</span>
-                  </div>
-                )}
+              <Label>رقم الطلب المتوقع</Label>
+              <div className="font-mono text-lg font-semibold h-7 text-primary">
+                {loading ? <Skeleton className="h-6 w-24" /> : rfqNumber}
+                <span className="text-[10px] text-muted-foreground block font-normal">(يتأكد عند الحفظ)</span>
               </div>
             </div>
           </div>
@@ -247,7 +241,7 @@ export default function NewRfqPage() {
                 control={control}
                 render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />}
               />
-              {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+              {errors.date && <p className="text-xs text-destructive font-bold">{errors.date.message}</p>}
             </div>
             <div className="grid gap-2">
               <Label>
@@ -267,7 +261,7 @@ export default function NewRfqPage() {
                 )}
               />
               {errors.vendorIds && (
-                <p className="text-xs text-destructive">{errors.vendorIds.message}</p>
+                <p className="text-xs text-destructive font-bold">{errors.vendorIds.message}</p>
               )}
             </div>
           </div>
@@ -303,7 +297,6 @@ export default function NewRfqPage() {
                             />
                           )}
                         />
-                        {/* إصلاح #8: عرض أخطاء التحقق لكل صنف بشكل واضح */}
                         {errors.items?.[index]?.internalItemId && (
                           <p className="text-xs text-destructive mt-1 px-2 font-bold">
                             {errors.items[index]?.internalItemId?.message}
@@ -353,7 +346,7 @@ export default function NewRfqPage() {
             </div>
           </div>
           {errors.items && (
-            <p className="text-destructive text-sm mt-2 font-bold">
+            <p className="text-destructive text-sm mt-2 font-bold text-center">
               {errors.items.root?.message || errors.items.message}
             </p>
           )}
