@@ -284,8 +284,8 @@ export default function NewRfqPage() {
 
           <div>
             <Label className="mb-2 block font-bold">الأصناف والكميات المطلوبة</Label>
-            <div className="border rounded-xl overflow-hidden shadow-sm">
-              <Table>
+            <div className="border rounded-xl shadow-sm">
+              <Table className="overflow-visible">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-3/5">الصنف</TableHead>
@@ -298,7 +298,7 @@ export default function NewRfqPage() {
                 <TableBody>
                   {fields.map((field, index) => (
                     <TableRow key={field.id} className="hover:bg-transparent">
-                      <TableCell>
+                      <TableCell className="overflow-visible">
                         <Controller
                           name={`items.${index}.internalItemId`}
                           control={control}

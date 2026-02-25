@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { Input } from './input';
 import { cn } from '@/lib/utils';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -32,21 +33,50 @@ export function InlineSearchList({
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const containerRef = React.useRef<HTMLDivElement>(null);
-  
+  const [mounted, setMounted] = React.useState(false);
+  const [coords, setCoords] = React.useState({ top: 0, left: 0, width: 0 });
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const selectedLabel = options.find((option) => option.value === value)?.label;
+
+  const updateCoords = React.useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    }
+  }, []);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        // Check if click was inside the portal
+        const portal = document.querySelector('[data-inline-search-list-portal]');
+        if (portal && portal.contains(event.target as Node)) return;
+        
         setOpen(false);
       }
     };
     
     if (open) {
+      updateCoords();
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      window.addEventListener('scroll', updateCoords, true);
+      window.addEventListener('resize', updateCoords);
     }
-  }, [open]);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', updateCoords, true);
+      window.removeEventListener('resize', updateCoords);
+    };
+  }, [open, updateCoords]);
 
   const filteredOptions = React.useMemo(() => {
     if (!search) return options;
@@ -76,11 +106,17 @@ export function InlineSearchList({
         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </Button>
       
-      {open && (
+      {open && mounted && createPortal(
         <div 
-          data-inline-search-list-options="true"
-          className="absolute z-[999999] w-full mt-1 bg-popover border rounded-md shadow-md"
-          style={{ pointerEvents: 'auto' }}
+          data-inline-search-list-portal="true"
+          className="fixed z-[999999] bg-popover border rounded-md shadow-md"
+          style={{ 
+            top: coords.top + 4, 
+            left: coords.left, 
+            width: coords.width,
+            pointerEvents: 'auto' 
+          }}
+          dir="rtl"
         >
           <div className="p-2 border-b">
             <Input
@@ -115,7 +151,7 @@ export function InlineSearchList({
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "ml-2 h-4 w-4",
                       value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
@@ -124,7 +160,8 @@ export function InlineSearchList({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
