@@ -26,8 +26,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // --- Schema Definitions ---
 export const itemSchema = z.object({
-  id: z.string(),
-  uid: z.string(),
+  uid: z.string(), // Unique ID for current session and DB ID
   itemNumber: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب."),
   unit: z.string().optional(),
@@ -55,7 +54,7 @@ type BoqItemWithChildren = BoqFormValues['items'][number] & {
     total: number;
 };
 
-// --- Optimized Row Renderer ---
+// --- Row Renderer ---
 const BoqItemRowRenderer = React.memo(({
     node, level, wbs, parentReferenceId, control, register, setValue, onDelete, onAdd, fields, masterItemsMap, masterItemsLoading
 }: {
@@ -119,7 +118,7 @@ const BoqItemRowRenderer = React.memo(({
                 itemData.isHeader ? "bg-muted/40 font-bold border-b-2" : "hover:bg-muted/20"
             )}>
                 <TableCell className="font-mono text-xs text-muted-foreground w-12 text-center border-l px-1">{wbs}</TableCell>
-                <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="min-w-[350px] px-2">
+                <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="min-w-[300px] px-2">
                      <div className="flex flex-col gap-2 py-1">
                         <InlineSearchList
                             value={itemData.itemId || ''}
@@ -136,7 +135,7 @@ const BoqItemRowRenderer = React.memo(({
                         />
                     </div>
                 </TableCell>
-                <TableCell className="min-w-[120px] px-1">
+                <TableCell className="min-w-[100px] px-1">
                     <Input 
                         {...register(`items.${node._index}.unit`)} 
                         className="h-10 text-center bg-background text-sm font-semibold px-1" 
@@ -144,7 +143,7 @@ const BoqItemRowRenderer = React.memo(({
                         placeholder="الوحدة" 
                     />
                 </TableCell>
-                <TableCell className="min-w-[140px] px-1">
+                <TableCell className="min-w-[120px] px-1">
                     <Input 
                         type="number" 
                         step="any" 
@@ -153,7 +152,7 @@ const BoqItemRowRenderer = React.memo(({
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="min-w-[180px] px-1">
+                <TableCell className="min-w-[150px] px-1">
                     <Input 
                         type="number" 
                         step="0.001" 
@@ -162,7 +161,7 @@ const BoqItemRowRenderer = React.memo(({
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="text-left font-mono font-bold min-w-[200px] border-r bg-muted/10 px-2">
+                <TableCell className="text-left font-mono font-bold min-w-[180px] border-r bg-muted/10 px-2">
                     <div className={cn(
                         "py-1 text-lg tracking-tight truncate",
                         itemData.isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
@@ -170,7 +169,7 @@ const BoqItemRowRenderer = React.memo(({
                         {formatCurrency(lineTotal)}
                     </div>
                 </TableCell>
-                <TableCell className="min-w-[200px] px-2">
+                <TableCell className="min-w-[180px] px-2">
                     <Textarea 
                         {...register(`items.${node._index}.notes`)} 
                         placeholder="ملاحظات..." 
@@ -214,47 +213,32 @@ const BoqItemRowRenderer = React.memo(({
 BoqItemRowRenderer.displayName = 'BoqItemRowRenderer';
 
 // --- Main Form Component ---
-export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialData?: Partial<BoqFormValues> | null, onSave: (data: BoqFormValues) => Promise<void>, onClose: () => void, isSaving: boolean }) {
+export function BoqForm({ 
+    onClose, 
+    isSaving, 
+    isEditing,
+    control,
+    register,
+    setValue,
+    watch,
+    errors
+}: { 
+    onClose: () => void, 
+    isSaving: boolean,
+    isEditing: boolean,
+    control: any,
+    register: any,
+    setValue: any,
+    watch: any,
+    errors: any
+}) {
     const { firestore } = useFirebase();
-    const { toast } = useToast();
 
     const masterItemsConstraints = React.useMemo(() => [orderBy('name')], []);
     const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', masterItemsConstraints);
 
-    const { control, handleSubmit, register, watch, reset, setValue, formState: { errors } } = useForm<BoqFormValues>({
-        resolver: zodResolver(boqFormSchema),
-        defaultValues: {
-            name: '',
-            clientName: '',
-            status: 'تقديري',
-            items: [{ id: '', uid: generateId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: '' }],
-        },
-    });
-
     const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
-    const watchedItems = useWatch({ control, name: 'items' });
-
-    React.useEffect(() => {
-        if (initialData) {
-            // Transform Firestore items to form items with stable UIDs
-            const idToUid = new Map<string, string>();
-            const items = initialData.items || [];
-            
-            items.forEach(item => {
-                if (item.id) idToUid.set(item.id, generateId());
-            });
-
-            reset({
-                ...initialData,
-                items: items.map(item => ({
-                    ...item,
-                    id: item.id || '',
-                    uid: (item.id && idToUid.get(item.id)) || generateId(),
-                    parentId: (item.parentId && idToUid.get(item.parentId)) || null,
-                })),
-            });
-        }
-    }, [initialData, reset]);
+    const watchedItems = watch('items');
 
     const masterItemsMap = React.useMemo(() => {
         const map = new Map<string | null, any[]>();
@@ -298,46 +282,20 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
     }, [watchedItems]);
 
     const handleAddRootSection = () => {
-        append({ id: '', uid: generateId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: '' });
+        append({ uid: generateId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: '' });
     };
 
     const handleAddItem = React.useCallback((parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
         const parent = fields.find(f => f.uid === parentId);
-        const parentLevel = parent ? parent.level : -1;
+        const parentLevel = parent ? (parent as any).level : -1;
         insert(insertAtIndex, {
-          id: '', uid: generateId(), description: '', unit: isHeader ? '' : 'مقطوعية',
+          uid: generateId(), description: '', unit: isHeader ? '' : 'مقطوعية',
           quantity: 1, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1,
           isHeader: isHeader, itemId: '', notes: '',
         });
     }, [fields, insert]);
 
-    // Handle form submission properly
-    const onSubmit = (data: BoqFormValues) => {
-        // Recalculate everything before passing to parent
-        const finalItems: any[] = [];
-        const childMap = new Map<string | null, string[]>();
-        data.items.forEach(item => {
-            if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
-            childMap.get(item.parentId)!.push(item.uid);
-        });
-
-        const processNode = (parentId: string | null, parentNumber: string, level: number) => {
-            const childrenUids = childMap.get(parentId) || [];
-            childrenUids.forEach((childUid, index) => {
-                const item = data.items.find(i => i.uid === childUid);
-                if (item) {
-                    const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
-                    finalItems.push({ ...item, itemNumber: newNumber, level });
-                    processNode(childUid, newNumber, level + 1);
-                }
-            });
-        };
-        processNode(null, '', 0);
-
-        onSave({ ...data, items: finalItems });
-    };
-
-    if (masterItemsLoading && !initialData) {
+    if (masterItemsLoading && !isEditing) {
         return (
             <div className="flex flex-col items-center justify-center h-96 gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -347,7 +305,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
     }
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-background">
+        <div className="bg-background">
             <div className="space-y-0">
                 <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-6">
                     <div className="flex justify-between items-center max-w-full px-4 mx-auto">
@@ -384,6 +342,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                         <div className="grid gap-2">
                             <Label className="font-bold text-sm text-foreground/70">اسم / مرجع الجدول *</Label>
                             <Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className="h-11 text-lg border-2" />
+                            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold text-sm text-foreground/70">العميل (المحتمل)</Label>
@@ -410,12 +369,12 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                                 <TableHeader className="bg-muted/80 backdrop-blur-sm">
                                     <TableRow className="hover:bg-transparent border-b-2">
                                         <TableHead className="w-12 text-center font-bold text-xs uppercase px-1">م</TableHead>
-                                        <TableHead className="min-w-[350px] font-bold py-4 px-2">بيان الأعمال التفصيلي</TableHead>
-                                        <TableHead className="min-w-[120px] text-center font-bold px-1">الوحدة</TableHead>
-                                        <TableHead className="min-w-[140px] text-center font-bold px-1">الكمية</TableHead>
-                                        <TableHead className="min-w-[180px] text-center font-bold px-1">سعر الوحدة</TableHead>
-                                        <TableHead className="min-w-[200px] text-left font-bold border-r px-2">الإجمالي</TableHead>
-                                        <TableHead className="min-w-[200px] font-bold px-2">ملاحظات</TableHead>
+                                        <TableHead className="min-w-[300px] font-bold py-4 px-2">بيان الأعمال التفصيلي</TableHead>
+                                        <TableHead className="min-w-[100px] text-center font-bold px-1">الوحدة</TableHead>
+                                        <TableHead className="min-w-[120px] text-center font-bold px-1">الكمية</TableHead>
+                                        <TableHead className="min-w-[150px] text-center font-bold px-1">سعر الوحدة</TableHead>
+                                        <TableHead className="min-w-[180px] text-left font-bold border-r px-2">الإجمالي</TableHead>
+                                        <TableHead className="min-w-[180px] font-bold px-2">ملاحظات</TableHead>
                                         <TableHead className="w-20 text-center font-bold border-r px-1">إجراءات</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -498,6 +457,6 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                     </div>
                 </div>
             </div>
-        </form>
+        </div>
     );
 }

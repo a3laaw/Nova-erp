@@ -1,12 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { BoqForm, boqFormSchema, type BoqFormValues } from '@/components/construction/boq/boq-form';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, runTransaction, writeBatch, serverTimestamp, getDocs, query } from 'firebase/firestore';
+import { collection, doc, runTransaction, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import { cleanFirestoreData } from '@/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 export default function NewBoqPage() {
     const { firestore } = useFirebase();
@@ -16,14 +22,49 @@ export default function NewBoqPage() {
     const searchParams = useSearchParams();
 
     const [isSaving, setIsSaving] = useState(false);
-    const [initialData, setInitialData] = useState<Partial<BoqFormValues> | null>(null);
+
+    const {
+        control,
+        handleSubmit,
+        register,
+        watch,
+        setValue,
+        formState: { errors },
+        reset,
+    } = useForm<BoqFormValues>({
+        resolver: zodResolver(boqFormSchema),
+        defaultValues: {
+            name: '',
+            clientName: '',
+            status: 'تقديري',
+            items: [
+                {
+                    uid: generateId(),
+                    description: '',
+                    unit: 'مقطوعية',
+                    quantity: 1,
+                    sellingUnitPrice: 0,
+                    parentId: null,
+                    level: 0,
+                    isHeader: false,
+                    itemId: '',
+                    notes: '',
+                },
+            ],
+        },
+    });
 
     useEffect(() => {
         const copiedDataString = sessionStorage.getItem('copiedBoqData');
         if (copiedDataString) {
             try {
                 const copiedData = JSON.parse(copiedDataString);
-                setInitialData(copiedData);
+                // Ensure each item has a UID which will serve as its Firestore ID
+                const items = (copiedData.items || []).map((item: any) => ({
+                    ...item,
+                    uid: item.uid || generateId(),
+                }));
+                reset({ ...copiedData, items });
                 toast({ title: 'تم النسخ', description: 'تم ملء النموذج ببيانات النسخة.' });
             } catch (error) {
                 console.error("Failed to parse copied BOQ data:", error);
@@ -31,7 +72,7 @@ export default function NewBoqPage() {
                 sessionStorage.removeItem('copiedBoqData');
             }
         }
-    }, [toast]);
+    }, [reset, toast]);
 
     const handleSave = async (data: BoqFormValues) => {
         if (!firestore || !currentUser) {
@@ -71,7 +112,7 @@ export default function NewBoqPage() {
                     clientName: data.clientName || null,
                     totalValue,
                     itemCount: data.items.length,
-                    createdBy: currentUser.uid,
+                    createdBy: currentUser.id,
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                     clientId: clientId || null,
@@ -87,11 +128,11 @@ export default function NewBoqPage() {
             });
 
             if (newBoqId) {
-                // Now, commit the processed items
+                // Now, commit the items using their UIDs as Firestore IDs
                 const batch = writeBatch(firestore);
                 data.items.forEach((item) => {
-                    const { uid, id, ...itemData } = item;
-                    const itemRef = doc(collection(firestore, `boqs/${newBoqId}/items`));
+                    const { uid, ...itemData } = item;
+                    const itemRef = doc(firestore, `boqs/${newBoqId}/items`, uid);
                     batch.set(itemRef, cleanFirestoreData(itemData));
                 });
                 await batch.commit();
@@ -117,12 +158,32 @@ export default function NewBoqPage() {
         }
     };
 
+    if (authLoading) {
+        return (
+            <Card className="max-w-4xl mx-auto" dir="rtl">
+                <CardHeader><CardTitle>إنشاء جدول كميات جديد</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="flex justify-center items-center h-64">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="mr-4">جاري تهيئة المحرر...</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+    
     return (
-        <BoqForm
-            initialData={initialData}
-            onSave={handleSave}
-            onClose={() => router.back()}
-            isSaving={isSaving}
-        />
+        <form onSubmit={handleSubmit(handleSave)}>
+            <BoqForm
+                onClose={() => router.back()}
+                isSaving={isSaving}
+                isEditing={false}
+                control={control}
+                register={register}
+                setValue={setValue}
+                watch={watch}
+                errors={errors}
+            />
+        </form>
     );
 }

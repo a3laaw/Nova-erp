@@ -1,15 +1,15 @@
 'use client';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useFirebase, useDocument } from '@/firebase';
-import { collection, doc, updateDoc, writeBatch, serverTimestamp, getDocs, query, getDoc } from 'firebase/firestore';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useFirebase } from '@/firebase';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/context/auth-context';
-import type { Boq, BoqItem } from '@/lib/types';
-import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-form';
+import { BoqForm, boqFormSchema, type BoqFormValues } from '@/components/construction/boq/boq-form';
 import { cleanFirestoreData } from '@/lib/utils';
+import type { Boq, BoqItem } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 
 export default function EditBoqPage() {
@@ -19,10 +19,21 @@ export default function EditBoqPage() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [initialData, setInitialData] = useState<Partial<BoqFormValues> | null>(null);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [initialItems, setInitialItems] = useState<BoqItem[]>([]);
+
+    const {
+        control,
+        handleSubmit,
+        register,
+        watch,
+        setValue,
+        formState: { errors },
+        reset,
+    } = useForm<BoqFormValues>({
+        resolver: zodResolver(boqFormSchema),
+    });
 
     useEffect(() => {
         if (!firestore || !id) return;
@@ -47,11 +58,16 @@ export default function EditBoqPage() {
                 const boqItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem));
                 
                 setInitialItems(boqItems);
-                setInitialData({
+                
+                // For editing, UID is the document ID
+                reset({
                     name: boqData.name,
-                    clientName: boqData.clientName,
+                    clientName: boqData.clientName || '',
                     status: boqData.status,
-                    items: boqItems.map(item => ({...item, id: item.id!})),
+                    items: boqItems.map(item => ({
+                        ...item,
+                        uid: item.id!, // Stable UID from DB ID
+                    })),
                 });
             } catch(e) {
                 console.error(e);
@@ -61,7 +77,7 @@ export default function EditBoqPage() {
             }
         };
         fetchData();
-    }, [firestore, id, router, toast]);
+    }, [firestore, id, router, toast, reset]);
 
     const handleSave = async (data: BoqFormValues) => {
         if (!firestore || !id) return;
@@ -72,8 +88,7 @@ export default function EditBoqPage() {
             
             const totalValue = data.items.reduce((sum, item) => {
                 if (item.isHeader) return sum;
-                const quantity = (item.quantity || 0);
-                return sum + (quantity * (item.sellingUnitPrice || 0));
+                return sum + ((item.quantity || 0) * (item.sellingUnitPrice || 0));
             }, 0);
 
             batch.update(boqRef, {
@@ -85,27 +100,21 @@ export default function EditBoqPage() {
                 updatedAt: serverTimestamp(),
             });
 
-            // Handle subcollection items
-            const originalItemIds = new Set(initialItems.map(item => item.id));
-            const currentItemIds = new Set(data.items.map(item => item.id).filter(id => id !== ''));
+            // Handle items: UID is the Firestore document ID
+            const currentUids = new Set(data.items.map(item => item.uid));
 
-            // Delete removed items
+            // 1. Delete removed items
             for (const originalItem of initialItems) {
-                if (!currentItemIds.has(originalItem.id!)) {
+                if (!currentUids.has(originalItem.id!)) {
                     batch.delete(doc(firestore, `boqs/${id}/items`, originalItem.id!));
                 }
             }
 
-            // Update or add items
+            // 2. Update or add items
             for (const item of data.items) {
-                const itemRef = item.id && originalItemIds.has(item.id)
-                    ? doc(firestore, `boqs/${id}/items`, item.id)
-                    : doc(collection(firestore, `boqs/${id}/items`));
-                
-                // Remove client-side helper fields
-                const { id: dbId, uid, ...itemData } = item;
-                // Use doc ID as parentId if it was translated from UID
-                // In reality, BoqForm already produces consistent parentIds
+                const itemRef = doc(firestore, `boqs/${id}/items`, item.uid);
+                // Remove client-side UID field before saving to data, but it is our document ID
+                const { uid, ...itemData } = item;
                 batch.set(itemRef, cleanFirestoreData(itemData), { merge: true });
             }
 
@@ -132,11 +141,17 @@ export default function EditBoqPage() {
     }
 
     return (
-        <BoqForm 
-            initialData={initialData}
-            onSave={handleSave}
-            onClose={() => router.push(`/dashboard/construction/boq/${id}`)}
-            isSaving={isSaving}
-        />
+        <form onSubmit={handleSubmit(handleSave)}>
+            <BoqForm 
+                onClose={() => router.push(`/dashboard/construction/boq/${id}`)}
+                isSaving={isSaving}
+                isEditing={true}
+                control={control}
+                register={register}
+                setValue={setValue}
+                watch={watch}
+                errors={errors}
+            />
+        </form>
     );
 }
