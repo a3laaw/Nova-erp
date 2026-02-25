@@ -250,7 +250,7 @@ export default function EditJournalEntryPage() {
                 <div className="flex justify-between items-start">
                     <div>
                         <CardTitle>تعديل قيد اليومية</CardTitle>
-                        <CardDescription>تعديل تفاصيل القيد والتأكد من توازنه.</CardDescription>
+                        <CardDescription>تعديل تفاصيل القيد والتأكد من توازن مراكز التكلفة.</CardDescription>
                     </div>
                      <div className="text-right">
                         <Label>رقم القيد</Label>
@@ -283,7 +283,7 @@ export default function EditJournalEntryPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="min-w-[250px]">الحساب</TableHead>
-                                <TableHead className="min-w-[200px]">ربط بمشروع</TableHead>
+                                <TableHead className="min-w-[200px]">مركز التكلفة / المشروع</TableHead>
                                 <TableHead className="min-w-[120px]">مدين</TableHead>
                                 <TableHead className="min-w-[120px]">دائن</TableHead>
                                 <TableHead className="min-w-[200px]">ملاحظات</TableHead>
@@ -294,7 +294,8 @@ export default function EditJournalEntryPage() {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('51');
+                                // السماح بربط مراكز التكلفة لكافة بنود المصاريف والإيرادات
+                                const showProjectLink = selectedAccount && (selectedAccount.code.startsWith('5') || selectedAccount.code.startsWith('4'));
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
@@ -304,10 +305,12 @@ export default function EditJournalEntryPage() {
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        {showProjectLink && (
+                                        {showProjectLink ? (
                                             <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
-                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مشروع..." disabled={refDataLoading} />
+                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مركز التكلفة..." disabled={refDataLoading} />
                                             )} />
+                                        ) : (
+                                            <div className="text-xs text-muted-foreground italic px-2">غير مطلوب</div>
                                         )}
                                     </TableCell>
                                     <TableCell>

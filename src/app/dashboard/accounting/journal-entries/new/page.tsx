@@ -25,7 +25,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown, Target } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
 import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
@@ -244,7 +244,7 @@ export default function NewJournalEntryPage() {
                 <div className="flex justify-between items-start">
                     <div>
                         <CardTitle>قيد يومية جديد</CardTitle>
-                        <CardDescription>أدخل تفاصيل القيد وتأكد من توازن المدين والدائن.</CardDescription>
+                        <CardDescription>أدخل تفاصيل القيد وتأكد من توازن المدين والدائن مع ربط مراكز التكلفة.</CardDescription>
                     </div>
                      <div className="text-right">
                         <Label>رقم القيد</Label>
@@ -277,7 +277,7 @@ export default function NewJournalEntryPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="min-w-[250px]">الحساب</TableHead>
-                                <TableHead className="min-w-[200px]">ربط بمشروع</TableHead>
+                                <TableHead className="min-w-[200px]">مركز التكلفة / المشروع</TableHead>
                                 <TableHead className="min-w-[120px]">مدين</TableHead>
                                 <TableHead className="min-w-[120px]">دائن</TableHead>
                                 <TableHead className="min-w-[200px]">ملاحظات</TableHead>
@@ -288,7 +288,8 @@ export default function NewJournalEntryPage() {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                const showProjectLink = selectedAccount && selectedAccount.code.startsWith('51');
+                                // التغيير: السماح بربط مركز التكلفة لكافة حسابات المصاريف (5) والإيرادات (4)
+                                const showProjectLink = selectedAccount && (selectedAccount.code.startsWith('5') || selectedAccount.code.startsWith('4'));
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
@@ -298,10 +299,12 @@ export default function NewJournalEntryPage() {
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        {showProjectLink && (
+                                        {showProjectLink ? (
                                             <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
-                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر مشروع..." disabled={refDataLoading} />
+                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={refDataLoading} />
                                             )} />
+                                        ) : (
+                                            <div className="text-xs text-muted-foreground italic px-2">غير مطلوب لهذا الحساب</div>
                                         )}
                                     </TableCell>
                                     <TableCell>
