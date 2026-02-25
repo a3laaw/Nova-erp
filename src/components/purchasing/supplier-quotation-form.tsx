@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -138,16 +139,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent 
-                className="max-w-2xl max-h-[90vh] flex flex-col" 
-                dir="rtl"
-                onInteractOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('[role="dialog"]') || target.closest('.react-select__menu-portal') || target.closest('[data-radix-popper-content-wrapper]')) {
-                        e.preventDefault();
-                    }
-                }}
-            >
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" dir="rtl">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-black flex items-center gap-2">
                         <Save className="h-5 w-5 text-primary"/>
@@ -155,7 +147,6 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                     </DialogTitle>
                     <DialogDescription>أدخل بيانات الأسعار والشروط من مستند المورد الرسمي.</DialogDescription>
                 </DialogHeader>
-                
                 <ScrollArea className="flex-1 px-2">
                     <div className="py-4 space-y-6">
                         <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-2xl space-y-4">
@@ -174,53 +165,21 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                                 </Button>
                             </div>
                         </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-2xl bg-muted/30">
-                            <div className="grid gap-2">
-                                <Label className="font-bold">مرجع العرض (رقم فاتورة المورد)</Label>
-                                <Input value={reference} onChange={e => setReference(e.target.value)} placeholder="مثال: QT-10203" className="rounded-xl h-11" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="font-bold">تاريخ العرض <span className="text-destructive">*</span></Label>
-                                <DateInput value={date} onChange={setDate} className="rounded-xl h-11" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="font-bold">مدة التوريد (أيام)</Label>
-                                <Input type="number" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="مثال: 3" className="rounded-xl h-11" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="font-bold">شروط الدفع</Label>
-                                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="مثال: دفع كاش" className="rounded-xl h-11" />
-                            </div>
+                            <div className="grid gap-2"><Label className="font-bold">مرجع العرض (رقم فاتورة المورد)</Label><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="مثال: QT-10203" className="rounded-xl h-11" /></div>
+                            <div className="grid gap-2"><Label className="font-bold">تاريخ العرض <span className="text-destructive">*</span></Label><DateInput value={date} onChange={setDate} className="rounded-xl h-11" /></div>
+                            <div className="grid gap-2"><Label className="font-bold">مدة التوريد (أيام)</Label><Input type="number" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="مثال: 3" className="rounded-xl h-11" /></div>
+                            <div className="grid gap-2"><Label className="font-bold">شروط الدفع</Label><Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="مثال: دفع كاش" className="rounded-xl h-11" /></div>
                         </div>
-
                         <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <Label className="text-lg font-black text-primary">قائمة الأسعار للأصناف المطلوبة</Label>
-                                <Badge variant="outline">{rfq.items.length} صنف</Badge>
-                            </div>
+                            <div className="flex items-center gap-2"><Label className="text-lg font-black text-primary">قائمة الأسعار للأصناف المطلوبة</Label><Badge variant="outline">{rfq.items.length} صنف</Badge></div>
                             <div className="space-y-3">
                                 {rfq.items.map(rfqItem => {
                                     const quoteItem = items.find(i => i.rfqItemId === rfqItem.id);
                                     return (
                                         <div key={rfqItem.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-background border-2 border-transparent hover:border-primary/20 rounded-2xl shadow-sm transition-all group">
-                                            <div className="col-span-6 flex flex-col gap-1">
-                                                <Label className="font-black group-hover:text-primary transition-colors">{rfqItem.itemName}</Label>
-                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">الكمية المطلوبة: {rfqItem.quantity}</span>
-                                            </div>
-                                            <div className="col-span-6">
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">د.ك</span>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.001"
-                                                        placeholder="سعر الوحدة"
-                                                        value={quoteItem?.unitPrice || ''}
-                                                        onChange={(e) => handleItemPriceChange(rfqItem.id!, e.target.value)}
-                                                        className="h-11 pl-10 dir-ltr text-left font-black text-lg rounded-xl border-2 focus:border-primary"
-                                                    />
-                                                </div>
-                                            </div>
+                                            <div className="col-span-6 flex flex-col gap-1"><Label className="font-black group-hover:text-primary transition-colors">{rfqItem.itemName}</Label><span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">الكمية المطلوبة: {rfqItem.quantity}</span></div>
+                                            <div className="col-span-6"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">د.ك</span><Input type="number" step="0.001" placeholder="سعر الوحدة" value={quoteItem?.unitPrice || ''} onChange={(e) => handleItemPriceChange(rfqItem.id!, e.target.value)} className="h-11 pl-10 dir-ltr text-left font-black text-lg rounded-xl border-2 focus:border-primary" /></div></div>
                                         </div>
                                     )
                                 })}
@@ -228,7 +187,6 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                         </div>
                     </div>
                 </ScrollArea>
-                
                 <DialogFooter className="p-6 border-t bg-muted/10">
                     <Button variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
                     <Button onClick={handleSubmit} disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20">
