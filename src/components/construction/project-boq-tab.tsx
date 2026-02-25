@@ -1,13 +1,13 @@
-
 'use client';
 
 import * as React from 'react';
 import { useFirebase, useSubscription, useDocument } from '@/firebase';
-import { collection, doc, query, where, writeBatch, serverTimestamp, getDocs, orderBy, updateDoc } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { ConstructionProject, Boq, Client } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { 
   ClipboardList, 
   PlusCircle, 
@@ -15,15 +15,11 @@ import {
   Link2, 
   Loader2, 
   AlertCircle,
-  FileText,
   Search,
-  CheckCircle2,
   User,
   Info
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { format } from 'date-fns';
-import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -58,7 +54,7 @@ export function ProjectBoqTab({ project, client }: ProjectBoqTabProps) {
   
   const { data: linkedBoq, loading: boqLoading } = useDocument<Boq>(firestore, boqRef?.path || null);
 
-  // 2. Fetch available BOQs from library (those not linked to projects)
+  // 2. Fetch available BOQs from library
   const libraryQuery = React.useMemo(() => [
     orderBy('createdAt', 'desc')
   ], []);
@@ -70,7 +66,6 @@ export function ProjectBoqTab({ project, client }: ProjectBoqTabProps) {
   );
 
   const availableBoqs = React.useMemo(() => {
-    // Filter BOQs that are either already linked to THIS project or not linked to any project
     return (libraryBoqs || []).filter(boq => 
       !boq.projectId || boq.projectId === project.id
     );
@@ -92,17 +87,15 @@ export function ProjectBoqTab({ project, client }: ProjectBoqTabProps) {
     try {
       const batch = writeBatch(firestore);
       
-      // Update Project
       const projectDocRef = doc(firestore, 'projects', project.id);
       batch.update(projectDocRef, { boqId: boq.id });
 
-      // Update BOQ in Library: Change name to project name and link project ID
       const boqDocRef = doc(firestore, 'boqs', boq.id!);
       batch.update(boqDocRef, {
         name: `جدول مشروع: ${project.projectName}`,
         clientName: client?.nameAr || boq.clientName,
         projectId: project.id,
-        status: 'تعاقدي', // Transition to contractual when linked to project
+        status: 'تعاقدي',
         updatedAt: serverTimestamp()
       });
 
