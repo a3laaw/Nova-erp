@@ -134,7 +134,7 @@ export function SystemExpertChatWidget() {
   return (
     <div
       ref={widgetRef}
-      className="fixed z-50 flex flex-col items-end gap-4"
+      className="fixed z-50 flex flex-col items-end gap-4 no-print"
       dir="rtl"
       style={{
         right: `${position.x}px`,

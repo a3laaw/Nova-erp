@@ -18,7 +18,7 @@ const SystemExpertChatWidget = dynamic(
   () => import('@/components/ai/chat-widget').then(mod => mod.SystemExpertChatWidget),
   {
     ssr: false,
-    loading: () => <div className="fixed bottom-6 right-6 h-16 w-16 rounded-full bg-primary/50" />, // A simple placeholder for the button
+    loading: () => <div className="fixed bottom-6 right-6 h-16 w-16 rounded-full bg-primary/50 no-print" />, // Added no-print
   }
 );
 
