@@ -16,7 +16,6 @@ import {
   query,
   orderBy,
   doc,
-  deleteDoc,
   getDocs,
   where,
   writeBatch,
@@ -40,7 +39,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import {
@@ -104,13 +103,22 @@ export function RfqsList() {
       const date = toFirestoreDate(dateValue);
       if (!date) return '-';
       return format(date, 'dd/MM/yyyy');
-    } catch {
+    } catch (err) {
+      console.error("Date formatting error:", err);
       return '-';
     }
   }, []);
 
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
+    
+    // منع حذف الطلبات المغلقة
+    if (itemToDelete.status === 'closed') {
+        toast({ variant: 'destructive', title: 'إجراء غير مسموح', description: 'لا يمكن حذف طلبات التسعير المغلقة التي تحت المقارنة.' });
+        setItemToDelete(null);
+        return;
+    }
+
     setIsDeleting(true);
     try {
       const rfqId = itemToDelete.id!;
@@ -120,9 +128,12 @@ export function RfqsList() {
 
       const batch = writeBatch(firestore);
       batch.delete(doc(firestore, 'rfqs', rfqId));
+      
+      // حذف كافة عروض الأسعار المرتبطة لضمان نظافة البيانات
       quotesSnap.docs.forEach((quoteDoc) => {
         batch.delete(quoteDoc.ref);
       });
+      
       await batch.commit();
 
       toast({

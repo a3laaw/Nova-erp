@@ -1,12 +1,12 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, where, updateDoc } from 'firebase/firestore';
+import { useFirebase, useDocument } from '@/firebase';
+import { doc, collection, query, where, updateDoc, getDocs } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -14,6 +14,7 @@ import { SupplierQuotationCard } from '@/components/purchasing/supplier-quotatio
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const statusColors: Record<string, string> = {
     draft: 'bg-yellow-100 text-yellow-800',
@@ -36,22 +37,53 @@ export default function RfqDetailsPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+    // داتا الموردين وعروض الأسعار
+    const [vendors, setVendors] = useState<Vendor[]>([]);
+    const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
+    const [dataLoading, setDataLoading] = useState(true);
+
     const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
 
-    const vendorsQuery = useMemo(() => {
-        if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) return null;
-        return [where('__name__', 'in', rfq.vendorIds)];
-    }, [firestore, rfq?.vendorIds]);
-    const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', vendorsQuery || []);
-    
-    const supplierQuotesQuery = useMemo(() => {
-        if (!firestore || !id) return null;
-        return [where('rfqId', '==', id)];
-    }, [firestore, id]);
-    const { data: supplierQuotations, loading: quotesLoading } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations', supplierQuotesQuery || []);
+    // إصلاح #3: جلب الموردين في مجموعات (Chunks) للتعامل مع أكثر من 30 ID
+    useEffect(() => {
+        if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) {
+            setDataLoading(false);
+            return;
+        }
 
-    const loading = rfqLoading || vendorsLoading || quotesLoading;
+        const fetchData = async () => {
+            setDataLoading(true);
+            try {
+                // 1. جلب الموردين في مجموعات من 30 (حد Firestore IN query)
+                const vendorIds = rfq.vendorIds;
+                const chunks = [];
+                for (let i = 0; i < vendorIds.length; i += 30) {
+                    chunks.push(vendorIds.slice(i, i + 30));
+                }
+
+                const vendorPromises = chunks.map(chunk => 
+                    getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
+                );
+                const vendorSnapshots = await Promise.all(vendorPromises);
+                const fetchedVendors = vendorSnapshots.flatMap(snap => 
+                    snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
+                );
+                setVendors(fetchedVendors);
+
+                // 2. جلب عروض الأسعار المرتبطة بالـ RFQ
+                const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', id)));
+                setSupplierQuotations(quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation)));
+
+            } catch (err) {
+                console.error("Error fetching RFQ related data:", err);
+            } finally {
+                setDataLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [firestore, rfq?.vendorIds, id]);
     
     const handleChangeStatus = async (newStatus: RequestForQuotation['status']) => {
         if (!rfqRef) return;
@@ -64,6 +96,8 @@ export default function RfqDetailsPage() {
             setIsUpdatingStatus(false);
         }
     };
+
+    const loading = rfqLoading || dataLoading;
 
     if (loading) {
         return (
@@ -80,8 +114,20 @@ export default function RfqDetailsPage() {
     
     if (!rfq) return <div className="text-center py-20 text-muted-foreground">لم يتم العثور على طلب التسعير.</div>;
 
+    const safeDate = toFirestoreDate(rfq.date);
+
     return (
         <div className="space-y-6" dir="rtl">
+             {rfq.vendorIds?.length > 30 && (
+                <Alert className="bg-amber-50 border-amber-200 text-amber-800">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>قائمة موردين كبيرة</AlertTitle>
+                    <AlertDescription>
+                        يحتوي هذا الطلب على {rfq.vendorIds.length} مورداً. قد تستغرق عملية تحميل البيانات وقتاً أطول من المعتاد.
+                    </AlertDescription>
+                </Alert>
+             )}
+
              <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
                 <CardHeader>
                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -94,7 +140,7 @@ export default function RfqDetailsPage() {
                                 <Badge className={cn("text-xs px-3", statusColors[rfq.status])}>{statusTranslations[rfq.status]}</Badge>
                             </div>
                             <CardDescription className="text-base font-medium">
-                                تاريخ الطلب: {toFirestoreDate(rfq.date) ? format(toFirestoreDate(rfq.date)!, 'eeee, dd MMMM yyyy') : '-'}
+                                تاريخ الطلب: {safeDate ? format(safeDate, 'eeee, dd MMMM yyyy', { locale: (require('date-fns/locale')).ar }) : '-'}
                             </CardDescription>
                         </div>
                          <div className="flex gap-2">

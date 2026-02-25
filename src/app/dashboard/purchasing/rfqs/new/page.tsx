@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, Info } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, Item, RequestForQuotation } from '@/lib/types';
@@ -35,6 +35,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+// توليد معرف قوي بطول 20 حرفاً
+const generateStrongTempId = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    return Array.from({ length: 20 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+};
 
 const itemSchema = z.object({
   id: z.string().optional(),
@@ -51,8 +58,6 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
-const generateTempId = () => Math.random().toString(36).substring(2, 9);
-
 export default function NewRfqPage() {
     const router = useRouter();
     const { firestore } = useFirebase();
@@ -61,6 +66,7 @@ export default function NewRfqPage() {
     
     const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
     const [isSaving, setIsSaving] = useState(false);
+    const isSavingRef = useRef(false); // حماية من الإرسال المزدوج
 
     const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
     const { data: items, loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
@@ -70,7 +76,7 @@ export default function NewRfqPage() {
         defaultValues: {
             date: new Date(),
             vendorIds: [],
-            items: [{ id: generateTempId(), internalItemId: '', quantity: 1 }],
+            items: [{ id: generateStrongTempId(), internalItemId: '', quantity: 1 }],
         },
     });
 
@@ -78,7 +84,9 @@ export default function NewRfqPage() {
     const loading = vendorsLoading || itemsLoading;
 
     useEffect(() => {
+        let isMounted = true;
         if (!firestore) return;
+
         const generateRfqNumber = async () => {
             try {
                 const currentYear = new Date().getFullYear();
@@ -89,20 +97,27 @@ export default function NewRfqPage() {
                     const counts = counterDoc.data()?.counts || {};
                     nextNumber = (counts[currentYear] || 0) + 1;
                 }
-                setRfqNumber(`RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+                if (isMounted) {
+                    setRfqNumber(`RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+                }
             } catch (error) {
-                setRfqNumber('خطأ');
+                if (isMounted) setRfqNumber('خطأ');
             }
         };
         generateRfqNumber();
+
+        return () => { isMounted = false; }; // Cleanup لضمان عدم تحديث الـ state إذا غادر المستخدم الصفحة
     }, [firestore]);
 
     const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
     const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
 
     const onSubmit = async (data: RfqFormValues) => {
-        if (!firestore || !currentUser || loading) return;
+        if (!firestore || !currentUser || loading || isSavingRef.current) return;
+        
         setIsSaving(true);
+        isSavingRef.current = true;
+
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
@@ -120,7 +135,7 @@ export default function NewRfqPage() {
                 const processedItems = data.items.map(item => {
                     const selectedItem = items.find(i => i.id === item.internalItemId);
                     return {
-                        id: generateTempId(),
+                        id: generateStrongTempId(),
                         internalItemId: item.internalItemId,
                         itemName: selectedItem?.name || 'Unknown',
                         quantity: Number(item.quantity)
@@ -145,7 +160,7 @@ export default function NewRfqPage() {
         } catch (error) {
             console.error("Error creating RFQ:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
-        } finally {
+            isSavingRef.current = false;
             setIsSaving(false);
         }
     };
@@ -160,10 +175,11 @@ export default function NewRfqPage() {
                             <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
                         </div>
                         <div className="text-right">
-                            <Label>رقم الطلب</Label>
+                            <Label>رقم الطلب (تقريبي)</Label>
                             <div className="font-mono text-lg font-semibold h-7">
                                 {loading ? <Skeleton className="h-6 w-24" /> : rfqNumber}
                             </div>
+                            <p className="text-[10px] text-muted-foreground">سيتم تأكيد الرقم النهائي عند الحفظ</p>
                         </div>
                     </div>
                 </CardHeader>
@@ -194,6 +210,15 @@ export default function NewRfqPage() {
                                 )}
                             />
                             {errors.vendorIds && <p className="text-xs text-destructive">{errors.vendorIds.message}</p>}
+                            {watch('vendorIds')?.length > 30 && (
+                                <Alert variant="destructive" className="mt-2 py-2">
+                                    <Info className="h-4 w-4" />
+                                    <AlertTitle className="text-xs">تنبيه</AlertTitle>
+                                    <AlertDescription className="text-[10px]">
+                                        لقد اخترت أكثر من 30 مورداً. قد يواجه النظام صعوبة في معالجة هذا العدد الكبير دفعة واحدة.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
                         </div>
                     </div>
 
@@ -212,23 +237,29 @@ export default function NewRfqPage() {
                                     {fields.map((field, index) => (
                                         <TableRow key={field.id} className="hover:bg-transparent">
                                             <TableCell>
-                                                <Controller
-                                                    name={`items.${index}.internalItemId`}
-                                                    control={control}
-                                                    render={({ field }) => (
-                                                        <InlineSearchList
-                                                            value={field.value}
-                                                            onSelect={field.onChange}
-                                                            options={itemOptions}
-                                                            placeholder={loading ? 'تحميل...' : 'اختر صنفًا من المخزون...'}
-                                                            disabled={loading}
-                                                            className="border-none shadow-none focus-visible:ring-0"
-                                                        />
-                                                    )}
-                                                />
+                                                <div className="space-y-1">
+                                                    <Controller
+                                                        name={`items.${index}.internalItemId`}
+                                                        control={control}
+                                                        render={({ field }) => (
+                                                            <InlineSearchList
+                                                                value={field.value}
+                                                                onSelect={field.onChange}
+                                                                options={itemOptions}
+                                                                placeholder={loading ? 'تحميل...' : 'اختر صنفًا من المخزون...'}
+                                                                disabled={loading}
+                                                                className={cn("border-none shadow-none focus-visible:ring-0", errors.items?.[index]?.internalItemId && "border-destructive")}
+                                                            />
+                                                        )}
+                                                    />
+                                                    {errors.items?.[index]?.internalItemId && <p className="text-[10px] text-destructive px-3">{errors.items[index]?.internalItemId?.message}</p>}
+                                                </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold" />
+                                                <div className="space-y-1">
+                                                    <Input type="number" step="any" {...register(`items.${index}.quantity`)} className={cn("dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold", errors.items?.[index]?.quantity && "text-destructive")} />
+                                                    {errors.items?.[index]?.quantity && <p className="text-[10px] text-destructive text-center">{errors.items[index]?.quantity?.message}</p>}
+                                                </div>
                                             </TableCell>
                                             <TableCell>
                                                 <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
@@ -241,7 +272,7 @@ export default function NewRfqPage() {
                             </Table>
                          </div>
                          <div className="flex justify-start mt-4">
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateTempId(), internalItemId: '', quantity: 1 })} className="rounded-xl">
+                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateStrongTempId(), internalItemId: '', quantity: 1 })} className="rounded-xl">
                                 <PlusCircle className="ml-2 h-4 w-4" />
                                 إضافة صنف للطلب
                             </Button>
