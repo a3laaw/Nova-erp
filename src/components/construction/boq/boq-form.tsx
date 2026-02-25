@@ -141,30 +141,30 @@ const BoqItemRowRenderer = React.memo(({
                         />
                     </div>
                 </TableCell>
-                <TableCell className="w-28">
-                    <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background" disabled={itemData.isHeader} placeholder="الوحدة" />
-                </TableCell>
-                <TableCell className="w-28">
-                    <Input 
-                        type="number" 
-                        step="any" 
-                        {...register(`items.${node._index}.quantity`)} 
-                        className="h-9 dir-ltr text-center font-mono text-base" 
-                        disabled={itemData.isHeader} 
-                    />
+                <TableCell className="w-32">
+                    <Input {...register(`items.${node._index}.unit`)} className="h-10 text-center bg-background text-base font-semibold" disabled={itemData.isHeader} placeholder="الوحدة" />
                 </TableCell>
                 <TableCell className="w-36">
                     <Input 
                         type="number" 
-                        step="0.001" 
-                        {...register(`items.${node._index}.sellingUnitPrice`)} 
-                        className="h-9 dir-ltr text-center font-mono text-base font-semibold text-primary" 
+                        step="any" 
+                        {...register(`items.${node._index}.quantity`)} 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold" 
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="text-left font-mono font-bold w-40 border-r bg-muted/10">
+                <TableCell className="w-44">
+                    <Input 
+                        type="number" 
+                        step="0.001" 
+                        {...register(`items.${node._index}.sellingUnitPrice`)} 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary" 
+                        disabled={itemData.isHeader} 
+                    />
+                </TableCell>
+                <TableCell className="text-left font-mono font-bold w-48 border-r bg-muted/10">
                     <div className={cn(
-                        "px-2 py-1 text-base tracking-tight",
+                        "px-2 py-1 text-lg tracking-tight",
                         itemData.isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
                     )}>
                         {formatCurrency(lineTotal)}
@@ -174,7 +174,7 @@ const BoqItemRowRenderer = React.memo(({
                     <Textarea 
                         {...register(`items.${node._index}.notes`)} 
                         placeholder="ملاحظات مهندس الموقع..." 
-                        className="h-9 min-h-[38px] text-xs bg-transparent border-transparent hover:border-muted focus:bg-background transition-all" 
+                        className="h-10 min-h-[40px] text-xs bg-transparent border-transparent hover:border-muted focus:bg-background transition-all" 
                         rows={1} 
                     />
                 </TableCell>
@@ -374,10 +374,10 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                                     <TableRow className="hover:bg-transparent border-b-2">
                                         <TableHead className="w-16 text-center font-bold text-xs uppercase">م</TableHead>
                                         <TableHead className="min-w-[450px] font-bold py-4">بيان الأعمال التفصيلي</TableHead>
-                                        <TableHead className="w-28 text-center font-bold">الوحدة</TableHead>
-                                        <TableHead className="w-28 text-center font-bold">الكمية</TableHead>
-                                        <TableHead className="w-36 text-center font-bold">سعر الوحدة</TableHead>
-                                        <TableHead className="w-40 text-left font-bold border-r">الإجمالي</TableHead>
+                                        <TableHead className="w-32 text-center font-bold">الوحدة</TableHead>
+                                        <TableHead className="w-36 text-center font-bold">الكمية</TableHead>
+                                        <TableHead className="w-44 text-center font-bold">سعر الوحدة</TableHead>
+                                        <TableHead className="w-48 text-left font-bold border-r">الإجمالي</TableHead>
                                         <TableHead className="min-w-[250px] font-bold">ملاحظات فنية</TableHead>
                                         <TableHead className="w-24 text-center font-bold border-r">إجراءات</TableHead>
                                     </TableRow>
