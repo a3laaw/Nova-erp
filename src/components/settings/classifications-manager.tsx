@@ -130,12 +130,10 @@ export function ClassificationsManager() {
         const map = new Map<string, ItemCategory & { children: any[] }>();
         const roots: (ItemCategory & { children: any[] })[] = [];
 
-        // First pass: add all matched categories to map
         filteredList.forEach(cat => {
             map.set(cat.id!, { ...cat, children: [] });
         });
 
-        // Second pass: build tree, ensuring parents exist in the filtered map
         filteredList.forEach(cat => {
             if (cat.parentCategoryId && map.has(cat.parentCategoryId)) {
                 map.get(cat.parentCategoryId)!.children.push(map.get(cat.id!)!);
@@ -177,10 +175,17 @@ export function ClassificationsManager() {
 
     const openDialog = (item: ItemCategory | null, parent: ItemCategory | null = null) => {
         setEditingItem(item);
-        setParentCategory(parent);
+        
+        // FIX: If we are editing, find the current parent category if not explicitly provided
+        let effectiveParent = parent;
+        if (item && !parent && item.parentCategoryId) {
+            effectiveParent = categories.find(c => c.id === item.parentCategoryId) || null;
+        }
+        
+        setParentCategory(effectiveParent);
         setItemName(item?.name || '');
         // Inherit activity types from parent if creating new, or use existing if editing
-        setSelectedActivityTypeIds(item?.activityTypeIds || parent?.activityTypeIds || []);
+        setSelectedActivityTypeIds(item?.activityTypeIds || effectiveParent?.activityTypeIds || []);
         setIsDialogOpen(true);
     };
 
@@ -199,12 +204,8 @@ export function ClassificationsManager() {
             const dataToSave: Partial<ItemCategory> = { 
                 name: itemName,
                 activityTypeIds: selectedActivityTypeIds,
+                parentCategoryId: parentCategory?.id || null // Explicitly set null for root items
             };
-            if (parentCategory) {
-                dataToSave.parentCategoryId = parentCategory.id;
-            } else {
-                dataToSave.parentCategoryId = null;
-            }
 
             if (editingItem) {
                 if(parentCategory && parentCategory.id === editingItem.id) {
@@ -213,12 +214,12 @@ export function ClassificationsManager() {
                     return;
                 }
                 await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
-                toast({ title: 'نجاح', description: 'تم تحديث التصنيف.' });
+                toast({ title: 'نجاح', description: 'تم تحديث التصنيف بنجاح.' });
             } else {
                 const currentList = parentCategory ? categories.filter(c => c.parentCategoryId === parentCategory.id) : categories.filter(c => !c.parentCategoryId);
-                dataToSave.order = currentList.length;
-                await addDoc(collection(firestore, 'itemCategories'), dataToSave);
-                toast({ title: 'نجاح', description: 'تمت إضافة التصنيف.' });
+                const order = currentList.length;
+                await addDoc(collection(firestore, 'itemCategories'), { ...dataToSave, order });
+                toast({ title: 'نجاح', description: 'تمت إضافة التصنيف بنجاح.' });
             }
             closeDialog();
         } catch (e) {
@@ -333,7 +334,15 @@ export function ClassificationsManager() {
             </CardContent>
 
             <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent dir="rtl">
+                <DialogContent 
+                    dir="rtl"
+                    onInteractOutside={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                            e.preventDefault();
+                        }
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>{editingItem ? 'تعديل تصنيف' : 'إضافة تصنيف جديد'}</DialogTitle>
                         <DialogDescription>أدخل بيانات التصنيف وقم بربطه بالأنشطة المناسبة.</DialogDescription>
@@ -346,7 +355,6 @@ export function ClassificationsManager() {
                                 onSelect={(val) => setParentCategory(categories.find(c => c.id === val) || null)}
                                 options={categoryOptions}
                                 placeholder="اتركه فارغًا ليكون تصنيفًا رئيسيًا"
-                                disabled={editingItem !== null}
                             />
                         </div>
                         <div className="grid gap-2">
