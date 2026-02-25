@@ -103,7 +103,7 @@ export function RfqsList() {
       const date = toFirestoreDate(dateValue);
       if (!date) return '-';
       return format(date, 'dd/MM/yyyy');
-    } catch (err) {
+    } catch {
       return '-';
     }
   }, []);

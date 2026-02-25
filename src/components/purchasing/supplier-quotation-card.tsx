@@ -33,6 +33,8 @@ export function SupplierQuotationCard({ rfq, vendor, existingQuote }: SupplierQu
     }, 0)
     : 0;
 
+  const formattedDate = existingQuote?.date ? (toFirestoreDate(existingQuote.date) ? format(toFirestoreDate(existingQuote.date)!, 'dd/MM/yyyy') : '-') : '-';
+
   return (
     <>
       <Card className={cn(
@@ -65,7 +67,7 @@ export function SupplierQuotationCard({ rfq, vendor, existingQuote }: SupplierQu
                     <div className="flex items-center gap-2">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
                         <span className="text-muted-foreground">التاريخ:</span>
-                        <span className="font-bold">{format(toFirestoreDate(existingQuote.date)!, 'dd/MM/yyyy')}</span>
+                        <span className="font-bold">{formattedDate}</span>
                     </div>
                     {existingQuote.deliveryTimeDays && (
                         <div className="flex items-center gap-2">

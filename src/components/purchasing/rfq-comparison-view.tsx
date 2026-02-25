@@ -37,7 +37,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // إصلاح #3: جلب الموردين وعروض الأسعار مع مراعاة حد 30 ID في Firestore
   useEffect(() => {
     if (!firestore || !rfq.id || !rfq.vendorIds || rfq.vendorIds.length === 0) {
       setLoadingData(false);
@@ -47,12 +46,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        // 1. جلب عروض الأسعار المرتبطة بالـ RFQ
         const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', rfq.id)));
         const fetchedQuotes = quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation));
         setSupplierQuotations(fetchedQuotes);
 
-        // 2. جلب الموردين في مجموعات من 30 (حد Firestore IN query)
         const vendorIds = rfq.vendorIds;
         const chunks = [];
         for (let i = 0; i < vendorIds.length; i += 30) {
@@ -78,11 +75,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     fetchData();
   }, [firestore, rfq.id, rfq.vendorIds]);
 
-  const comparisonData = useMemo((): {
-    data: ComparisonData[];
-    vendors: Vendor[];
-    totals: Record<string, number>;
-  } => {
+  const comparisonData = useMemo(() => {
     if (loadingData || !rfq || !supplierQuotations || !vendors) {
       return { data: [], vendors: [], totals: {} };
     }
@@ -140,7 +133,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         <Alert className="mx-6 mt-4 bg-amber-50 border-amber-200 text-amber-800">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>تنبيه</AlertTitle>
-          <AlertDescription>لقد تم جلب بيانات {rfq.vendorIds.length} مورداً بنجاح.</AlertDescription>
+          <AlertDescription>لقد تم جلب بيانات الموردين في مجموعات لضمان دقة التحليل.</AlertDescription>
         </Alert>
       )}
       

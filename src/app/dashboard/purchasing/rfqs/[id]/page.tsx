@@ -46,7 +46,6 @@ export default function RfqDetailsPage() {
     const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
 
-    // إصلاح #3: جلب الموردين في مجموعات (Chunks) للتعامل مع أكثر من 30 ID
     useEffect(() => {
         if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) {
             setDataLoading(false);
@@ -56,6 +55,7 @@ export default function RfqDetailsPage() {
         const fetchData = async () => {
             setDataLoading(true);
             try {
+                // تقسيم الموردين لمجموعات من 30 لتجاوز حد Firestore In Query
                 const vendorIds = rfq.vendorIds;
                 const chunks = [];
                 for (let i = 0; i < vendorIds.length; i += 30) {
@@ -122,7 +122,7 @@ export default function RfqDetailsPage() {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>قائمة موردين كبيرة</AlertTitle>
                     <AlertDescription>
-                        يحتوي هذا الطلب على {rfq.vendorIds.length} مورداً.
+                        يحتوي هذا الطلب على {rfq.vendorIds.length} مورداً. تم تقسيم جلب البيانات لضمان الاستقرار.
                     </AlertDescription>
                 </Alert>
              )}
@@ -166,7 +166,7 @@ export default function RfqDetailsPage() {
                 </CardHeader>
                  <CardContent>
                     <div className="p-4 bg-white/50 dark:bg-muted/20 rounded-xl border">
-                        <h3 className="text-sm font-bold text-muted-foreground mb-3 flex items-center gap-2">الأصناف المطلوبة في هذا الطلب:</h3>
+                        <h3 className="text-sm font-bold text-muted-foreground mb-3">الأصناف المطلوبة:</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                             {rfq.items.map(item => (
                                 <div key={item.id} className="flex justify-between items-center p-3 bg-card border rounded-lg shadow-sm">
