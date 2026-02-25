@@ -123,8 +123,8 @@ const BoqItemRowRenderer = React.memo(({
                 "transition-colors",
                 itemData.isHeader ? "bg-muted/40 font-bold border-b-2" : "hover:bg-muted/20"
             )}>
-                <TableCell className="font-mono text-xs text-muted-foreground w-14 text-center border-l">{wbs}</TableCell>
-                <TableCell style={{ paddingRight: `${level * 2}rem` }} className="min-w-[400px]">
+                <TableCell className="font-mono text-xs text-muted-foreground w-12 text-center border-l px-1">{wbs}</TableCell>
+                <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="min-w-[350px] px-2">
                      <div className="flex flex-col gap-2 py-1">
                         <InlineSearchList
                             value={itemData.itemId || ''}
@@ -135,53 +135,58 @@ const BoqItemRowRenderer = React.memo(({
                         />
                         <Textarea
                             {...register(`items.${node._index}.description`)}
-                            placeholder="تفاصيل فنية أو بيان أعمال إضافي..."
+                            placeholder="بيان الأعمال التفصيلي..."
                             rows={1}
                             className="text-sm mt-1 min-h-[38px] border-muted focus:border-primary transition-all"
                         />
                     </div>
                 </TableCell>
-                <TableCell className="w-32">
-                    <Input {...register(`items.${node._index}.unit`)} className="h-10 text-center bg-background text-base font-semibold" disabled={itemData.isHeader} placeholder="الوحدة" />
+                <TableCell className="min-w-[100px] px-1">
+                    <Input 
+                        {...register(`items.${node._index}.unit`)} 
+                        className="h-10 text-center bg-background text-sm font-semibold px-1" 
+                        disabled={itemData.isHeader} 
+                        placeholder="الوحدة" 
+                    />
                 </TableCell>
-                <TableCell className="w-36">
+                <TableCell className="min-w-[120px] px-1">
                     <Input 
                         type="number" 
                         step="any" 
                         {...register(`items.${node._index}.quantity`)} 
-                        className="h-10 dir-ltr text-center font-mono text-lg font-bold" 
+                        className="h-10 dir-ltr text-center font-mono text-base font-bold px-1" 
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="w-44">
+                <TableCell className="min-w-[150px] px-1">
                     <Input 
                         type="number" 
                         step="0.001" 
                         {...register(`items.${node._index}.sellingUnitPrice`)} 
-                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary" 
+                        className="h-10 dir-ltr text-center font-mono text-base font-bold text-primary px-1" 
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="text-left font-mono font-bold w-48 border-r bg-muted/10">
+                <TableCell className="text-left font-mono font-bold min-w-[160px] border-r bg-muted/10 px-2">
                     <div className={cn(
-                        "px-2 py-1 text-lg tracking-tight",
+                        "py-1 text-base tracking-tight truncate",
                         itemData.isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
                     )}>
                         {formatCurrency(lineTotal)}
                     </div>
                 </TableCell>
-                <TableCell className="min-w-[250px]">
+                <TableCell className="min-w-[200px] px-2">
                     <Textarea 
                         {...register(`items.${node._index}.notes`)} 
-                        placeholder="ملاحظات مهندس الموقع..." 
+                        placeholder="ملاحظات..." 
                         className="h-10 min-h-[40px] text-xs bg-transparent border-transparent hover:border-muted focus:bg-background transition-all" 
                         rows={1} 
                     />
                 </TableCell>
-                <TableCell className="w-24 text-center border-r">
+                <TableCell className="w-20 text-center border-r px-1">
                     <div className="flex items-center justify-center gap-1">
                         {itemData.isHeader && (
-                            <Button type="button" size="icon" variant="outline" className="h-8 w-8 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل تحت هذا القسم">
+                            <Button type="button" size="icon" variant="outline" className="h-8 w-8 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل">
                                 <PlusCircle className="h-4 w-4"/>
                             </Button>
                         )}
@@ -313,16 +318,16 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
         <form onSubmit={handleSubmit(onSave)} className="bg-background">
             <div className="space-y-0">
                 <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-6">
-                    <div className="flex justify-between items-center max-w-7xl mx-auto">
+                    <div className="flex justify-between items-center max-w-full px-4 mx-auto">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-primary/10 rounded-xl text-primary shadow-inner">
                                 <ListTree className="h-7 w-7" />
                             </div>
                             <div>
-                                <CardTitle className="text-2xl font-extrabold tracking-tight">مُحرر جداول الكميات الذكي</CardTitle>
+                                <CardTitle className="text-2xl font-extrabold tracking-tight">مُحرر جداول الكميات</CardTitle>
                                 <CardDescription className="flex items-center gap-2">
                                     <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-                                    إدارة البنود، الحصر، والتسعير بنظام الهيكل الإنشائي (WBS)
+                                    إدارة الحصر والتسعير بنظام الهيكل الإنشائي (WBS)
                                 </CardDescription>
                             </div>
                         </div>
@@ -333,7 +338,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                                     {formatCurrency(grandTotal)}
                                 </div>
                             </div>
-                            <Separator orientation="vertical" className="h-10" />
+                            <Separator orientation="vertical" className="h-10 mx-4" />
                             <div className="flex flex-col items-start">
                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">عدد البنود</Label>
                                 <div className="text-2xl font-bold font-mono text-foreground/80">{fields.length}</div>
@@ -342,8 +347,8 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                     </div>
                 </div>
 
-                <CardContent className="p-0 max-w-7xl mx-auto mt-6">
-                    <div className="grid md:grid-cols-3 gap-8 p-8 mb-6 border rounded-3xl bg-card shadow-sm mx-4">
+                <CardContent className="p-0 max-w-full mx-auto mt-6 px-4">
+                    <div className="grid md:grid-cols-3 gap-8 p-8 mb-6 border rounded-3xl bg-card shadow-sm">
                         <div className="grid gap-2">
                             <Label className="font-bold text-sm text-foreground/70">اسم / مرجع الجدول *</Label>
                             <Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className="h-11 text-lg border-2" />
@@ -367,19 +372,19 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                         </div>
                     </div>
 
-                    <div className="border rounded-3xl overflow-hidden shadow-xl mx-4 bg-card">
+                    <div className="border rounded-3xl overflow-hidden shadow-xl bg-card">
                         <div className="overflow-x-auto">
-                            <Table>
+                            <Table className="w-full border-collapse">
                                 <TableHeader className="bg-muted/80 backdrop-blur-sm">
                                     <TableRow className="hover:bg-transparent border-b-2">
-                                        <TableHead className="w-16 text-center font-bold text-xs uppercase">م</TableHead>
-                                        <TableHead className="min-w-[450px] font-bold py-4">بيان الأعمال التفصيلي</TableHead>
-                                        <TableHead className="w-32 text-center font-bold">الوحدة</TableHead>
-                                        <TableHead className="w-36 text-center font-bold">الكمية</TableHead>
-                                        <TableHead className="w-44 text-center font-bold">سعر الوحدة</TableHead>
-                                        <TableHead className="w-48 text-left font-bold border-r">الإجمالي</TableHead>
-                                        <TableHead className="min-w-[250px] font-bold">ملاحظات فنية</TableHead>
-                                        <TableHead className="w-24 text-center font-bold border-r">إجراءات</TableHead>
+                                        <TableHead className="w-12 text-center font-bold text-xs uppercase px-1">م</TableHead>
+                                        <TableHead className="min-w-[350px] font-bold py-4 px-2">بيان الأعمال التفصيلي</TableHead>
+                                        <TableHead className="min-w-[100px] text-center font-bold px-1">الوحدة</TableHead>
+                                        <TableHead className="min-w-[120px] text-center font-bold px-1">الكمية</TableHead>
+                                        <TableHead className="min-w-[150px] text-center font-bold px-1">سعر الوحدة</TableHead>
+                                        <TableHead className="min-w-[160px] text-left font-bold border-r px-2">الإجمالي</TableHead>
+                                        <TableHead className="min-w-[200px] font-bold px-2">ملاحظات</TableHead>
+                                        <TableHead className="w-20 text-center font-bold border-r px-1">إجراءات</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -415,7 +420,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                                 <TableFooter className="bg-primary/5">
                                     <TableRow className="font-black text-xl hover:bg-transparent">
                                         <TableCell colSpan={5} className="text-right py-8 px-8">الإجمالي العام لجدول الكميات:</TableCell>
-                                        <TableCell className="text-left font-mono text-primary py-8 border-r bg-primary/5">
+                                        <TableCell className="text-left font-mono text-primary py-8 border-r bg-primary/5 px-2">
                                             <div className="flex flex-col">
                                                 <span className="text-2xl">{formatCurrency(grandTotal)}</span>
                                                 <span className="text-[10px] font-normal text-muted-foreground mt-1">فقط لا غير</span>
@@ -428,7 +433,7 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                         </div>
                     </div>
                     
-                    <div className="flex justify-center p-12 mb-20">
+                    <div className="flex justify-center p-12 mb-24">
                         <Button 
                             type="button" 
                             variant="secondary" 
@@ -448,14 +453,14 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                             تم حفظ جميع التغييرات في مسودة الجلسة
                         </div>
                         <div className="flex gap-4">
-                            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء وتجاهل</Button>
+                            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
                             <Button 
                                 type="submit" 
                                 disabled={isSaving} 
                                 className="h-12 px-12 rounded-xl font-extrabold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[200px]"
                             >
                                 {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin" /> : <Save className="ml-3 h-5 w-5" />} 
-                                {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول النهائي'}
+                                {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول'}
                             </Button>
                         </div>
                     </div>
