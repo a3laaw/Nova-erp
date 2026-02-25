@@ -794,3 +794,27 @@ export type Warehouse = {
     isDefault?: boolean;
     projectId?: string; // NEW: If it's a project-specific store
 };
+
+export interface ItemCategory {
+    id?: string;
+    name: string;
+    parentCategoryId: string | null;
+    order?: number;
+    activityTypeIds?: string[]; // NEW: Linked activity types
+}
+
+export interface Item {
+    id?: string;
+    name: string;
+    sku: string;
+    categoryId: string;
+    itemType: 'product' | 'service';
+    inventoryTracked?: boolean;
+    unitOfMeasure: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    reorderLevel?: number;
+    expiryTracked?: boolean;
+    description?: string;
+    createdAt?: any;
+}

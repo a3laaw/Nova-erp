@@ -1433,7 +1433,8 @@
       "properties": {
         "name": { "type": "string" },
         "parentCategoryId": { "type": "string", "description": "The ID of the parent category, null for root categories." },
-        "order": { "type": "number", "description": "The display order." }
+        "order": { "type": "number", "description": "The display order." },
+        "activityTypeIds": { "type": "array", "items": { "type": "string" }, "description": "Linked business activity types." }
       },
       "required": ["name"]
     },
@@ -1835,6 +1836,10 @@
       },
       "description": "Stores dynamically generated contracts."
     },
+    "/contracts/{contractId}/clauses/{clauseId}": {
+      "schema": { "$ref": "#/entities/ContractClause" },
+      "description": "Stores the individual payment clauses/milestones for a contract."
+    },
     "/contractTemplates/{templateId}": {
       "schema": {
         "$ref": "#/entities/ContractTemplate"
@@ -1927,4 +1932,3 @@
     }
   }
 }
-
