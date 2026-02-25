@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -15,7 +16,18 @@ import { Users, UserSearch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ClientsPage() {
+    const searchParams = useSearchParams();
     const [view, setView] = useState<'registered' | 'prospective'>('registered');
+
+    // Handle initial view from URL params (e.g., ?view=prospective)
+    useEffect(() => {
+        const viewParam = searchParams.get('view');
+        if (viewParam === 'prospective') {
+            setView('prospective');
+        } else if (viewParam === 'registered') {
+            setView('registered');
+        }
+    }, [searchParams]);
 
     return (
         <Card dir="rtl" className="border-none shadow-sm overflow-hidden">

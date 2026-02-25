@@ -41,7 +41,8 @@ import {
   Building,
   Package,
   Boxes,
-  Construction
+  Construction,
+  UserSearch
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -67,18 +68,24 @@ const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
-      label: 'إدارة علاقات العملاء', 
+      label: 'إدارة علاقات العملاء (CRM)', 
       icon: LineChart, 
       roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
-      hrefPrefix: '/dashboard/reports',
+      hrefPrefix: '/dashboard',
       children: [
-        { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة' },
-        { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة' },
-        { href: '/dashboard/reports/prospective-clients', label: 'العملاء المحتملون' },
-        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية' },
+        { href: '/dashboard/clients?view=prospective', label: 'إدارة العملاء المحتملين', icon: UserSearch },
+        { 
+          label: 'تقارير المتابعة',
+          children: [
+            { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة' },
+            { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة' },
+            { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين (تقرير)' },
+            { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية' },
+          ]
+        },
       ]
     },
-    { href: '/dashboard/clients', label: 'العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
+    { href: '/dashboard/clients', label: 'ملفات العملاء', icon: Users, roles: ['Admin', 'Secretary', 'Engineer'] },
     { 
       label: 'المقاولات',
       icon: Construction,
@@ -190,15 +197,21 @@ const navItems = {
       label: 'CRM', 
       icon: LineChart, 
       roles: ['Admin', 'Engineer', 'Accountant', 'HR'],
-      hrefPrefix: '/dashboard/reports',
+      hrefPrefix: '/dashboard',
       children: [
-        { href: '/dashboard/reports/delayed-stages', label: 'Delayed Tasks' },
-        { href: '/dashboard/reports/stalled-stages', label: 'Stalled Stages' },
-        { href: '/dashboard/reports/prospective-clients', label: 'Prospective Clients' },
-        { href: '/dashboard/reports/upsell-opportunities', label: 'Upsell Opportunities' },
+        { href: '/dashboard/clients?view=prospective', label: 'Lead Management', icon: UserSearch },
+        { 
+          label: 'Follow-up Reports',
+          children: [
+            { href: '/dashboard/reports/delayed-stages', label: 'Delayed Tasks' },
+            { href: '/dashboard/reports/stalled-stages', label: 'Stalled Stages' },
+            { href: '/dashboard/reports/prospective-clients', label: 'Prospective Clients' },
+            { href: '/dashboard/reports/upsell-opportunities', label: 'Upsell Opportunities' },
+          ]
+        },
       ]
     },
-    { href: '/dashboard/clients', label: 'Clients', icon: Users, roles: ['Admin', 'Secretary'] },
+    { href: '/dashboard/clients', label: 'Client Files', icon: Users, roles: ['Admin', 'Secretary'] },
     { 
       label: 'Construction',
       icon: Construction,
@@ -318,7 +331,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem>
         <SidebarMenuButton isActive={currentPath === item.href} asChild tooltip={item.label}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            <item.icon />
+            {item.icon && <item.icon />}
             <span className="group-data-[state=collapsed]:hidden">{item.label}</span>
           </Link>
         </SidebarMenuButton>
@@ -411,7 +424,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 <SidebarMenuSubItem key={child.href}>
                    <SidebarMenuSubButton isActive={currentPath === child.href} asChild>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                            {child.label}
+                            <div className="flex items-center gap-2">
+                                {child.icon && <child.icon className="h-3.5 w-3.5" />}
+                                {child.label}
+                            </div>
                         </Link>
                     </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
@@ -475,5 +491,3 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     </>
   );
 }
-
-    
