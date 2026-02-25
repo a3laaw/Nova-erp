@@ -161,7 +161,7 @@ export default function NewRfqPage() {
     setIsSaving(true);
 
     try {
-      // إصلاح: أخذ نسخة محلية من الأصناف لضمان توفرها داخل الـ Transaction
+      // أخذ نسخة محلية من الأصناف لضمان توفرها داخل الـ Transaction
       const currentItems = items || [];
 
       await runTransaction(firestore, async (transaction) => {

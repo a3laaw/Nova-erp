@@ -16,7 +16,6 @@ import {
   query,
   orderBy,
   doc,
-  deleteDoc,
   getDocs,
   where,
   writeBatch,
@@ -104,15 +103,19 @@ export function RfqsList() {
     }
   }, []);
 
+  // إصلاح #1: حذف RFQ مع حذف جميع عروض الأسعار المرتبطة باستخدام writeBatch
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
     setIsDeleting(true);
     try {
       const rfqId = itemToDelete.id!;
+
+      // البحث عن جميع عروض الأسعار المرتبطة بهذا الطلب
       const quotesRef = collection(firestore, 'supplierQuotations');
       const quotesQuery = query(quotesRef, where('rfqId', '==', rfqId));
       const quotesSnap = await getDocs(quotesQuery);
 
+      // حذف الطلب وعروضه في batch واحد
       const batch = writeBatch(firestore);
       batch.delete(doc(firestore, 'rfqs', rfqId));
       quotesSnap.docs.forEach((quoteDoc) => {
@@ -234,6 +237,7 @@ export function RfqsList() {
                           <Eye className="ml-2 h-4 w-4" /> إدارة العروض
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        {/* إصلاح #5: منع حذف الطلبات المغلقة */}
                         <DropdownMenuItem
                           onClick={() => setItemToDelete(rfq)}
                           disabled={rfq.status === 'closed'}
@@ -274,6 +278,7 @@ export function RfqsList() {
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold"
             >
+              {/* إصلاح #2: تم استيراد Loader2 في الأعلى */}
               {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'نعم، حذف نهائي'}
             </AlertDialogAction>
           </AlertDialogFooter>
