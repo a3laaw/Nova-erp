@@ -13,6 +13,7 @@ import {
   getDoc,
   getDocs,
   query,
+  updateDoc, // تم إضافة الاستيراد الناقص هنا
 } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -21,6 +22,7 @@ import { cleanFirestoreData } from '@/lib/utils';
 import { boqFormSchema, type BoqFormValues } from './boq-form';
 import type { Boq, BoqItem } from '@/lib/types';
 
+// ─── مولد ID آمن ───
 export const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -32,6 +34,7 @@ export const generateStableId = (): string => {
 
 const MAX_BATCH_OPS = 490;
 
+// ─── معالجة الهيكل الشجري وحساب الإجماليات ───
 function processItemsHierarchy(items: BoqFormValues['items']): {
   finalItems: (BoqFormValues['items'][number] & {
     itemNumber: string;
