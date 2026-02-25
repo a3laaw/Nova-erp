@@ -17,7 +17,9 @@ import {
   AlertCircle,
   FileText,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  User,
+  Info
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -35,6 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ProjectBoqTabProps {
   project: ConstructionProject;
