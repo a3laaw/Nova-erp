@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, collection, query, where, updateDoc } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { SupplierQuotationCard } from '@/components/purchasing/supplier-quotation-card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
     draft: 'bg-yellow-100 text-yellow-800',

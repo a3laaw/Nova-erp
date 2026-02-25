@@ -25,6 +25,7 @@ import { Input } from '../ui/input';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { searchRfqs } from '@/lib/cache/fuse-search';
+import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
     draft: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -156,7 +157,7 @@ export function RfqsList() {
                                             <Eye className="ml-2 h-4 w-4"/> إدارة العروض
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setItemToDelete(rfq)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                        <DropdownMenuItem onClick={() => setItemToDelete(rfq)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                                             <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
