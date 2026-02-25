@@ -131,7 +131,7 @@ export function SupplierQuotationForm({
         .filter((item) => item.unitPrice !== '' && !isNaN(Number(item.unitPrice)))
         .map((item) => ({ ...item, unitPrice: Number(item.unitPrice) }));
 
-      if (processedItems.length === 0) throw new Error('الرجاء إدخل أسعار الأصناف.');
+      if (processedItems.length === 0) throw new Error('الرجاء إدخال أسعار الأصناف.');
 
       const dataToSave = {
         rfqId: rfq.id!,

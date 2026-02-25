@@ -46,7 +46,7 @@ export default function RfqDetailsPage() {
     const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
 
-    // إصلاح #3: جلب الموردين في مجموعات (Chunks) لتجنب حد الـ 30 في Firestore IN Query
+    // إصلاح #3: جلب الموردين في مجموعات لتجنب حد الـ 30 في Firestore IN Query
     useEffect(() => {
         if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) {
             setDataLoading(false);

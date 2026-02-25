@@ -24,29 +24,33 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Info } from 'lucide-react';
+import { Save, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import {
+  collection,
+  runTransaction,
+  doc,
+  getDoc,
+  serverTimestamp,
+  orderBy,
+} from 'firebase/firestore';
 import type { Vendor, Item, RequestForQuotation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
-import { cleanFirestoreData, cn } from '@/lib/utils';
+import { cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
-
-// إصلاح #10: توليد معرف طويل (20 حرفاً)
-const generateStrongTempId = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    return Array.from({ length: 20 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
-};
 
 const itemSchema = z.object({
   id: z.string().optional(),
-  internalItemId: z.string().min(1, "الصنف مطلوب."),
+  internalItemId: z.string().min(1, 'الصنف مطلوب.'),
   itemName: z.string().optional(),
-  quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
+  quantity: z.preprocess(
+    (v) => parseFloat(String(v || '0')),
+    z.number().min(0.01, 'الكمية مطلوبة')
+  ),
 });
 
 const rfqSchema = z.object({
@@ -57,231 +61,317 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
+const generateTempId = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let id = '';
+  for (let i = 0; i < 20; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+};
+
 export default function NewRfqPage() {
-    const router = useRouter();
-    const { firestore } = useFirebase();
-    const { user: currentUser } = useAuth();
-    const { toast } = useToast();
-    
-    // إصلاح #9: توضيح أن الرقم تقريبي
-    const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
-    const [isSaving, setIsSaving] = useState(false);
-    
-    // إصلاح #6: منع الإرسال المزدوج
-    const isSavingRef = useRef(false);
+  const router = useRouter();
+  const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
 
-    const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
-    const { data: items, loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
+  const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
 
-    const { register, handleSubmit, control, formState: { errors } } = useForm<RfqFormValues>({
-        resolver: zodResolver(rfqSchema),
-        defaultValues: {
-            date: new Date(),
-            vendorIds: [],
-            items: [{ id: generateStrongTempId(), internalItemId: '', quantity: 1 }],
-        },
-    });
+  const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
+    firestore,
+    'vendors',
+    [orderBy('name')]
+  );
+  const { data: items, loading: itemsLoading } = useSubscription<Item>(
+    firestore,
+    'items',
+    [orderBy('name')]
+  );
 
-    const { fields, append, remove } = useFieldArray({ control, name: "items" });
-    const loading = vendorsLoading || itemsLoading;
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm<RfqFormValues>({
+    resolver: zodResolver(rfqSchema),
+    defaultValues: {
+      date: new Date(),
+      vendorIds: [],
+      items: [{ id: generateTempId(), internalItemId: '', quantity: 1 }],
+    },
+  });
 
-    useEffect(() => {
-        let isMounted = true;
-        if (!firestore) return;
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const loading = vendorsLoading || itemsLoading;
 
-        const generateRfqNumber = async () => {
-            try {
-                const currentYear = new Date().getFullYear();
-                const counterRef = doc(firestore, 'counters', 'rfqs');
-                const counterDoc = await getDoc(counterRef);
-                let nextNumber = 1;
-                if (counterDoc.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 0) + 1;
-                }
-                if (isMounted) {
-                    setRfqNumber(`RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
-                }
-            } catch (error) {
-                if (isMounted) setRfqNumber('خطأ');
-            }
-        };
-        generateRfqNumber();
+  useEffect(() => {
+    if (!firestore) return;
+    let cancelled = false;
 
-        // إصلاح #7: إضافة Cleanup
-        return () => { isMounted = false; };
-    }, [firestore]);
-
-    const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
-    const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
-
-    const onSubmit = async (data: RfqFormValues) => {
-        if (!firestore || !currentUser || loading || isSavingRef.current) return;
-        
-        setIsSaving(true);
-        isSavingRef.current = true;
-
-        try {
-            await runTransaction(firestore, async (transaction) => {
-                const currentYear = new Date().getFullYear();
-                const counterRef = doc(firestore, 'counters', 'rfqs');
-                const counterDoc = await transaction.get(counterRef);
-                let nextNumber = 1;
-                if (counterDoc.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 0) + 1;
-                }
-                const newRfqNumber = `RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-                
-                const newRfqRef = doc(collection(firestore, 'rfqs'));
-                
-                const processedItems = data.items.map(item => {
-                    const selectedItem = items.find(i => i.id === item.internalItemId);
-                    return {
-                        id: generateStrongTempId(),
-                        internalItemId: item.internalItemId,
-                        itemName: selectedItem?.name || 'Unknown',
-                        quantity: Number(item.quantity)
-                    };
-                });
-                
-                const rfqData = {
-                    rfqNumber: newRfqNumber,
-                    date: data.date,
-                    vendorIds: data.vendorIds,
-                    items: processedItems,
-                    status: 'draft',
-                    createdAt: serverTimestamp(),
-                };
-
-                transaction.set(newRfqRef, cleanFirestoreData(rfqData));
-                transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-            });
-            
-            toast({ title: 'نجاح', description: 'تم إنشاء طلب التسعير بنجاح.' });
-            router.push('/dashboard/purchasing/rfqs');
-        } catch (error) {
-            console.error("Error creating RFQ:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
-            isSavingRef.current = false;
-            setIsSaving(false);
+    const generateRfqNumber = async () => {
+      try {
+        const currentYear = new Date().getFullYear();
+        const counterRef = doc(firestore, 'counters', 'rfqs');
+        const counterDoc = await getDoc(counterRef);
+        let nextNumber = 1;
+        if (counterDoc.exists()) {
+          const counts = counterDoc.data()?.counts || {};
+          nextNumber = (counts[currentYear] || 0) + 1;
         }
+        if (!cancelled) {
+          setRfqNumber(`RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+        }
+      } catch {
+        if (!cancelled) {
+          setRfqNumber('سيتم التوليد عند الحفظ');
+        }
+      }
     };
+    generateRfqNumber();
 
-    return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit(onSubmit)}>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle>طلب تسعير جديد (RFQ)</CardTitle>
-                            <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
-                        </div>
-                        <div className="text-right">
-                            <Label>رقم الطلب (تقريبي)</Label>
-                            <div className="font-mono text-lg font-semibold h-7">
-                                {loading ? <Skeleton className="h-6 w-24" /> : rfqNumber}
-                            </div>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="grid gap-2">
-                            <Label>تاريخ الطلب <span className="text-destructive">*</span></Label>
-                            <Controller
-                                name="date"
-                                control={control}
-                                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />}
-                            />
-                            {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>الموردون المستهدفون <span className="text-destructive">*</span></Label>
-                            <Controller
-                                name="vendorIds"
-                                control={control}
-                                render={({ field }) => (
-                                    <MultiSelect
-                                        options={vendorOptions}
-                                        selected={field.value}
-                                        onChange={field.onChange}
-                                        placeholder={loading ? 'جاري التحميل...' : 'اختر موردًا أو أكثر...'}
-                                        disabled={loading}
-                                    />
-                                )}
-                            />
-                            {errors.vendorIds && <p className="text-xs text-destructive">{errors.vendorIds.message}</p>}
-                        </div>
-                    </div>
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore]);
 
-                    <div>
-                        <Label className="mb-2 block font-bold">الأصناف والكميات المطلوبة</Label>
-                        <div className="border rounded-xl overflow-hidden shadow-sm">
-                            <Table>
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow>
-                                        <TableHead className="w-3/5">الصنف</TableHead>
-                                        <TableHead>الكمية المطلوبة</TableHead>
-                                        <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {fields.map((field, index) => (
-                                        <TableRow key={field.id} className="hover:bg-transparent">
-                                            <TableCell>
-                                                <div className="space-y-1">
-                                                    <Controller
-                                                        name={`items.${index}.internalItemId`}
-                                                        control={control}
-                                                        render={({ field }) => (
-                                                            <InlineSearchList
-                                                                value={field.value}
-                                                                onSelect={field.onChange}
-                                                                options={itemOptions}
-                                                                placeholder={loading ? 'تحميل...' : 'اختر صنفًا من المخزون...'}
-                                                                disabled={loading}
-                                                                className={cn("border-none shadow-none focus-visible:ring-0", errors.items?.[index]?.internalItemId && "border-destructive")}
-                                                            />
-                                                        )}
-                                                    />
-                                                    {/* إصلاح #8: عرض أخطاء validation على البنود */}
-                                                    {errors.items?.[index]?.internalItemId && <p className="text-[10px] text-destructive px-3">{errors.items[index]?.internalItemId?.message}</p>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="space-y-1">
-                                                    <Input type="number" step="any" {...register(`items.${index}.quantity`)} className={cn("dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold", errors.items?.[index]?.quantity && "text-destructive")} />
-                                                    {errors.items?.[index]?.quantity && <p className="text-[10px] text-destructive text-center">{errors.items[index]?.quantity?.message}</p>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                         </div>
-                         <div className="flex justify-start mt-4">
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateStrongTempId(), internalItemId: '', quantity: 1 })} className="rounded-xl">
-                                <PlusCircle className="ml-2 h-4 w-4" />
-                                إضافة صنف للطلب
-                            </Button>
-                         </div>
-                    </div>
-                    {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
-                </CardContent>
-                <CardFooter className="flex justify-end gap-2 p-8 border-t bg-muted/10">
-                    <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20">
-                        {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin"/> : <Save className="ml-3 h-5 w-5"/>}
-                        {isSaving ? 'جاري الحفظ...' : 'حفظ كمسودة وإرسال'}
-                    </Button>
-                </CardFooter>
-            </form>
-        </Card>
-    );
+  const vendorOptions: MultiSelectOption[] = useMemo(
+    () => (vendors || []).map((v) => ({ value: v.id!, label: v.name })),
+    [vendors]
+  );
+  const itemOptions = useMemo(
+    () => (items || []).map((i) => ({ value: i.id!, label: i.name, searchKey: i.sku })),
+    [items]
+  );
+
+  const onSubmit = async (data: RfqFormValues) => {
+    if (!firestore || !currentUser || loading) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+
+    try {
+      await runTransaction(firestore, async (transaction) => {
+        const currentYear = new Date().getFullYear();
+        const counterRef = doc(firestore, 'counters', 'rfqs');
+        const counterDoc = await transaction.get(counterRef);
+        let nextNumber = 1;
+        if (counterDoc.exists()) {
+          const counts = counterDoc.data()?.counts || {};
+          nextNumber = (counts[currentYear] || 0) + 1;
+        }
+        const newRfqNumber = `RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+
+        const newRfqRef = doc(collection(firestore, 'rfqs'));
+
+        const processedItems = data.items.map((item) => {
+          const selectedItem = items?.find((i) => i.id === item.internalItemId);
+          return {
+            id: generateTempId(),
+            internalItemId: item.internalItemId,
+            itemName: selectedItem?.name || 'Unknown',
+            quantity: Number(item.quantity),
+          };
+        });
+
+        const rfqData: Omit<RequestForQuotation, 'id'> = {
+          rfqNumber: newRfqNumber,
+          date: data.date,
+          vendorIds: data.vendorIds,
+          items: processedItems,
+          status: 'draft',
+          createdAt: serverTimestamp(),
+        };
+
+        transaction.set(newRfqRef, cleanFirestoreData(rfqData));
+        transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+      });
+
+      toast({ title: 'نجاح', description: 'تم إنشاء طلب التسعير بنجاح.' });
+      router.push('/dashboard/purchasing/rfqs');
+    } catch (error) {
+      console.error('Error creating RFQ:', error);
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
+    } finally {
+      setIsSaving(false);
+      savingRef.current = false;
+    }
+  };
+
+  return (
+    <Card className="max-w-4xl mx-auto" dir="rtl">
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>طلب تسعير جديد (RFQ)</CardTitle>
+              <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
+            </div>
+            <div className="text-right">
+              <Label>رقم الطلب</Label>
+              <div className="font-mono text-lg font-semibold h-7">
+                {loading ? (
+                  <Skeleton className="h-6 w-24" />
+                ) : (
+                  <span className="text-muted-foreground text-sm">
+                    {rfqNumber}
+                    <span className="text-[10px] text-muted-foreground/60 block">
+                      (تقريبي — يتأكد عند الحفظ)
+                    </span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid gap-2">
+              <Label>
+                تاريخ الطلب <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="date"
+                control={control}
+                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />}
+              />
+              {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+            </div>
+            <div className="grid gap-2">
+              <Label>
+                الموردون المستهدفون <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="vendorIds"
+                control={control}
+                render={({ field }) => (
+                  <MultiSelect
+                    options={vendorOptions}
+                    selected={field.value}
+                    onChange={field.onChange}
+                    placeholder={loading ? 'جاري التحميل...' : 'اختر موردًا أو أكثر...'}
+                    disabled={loading}
+                  />
+                )}
+              />
+              {errors.vendorIds && (
+                <p className="text-xs text-destructive">{errors.vendorIds.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <Label className="mb-2 block font-bold">الأصناف والكميات المطلوبة</Label>
+            <div className="border rounded-xl overflow-hidden shadow-sm">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-3/5">الصنف</TableHead>
+                    <TableHead>الكمية المطلوبة</TableHead>
+                    <TableHead className="w-[50px]">
+                      <span className="sr-only">حذف</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {fields.map((field, index) => (
+                    <TableRow key={field.id} className="hover:bg-transparent">
+                      <TableCell>
+                        <Controller
+                          name={`items.${index}.internalItemId`}
+                          control={control}
+                          render={({ field }) => (
+                            <InlineSearchList
+                              value={field.value}
+                              onSelect={field.onChange}
+                              options={itemOptions}
+                              placeholder={loading ? 'تحميل...' : 'اختر صنفًا من المخزون...'}
+                              disabled={loading}
+                              className="border-none shadow-none focus-visible:ring-0"
+                            />
+                          )}
+                        />
+                        {errors.items?.[index]?.internalItemId && (
+                          <p className="text-xs text-destructive mt-1 px-2">
+                            {errors.items[index]!.internalItemId!.message}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="any"
+                          {...register(`items.${index}.quantity`)}
+                          className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold"
+                        />
+                        {errors.items?.[index]?.quantity && (
+                          <p className="text-xs text-destructive mt-1">
+                            {errors.items[index]!.quantity!.message}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          disabled={fields.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-start mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ id: generateTempId(), internalItemId: '', quantity: 1 })}
+                className="rounded-xl"
+              >
+                <PlusCircle className="ml-2 h-4 w-4" />
+                إضافة صنف للطلب
+              </Button>
+            </div>
+          </div>
+          {errors.items && (
+            <p className="text-destructive text-sm mt-2">
+              {errors.items.root?.message || errors.items.message}
+            </p>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2 p-8 border-t bg-muted/10">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={isSaving}
+            className="h-12 px-8 rounded-xl font-bold"
+          >
+            إلغاء
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSaving || loading}
+            className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20"
+          >
+            {isSaving ? (
+              <Loader2 className="ml-3 h-5 w-5 animate-spin" />
+            ) : (
+              <Save className="ml-3 h-5 w-5" />
+            )}
+            {isSaving ? 'جاري الحفظ...' : 'حفظ كمسودة وإرسال'}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
 }
