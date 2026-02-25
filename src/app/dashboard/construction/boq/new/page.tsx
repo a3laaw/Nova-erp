@@ -59,10 +59,10 @@ export default function NewBoqPage() {
         if (copiedDataString) {
             try {
                 const copiedData = JSON.parse(copiedDataString);
-                // Ensure each item has a UID which will serve as its Firestore ID
+                // When copying, we assign new UIDs to items but keep the structure
                 const items = (copiedData.items || []).map((item: any) => ({
                     ...item,
-                    uid: item.uid || generateId(),
+                    uid: generateId(),
                 }));
                 reset({ ...copiedData, items });
                 toast({ title: 'تم النسخ', description: 'تم ملء النموذج ببيانات النسخة.' });
@@ -128,9 +128,29 @@ export default function NewBoqPage() {
             });
 
             if (newBoqId) {
-                // Now, commit the items using their UIDs as Firestore IDs
+                // Calculate hierarchy numbering and levels before saving
+                const finalItems: any[] = [];
+                const childMap = new Map<string | null, string[]>();
+                data.items.forEach(item => {
+                    if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
+                    childMap.get(item.parentId)!.push(item.uid);
+                });
+
+                const processNode = (parentId: string | null, parentNumber: string, level: number) => {
+                    const childrenUids = childMap.get(parentId) || [];
+                    childrenUids.forEach((childUid, index) => {
+                        const item = data.items.find(i => i.uid === childUid);
+                        if (item) {
+                            const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
+                            finalItems.push({ ...item, itemNumber: newNumber, level });
+                            processNode(childUid, newNumber, level + 1);
+                        }
+                    });
+                };
+                processNode(null, '', 0);
+
                 const batch = writeBatch(firestore);
-                data.items.forEach((item) => {
+                finalItems.forEach((item) => {
                     const { uid, ...itemData } = item;
                     const itemRef = doc(firestore, `boqs/${newBoqId}/items`, uid);
                     batch.set(itemRef, cleanFirestoreData(itemData));
@@ -160,15 +180,10 @@ export default function NewBoqPage() {
 
     if (authLoading) {
         return (
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader><CardTitle>إنشاء جدول كميات جديد</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="flex justify-center items-center h-64">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="mr-4">جاري تهيئة المحرر...</p>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center h-screen gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg font-medium animate-pulse">جاري تهيئة المحرر الجديد...</p>
+            </div>
         );
     }
     

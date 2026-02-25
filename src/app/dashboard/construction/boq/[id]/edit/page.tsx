@@ -1,9 +1,8 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
 import { collection, doc, writeBatch, serverTimestamp, getDocs, query, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -57,16 +56,17 @@ export default function EditBoqPage() {
                 const boqData = boqSnap.data() as Boq;
                 const boqItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem));
                 
-                setInitialItems(boqItems);
+                // Sort items by itemNumber to maintain visual order
+                const sortedItems = boqItems.sort((a, b) => (a.itemNumber || '').localeCompare(b.itemNumber || '', undefined, { numeric: true }));
+                setInitialItems(sortedItems);
                 
-                // For editing, UID is the document ID
                 reset({
                     name: boqData.name,
                     clientName: boqData.clientName || '',
                     status: boqData.status,
-                    items: boqItems.map(item => ({
+                    items: sortedItems.map(item => ({
                         ...item,
-                        uid: item.id!, // Stable UID from DB ID
+                        uid: item.id!, 
                     })),
                 });
             } catch(e) {
@@ -91,17 +91,37 @@ export default function EditBoqPage() {
                 return sum + ((item.quantity || 0) * (item.sellingUnitPrice || 0));
             }, 0);
 
+            // Re-calculate hierarchical numbering and levels for data integrity
+            const finalItems: any[] = [];
+            const childMap = new Map<string | null, string[]>();
+            data.items.forEach(item => {
+                if (!childMap.has(item.parentId)) childMap.set(item.parentId, []);
+                childMap.get(item.parentId)!.push(item.uid);
+            });
+
+            const processNode = (parentId: string | null, parentNumber: string, level: number) => {
+                const childrenUids = childMap.get(parentId) || [];
+                childrenUids.forEach((childUid, index) => {
+                    const item = data.items.find(i => i.uid === childUid);
+                    if (item) {
+                        const newNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
+                        finalItems.push({ ...item, itemNumber: newNumber, level });
+                        processNode(childUid, newNumber, level + 1);
+                    }
+                });
+            };
+            processNode(null, '', 0);
+
             batch.update(boqRef, {
                 name: data.name,
                 clientName: data.clientName || null,
                 status: data.status,
                 totalValue,
-                itemCount: data.items.length,
+                itemCount: finalItems.length,
                 updatedAt: serverTimestamp(),
             });
 
-            // Handle items: UID is the Firestore document ID
-            const currentUids = new Set(data.items.map(item => item.uid));
+            const currentUids = new Set(finalItems.map(item => item.uid));
 
             // 1. Delete removed items
             for (const originalItem of initialItems) {
@@ -111,21 +131,19 @@ export default function EditBoqPage() {
             }
 
             // 2. Update or add items
-            for (const item of data.items) {
+            for (const item of finalItems) {
                 const itemRef = doc(firestore, `boqs/${id}/items`, item.uid);
-                // Remove client-side UID field before saving to data, but it is our document ID
                 const { uid, ...itemData } = item;
                 batch.set(itemRef, cleanFirestoreData(itemData), { merge: true });
             }
 
             await batch.commit();
-
             toast({ title: 'نجاح', description: 'تم تحديث جدول الكميات بنجاح.' });
             router.push(`/dashboard/construction/boq/${id}`);
 
         } catch (error) {
             console.error("Error updating BOQ:", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل تحديث جدول الكميات. تأكد من البيانات وحاول مرة أخرى.' });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'فشل تحديث جدول الكميات.' });
         } finally {
             setIsSaving(false);
         }
@@ -133,9 +151,9 @@ export default function EditBoqPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center h-96 gap-4">
+            <div className="flex flex-col items-center justify-center h-screen gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-lg font-medium animate-pulse">جاري تحميل بيانات التعديل...</p>
+                <p className="text-lg font-medium animate-pulse">جاري تحميل بيانات التعديل وتحليل الهيكل...</p>
             </div>
         );
     }

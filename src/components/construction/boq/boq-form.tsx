@@ -1,20 +1,20 @@
 'use client';
 
 import * as React from 'react';
-import { useFieldArray, Controller, useWatch, useForm } from 'react-hook-form';
+import { useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
-import type { BoqItem, BoqReferenceItem } from '@/lib/types';
+import type { BoqItem, BoqReferenceItem, SubcontractorType, CompanyActivityType, TransactionType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, PlusCircle, Trash2, ListTree, Calculator, Info } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, ListTree, Calculator, Info, Minus, Plus } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
-import { CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
+import { CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -26,7 +26,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // --- Schema Definitions ---
 export const itemSchema = z.object({
-  uid: z.string(), // Unique ID for current session and DB ID
+  uid: z.string(), 
   itemNumber: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب."),
   unit: z.string().optional(),
