@@ -141,7 +141,7 @@ const BoqItemRowRenderer = React.memo(({
                         />
                     </div>
                 </TableCell>
-                <TableCell className="min-w-[100px] px-1">
+                <TableCell className="min-w-[120px] px-1">
                     <Input 
                         {...register(`items.${node._index}.unit`)} 
                         className="h-10 text-center bg-background text-sm font-semibold px-1" 
@@ -149,27 +149,27 @@ const BoqItemRowRenderer = React.memo(({
                         placeholder="الوحدة" 
                     />
                 </TableCell>
-                <TableCell className="min-w-[120px] px-1">
+                <TableCell className="min-w-[140px] px-1">
                     <Input 
                         type="number" 
                         step="any" 
                         {...register(`items.${node._index}.quantity`)} 
-                        className="h-10 dir-ltr text-center font-mono text-base font-bold px-1" 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold px-1" 
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="min-w-[150px] px-1">
+                <TableCell className="min-w-[180px] px-1">
                     <Input 
                         type="number" 
                         step="0.001" 
                         {...register(`items.${node._index}.sellingUnitPrice`)} 
-                        className="h-10 dir-ltr text-center font-mono text-base font-bold text-primary px-1" 
+                        className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary px-1" 
                         disabled={itemData.isHeader} 
                     />
                 </TableCell>
-                <TableCell className="text-left font-mono font-bold min-w-[160px] border-r bg-muted/10 px-2">
+                <TableCell className="text-left font-mono font-bold min-w-[200px] border-r bg-muted/10 px-2">
                     <div className={cn(
-                        "py-1 text-base tracking-tight truncate",
+                        "py-1 text-lg tracking-tight truncate",
                         itemData.isHeader ? "text-primary border-b-2 border-primary/20" : "text-foreground"
                     )}>
                         {formatCurrency(lineTotal)}
@@ -379,10 +379,10 @@ export function BoqForm({ initialData, onSave, onClose, isSaving }: { initialDat
                                     <TableRow className="hover:bg-transparent border-b-2">
                                         <TableHead className="w-12 text-center font-bold text-xs uppercase px-1">م</TableHead>
                                         <TableHead className="min-w-[350px] font-bold py-4 px-2">بيان الأعمال التفصيلي</TableHead>
-                                        <TableHead className="min-w-[100px] text-center font-bold px-1">الوحدة</TableHead>
-                                        <TableHead className="min-w-[120px] text-center font-bold px-1">الكمية</TableHead>
-                                        <TableHead className="min-w-[150px] text-center font-bold px-1">سعر الوحدة</TableHead>
-                                        <TableHead className="min-w-[160px] text-left font-bold border-r px-2">الإجمالي</TableHead>
+                                        <TableHead className="min-w-[120px] text-center font-bold px-1">الوحدة</TableHead>
+                                        <TableHead className="min-w-[140px] text-center font-bold px-1">الكمية</TableHead>
+                                        <TableHead className="min-w-[180px] text-center font-bold px-1">سعر الوحدة</TableHead>
+                                        <TableHead className="min-w-[200px] text-left font-bold border-r px-2">الإجمالي</TableHead>
                                         <TableHead className="min-w-[200px] font-bold px-2">ملاحظات</TableHead>
                                         <TableHead className="w-20 text-center font-bold border-r px-1">إجراءات</TableHead>
                                     </TableRow>

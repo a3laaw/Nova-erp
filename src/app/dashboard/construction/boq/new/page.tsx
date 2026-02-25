@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BoqForm, type BoqFormValues } from '@/components/construction/boq/boq-form';
 import { useFirebase } from '@/firebase';
@@ -16,6 +16,22 @@ export default function NewBoqPage() {
     const searchParams = useSearchParams();
 
     const [isSaving, setIsSaving] = useState(false);
+    const [initialData, setInitialData] = useState<Partial<BoqFormValues> | null>(null);
+
+    useEffect(() => {
+        const copiedDataString = sessionStorage.getItem('copiedBoqData');
+        if (copiedDataString) {
+            try {
+                const copiedData = JSON.parse(copiedDataString);
+                setInitialData(copiedData);
+                toast({ title: 'تم النسخ', description: 'تم ملء النموذج ببيانات النسخة.' });
+            } catch (error) {
+                console.error("Failed to parse copied BOQ data:", error);
+            } finally {
+                sessionStorage.removeItem('copiedBoqData');
+            }
+        }
+    }, [toast]);
 
     const handleSave = async (data: BoqFormValues) => {
         if (!firestore || !currentUser) return;
@@ -120,6 +136,7 @@ export default function NewBoqPage() {
 
     return (
         <BoqForm
+            initialData={initialData}
             onSave={handleSave}
             onClose={() => router.back()}
             isSaving={isSaving}
