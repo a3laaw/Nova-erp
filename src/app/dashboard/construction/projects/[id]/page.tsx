@@ -1,3 +1,4 @@
+
 'use client';
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -8,16 +9,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent } from 'lucide-react';
+import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { BoqView } from '@/components/clients/boq/boq-view';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
+import { ProjectBoqTab } from '@/components/construction/project-boq-tab';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -73,60 +74,89 @@ export default function ProjectDetailPage() {
 
     if (loading) {
         return (
-            <div className="space-y-4">
-                <Skeleton className="h-48 w-full" />
-                <Skeleton className="h-64 w-full" />
+            <div className="space-y-4 max-w-6xl mx-auto p-6" dir="rtl">
+                <Skeleton className="h-48 w-full rounded-xl" />
+                <Skeleton className="h-64 w-full rounded-xl" />
             </div>
         );
     }
     
     if (!project) {
-        return <p className="text-center">لم يتم العثور على المشروع.</p>;
+        return <div className="text-center p-20 text-muted-foreground">لم يتم العثور على المشروع.</div>;
     }
     
     return (
-        <div className="space-y-6">
-            <Card>
+        <div className="space-y-6 max-w-6xl mx-auto p-4 sm:p-6" dir="rtl">
+            <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
                 <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle className="text-2xl font-bold flex items-center gap-3">
-                                {project.projectName}
-                                <Badge variant="outline" className={statusColors[project.status] || ''}>{project.status}</Badge>
-                            </CardTitle>
-                            <CardDescription>
-                                مشروع {project.projectType} للعميل: <Link href={`/dashboard/clients/${project.clientId}`} className="text-primary hover:underline">{client?.nameAr || '...'}</Link>
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                                <CardTitle className="text-3xl font-black text-foreground">
+                                    {project.projectName}
+                                </CardTitle>
+                                <Badge className={cn("text-xs px-3", statusColors[project.status])}>{project.status}</Badge>
+                            </div>
+                            <CardDescription className="text-base font-medium flex items-center gap-2">
+                                <Building className="h-4 w-4 text-muted-foreground"/>
+                                مشروع {project.projectType} للعميل: 
+                                <Link href={`/dashboard/clients/${project.clientId}`} className="text-primary hover:underline font-bold">
+                                    {client?.nameAr || '...'}
+                                </Link>
                             </CardDescription>
                         </div>
-                         <Button variant="outline" onClick={() => router.back()}><ArrowRight className="ml-2 h-4"/> العودة للقائمة</Button>
+                         <Button variant="ghost" onClick={() => router.back()} className="gap-2 group">
+                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1"/> 
+                            العودة للمشاريع
+                        </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center gap-2"><User className="text-muted-foreground"/> <span>المهندس: {engineer?.fullName || '...'}</span></div>
-                        <div className="flex items-center gap-2"><Calendar className="text-muted-foreground"/> <span>يبدأ: {formatDate(project.startDate)}</span></div>
-                        <div className="flex items-center gap-2"><Calendar className="text-muted-foreground"/> <span>ينتهي: {formatDate(project.endDate)}</span></div>
-                         {daysRemaining && <div className="flex items-center gap-2 text-primary font-semibold"><Calendar className="text-muted-foreground"/> <span>متبقٍ: {daysRemaining}</span></div>}
+                <CardContent className="space-y-6">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-4 bg-white/50 dark:bg-muted/20 rounded-xl border">
+                        <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المهندس المسؤول</Label>
+                            <p className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> {engineer?.fullName || '...'}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">تاريخ البدء</Label>
+                            <p className="font-bold flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground"/> {formatDate(project.startDate)}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">التسليم المتوقع</Label>
+                            <p className="font-bold flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground"/> {formatDate(project.endDate)}</p>
+                        </div>
+                         <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">الوقت المتبقي</Label>
+                            <p className="font-bold text-primary flex items-center gap-2">{daysRemaining || '---'}</p>
+                        </div>
                     </div>
-                    <div>
-                        <Label>نسبة الإنجاز</Label>
-                        <Progress value={project.progressPercentage} className="mt-2" />
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                            <Label className="font-bold">إجمالي نسبة الإنجاز</Label>
+                            <span className="font-mono text-xl font-black text-primary">{project.progressPercentage}%</span>
+                        </div>
+                        <Progress value={project.progressPercentage} className="h-3" />
                     </div>
                 </CardContent>
             </Card>
 
-            <Tabs defaultValue="overview">
-                <TabsList>
-                    <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
-                    <TabsTrigger value="subcontracts" disabled>المقاولون</TabsTrigger>
-                    <TabsTrigger value="procurement" disabled>المشتريات</TabsTrigger>
-                    <TabsTrigger value="financials" disabled>المالية</TabsTrigger>
-                    <TabsTrigger value="files" disabled>الملفات</TabsTrigger>
+            <Tabs defaultValue="boq" className="w-full">
+                <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
+                    <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> جداول الكميات</TabsTrigger>
+                    <TabsTrigger value="overview" className="gap-2 py-3 rounded-lg">نظرة عامة</TabsTrigger>
+                    <TabsTrigger value="subcontracts" disabled className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
+                    <TabsTrigger value="procurement" disabled className="gap-2 py-3 rounded-lg">المشتريات</TabsTrigger>
+                    <TabsTrigger value="financials" disabled className="gap-2 py-3 rounded-lg">المالية</TabsTrigger>
                 </TabsList>
-                <TabsContent value="overview" className="mt-4">
-                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <StatCard title="قيمة العقد" value={formatCurrency(project.contractValue)} icon={<DollarSign/>}/>
-                        <StatCard title="نسبة الإنجاز" value={`${project.progressPercentage}%`} icon={<Percent/>}/>
+                
+                <TabsContent value="boq">
+                    <ProjectBoqTab project={project} client={client} />
+                </TabsContent>
+
+                <TabsContent value="overview">
+                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard title="قيمة العقد" value={formatCurrency(project.contractValue)} icon={<DollarSign className="text-green-600"/>}/>
+                        <StatCard title="نسبة الإنجاز" value={`${project.progressPercentage}%`} icon={<Percent className="text-blue-600"/>}/>
                      </div>
                 </TabsContent>
             </Tabs>

@@ -1,5 +1,4 @@
 
-
 export interface Company {
     id?: string;
     name: string;
@@ -444,6 +443,7 @@ export type ClientTransaction = {
     updatedAt?: any;
     engineerName?: string;
     stages?: TransactionStage[];
+    boqId?: string; // Link to standalone Boq document
     boqItemCount?: number;
     boqTotalValue?: number;
     contract?: {
@@ -704,6 +704,7 @@ export type ConstructionProject = {
   mainEngineerName?: string;
   progressPercentage: number;
   linkedTransactionId?: string;
+  boqId?: string; // Link to Standalone BOQ
   createdAt?: any;
   createdBy?: string;
 };
@@ -766,6 +767,7 @@ export type Boq = {
   clientId?: string;
   clientName?: string; // For prospective
   transactionId?: string;
+  projectId?: string; // Link back to construction project
   totalValue: number;
   itemCount: number;
   createdAt?: any;
@@ -782,14 +784,3 @@ export type BoqReferenceItem = {
   order?: number;
   parentBoqReferenceItemId?: string;
 };
-  
-
-    
-
-
-
-
-
-
-
-
