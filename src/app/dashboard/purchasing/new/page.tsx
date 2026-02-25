@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -27,297 +26,452 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Building2, Target } from 'lucide-react';
-import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { 
+  Save, 
+  Loader2, 
+  PlusCircle, 
+  Trash2, 
+  ShoppingCart, 
+  Target, 
+  Calendar,
+  Building2,
+  Calculator,
+  X
+} from 'lucide-react';
+import { useFirebase, useSubscription } from '@/firebase';
+import {
+  collection,
+  runTransaction,
+  doc,
+  getDoc,
+  serverTimestamp,
+  orderBy,
+  query,
+} from 'firebase/firestore';
 import type { Vendor, PurchaseOrder, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
+import { cleanFirestoreData, formatCurrency, cn } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
+import { Separator } from '@/components/ui/separator';
 
 const itemSchema = z.object({
-  description: z.string().min(1, "الوصف مطلوب"),
-  quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0.01, "الكمية مطلوبة")),
-  unitPrice: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0, "السعر مطلوب")),
+  uid: z.string(),
+  description: z.string().min(1, 'الوصف مطلوب.'),
+  quantity: z.preprocess(
+    (v) => parseFloat(String(v || '0')),
+    z.number().min(0.01, 'الكمية مطلوبة')
+  ),
+  unitPrice: z.preprocess(
+    (v) => parseFloat(String(v || '0')),
+    z.number().min(0, 'السعر مطلوب')
+  ),
 });
 
-const purchaseOrderSchema = z.object({
-  vendorId: z.string().min(1, "المورد مطلوب"),
+const poSchema = z.object({
+  orderDate: z.date({ required_error: 'التاريخ مطلوب.' }),
+  vendorId: z.string().min(1, 'المورد مطلوب.'),
   projectId: z.string().optional().nullable(),
-  orderDate: z.date({ required_error: 'تاريخ الطلب مطلوب' }),
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
 });
 
-type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
+type PoFormValues = z.infer<typeof poSchema>;
+
+const generateStableId = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let id = '';
+  for (let i = 0; i < 20; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+};
 
 export default function NewPurchaseOrderPage() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const { firestore } = useFirebase();
-    const { user: currentUser } = useAuth();
-    const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
 
-    const [vendors, setVendors] = useState<Vendor[]>([]);
-    const [projects, setProjects] = useState<ConstructionProject[]>([]);
-    const [loadingRefs, setLoadingRefs] = useState(true);
-    const [poNumber, setPoNumber] = useState('جاري التوليد...');
-    const [isSaving, setIsSaving] = useState(false);
+  const [poNumber, setPoNumber] = useState('جاري التوليد...');
+  const [poNumberLoaded, setPoNumberLoaded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
 
-    const { register, handleSubmit, control, formState: { errors }, reset, setValue } = useForm<PurchaseOrderFormValues>({
-        resolver: zodResolver(purchaseOrderSchema),
-        mode: 'onChange',
-        defaultValues: {
-            orderDate: new Date(),
-            items: [{ description: '', quantity: 1, unitPrice: 0 }],
-            projectId: null,
-        },
-    });
+  const vendorConstraints = useMemo(() => [orderBy('name')], []);
+  const projectConstraints = useMemo(() => [orderBy('projectName')], []);
 
-    const { fields, append, remove } = useFieldArray({ control, name: "items" });
-    const watchedItems = useWatch({ control, name: "items" });
-    const totalAmount = useMemo(() =>
-        (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
-        [watchedItems]
+  const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
+    firestore,
+    'vendors',
+    vendorConstraints
+  );
+  const { data: projects, loading: projectsLoading } = useSubscription<ConstructionProject>(
+    firestore,
+    'projects',
+    projectConstraints
+  );
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    formState: { errors },
+  } = useForm<PoFormValues>({
+    resolver: zodResolver(poSchema),
+    defaultValues: {
+      orderDate: new Date(),
+      vendorId: '',
+      projectId: searchParams.get('projectId') || null,
+      items: [{ uid: generateStableId(), description: '', quantity: 1, unitPrice: 0 }],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const watchedItems = useWatch({ control, name: 'items' });
+
+  const totalAmount = useMemo(() => {
+    return (watchedItems || []).reduce((sum, item) => 
+      sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0
     );
+  }, [watchedItems]);
 
-    useEffect(() => {
-        if (!firestore) return;
-        
-        const fetchInitialData = async () => {
-            setLoadingRefs(true);
-            try {
-                const [vendorsSnap, projectsSnap, counterSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'vendors'), orderBy('name'))),
-                    getDocs(query(collection(firestore, 'projects'), orderBy('projectName'))),
-                    getDoc(doc(firestore, 'counters', 'purchaseOrders'))
-                ]);
+  useEffect(() => {
+    if (!firestore || poNumberLoaded) return;
+    let cancelled = false;
 
-                setVendors(vendorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
-                setProjects(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConstructionProject)));
-                
-                const currentYear = new Date().getFullYear();
-                let nextNumber = 1;
-                if (counterSnap.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 0) + 1;
-                }
-                setPoNumber(`PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
-
-                const preselectedProjectId = searchParams.get('projectId');
-                if (preselectedProjectId) {
-                    setValue('projectId', preselectedProjectId);
-                }
-
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات الأولية.' });
-            } finally {
-                setLoadingRefs(false);
-            }
-        };
-        fetchInitialData();
-    }, [firestore, toast, setValue, searchParams]);
-
-    const vendorOptions = useMemo(() => vendors.map(v => ({ value: v.id!, label: v.name, searchKey: v.contactPerson })), [vendors]);
-    const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: p.projectName, searchKey: p.projectId })), [projects]);
-
-    const onSubmit = async (data: PurchaseOrderFormValues) => {
-        if (!firestore || !currentUser || loadingRefs) return;
-        setIsSaving(true);
-        try {
-            await runTransaction(firestore, async (transaction) => {
-                const currentYear = new Date().getFullYear();
-                const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-                const counterDoc = await transaction.get(counterRef);
-                let nextNumber = 1;
-                if (counterDoc.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextNumber = (counts[currentYear] || 0) + 1;
-                }
-                
-                const newPoNumber = `PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-                const newPoRef = doc(collection(firestore, 'purchaseOrders'));
-                
-                const vendor = vendors.find(v => v.id === data.vendorId);
-                
-                const processedItems = data.items.map(item => ({
-                    ...item,
-                    total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-                }));
-                const totalAmount = processedItems.reduce((sum, item) => sum + item.total, 0);
-
-                const poData: Omit<PurchaseOrder, 'id'> = {
-                    poNumber: newPoNumber,
-                    orderDate: data.orderDate,
-                    vendorId: data.vendorId,
-                    vendorName: vendor?.name || '',
-                    projectId: data.projectId || null,
-                    items: processedItems,
-                    totalAmount,
-                    paymentTerms: data.paymentTerms,
-                    notes: data.notes,
-                    status: 'draft',
-                    createdAt: serverTimestamp(),
-                };
-
-                transaction.set(newPoRef, cleanFirestoreData(poData));
-                transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-            });
-            
-            toast({ title: 'نجاح', description: 'تم إنشاء أمر الشراء بنجاح.' });
-            if (data.projectId) {
-                router.push(`/dashboard/construction/projects/${data.projectId}`);
-            } else {
-                router.push('/dashboard/purchasing/purchase-orders');
-            }
-
-        } catch (error) {
-            console.error("Error creating purchase order:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء أمر الشراء.' });
-        } finally {
-            setIsSaving(false);
+    const generatePoNumber = async () => {
+      try {
+        const currentYear = new Date().getFullYear();
+        const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+        const counterDoc = await getDoc(counterRef);
+        let nextNumber = 1;
+        if (counterDoc.exists()) {
+          const counts = counterDoc.data()?.counts || {};
+          nextNumber = (counts[currentYear] || 0) + 1;
         }
+        if (!cancelled) {
+          setPoNumber(`PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+          setPoNumberLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setPoNumber('سيتم التوليد عند الحفظ');
+          setPoNumberLoaded(true);
+        }
+      }
     };
+    generatePoNumber();
 
-    return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit(onSubmit)}>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle>أمر شراء جديد</CardTitle>
-                            <CardDescription>أدخل تفاصيل أمر الشراء للمورد وحدد مركز التكلفة المراد التحميل عليه.</CardDescription>
-                        </div>
-                        <div className="text-right">
-                            <Label>رقم أمر الشراء</Label>
-                            <div className="font-mono text-lg font-semibold h-7">
-                                {loadingRefs ? <Skeleton className="h-6 w-24" /> : poNumber}
-                            </div>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="grid gap-2">
-                            <Label>المورد <span className="text-destructive">*</span></Label>
-                            <Controller
-                                control={control}
-                                name="vendorId"
-                                render={({ field }) => (
-                                    <InlineSearchList 
-                                        value={field.value} 
-                                        onSelect={field.onChange} 
-                                        options={vendorOptions}
-                                        placeholder={loadingRefs ? "تحميل..." : "اختر موردًا..."}
-                                        disabled={loadingRefs}
-                                    />
-                                )}
-                            />
-                            {errors.vendorId && <p className="text-xs text-destructive">{errors.vendorId.message}</p>}
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="orderDate">تاريخ الطلب <span className="text-destructive">*</span></Label>
-                            <Controller
-                                name="orderDate"
-                                control={control}
-                                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />}
-                            />
-                            {errors.orderDate && <p className="text-xs text-destructive">{errors.orderDate.message}</p>}
-                        </div>
-                    </div>
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore, poNumberLoaded]);
 
-                    <div className="p-4 border rounded-xl bg-primary/5 flex items-center gap-4">
-                        <div className="bg-primary/10 p-2 rounded-lg"><Target className="text-primary h-5 w-5" /></div>
-                        <div className="grid gap-2 flex-grow">
-                            <Label className="font-bold">مركز التكلفة المستهدف (مشروع)</Label>
-                            <Controller
-                                control={control}
-                                name="projectId"
-                                render={({ field }) => (
-                                    <InlineSearchList 
-                                        value={field.value || ''} 
-                                        onSelect={field.onChange} 
-                                        options={projectOptions}
-                                        placeholder="اختر المشروع لربط التكاليف مستقبلاً..."
-                                        disabled={loadingRefs}
-                                    />
-                                )}
-                            />
-                        </div>
-                    </div>
+  const vendorOptions = useMemo(
+    () => (vendors || []).map((v) => ({ value: v.id!, label: v.name, searchKey: v.contactPerson })),
+    [vendors]
+  );
 
-                    <div>
-                        <Label className="mb-2 block font-bold">بنود التوريد</Label>
-                        <div className="border rounded-xl overflow-hidden shadow-sm">
-                            <Table>
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow>
-                                        <TableHead className="w-2/5">الوصف</TableHead>
-                                        <TableHead className="w-1/6">الكمية</TableHead>
-                                        <TableHead className="w-1/6">سعر الوحدة</TableHead>
-                                        <TableHead className="w-1/6 text-left">الإجمالي</TableHead>
-                                        <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {fields.map((field, index) => {
-                                        const item = watchedItems?.[index] || {};
-                                        const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
-                                        return (
-                                        <TableRow key={field.id}>
-                                            <TableCell><Input {...register(`items.${index}.description`)} placeholder="وصف البند..." className="border-none shadow-none focus-visible:ring-0" /></TableCell>
-                                            <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr text-center border-none shadow-none focus-visible:ring-0" /></TableCell>
-                                            <TableCell><Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr text-center border-none shadow-none focus-visible:ring-0" /></TableCell>
-                                            <TableCell className="text-left font-mono font-bold">{formatCurrency(lineTotal)}</TableCell>
-                                            <TableCell>
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    )})}
-                                </TableBody>
-                                <TableFooter className="bg-muted/20">
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="font-black text-lg py-6 px-8">المجموع الإجمالي لأمر الشراء:</TableCell>
-                                        <TableCell className="font-black font-mono text-xl text-left text-primary px-3">{formatCurrency(totalAmount)}</TableCell>
-                                        <TableCell />
-                                    </TableRow>
-                                </TableFooter>
-                            </Table>
-                        </div>
-                        <div className="flex justify-start mt-4">
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })} className="rounded-xl">
-                                <PlusCircle className="ml-2 h-4 w-4" />
-                                إضافة بند جديد
-                            </Button>
-                        </div>
-                    </div>
-                    {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
+  const projectOptions = useMemo(
+    () => (projects || []).map((p) => ({ value: p.id!, label: p.projectName, searchKey: p.projectId })),
+    [projects]
+  );
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="grid gap-2">
-                            <Label htmlFor="paymentTerms">شروط الدفع</Label>
-                            <Input id="paymentTerms" {...register('paymentTerms')} placeholder="مثال: آجل 30 يوم" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="notes">ملاحظات إضافية</Label>
-                            <Textarea id="notes" {...register('notes')} rows={3} placeholder="أي تعليمات خاصة للمورد..." />
-                        </div>
-                    </div>
-                </CardContent>
-                <CardFooter className="flex justify-end gap-2 p-8 border-t bg-muted/10">
-                    <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loadingRefs} className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20">
-                        {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin"/> : <Save className="ml-3 h-5 w-5"/>}
-                        {isSaving ? 'جاري الحفظ...' : 'حفظ وإرسال'}
-                    </Button>
-                </CardFooter>
-            </form>
-        </Card>
-    );
+  const onSubmit = async (data: PoFormValues) => {
+    if (!firestore || !currentUser) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+
+    try {
+      await runTransaction(firestore, async (transaction) => {
+        const currentYear = new Date().getFullYear();
+        const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+        const counterDoc = await transaction.get(counterRef);
+        let nextNumber = 1;
+        if (counterDoc.exists()) {
+          const counts = counterDoc.data()?.counts || {};
+          nextNumber = (counts[currentYear] || 0) + 1;
+        }
+        const newPoNumber = `PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+        const newPoRef = doc(collection(firestore, 'purchaseOrders'));
+
+        const vendor = vendors.find(v => v.id === data.vendorId);
+
+        const processedItems = data.items.map((item) => ({
+          itemName: item.description,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          total: Number(item.quantity) * Number(item.unitPrice),
+        }));
+
+        const poData = {
+          poNumber: newPoNumber,
+          orderDate: data.orderDate,
+          vendorId: data.vendorId,
+          vendorName: vendor?.name || 'Unknown',
+          projectId: data.projectId,
+          items: processedItems,
+          totalAmount: processedItems.reduce((sum, i) => sum + i.total, 0),
+          paymentTerms: data.paymentTerms,
+          notes: data.notes,
+          status: 'draft' as const,
+          createdAt: serverTimestamp(),
+        };
+
+        transaction.set(newPoRef, cleanFirestoreData(poData));
+        transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+      });
+
+      toast({ title: 'نجاح', description: 'تم إنشاء أمر الشراء بنجاح.' });
+      router.push('/dashboard/purchasing/purchase-orders');
+    } catch (error) {
+      console.error('Error creating PO:', error);
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء أمر الشراء.' });
+    } finally {
+      setIsSaving(false);
+      savingRef.current = false;
+    }
+  };
+
+  return (
+    <Card className="max-w-5xl mx-auto rounded-3xl border-none shadow-xl overflow-hidden" dir="rtl">
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <CardHeader className="bg-muted/30 pb-8 px-8 border-b">
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                  <ShoppingCart className="h-6 w-6" />
+                </div>
+                <CardTitle className="text-3xl font-black tracking-tight text-foreground">أمر شراء جديد</CardTitle>
+              </div>
+              <CardDescription className="text-base font-medium pr-11">أدخل تفاصيل التوريد وحدد المورد لإنشاء أمر شراء رسمي.</CardDescription>
+            </div>
+            <div className="text-left bg-background/50 px-4 py-2 rounded-2xl border shadow-inner">
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">رقم الأمر (تقريبي)</Label>
+              <div className="font-mono text-xl font-black text-primary">
+                {!poNumberLoaded ? <Skeleton className="h-6 w-32" /> : poNumber}
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-8 p-8">
+          {/* Main Info Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid gap-3">
+              <Label className="font-bold text-sm text-foreground/70 flex items-center gap-2">
+                المورد المستهدف <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="vendorId"
+                control={control}
+                render={({ field }) => (
+                  <InlineSearchList
+                    value={field.value}
+                    onSelect={field.onChange}
+                    options={vendorOptions}
+                    placeholder={vendorsLoading ? 'جاري تحميل الموردين...' : 'ابحث عن مورد...'}
+                    disabled={vendorsLoading}
+                    className="h-11 rounded-xl border-2"
+                  />
+                )}
+              />
+              {errors.vendorId && <p className="text-xs text-destructive font-bold">{errors.vendorId.message}</p>}
+            </div>
+
+            <div className="grid gap-3">
+              <Label className="font-bold text-sm text-foreground/70 flex items-center gap-2">
+                تاريخ الطلب <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="orderDate"
+                control={control}
+                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-11 rounded-xl" />}
+              />
+              {errors.orderDate && <p className="text-xs text-destructive font-bold">{errors.orderDate.message}</p>}
+            </div>
+          </div>
+
+          {/* Project Center Highlighting */}
+          <div className="p-6 border-2 border-primary/10 bg-primary/5 rounded-3xl flex items-center gap-6 shadow-sm">
+            <div className="bg-primary/10 p-4 rounded-2xl shadow-inner">
+              <Target className="text-primary h-8 w-8" />
+            </div>
+            <div className="grid gap-2 flex-grow">
+              <Label className="font-black text-lg text-primary">مركز التكلفة المستهدف (المشروع)</Label>
+              <Controller
+                control={control}
+                name="projectId"
+                render={({ field }) => (
+                  <InlineSearchList 
+                    value={field.value || ''} 
+                    onSelect={field.onChange} 
+                    options={projectOptions}
+                    placeholder={projectsLoading ? "جاري تحميل المشاريع..." : "اختر المشروع لتحميل التكاليف عليه (اختياري)..."}
+                    disabled={projectsLoading}
+                    className="bg-background border-primary/20 h-12 text-lg rounded-2xl"
+                  />
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Items Table Section */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-2">
+              <Label className="text-xl font-black flex items-center gap-2 text-foreground">
+                <Calculator className="h-5 w-5 text-muted-foreground" />
+                الأصناف والكميات
+              </Label>
+              <div className="bg-muted px-4 py-1.5 rounded-full text-xs font-bold border shadow-inner">
+                إجمالي البنود: {fields.length}
+              </div>
+            </div>
+
+            <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="h-14 border-b-2">
+                    <TableHead className="w-[60px] text-center font-bold text-xs uppercase">إجراء</TableHead>
+                    <TableHead className="w-2/5 font-bold text-base">وصف البند</TableHead>
+                    <TableHead className="text-center font-bold text-base">الكمية</TableHead>
+                    <TableHead className="text-center font-bold text-base">سعر الوحدة</TableHead>
+                    <TableHead className="text-left font-bold text-base px-6">الإجمالي</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {fields.map((field, index) => {
+                    const item = watchedItems?.[index];
+                    const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
+                    return (
+                      <TableRow key={field.id} className="hover:bg-muted/5 transition-colors border-b last:border-0 h-16">
+                        <TableCell className="text-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                            className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-full"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Input
+                            {...register(`items.${index}.description`)}
+                            placeholder="مثال: أسمنت بورتلاندي 50 كجم..."
+                            className="border-none shadow-none focus-visible:ring-0 text-lg font-medium"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="any"
+                            {...register(`items.${index}.quantity`)}
+                            className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 text-xl font-black font-mono"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            {...register(`items.${index}.unitPrice`)}
+                            className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 text-xl font-black font-mono text-primary"
+                          />
+                        </TableCell>
+                        <TableCell className="text-left font-mono font-black text-lg px-6 bg-muted/5">
+                          {formatCurrency(lineTotal)}
+                        </TableCell>
+                      </TableRow>
+                    )})}
+                </TableBody>
+                <TableFooter className="bg-primary/5">
+                  <TableRow className="h-20 border-t-4 border-primary/20">
+                    <TableCell colSpan={4} className="text-right px-8 font-black text-xl text-foreground">
+                      المجموع الإجمالي للأمر:
+                    </TableCell>
+                    <TableCell className="text-left font-mono text-2xl font-black text-primary px-6 border-r bg-primary/5">
+                      {formatCurrency(totalAmount)}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+
+            <div className="flex justify-center pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => append({ uid: generateStableId(), description: '', quantity: 1, unitPrice: 0 })}
+                className="h-14 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold transition-all gap-2 group"
+              >
+                <PlusCircle className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+                إضافة بند جديد للأمر
+              </Button>
+            </div>
+          </div>
+
+          <Separator className="my-8" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid gap-3">
+              <Label className="font-bold text-sm text-foreground/70">شروط الدفع</Label>
+              <Input
+                {...register('paymentTerms')}
+                placeholder="مثال: دفع كاش، آجل 30 يوم، دفعة مقدمة 50%..."
+                className="h-11 rounded-xl border-2"
+              />
+            </div>
+            <div className="grid gap-3">
+              <Label className="font-bold text-sm text-foreground/70">ملاحظات إضافية للمورد</Label>
+              <Textarea
+                {...register('notes')}
+                placeholder="أدخل أي تعليمات خاصة بالتوريد أو ملاحظات..."
+                className="rounded-xl border-2 resize-none"
+                rows={3}
+              />
+            </div>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={isSaving}
+            className="h-14 px-10 rounded-2xl font-bold text-lg hover:bg-background"
+          >
+            إلغاء
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSaving || vendorsLoading}
+            className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all min-w-[240px]"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="ml-3 h-6 w-6 animate-spin" />
+                جاري الحفظ...
+              </>
+            ) : (
+              <>
+                <Save className="ml-3 h-6 w-6" />
+                حفظ وإرسال الطلب
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
 }
