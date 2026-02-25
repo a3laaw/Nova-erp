@@ -27,7 +27,8 @@ export function SupplierQuotationCard({ rfq, vendor, existingQuote }: SupplierQu
 
   const quoteTotal = existingQuote
     ? existingQuote.items.reduce((sum, item) => {
-        const rfqQty = rfq.items.find(i => i.id === item.rfqItemId)?.quantity || 0;
+        const rfqItem = rfq.items.find(i => i.id === item.rfqItemId);
+        const rfqQty = rfqItem?.quantity || 0;
         return sum + (item.unitPrice * rfqQty);
     }, 0)
     : 0;

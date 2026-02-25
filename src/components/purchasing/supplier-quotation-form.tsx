@@ -143,7 +143,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                 dir="rtl"
                 onInteractOutside={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('[role="dialog"]') || target.closest('.react-select__menu-portal')) {
+                    if (target.closest('[role="dialog"]') || target.closest('.react-select__menu-portal') || target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                     }
                 }}
