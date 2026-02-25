@@ -1,8 +1,8 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, getDocs } from 'firebase/firestore';
-import type { Boq } from '@/lib/types';
+import { collection, query, orderBy, doc, deleteDoc, getDocs, where } from 'firebase/firestore';
+import type { Boq, ConstructionProject } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -15,11 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Search, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Copy } from 'lucide-react';
+import { PlusCircle, Search, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Copy, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import Fuse from 'fuse.js';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import {
   DropdownMenu,
@@ -55,7 +55,11 @@ export function BoqLibrary() {
         return [orderBy('createdAt', 'desc')];
     }, [firestore]);
 
-    const { data: boqs, loading } = useSubscription<Boq>(firestore, 'boqs', boqsQuery || []);
+    const { data: boqs, loading: boqsLoading } = useSubscription<Boq>(firestore, 'boqs', boqsQuery || []);
+    
+    // Fetch all projects to map them by ID
+    const { data: projects } = useSubscription<ConstructionProject>(firestore, 'projects');
+    const projectsMap = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
 
     const fuse = useMemo(() => new Fuse(boqs, {
         keys: ['name', 'boqNumber', 'clientName'],
@@ -86,17 +90,14 @@ export function BoqLibrary() {
         }
     };
     
-    // --- منطق النسخ الذكي ---
     const handleCopy = async (boqToCopy: Boq) => {
         if (!firestore) return;
         toast({ title: 'جاري استنساخ جدول الكميات...' });
         
         try {
-            // 1. جلب كافة بنود الجدول الأصلي
             const itemsQuery = query(collection(firestore, `boqs/${boqToCopy.id}/items`));
             const itemsSnap = await getDocs(itemsQuery);
             
-            // 2. تحضير البيانات مع الاحتفاظ بالمعرفات الحالية للمرحلة الثانية (Remapping)
             const items = itemsSnap.docs.map(d => {
                 const data = d.data();
                 return { ...data, uid: d.id }; 
@@ -109,7 +110,6 @@ export function BoqLibrary() {
                 items: items,
             };
 
-            // 3. التخزين المؤقت في الجلسة والتوجه لصفحة الإنشاء
             sessionStorage.setItem('copiedBoqData', JSON.stringify(copiedData));
             router.push('/dashboard/construction/boq/new');
             
@@ -145,28 +145,31 @@ export function BoqLibrary() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>اسم/رقم الـ BOQ</TableHead>
+                                <TableHead>الارتباط</TableHead>
                                 <TableHead>العميل (المحتمل)</TableHead>
                                 <TableHead>تاريخ الإنشاء</TableHead>
                                 <TableHead>الحالة</TableHead>
-                                <TableHead>عدد البنود</TableHead>
                                 <TableHead className="text-left">القيمة الإجمالية</TableHead>
                                 <TableHead><span className="sr-only">الإجراءات</span></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading && Array.from({ length: 5 }).map((_, i) => (
+                            {boqsLoading && Array.from({ length: 5 }).map((_, i) => (
                                 <TableRow key={i}>
                                     <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
                                 </TableRow>
                             ))}
-                            {!loading && filteredBoqs.length === 0 && (
+                            {!boqsLoading && filteredBoqs.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center">
                                         لا توجد جداول كميات لعرضها.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!loading && filteredBoqs.map(boq => (
+                            {!boqsLoading && filteredBoqs.map(boq => {
+                                const linkedProject = boq.projectId ? projectsMap.get(boq.projectId) : null;
+                                
+                                return (
                                  <TableRow key={boq.id}>
                                     <TableCell className="font-medium">
                                         <Link href={`/dashboard/construction/boq/${boq.id}`} className="hover:underline text-primary">
@@ -174,10 +177,29 @@ export function BoqLibrary() {
                                         </Link>
                                         <p className="text-xs text-muted-foreground font-mono">{boq.boqNumber}</p>
                                     </TableCell>
+                                    <TableCell>
+                                        {linkedProject ? (
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 w-fit">
+                                                <Building2 className="h-3 w-3" />
+                                                {linkedProject.projectName}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">غير مرتبط بمشروع</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{boq.clientName || '-'}</TableCell>
                                     <TableCell>{formatDate(boq.createdAt)}</TableCell>
-                                    <TableCell><Badge variant="outline">{boq.status}</Badge></TableCell>
-                                    <TableCell className="text-center">{boq.itemCount || 0}</TableCell>
+                                    <TableCell>
+                                        <Badge 
+                                            variant="outline" 
+                                            className={cn(
+                                                boq.status === 'تعاقدي' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                boq.status === 'منفذ' ? 'bg-purple-50 text-purple-700 border-purple-200' : ''
+                                            )}
+                                        >
+                                            {boq.status}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell className="text-left font-mono font-semibold">{formatCurrency(boq.totalValue || 0)}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
@@ -206,7 +228,7 @@ export function BoqLibrary() {
                                         </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                 </div>

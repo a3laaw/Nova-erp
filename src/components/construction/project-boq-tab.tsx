@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Search,
   User,
-  Info
+  Info,
+  Building2
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
