@@ -262,11 +262,17 @@ export function BoqForm({
   errors: FieldErrors<BoqFormValues>;
 }) {
   const { firestore } = useFirebase();
+
+  // CRITICAL FIX: Use useWatch to deeply observe the items array for real-time calculations
+  const watchedItems = useWatch({
+    control,
+    name: "items"
+  });
+
   const masterItemsConstraints = React.useMemo(() => [orderBy('name')], []);
   const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', masterItemsConstraints);
 
   const { fields, remove, insert, append } = useFieldArray({ control, name: 'items' });
-  const watchedItems = watch('items');
 
   const masterItemsMap = React.useMemo(() => {
     const map = new Map<string | null, any[]>();
@@ -331,7 +337,7 @@ export function BoqForm({
               <div><CardTitle className="text-2xl font-extrabold tracking-tight">مُحرر جداول الكميات</CardTitle><CardDescription className="flex items-center gap-2"><span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />إدارة الحصر والتسعير بنظام WBS</CardDescription></div>
             </div>
             <div className="flex items-center gap-8 bg-muted/30 px-6 py-3 rounded-2xl border">
-              <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">إجمالي المشروع</Label><div className="text-3xl font-black text-primary font-mono">{formatCurrency(grandTotal)}</div></div>
+              <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">إجمالي المشروع</Label><div className="text-3xl font-black text-primary font-mono tabular-nums">{formatCurrency(grandTotal)}</div></div>
               <Separator orientation="vertical" className="h-10 mx-4" />
               <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">عدد البنود</Label><div className="text-2xl font-bold font-mono text-foreground/80">{fields.length}</div></div>
             </div>
