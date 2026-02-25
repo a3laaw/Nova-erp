@@ -1,16 +1,15 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, addDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { Loader2, Save, Sparkles } from 'lucide-react';
-import type { Vendor, RequestForQuotation, SupplierQuotation, RfqItem } from '@/lib/types';
+import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
+import { Loader2, Save, Sparkles, FileUp } from 'lucide-react';
+import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
-import { Textarea } from '../ui/textarea';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
@@ -39,10 +38,8 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
     const [items, setItems] = useState<QuoteItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     
-    // New states for file upload
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-
 
     useEffect(() => {
         if (isOpen) {
@@ -60,7 +57,6 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                     }
                 });
                 setItems(initialItems);
-
             } else {
                 setReference('');
                 setDate(new Date());
@@ -68,7 +64,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                 setPaymentTerms('');
                 setItems(rfq.items.map(item => ({ rfqItemId: item.id!, unitPrice: '' })));
             }
-            setSelectedFile(null); // Reset file on open
+            setSelectedFile(null);
         }
     }, [isOpen, rfq, existingQuote]);
 
@@ -80,7 +76,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
         const file = event.target.files?.[0];
         if (file && file.type === 'application/pdf') {
             setSelectedFile(file);
-        } else {
+        } else if (file) {
             toast({ variant: 'destructive', title: 'ملف غير صالح', description: 'الرجاء اختيار ملف PDF فقط.' });
             setSelectedFile(null);
         }
@@ -88,17 +84,21 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
 
     const handleAnalyzePdf = async () => {
         if (!selectedFile) return;
-        // In the future, this will call a Genkit flow.
-        // For now, it just shows a toast message as a placeholder for the functionality.
-        toast({
-            title: 'قيد التطوير',
-            description: 'سيتم تفعيل ميزة تحليل عروض الأسعار من ملفات PDF قريبًا.',
-        });
+        setIsAnalyzing(true);
+        // Placeholder for future Genkit Flow implementation
+        setTimeout(() => {
+            toast({
+                title: 'ميزة ذكية قيد التنفيذ',
+                description: 'جاري العمل على تفعيل الذكاء الاصطناعي لقراءة الأسعار من ملفات PDF مباشرة.',
+            });
+            setIsAnalyzing(false);
+        }, 1500);
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
         if (!firestore || !date) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'بيانات غير كافية.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير مكتملة.' });
             return;
         }
 
@@ -108,9 +108,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
               .filter(item => item.unitPrice !== '' && !isNaN(Number(item.unitPrice)))
               .map(item => ({...item, unitPrice: Number(item.unitPrice)}));
 
-            if (processedItems.length !== rfq.items.length) {
-                throw new Error("الرجاء إدخال أسعار لجميع الأصناف المطلوبة.");
-            }
+            if (processedItems.length === 0) throw new Error("الرجاء إدخال أسعار الأصناف.");
 
             const dataToSave = {
                 rfqId: rfq.id!,
@@ -125,12 +123,11 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
             if (existingQuote) {
                 const quoteRef = doc(firestore, 'supplierQuotations', existingQuote.id!);
                 await updateDoc(quoteRef, dataToSave);
-                toast({ title: 'نجاح', description: 'تم تحديث عرض سعر المورد.' });
+                toast({ title: 'نجاح', description: 'تم تحديث عرض السعر بنجاح.' });
             } else {
                 await addDoc(collection(firestore, 'supplierQuotations'), dataToSave);
                 toast({ title: 'نجاح', description: 'تم حفظ عرض سعر المورد.' });
             }
-
             onClose();
         } catch (error) {
             const message = error instanceof Error ? error.message : "فشل حفظ عرض السعر.";
@@ -142,91 +139,80 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl" dir="rtl">
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" dir="rtl">
                 <DialogHeader>
-                    <DialogTitle>
-                        {existingQuote ? 'تعديل' : 'إضافة'} عرض سعر للمورد: {vendor.name}
+                    <DialogTitle className="text-xl font-black flex items-center gap-2">
+                        <Save className="h-5 w-5 text-primary"/>
+                        {existingQuote ? 'تعديل' : 'إدخال'} عرض سعر: {vendor.name}
                     </DialogTitle>
-                    <DialogDescription>
-                        أدخل البيانات من عرض السعر الذي استلمته من المورد.
-                    </DialogDescription>
+                    <DialogDescription>أدخل بيانات الأسعار والشروط من مستند المورد الرسمي.</DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="max-h-[70vh]">
-                    <div className="py-4 space-y-4 px-2">
-                        <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
-                            <h4 className="font-semibold text-base">
-                                أو، قم برفع عرض السعر مباشرة (PDF)
-                            </h4>
+                
+                <ScrollArea className="flex-1 px-2">
+                    <div className="py-4 space-y-6">
+                        <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-2xl space-y-4">
+                            <div className="flex items-center gap-3">
+                                <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                                <h4 className="font-bold text-primary">المساعد الذكي (قيد التطوير)</h4>
+                            </div>
                             <div className="flex items-end gap-4">
                                 <div className="grid gap-2 flex-grow">
-                                    <Label htmlFor="pdf-upload">اختر ملف PDF</Label>
-                                    <Input
-                                        id="pdf-upload"
-                                        type="file"
-                                        accept="application/pdf"
-                                        onChange={handleFileChange}
-                                        className="text-xs"
-                                    />
+                                    <Label className="text-xs font-bold text-muted-foreground">رفع مستند المورد (PDF)</Label>
+                                    <Input type="file" accept="application/pdf" onChange={handleFileChange} className="bg-background rounded-xl border-primary/10 h-11" />
                                 </div>
-                                <Button
-                                    type="button"
-                                    onClick={handleAnalyzePdf}
-                                    disabled={!selectedFile || isAnalyzing}
-                                    variant="secondary"
-                                >
-                                    {isAnalyzing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Sparkles className="ml-2 h-4 w-4"/>}
+                                <Button type="button" onClick={handleAnalyzePdf} disabled={!selectedFile || isAnalyzing} variant="secondary" className="h-11 px-6 rounded-xl font-bold">
+                                    {isAnalyzing ? <Loader2 className="animate-spin h-4 w-4"/> : <FileUp className="h-4 w-4 ml-2"/>}
                                     تحليل العرض
                                 </Button>
                             </div>
-                             <p className="text-xs text-muted-foreground">
-                                سيقوم الذكاء الاصطناعي بمحاولة قراءة البيانات من الملف وتعبئة الحقول أدناه تلقائيًا.
-                            </p>
                         </div>
 
-                        <div className="relative py-4">
-                            <Separator />
-                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-muted-foreground">
-                                أو أدخل البيانات يدويًا
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-2xl bg-muted/30">
+                            <div className="grid gap-2">
+                                <Label className="font-bold">مرجع العرض (رقم فاتورة المورد)</Label>
+                                <Input value={reference} onChange={e => setReference(e.target.value)} placeholder="مثال: QT-10203" className="rounded-xl h-11" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-bold">تاريخ العرض <span className="text-destructive">*</span></Label>
+                                <DateInput value={date} onChange={setDate} className="rounded-xl h-11" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-bold">مدة التوريد (أيام)</Label>
+                                <Input type="number" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="مثال: 3" className="rounded-xl h-11" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-bold">شروط الدفع</Label>
+                                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="مثال: دفع كاش" className="rounded-xl h-11" />
                             </div>
                         </div>
 
-                        <div className="space-y-4 px-2">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>مرجع المورد (رقم الفاتورة)</Label>
-                                    <Input value={reference} onChange={e => setReference(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>تاريخ العرض</Label>
-                                    <DateInput value={date} onChange={setDate} />
-                                </div>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <Label className="text-lg font-black text-primary">قائمة الأسعار للأصناف المطلوبة</Label>
+                                <Badge variant="outline">{rfq.items.length} صنف</Badge>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>مدة التوريد (بالأيام)</Label>
-                                    <Input type="number" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>شروط الدفع</Label>
-                                    <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="space-y-2 pt-4">
-                                <Label className="font-semibold">أسعار الأصناف</Label>
+                            <div className="space-y-3">
                                 {rfq.items.map(rfqItem => {
                                     const quoteItem = items.find(i => i.rfqItemId === rfqItem.id);
                                     return (
-                                        <div key={rfqItem.id} className="grid grid-cols-5 gap-2 items-center">
-                                            <Label className="col-span-3">{rfqItem.itemName}</Label>
-                                            <span className="text-sm text-muted-foreground text-center">الكمية: {rfqItem.quantity}</span>
-                                            <Input
-                                                type="number"
-                                                step="0.001"
-                                                placeholder="سعر الوحدة"
-                                                value={quoteItem?.unitPrice || ''}
-                                                onChange={(e) => handleItemPriceChange(rfqItem.id!, e.target.value)}
-                                                className="dir-ltr text-left"
-                                            />
+                                        <div key={rfqItem.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-background border-2 border-transparent hover:border-primary/20 rounded-2xl shadow-sm transition-all group">
+                                            <div className="col-span-6 flex flex-col gap-1">
+                                                <Label className="font-black group-hover:text-primary transition-colors">{rfqItem.itemName}</Label>
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">الكمية المطلوبة: {rfqItem.quantity}</span>
+                                            </div>
+                                            <div className="col-span-6">
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">د.ك</span>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.001"
+                                                        placeholder="سعر الوحدة"
+                                                        value={quoteItem?.unitPrice || ''}
+                                                        onChange={(e) => handleItemPriceChange(rfqItem.id!, e.target.value)}
+                                                        className="h-11 pl-10 dir-ltr text-left font-black text-lg rounded-xl border-2 focus:border-primary"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -234,11 +220,12 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                         </div>
                     </div>
                 </ScrollArea>
-                <DialogFooter className="pt-4 border-t">
-                    <Button variant="outline" onClick={onClose}>إلغاء</Button>
-                    <Button onClick={handleSubmit} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="animate-spin ml-2" /> : <Save className="ml-2"/>}
-                        حفظ عرض السعر
+                
+                <DialogFooter className="p-6 border-t bg-muted/10">
+                    <Button variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
+                    <Button onClick={handleSubmit} disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20">
+                        {isSaving ? <Loader2 className="animate-spin ml-3 h-5 w-5" /> : <Save className="ml-3 h-5 w-5"/>}
+                        {existingQuote ? 'تحديث عرض السعر' : 'حفظ عرض السعر'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

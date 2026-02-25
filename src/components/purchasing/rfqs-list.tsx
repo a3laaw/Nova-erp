@@ -10,12 +10,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirebase } from '@/firebase';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { RequestForQuotation } from '@/lib/types';
 import { format } from 'date-fns';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search } from 'lucide-react';
+import { FileText, MoreHorizontal, Eye, Trash2, Search, ClipboardList } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -25,18 +24,19 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
+import { searchRfqs } from '@/lib/cache/fuse-search';
 
 const statusColors: Record<string, string> = {
-    draft: 'bg-yellow-100 text-yellow-800',
-    sent: 'bg-blue-100 text-blue-800',
-    closed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
+    draft: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    sent: 'bg-blue-100 text-blue-800 border-blue-200',
+    closed: 'bg-green-100 text-green-800 border-green-200',
+    cancelled: 'bg-red-100 text-red-800 border-red-200',
 };
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
-    sent: 'مرسل',
-    closed: 'مغلق',
+    sent: 'مرسل للموردين',
+    closed: 'مغلق للمقارنة',
     cancelled: 'ملغي',
 };
 
@@ -53,11 +53,7 @@ export function RfqsList() {
   const { data: rfqs, loading, error } = useSubscription<RequestForQuotation>(firestore, 'rfqs', rfqQueryConstraints);
 
   const filteredRfqs = useMemo(() => {
-    if (!searchQuery) return rfqs;
-    return rfqs.filter(rfq => 
-        rfq.rfqNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        statusTranslations[rfq.status]?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return searchRfqs(rfqs, searchQuery);
   }, [rfqs, searchQuery]);
 
   const formatDate = (dateValue: any) => {
@@ -82,105 +78,86 @@ export function RfqsList() {
 
   if (loading) {
     return (
-        <div className="border rounded-lg">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>رقم الطلب</TableHead>
-                        <TableHead>التاريخ</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+        <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
         </div>
     );
   }
   
-  if (error) {
-      return <div className="text-center py-10 text-destructive">فشل تحميل قائمة طلبات التسعير.</div>;
-  }
+  if (error) return <div className="text-center py-10 text-destructive font-bold">فشل تحميل قائمة طلبات التسعير.</div>;
 
   return (
     <>
-        <div className="flex items-center mb-4">
-             <div className="relative w-full max-w-sm">
+        <div className="flex items-center mb-6">
+             <div className="relative w-full max-w-md">
                 <Search className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                    placeholder="ابحث برقم الطلب أو الحالة..."
+                    placeholder="ابحث برقم الطلب (مثال: RFQ-2024)..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 rtl:pr-10"
+                    className="pl-10 rtl:pr-10 h-11 rounded-xl shadow-sm"
                 />
             </div>
         </div>
 
-        <div className="border rounded-lg">
+        <div className="border rounded-2xl overflow-hidden shadow-sm">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead>رقم الطلب</TableHead>
+                <TableHead className="w-1/4">رقم الطلب</TableHead>
                 <TableHead>التاريخ</TableHead>
-                <TableHead>عدد الموردين</TableHead>
-                <TableHead>عدد الأصناف</TableHead>
+                <TableHead className="text-center">الموردين</TableHead>
+                <TableHead className="text-center">الأصناف</TableHead>
                 <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
+                <TableHead className="w-[100px] text-center">الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
                 {rfqs.length === 0 ? (
                      <TableRow>
                         <TableCell colSpan={6}>
-                            <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                                <h3 className="mt-4 text-lg font-medium">لا توجد طلبات تسعير</h3>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    ابدأ بإنشاء طلب جديد ليظهر هنا.
+                            <div className="p-12 text-center border-2 border-dashed rounded-2xl bg-muted/10 m-4">
+                                <ClipboardList className="mx-auto h-16 w-16 text-muted-foreground/30" />
+                                <h3 className="mt-4 text-xl font-black">لا توجد طلبات تسعير بعد</h3>
+                                <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto">
+                                    ابدأ بإنشاء طلب تسعير جديد لإرساله لمورديك والمفاضلة بين أسعارهم.
                                 </p>
                             </div>
                         </TableCell>
                     </TableRow>
                 ) : filteredRfqs.length === 0 ? (
                     <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
-                            لا توجد نتائج تطابق بحثك.
+                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground font-bold">
+                            لا توجد نتائج تطابق بحثك الحالي.
                         </TableCell>
                     </TableRow>
                 ) : (
                     filteredRfqs.map((rfq) => (
-                        <TableRow key={rfq.id}>
-                            <TableCell className="font-mono">
-                                <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="hover:underline text-primary">
+                        <TableRow key={rfq.id} className="group hover:bg-muted/30 transition-colors">
+                            <TableCell className="font-mono font-bold text-primary">
+                                <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="hover:underline">
                                     {rfq.rfqNumber}
                                 </Link>
                             </TableCell>
-                            <TableCell>{formatDate(rfq.date)}</TableCell>
-                            <TableCell className="text-center">{rfq.vendorIds?.length || 0}</TableCell>
-                            <TableCell className="text-center">{rfq.items?.length || 0}</TableCell>
+                            <TableCell className="font-medium text-foreground/70">{formatDate(rfq.date)}</TableCell>
+                            <TableCell className="text-center"><Badge variant="secondary">{rfq.vendorIds?.length || 0}</Badge></TableCell>
+                            <TableCell className="text-center"><Badge variant="outline">{rfq.items?.length || 0}</Badge></TableCell>
                             <TableCell>
-                                <Badge variant="outline" className={statusColors[rfq.status]}>{statusTranslations[rfq.status]}</Badge>
+                                <Badge variant="outline" className={cn("px-2 font-bold", statusColors[rfq.status])}>{statusTranslations[rfq.status]}</Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" dir="rtl">
-                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                        <DropdownMenuLabel>خيارات الطلب</DropdownMenuLabel>
                                         <DropdownMenuItem onClick={() => router.push(`/dashboard/purchasing/rfqs/${rfq.id}`)}>
-                                            <Eye className="ml-2 h-4 w-4"/> عرض ومقارنة
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem disabled>
-                                            <Pencil className="ml-2 h-4 w-4"/> تعديل
+                                            <Eye className="ml-2 h-4 w-4"/> إدارة العروض
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setItemToDelete(rfq)} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                        <DropdownMenuItem onClick={() => setItemToDelete(rfq)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                            <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -195,13 +172,15 @@ export function RfqsList() {
          <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم حذف الطلب رقم "{itemToDelete?.rfqNumber}" بشكل دائم.</AlertDialogDescription>
+                    <AlertDialogTitle className="text-destructive font-black text-xl">تأكيد حذف طلب التسعير؟</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        سيتم حذف الطلب رقم <span className="font-bold text-foreground">"{itemToDelete?.rfqNumber}"</span> وكافة عروض الأسعار المرتبطة به نهائياً.
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
+                    <AlertDialogCancel disabled={isDeleting} className="rounded-xl">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
+                        {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

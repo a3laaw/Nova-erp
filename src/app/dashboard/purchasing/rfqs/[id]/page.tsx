@@ -1,12 +1,12 @@
 'use client';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, where, orderBy, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -23,8 +23,8 @@ const statusColors: Record<string, string> = {
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
-    sent: 'مرسل',
-    closed: 'مغلق',
+    sent: 'مرسل للموردين',
+    closed: 'مغلق (تحت المقارنة)',
     cancelled: 'ملغي',
 };
 
@@ -35,9 +35,8 @@ export default function RfqDetailsPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-
     const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
-    const { data: rfq, loading: rfqLoading, error } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
+    const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
 
     const vendorsQuery = useMemo(() => {
         if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) return null;
@@ -65,89 +64,93 @@ export default function RfqDetailsPage() {
         }
     };
 
-
     if (loading) {
         return (
-            <div className="space-y-4">
-                <Skeleton className="h-24 w-full" />
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Skeleton className="h-48 w-full" />
-                    <Skeleton className="h-48 w-full" />
+            <div className="space-y-6" dir="rtl">
+                <Skeleton className="h-32 w-full rounded-2xl" />
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Skeleton className="h-64 w-full rounded-2xl" />
+                    <Skeleton className="h-64 w-full rounded-2xl" />
+                    <Skeleton className="h-64 w-full rounded-2xl" />
                 </div>
             </div>
         );
     }
     
-    if (!rfq) {
-        return <div className="text-center py-10">لم يتم العثور على طلب التسعير.</div>;
-    }
+    if (!rfq) return <div className="text-center py-20 text-muted-foreground">لم يتم العثور على طلب التسعير.</div>;
 
     return (
         <div className="space-y-6" dir="rtl">
-             <Card>
+             <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
                 <CardHeader>
-                     <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                                <FileText />
-                                {`طلب تسعير #${rfq.rfqNumber}`}
-                                <Badge variant="outline" className={statusColors[rfq.status]}>{statusTranslations[rfq.status]}</Badge>
-                            </CardTitle>
-                            <CardDescription>
-                                تاريخ الطلب: {toFirestoreDate(rfq.date) ? format(toFirestoreDate(rfq.date)!, 'PPP') : '-'}
+                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                                <CardTitle className="text-3xl font-black text-foreground flex items-center gap-2">
+                                    <FileText className="text-primary"/>
+                                    {`طلب تسعير #${rfq.rfqNumber}`}
+                                </CardTitle>
+                                <Badge className={cn("text-xs px-3", statusColors[rfq.status])}>{statusTranslations[rfq.status]}</Badge>
+                            </div>
+                            <CardDescription className="text-base font-medium">
+                                تاريخ الطلب: {toFirestoreDate(rfq.date) ? format(toFirestoreDate(rfq.date)!, 'eeee, dd MMMM yyyy') : '-'}
                             </CardDescription>
                         </div>
                          <div className="flex gap-2">
+                            {rfq.status === 'draft' && (
+                                <Button onClick={() => handleChangeStatus('sent')} disabled={isUpdatingStatus} className="gap-2">
+                                    <Send className="h-4 w-4" /> إرسال الطلب
+                                </Button>
+                            )}
                             {rfq.status === 'sent' && (
-                                <Button onClick={() => handleChangeStatus('closed')} disabled={isUpdatingStatus}>
-                                    <XCircle className="ml-2 h-4 w-4" />
-                                    إغلاق الطلب وبدء المقارنة
+                                <Button onClick={() => handleChangeStatus('closed')} disabled={isUpdatingStatus} className="bg-green-600 hover:bg-green-700 gap-2">
+                                    <XCircle className="h-4 w-4" /> إغلاق الطلب والمقارنة
                                 </Button>
                             )}
                             {rfq.status === 'closed' && (
-                                <Button asChild>
+                                <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2">
                                     <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
-                                        <BarChart className="ml-2 h-4 w-4" />
-                                        عرض جدول المقارنة
+                                        <BarChart className="h-4 w-4" /> عرض مصفوفة المقارنة
                                     </Link>
                                 </Button>
                             )}
-                            <Button variant="outline" onClick={() => router.back()}><ArrowRight className="ml-2 h-4"/> العودة للقائمة</Button>
+                            <Button variant="ghost" onClick={() => router.back()} className="gap-2"><ArrowRight className="h-4 w-4"/> العودة</Button>
                          </div>
                     </div>
                 </CardHeader>
                  <CardContent>
-                    <h3 className="font-semibold mb-2">الأصناف المطلوبة ({rfq.items.length})</h3>
-                     <div className="border rounded-md">
-                        {rfq.items.map(item => (
-                            <div key={item.id} className="flex justify-between items-center p-3 border-b last:border-b-0">
-                                <span className="font-medium">{item.itemName}</span>
-                                <span className="text-sm font-mono bg-muted px-2 py-1 rounded-md">{item.quantity}</span>
-                            </div>
-                        ))}
+                    <div className="p-4 bg-white/50 dark:bg-muted/20 rounded-xl border">
+                        <h3 className="text-sm font-bold text-muted-foreground mb-3 flex items-center gap-2">الأصناف المطلوبة في هذا الطلب:</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {rfq.items.map(item => (
+                                <div key={item.id} className="flex justify-between items-center p-3 bg-card border rounded-lg shadow-sm">
+                                    <span className="font-bold text-sm">{item.itemName}</span>
+                                    <Badge variant="secondary" className="font-mono">{item.quantity}</Badge>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><GanttChartSquare /> عروض أسعار الموردين</CardTitle>
-                    <CardDescription>أدخل عروض الأسعار المستلمة من الموردين أدناه للبدء في المقارنة.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vendors.map(vendor => {
-                        const existingQuote = supplierQuotations.find(q => q.vendorId === vendor.id);
-                        return (
-                            <SupplierQuotationCard 
-                                key={vendor.id}
-                                rfq={rfq}
-                                vendor={vendor}
-                                existingQuote={existingQuote}
-                            />
-                        )
-                    })}
-                </CardContent>
-            </Card>
+            <div className="flex items-center gap-3 mb-2">
+                <GanttChartSquare className="text-primary h-6 w-6" />
+                <h3 className="text-xl font-black">عروض أسعار الموردين ({vendors.length})</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {vendors.map(vendor => {
+                    const existingQuote = supplierQuotations.find(q => q.vendorId === vendor.id);
+                    return (
+                        <SupplierQuotationCard 
+                            key={vendor.id}
+                            rfq={rfq}
+                            vendor={vendor}
+                            existingQuote={existingQuote}
+                        />
+                    )
+                })}
+            </div>
         </div>
     );
 }

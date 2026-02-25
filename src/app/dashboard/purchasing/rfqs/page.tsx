@@ -18,7 +18,7 @@ export default function RfqsPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>طلبات التسعير (RFQ)</CardTitle>
-                        <CardDescription>إنشاء وتتبع طلبات عروض الأسعار المرسلة للموردين.</CardDescription>
+                        <CardDescription>إنشاء وتتبع طلبات عروض الأسعار المرسلة للموردين والمفاضلة بينها.</CardDescription>
                     </div>
                     <Button asChild size="sm">
                         <Link href="/dashboard/purchasing/rfqs/new">

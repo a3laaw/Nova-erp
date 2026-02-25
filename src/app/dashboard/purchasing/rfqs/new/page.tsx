@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -27,10 +26,10 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Vendor, Item, RequestForQuotation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateInput } from '@/components/ui/date-input';
@@ -52,7 +51,7 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+const generateTempId = () => Math.random().toString(36).substring(2, 9);
 
 export default function NewRfqPage() {
     const router = useRouter();
@@ -71,7 +70,7 @@ export default function NewRfqPage() {
         defaultValues: {
             date: new Date(),
             vendorIds: [],
-            items: [{ id: generateId(), internalItemId: '', quantity: 1 }],
+            items: [{ id: generateTempId(), internalItemId: '', quantity: 1 }],
         },
     });
 
@@ -93,26 +92,17 @@ export default function NewRfqPage() {
                 setRfqNumber(`RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
             } catch (error) {
                 setRfqNumber('خطأ');
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في توليد رقم الطلب.' });
             }
         };
         generateRfqNumber();
-    }, [firestore, toast]);
+    }, [firestore]);
 
     const vendorOptions: MultiSelectOption[] = useMemo(() => (vendors || []).map(v => ({ value: v.id!, label: v.name })), [vendors]);
     const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
-    
-    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-      useEffect(() => {
-        if (typeof window !== 'undefined') {
-          setPortalTarget(document.body);
-        }
-    }, []);
 
     const onSubmit = async (data: RfqFormValues) => {
         if (!firestore || !currentUser || loading) return;
         setIsSaving(true);
-        let newRfqId = '';
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
@@ -126,12 +116,11 @@ export default function NewRfqPage() {
                 const newRfqNumber = `RFQ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
                 
                 const newRfqRef = doc(collection(firestore, 'rfqs'));
-                newRfqId = newRfqRef.id;
                 
                 const processedItems = data.items.map(item => {
                     const selectedItem = items.find(i => i.id === item.internalItemId);
                     return {
-                        id: generateId(),
+                        id: generateTempId(),
                         internalItemId: item.internalItemId,
                         itemName: selectedItem?.name || 'Unknown',
                         quantity: Number(item.quantity)
@@ -151,7 +140,7 @@ export default function NewRfqPage() {
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
             
-            toast({ title: 'نجاح', description: 'تم إنشاء طلب التسعير كمسودة.' });
+            toast({ title: 'نجاح', description: 'تم إنشاء طلب التسعير بنجاح.' });
             router.push('/dashboard/purchasing/rfqs');
         } catch (error) {
             console.error("Error creating RFQ:", error);
@@ -168,7 +157,7 @@ export default function NewRfqPage() {
                     <div className="flex justify-between items-start">
                         <div>
                             <CardTitle>طلب تسعير جديد (RFQ)</CardTitle>
-                            <CardDescription>أرسل طلبًا لعدة موردين للحصول على أفضل سعر.</CardDescription>
+                            <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
                         </div>
                         <div className="text-right">
                             <Label>رقم الطلب</Label>
@@ -181,7 +170,7 @@ export default function NewRfqPage() {
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">
-                            <Label>التاريخ <span className="text-destructive">*</span></Label>
+                            <Label>تاريخ الطلب <span className="text-destructive">*</span></Label>
                             <Controller
                                 name="date"
                                 control={control}
@@ -190,7 +179,7 @@ export default function NewRfqPage() {
                             {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
                         </div>
                         <div className="grid gap-2">
-                            <Label>الموردون <span className="text-destructive">*</span></Label>
+                            <Label>الموردون المستهدفون <span className="text-destructive">*</span></Label>
                             <Controller
                                 name="vendorIds"
                                 control={control}
@@ -199,9 +188,8 @@ export default function NewRfqPage() {
                                         options={vendorOptions}
                                         selected={field.value}
                                         onChange={field.onChange}
-                                        placeholder={loading ? 'تحميل...' : 'اختر موردًا أو أكثر...'}
+                                        placeholder={loading ? 'جاري التحميل...' : 'اختر موردًا أو أكثر...'}
                                         disabled={loading}
-                                        menuPortalTarget={portalTarget}
                                     />
                                 )}
                             />
@@ -210,19 +198,19 @@ export default function NewRfqPage() {
                     </div>
 
                     <div>
-                        <Label className="mb-2 block">الأصناف المطلوبة</Label>
-                        <div className="border rounded-lg">
+                        <Label className="mb-2 block font-bold">الأصناف والكميات المطلوبة</Label>
+                        <div className="border rounded-xl overflow-hidden shadow-sm">
                             <Table>
-                                <TableHeader>
+                                <TableHeader className="bg-muted/50">
                                     <TableRow>
                                         <TableHead className="w-3/5">الصنف</TableHead>
-                                        <TableHead>الكمية</TableHead>
+                                        <TableHead>الكمية المطلوبة</TableHead>
                                         <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {fields.map((field, index) => (
-                                        <TableRow key={field.id}>
+                                        <TableRow key={field.id} className="hover:bg-transparent">
                                             <TableCell>
                                                 <Controller
                                                     name={`items.${index}.internalItemId`}
@@ -232,14 +220,15 @@ export default function NewRfqPage() {
                                                             value={field.value}
                                                             onSelect={field.onChange}
                                                             options={itemOptions}
-                                                            placeholder={loading ? 'تحميل...' : 'اختر صنفًا...'}
+                                                            placeholder={loading ? 'تحميل...' : 'اختر صنفًا من المخزون...'}
                                                             disabled={loading}
+                                                            className="border-none shadow-none focus-visible:ring-0"
                                                         />
                                                     )}
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" />
+                                                <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold" />
                                             </TableCell>
                                             <TableCell>
                                                 <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
@@ -251,20 +240,20 @@ export default function NewRfqPage() {
                                 </TableBody>
                             </Table>
                          </div>
-                         <div className="flex justify-start mt-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), internalItemId: '', quantity: 1 })}>
+                         <div className="flex justify-start mt-4">
+                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateTempId(), internalItemId: '', quantity: 1 })} className="rounded-xl">
                                 <PlusCircle className="ml-2 h-4 w-4" />
-                                إضافة صنف
+                                إضافة صنف للطلب
                             </Button>
                          </div>
                     </div>
                     {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                        {isSaving ? 'جاري الحفظ...' : 'حفظ كمسودة'}
+                <CardFooter className="flex justify-end gap-2 p-8 border-t bg-muted/10">
+                    <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
+                    <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20">
+                        {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin"/> : <Save className="ml-3 h-5 w-5"/>}
+                        {isSaving ? 'جاري الحفظ...' : 'حفظ كمسودة وإرسال'}
                     </Button>
                 </CardFooter>
             </form>
