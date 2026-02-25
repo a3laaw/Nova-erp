@@ -61,7 +61,7 @@ const rfqSchema = z.object({
 
 type RfqFormValues = z.infer<typeof rfqSchema>;
 
-// إصلاح #10: توليد معرفات مؤقتة قوية بطول 20 حرفاً
+// إصلاح #10: توليد معرفات مؤقتة قوية بطول 20 حرفاً لضمان عدم التكرار
 const generateTempId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -80,7 +80,7 @@ export default function NewRfqPage() {
   const [rfqNumber, setRfqNumber] = useState('جاري التوليد...');
   const [isSaving, setIsSaving] = useState(false);
   
-  // إصلاح #6: استخدام useRef لمنع الإرسال المزدوج
+  // إصلاح #6: استخدام useRef لمنع الإرسال المزدوج (Double Submission)
   const savingRef = useRef(false);
 
   const { data: vendors, loading: vendorsLoading } = useSubscription<Vendor>(
@@ -161,6 +161,9 @@ export default function NewRfqPage() {
     setIsSaving(true);
 
     try {
+      // إصلاح: أخذ نسخة محلية من الأصناف لضمان توفرها داخل الـ Transaction
+      const currentItems = items || [];
+
       await runTransaction(firestore, async (transaction) => {
         const currentYear = new Date().getFullYear();
         const counterRef = doc(firestore, 'counters', 'rfqs');
@@ -175,7 +178,7 @@ export default function NewRfqPage() {
         const newRfqRef = doc(collection(firestore, 'rfqs'));
 
         const processedItems = data.items.map((item) => {
-          const selectedItem = items?.find((i) => i.id === item.internalItemId);
+          const selectedItem = currentItems.find((i) => i.id === item.internalItemId);
           return {
             id: generateTempId(),
             internalItemId: item.internalItemId,
@@ -184,12 +187,12 @@ export default function NewRfqPage() {
           };
         });
 
-        const rfqData: Omit<RequestForQuotation, 'id'> = {
+        const rfqData = {
           rfqNumber: newRfqNumber,
           date: data.date,
           vendorIds: data.vendorIds,
           items: processedItems,
-          status: 'draft',
+          status: 'draft' as const,
           createdAt: serverTimestamp(),
         };
 
@@ -202,7 +205,8 @@ export default function NewRfqPage() {
     } catch (error) {
       console.error('Error creating RFQ:', error);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء طلب التسعير.' });
-      savingRef.current = false; // إعادة السماح بالحفظ في حال الفشل
+      // إعادة السماح بالحفظ في حال الفشل
+      savingRef.current = false;
       setIsSaving(false);
     }
   };
@@ -217,15 +221,16 @@ export default function NewRfqPage() {
               <CardDescription>حدد الموردين والأصناف المطلوبة لإرسال طلب عرض السعر.</CardDescription>
             </div>
             <div className="text-right">
-              {/* إصلاح #9: توضيح أن الرقم تقريبي */}
+              {/* إصلاح #9: توضيح أن الرقم تقريبي قبل الحفظ الفعلي */}
               <Label>رقم الطلب (تقريبي)</Label>
               <div className="font-mono text-lg font-semibold h-7">
                 {loading ? (
                   <Skeleton className="h-6 w-24" />
                 ) : (
-                  <span className="text-muted-foreground text-sm">
-                    {rfqNumber}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-primary">{rfqNumber}</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">يتأكد عند الحفظ</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -298,9 +303,9 @@ export default function NewRfqPage() {
                             />
                           )}
                         />
-                        {/* إصلاح #8: عرض خطأ الصنف في الجدول */}
+                        {/* إصلاح #8: عرض أخطاء التحقق لكل صنف بشكل واضح */}
                         {errors.items?.[index]?.internalItemId && (
-                          <p className="text-xs text-destructive mt-1 px-2">
+                          <p className="text-xs text-destructive mt-1 px-2 font-bold">
                             {errors.items[index]?.internalItemId?.message}
                           </p>
                         )}
@@ -312,9 +317,8 @@ export default function NewRfqPage() {
                           {...register(`items.${index}.quantity`)}
                           className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 font-bold"
                         />
-                        {/* إصلاح #8: عرض خطأ الكمية في الجدول */}
                         {errors.items?.[index]?.quantity && (
-                          <p className="text-xs text-destructive mt-1">
+                          <p className="text-xs text-destructive mt-1 font-bold">
                             {errors.items[index]?.quantity?.message}
                           </p>
                         )}
@@ -349,7 +353,7 @@ export default function NewRfqPage() {
             </div>
           </div>
           {errors.items && (
-            <p className="text-destructive text-sm mt-2">
+            <p className="text-destructive text-sm mt-2 font-bold">
               {errors.items.root?.message || errors.items.message}
             </p>
           )}
