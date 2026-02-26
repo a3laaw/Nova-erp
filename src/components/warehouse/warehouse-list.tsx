@@ -4,10 +4,10 @@
 import { useMemo, useState } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, where, getDocs } from 'firebase/firestore';
-import type { Warehouse, ConstructionProject } from '@/lib/types';
+import type { Warehouse, ConstructionProject, Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, MapPin, Building } from 'lucide-react';
+import { Button } from '../ui/button';
+import { MoreHorizontal, Pencil, Trash2, MapPin, Building, Briefcase } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -26,13 +26,15 @@ export function WarehouseList({ onEdit }: WarehouseListProps) {
 
     const { data: warehouses, loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
     const { data: projects } = useSubscription<ConstructionProject>(firestore, 'projects');
+    const { data: companies } = useSubscription<Company>(firestore, 'companies');
+
     const projectsMap = useMemo(() => new Map(projects.map(p => [p.id, p.projectName])), [projects]);
+    const companiesMap = useMemo(() => new Map(companies.map(c => [c.id, c.name])), [companies]);
 
     const handleDelete = async () => {
         if (!itemToDelete || !firestore) return;
         setIsDeleting(true);
         try {
-            // Check if there are stock items in this warehouse before deleting (MVP simulation)
             await deleteDoc(doc(firestore, 'warehouses', itemToDelete.id!));
             toast({ title: 'نجاح', description: 'تم حذف المستودع بنجاح.' });
         } catch (error) {
@@ -51,7 +53,8 @@ export function WarehouseList({ onEdit }: WarehouseListProps) {
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead>اسم المستودع</TableHead>
+                            <TableHead>اسم المستودع / الفرع</TableHead>
+                            <TableHead>التابعية للشركة</TableHead>
                             <TableHead>الموقع / المشروع المرتبط</TableHead>
                             <TableHead>النوع</TableHead>
                             <TableHead className="w-[100px] text-center">الإجراءات</TableHead>
@@ -60,7 +63,7 @@ export function WarehouseList({ onEdit }: WarehouseListProps) {
                     <TableBody>
                         {warehouses.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                                     لا توجد مستودعات معرفة حالياً.
                                 </TableCell>
                             </TableRow>
@@ -72,21 +75,27 @@ export function WarehouseList({ onEdit }: WarehouseListProps) {
                                         {warehouse.isDefault && <Badge className="bg-green-100 text-green-800 border-green-200">الافتراضي</Badge>}
                                     </TableCell>
                                     <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <Building className="h-4 w-4 text-muted-foreground" />
+                                            <span>{companiesMap.get(warehouse.companyId!) || 'الشركة الرئيسية'}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
                                         {warehouse.projectId ? (
-                                            <div className="flex items-center gap-2 text-blue-600">
-                                                <Building className="h-4 w-4" />
+                                            <div className="flex items-center gap-2 text-blue-600 font-medium">
+                                                <Briefcase className="h-4 w-4" />
                                                 <span>{projectsMap.get(warehouse.projectId) || 'مشروع غير معروف'}</span>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                            <div className="flex items-center gap-2 text-muted-foreground italic text-xs">
                                                 <MapPin className="h-4 w-4" />
                                                 <span>{warehouse.location || 'مخزن عام'}</span>
                                             </div>
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline">
-                                            {warehouse.projectId ? 'مخزن موقع' : 'مخزن رئيسي'}
+                                        <Badge variant="outline" className={cn(warehouse.projectId ? "bg-blue-50" : "bg-slate-50")}>
+                                            {warehouse.projectId ? 'مخزن موقع' : 'مخزن / فرع عام'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
@@ -114,7 +123,7 @@ export function WarehouseList({ onEdit }: WarehouseListProps) {
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد حذف المستودع؟</AlertDialogTitle>
-                        <AlertDialogDescription>سيتم حذف المستودع "{itemToDelete?.name}" نهائياً. تأكد من خلوه من أي أرصدة مخزنية قبل الحذف.</AlertDialogDescription>
+                        <AlertDialogDescription>سيتم حذف المستودع "{itemToDelete?.name}" نهائياً من النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>

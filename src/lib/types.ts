@@ -792,7 +792,8 @@ export type Warehouse = {
     name: string;
     location?: string;
     isDefault?: boolean;
-    projectId?: string; // NEW: If it's a project-specific store
+    projectId?: string | null; 
+    companyId?: string | null; // NEW: For branch/subsidiary specific store
 };
 
 export interface ItemCategory {

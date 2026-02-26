@@ -9,9 +9,9 @@ import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, doc, updateDoc, serverTimestamp, writeBatch, getDocs, query, where } from 'firebase/firestore';
-import { Loader2, Save } from 'lucide-react';
-import type { Warehouse, ConstructionProject } from '@/lib/types';
+import { collection, query, where, getDocs, doc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { Loader2, Save, Building, Briefcase } from 'lucide-react';
+import type { Warehouse, ConstructionProject, Company } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { cleanFirestoreData } from '@/lib/utils';
 
@@ -32,9 +32,11 @@ export function WarehouseForm({ isOpen, onClose, warehouse }: WarehouseFormProps
         location: '',
         isDefault: false,
         projectId: null,
+        companyId: null,
     });
 
     const { data: projects, loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
+    const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', [orderBy('name')]);
 
     useEffect(() => {
         if (warehouse) {
@@ -43,9 +45,10 @@ export function WarehouseForm({ isOpen, onClose, warehouse }: WarehouseFormProps
                 location: warehouse.location || '',
                 isDefault: warehouse.isDefault || false,
                 projectId: warehouse.projectId || null,
+                companyId: warehouse.companyId || null,
             });
         } else {
-            setFormData({ name: '', location: '', isDefault: false, projectId: null });
+            setFormData({ name: '', location: '', isDefault: false, projectId: null, companyId: null });
         }
     }, [warehouse, isOpen]);
 
@@ -86,37 +89,52 @@ export function WarehouseForm({ isOpen, onClose, warehouse }: WarehouseFormProps
     };
 
     const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: p.projectName })), [projects]);
+    const companyOptions = useMemo(() => companies.map(c => ({ value: c.id!, label: c.name })), [companies]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl">
+            <DialogContent dir="rtl" className="max-w-lg">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>{isEditing ? 'تعديل مستودع' : 'إضافة مستودع جديد'}</DialogTitle>
-                        <DialogDescription>تعريف مستودع جديد لتخزين المواد أو ربطه بمشروع تنفيذي.</DialogDescription>
+                        <DialogTitle>{isEditing ? 'تعديل مستودع / فرع' : 'إضافة مستودع جديد'}</DialogTitle>
+                        <DialogDescription>تعريف مستودع جديد لتخزين المواد، سواء كان مخزناً عاماً لشركة أو مخزناً خاصاً بموقع مشروع.</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="name">اسم المستودع *</Label>
-                            <Input id="name" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} required placeholder="مثال: المخزن الرئيسي، مخزن موقع الرميثية..." />
+                            <Label htmlFor="name">اسم المستودع / الفرع *</Label>
+                            <Input id="name" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} required placeholder="مثال: المخزن الرئيسي، فرع المبيعات، موقع الرميثية..." />
                         </div>
-                        <div className="grid gap-2">
-                            <Label>ربط بمشروع (لمخازن المواقع)</Label>
-                            <InlineSearchList 
-                                value={formData.projectId || ''}
-                                onSelect={(v) => setFormData(p => ({...p, projectId: v || null}))}
-                                options={projectOptions}
-                                placeholder={projectsLoading ? "تحميل..." : "ابحث عن مشروع..."}
-                            />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label className="flex items-center gap-2"><Building className="h-3 w-3" /> التابعية لشركة</Label>
+                                <InlineSearchList 
+                                    value={formData.companyId || ''}
+                                    onSelect={(v) => setFormData(p => ({...p, companyId: v || null}))}
+                                    options={companyOptions}
+                                    placeholder={companiesLoading ? "تحميل..." : "اختر الشركة..."}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="flex items-center gap-2"><Briefcase className="h-3 w-3" /> مرتبط بمشروع (اختياري)</Label>
+                                <InlineSearchList 
+                                    value={formData.projectId || ''}
+                                    onSelect={(v) => setFormData(p => ({...p, projectId: v || null}))}
+                                    options={projectOptions}
+                                    placeholder={projectsLoading ? "تحميل..." : "ابحث عن مشروع..."}
+                                />
+                            </div>
                         </div>
+
                         <div className="grid gap-2">
                             <Label htmlFor="location">الموقع الجغرافي / الوصف</Label>
-                            <Input id="location" value={formData.location || ''} onChange={e => setFormData(p => ({...p, location: e.target.value}))} />
+                            <Input id="location" value={formData.location || ''} onChange={e => setFormData(p => ({...p, location: e.target.value}))} placeholder="العنوان أو وصف مكان المخزن..." />
                         </div>
-                        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+
+                        <div className="flex items-center justify-between p-4 border rounded-2xl bg-muted/20">
                             <div className="space-y-0.5">
                                 <Label htmlFor="isDefault">تعيين كمستودع افتراضي</Label>
-                                <p className="text-xs text-muted-foreground">سيتم استخدامه تلقائياً في عمليات الشراء والاستلام.</p>
+                                <p className="text-[10px] text-muted-foreground">سيتم استخدامه تلقائياً في العمليات ما لم يتم اختيار غيره.</p>
                             </div>
                             <Switch 
                                 id="isDefault" 

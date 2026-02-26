@@ -1423,7 +1423,8 @@
         "name": { "type": "string" },
         "location": { "type": "string" },
         "isDefault": { "type": "boolean" },
-        "projectId": { "type": "string", "description": "Link to project if site-specific" }
+        "projectId": { "type": "string", "description": "Link to project if site-specific" },
+        "companyId": { "type": "string", "description": "Link to the company/entity owning this warehouse" }
       },
       "required": ["name"]
     },
@@ -1563,7 +1564,7 @@
         "properties": {
             "adjustmentNumber": { "type": "string" },
             "date": { "type": "string", "format": "date-time" },
-            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "material_issue", "other"] },
+            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "material_issue", "transfer", "other"] },
             "notes": { "type": "string" },
             "journalEntryId": { "type": "string" },
             "projectId": { "type": "string" },
@@ -1787,11 +1788,11 @@
     },
     "/attendance/{attendanceId}": {
       "schema": { "$ref": "#/entities/MonthlyAttendance" },
-      "description": "Stores monthly attendance sheets for employees. The ID is a composite of year-month-employeeId."
+      "description": "Stores monthly attendance sheets for employees. The ID is a collector of year-month-employeeId."
     },
     "/payroll/{payslipId}": {
       "schema": { "$ref": "#/entities/Payslip" },
-      "description": "Stores generated monthly payslips for employees. The ID is a composite of year-month-employeeId."
+      "description": "Stores generated monthly payslips for employees. The ID is a collector of year-month-employeeId."
     },
     "/notifications/{notificationId}": {
       "schema": {
