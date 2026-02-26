@@ -203,7 +203,7 @@ const navItems = {
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
         { href: '/dashboard/contracts', label: 'نماذج العقود', icon: FileSignature },
-        { href: '/dashboard/settings/classifications', label: 'التصنيفات', icon: Tags },
+        { href: '/dashboard/settings/classifications', label: 'الفئات', icon: Tags },
       ]
     },
   ],

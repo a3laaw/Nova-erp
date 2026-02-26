@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -175,7 +176,7 @@ export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSe
             <div className="relative mb-2">
                 <Search className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                    placeholder="ابحث عن تصنيف..."
+                    placeholder="ابحث عن فئة..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 rtl:pr-10"
@@ -190,12 +191,12 @@ export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSe
                 )}
                 onClick={() => onSelectCategory(null)}
             >
-                جميع التصنيفات
+                جميع الفئات
             </Button>
             <Separator className="my-2" />
             <div className="max-h-[60vh] overflow-y-auto">
                 {loading && <div className="p-4 text-center"><Loader2 className="animate-spin" /></div>}
-                {!loading && categoryTree.length === 0 && <p className="text-center text-muted-foreground p-4">لا توجد تصنيفات تطابق البحث.</p>}
+                {!loading && categoryTree.length === 0 && <p className="text-center text-muted-foreground p-4">لا توجد فئات تطابق البحث.</p>}
                 {!loading && categoryTree.map(node => (
                     <CategoryTreeItem 
                         key={node.id} 

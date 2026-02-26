@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import {
@@ -24,13 +25,13 @@ export default function ItemsPage() {
             <CardHeader>
                 <CardTitle>إدارة الأصناف</CardTitle>
                 <CardDescription>
-                    تصفح الأصناف حسب التصنيف، أو أضف وعدّل الأصناف الموجودة.
+                    تصفح الأصناف حسب الفئة، أو أضف وعدّل الأصناف الموجودة.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-1">
-                        <h3 className="font-semibold mb-2">التصنيفات</h3>
+                        <h3 className="font-semibold mb-2">الفئات</h3>
                         <ItemCategoryTree 
                             categories={categories || []}
                             loading={categoriesLoading}

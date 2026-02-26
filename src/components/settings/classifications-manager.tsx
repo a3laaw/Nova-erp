@@ -169,15 +169,12 @@ export function ClassificationsManager() {
     const [isImporting, setIsImporting] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
-    // Logic to determine if current item is a leaf and follows construction
     const isLeafAndConstruction = useMemo(() => {
-        if (!editingItem && !parentCategory) return false; // Initial root add is not a leaf usually
+        if (!editingItem && !parentCategory) return false; 
         
-        // 1. Is it a leaf? (No other category has this ID as its parent)
         const isCurrentlyALeaf = editingItem ? !categories.some(c => c.parentCategoryId === editingItem.id) : true;
         if (!isCurrentlyALeaf) return false;
 
-        // 2. Finding Root Parent
         const getRootParent = (currentId: string | null): ItemCategory | null => {
             if (!currentId) return null;
             const current = categories.find(c => c.id === currentId);
@@ -188,7 +185,6 @@ export function ClassificationsManager() {
 
         const rootParent = getRootParent(editingItem?.parentCategoryId || parentCategory?.id || null);
         if (!rootParent) {
-            // If it's a root category itself
             const selfIsRoot = editingItem && !editingItem.parentCategoryId;
             if (selfIsRoot) {
                 return selectedActivityTypeIds.some(id => activityTypeMap.get(id)?.includes('مقاولات') || activityTypeMap.get(id)?.toLowerCase().includes('construction'));
@@ -196,7 +192,6 @@ export function ClassificationsManager() {
             return false;
         }
 
-        // 3. Check if root parent follows construction
         return rootParent.activityTypeIds?.some(id => 
             activityTypeMap.get(id)?.includes('مقاولات') || 
             activityTypeMap.get(id)?.toLowerCase().includes('construction')
@@ -248,21 +243,21 @@ export function ClassificationsManager() {
 
             if (editingItem) {
                 if(parentCategory && parentCategory.id === editingItem.id) {
-                    toast({variant: 'destructive', title: 'خطأ', description: 'لا يمكن أن تكون الفئة أبًا لنفسها.'});
+                    toast({variant: 'destructive', title: 'خطأ', description: 'لا يمكن أن تكون الفئة أماً لنفسها.'});
                     setIsSaving(false);
                     return;
                 }
                 await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
-                toast({ title: 'نجاح', description: 'تم تحديث التصنيف بنجاح.' });
+                toast({ title: 'نجاح', description: 'تم تحديث الفئة بنجاح.' });
             } else {
                 const currentList = parentCategory ? categories.filter(c => c.parentCategoryId === parentCategory.id) : categories.filter(c => !c.parentCategoryId);
                 const order = currentList.length;
                 await addDoc(collection(firestore, 'itemCategories'), { ...dataToSave, order });
-                toast({ title: 'نجاح', description: 'تمت إضافة التصنيف بنجاح.' });
+                toast({ title: 'نجاح', description: 'تمت إضافة الفئة بنجاح.' });
             }
             closeDialog();
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التصنيف.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الفئة.' });
         } finally {
             setIsSaving(false);
         }
@@ -273,9 +268,9 @@ export function ClassificationsManager() {
         setIsSaving(true);
         try {
             await deleteDoc(doc(firestore, 'itemCategories', itemToDelete.id!));
-            toast({ title: 'نجاح', description: 'تم حذف التصنيف.' });
+            toast({ title: 'نجاح', description: 'تم حذف الفئة.' });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف التصنيف. قد يكون مرتبطًا بأصناف أخرى.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفئة. قد تكون مرتبطة بأصناف أخرى.' });
         } finally {
             setIsSaving(false);
             setItemToDelete(null);
@@ -295,9 +290,9 @@ export function ClassificationsManager() {
                 batch.set(docRef, category);
             }
             await batch.commit();
-            toast({ title: 'نجاح', description: 'تم استيراد التصنيفات الافتراضية.' });
+            toast({ title: 'نجاح', description: 'تم استيراد الفئات الافتراضية.' });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد التصنيفات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد الفئات.' });
         } finally {
             setIsImporting(false);
             setIsImportConfirmOpen(false);
@@ -311,7 +306,7 @@ export function ClassificationsManager() {
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>إدارة تصنيفات الأصناف</CardTitle>
+                        <CardTitle>إدارة فئات الأصناف</CardTitle>
                         <CardDescription>
                             تنظيم الأصناف في هيكل شجري وربطها بأنواع أنشطة الشركة وبنود الـ BOQ.
                         </CardDescription>
@@ -320,7 +315,7 @@ export function ClassificationsManager() {
                         <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
                             {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>} استيراد الافتراضي
                         </Button>
-                        <Button onClick={() => openDialog(null)}><PlusCircle className="ml-2 h-4"/> إضافة تصنيف رئيسي</Button>
+                        <Button onClick={() => openDialog(null)}><PlusCircle className="ml-2 h-4"/> إضافة فئة رئيسية</Button>
                     </div>
                 </div>
             </CardHeader>
@@ -351,7 +346,7 @@ export function ClassificationsManager() {
                             <Skeleton className="h-10 w-4/5 mr-auto" />
                         </div>
                     ) : categoryTree.length === 0 ? (
-                        <p className="text-center text-muted-foreground p-12">لا توجد تصنيفات معرفة لهذا النشاط.</p>
+                        <p className="text-center text-muted-foreground p-12">لا توجد فئات معرفة لهذا النشاط.</p>
                     ) : (
                         <div className="space-y-1">
                             {categoryTree.map(node => (
@@ -384,8 +379,8 @@ export function ClassificationsManager() {
                     }}
                 >
                     <DialogHeader>
-                        <DialogTitle>{editingItem ? 'تعديل تصنيف' : 'إضافة تصنيف جديد'}</DialogTitle>
-                        <DialogDescription>أدخل بيانات التصنيف وقم بربطه بالأنشطة المناسبة.</DialogDescription>
+                        <DialogTitle>{editingItem ? 'تعديل فئة' : 'إضافة فئة جديدة'}</DialogTitle>
+                        <DialogDescription>أدخل بيانات الفئة وقم بربطها بالأنشطة المناسبة.</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-6">
                         <div className="grid gap-2">
@@ -394,11 +389,11 @@ export function ClassificationsManager() {
                                 value={parentCategory?.id || ''}
                                 onSelect={(val) => setParentCategory(categories.find(c => c.id === val) || null)}
                                 options={categoryOptions}
-                                placeholder="اتركه فارغًا ليكون تصنيفًا رئيسيًا"
+                                placeholder="اتركها فارغة لتكون فئة رئيسية"
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="item-name">اسم التصنيف <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="item-name">اسم الفئة <span className="text-destructive">*</span></Label>
                             <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} required placeholder="مثال: مواد بناء، خدمات استشارية..." />
                         </div>
                         <div className="grid gap-2">
@@ -407,7 +402,7 @@ export function ClassificationsManager() {
                                 options={activityTypeOptions}
                                 selected={selectedActivityTypeIds}
                                 onChange={setSelectedActivityTypeIds}
-                                placeholder="اختر نشاطًا واحدًا أو أكثر..."
+                                placeholder="اختر نشاطاً واحداً أو أكثر..."
                             />
                         </div>
 
@@ -417,7 +412,7 @@ export function ClassificationsManager() {
                                     <Badge className="bg-primary/20 text-primary border-none">قسم المقاولات</Badge>
                                     <Label className="font-bold">ربط مع بنود جداول الكميات (BOQ)</Label>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground">بما أن هذا التصنيف هو "ابن أخير" ويتبع نشاط المقاولات، يمكنك ربطه ببنود المقايسات المرجعية.</p>
+                                <p className="text-[10px] text-muted-foreground">بما أن هذه الفئة هي "ابنة أخيرة" وتتبع نشاط المقاولات، يمكنك ربطها ببنود المقايسات المرجعية.</p>
                                 <MultiSelect 
                                     options={boqItemOptions}
                                     selected={selectedBoqItemIds}
@@ -431,7 +426,7 @@ export function ClassificationsManager() {
                         <Button variant="outline" onClick={closeDialog} disabled={isSaving}>إلغاء</Button>
                         <Button onClick={handleSave} disabled={isSaving || !itemName.trim()}>
                              {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                            حفظ التصنيف
+                            حفظ الفئة
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -442,9 +437,9 @@ export function ClassificationsManager() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيتم حذف التصنيف "{itemToDelete?.name}" بشكل دائم. 
+                            سيتم حذف الفئة "{itemToDelete?.name}" بشكل دائم. 
                             <br />
-                            <span className="text-destructive font-semibold">تنبيه: سيؤدي هذا إلى فصل الأصناف والروابط المرتبطة بهذا التصنيف.</span>
+                            <span className="text-destructive font-semibold">تنبيه: سيؤدي هذا إلى فصل الأصناف والروابط المرتبطة بهذه الفئة.</span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -459,9 +454,9 @@ export function ClassificationsManager() {
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
                 <AlertDialogContent dir="rtl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد استيراد التصنيفات الافتراضية؟</AlertDialogTitle>
+                        <AlertDialogTitle>تأكيد استيراد الفئات الافتراضية؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيؤدي هذا الإجراء إلى مسح جميع التصنيفات الحالية واستبدالها بالقائمة الافتراضية الأولية.
+                            سيؤدي هذا الإجراء إلى مسح جميع الفئات الحالية واستبدالها بالقائمة الافتراضية الأولية.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

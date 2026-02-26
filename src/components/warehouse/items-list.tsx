@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -10,8 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirebase } from '@/firebase';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, where } from 'firebase/firestore';
 import type { Item, ItemCategory } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -74,7 +74,7 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
   const filteredItems = useMemo(() => {
     const augmentedItems = (items || []).map(item => ({
         ...item,
-        categoryName: categoryMap.get(item.categoryId) || 'غير مصنف'
+        categoryName: categoryMap.get(item.categoryId) || 'غير مفنف'
     })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
 
     return searchItems(augmentedItems, searchQuery);
@@ -130,7 +130,7 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
                 <TableHead>الاسم</TableHead>
                 <TableHead>الكود (SKU)</TableHead>
                 <TableHead>النوع</TableHead>
-                <TableHead>التصنيف</TableHead>
+                <TableHead>الفئة</TableHead>
                 <TableHead className="text-left">سعر البيع</TableHead>
                 <TableHead className="text-left">الإجراءات</TableHead>
               </TableRow>

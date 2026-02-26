@@ -1,7 +1,8 @@
+
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, Palette, Database, Clock, CreditCard, ShieldCheck, Building, FileSignature } from 'lucide-react';
+import { Users, Palette, Database, Clock, CreditCard, ShieldCheck, Building, FileSignature, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const settingsFeatures = [
@@ -60,6 +61,13 @@ const settingsFeatures = [
         href: '/dashboard/contracts',
         icon: FileSignature,
         color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
+    },
+    {
+        title: 'إدارة الفئات',
+        description: 'تنظيم وتصنيف الأصناف والخدمات في المخازن.',
+        href: '/dashboard/settings/classifications',
+        icon: Tags,
+        color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300'
     },
 ];
 
