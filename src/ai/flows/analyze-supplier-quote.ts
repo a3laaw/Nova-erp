@@ -1,7 +1,7 @@
 'use server';
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار - النسخة فائقة الاستقرار.
- * يقوم باستخراج الأسعار من الصور وربطها بالأصناف المطلوبة مع معالجة يدوية للـ JSON لتجنب أخطاء الـ API.
+ * @fileOverview محرك تحليل صور عروض الأسعار - نسخة 2026 المستقرة.
+ * يقوم باستخراج الأسعار من الصور وربطها بالأصناف المطلوبة مع نظام محاولات متعددة للموديلات.
  */
 
 import { ai } from '@/ai/genkit';
@@ -18,7 +18,7 @@ const AnalyzeQuoteInputSchema = z.object({
 const AnalyzeQuoteOutputSchema = z.object({
   extractedPrices: z.array(z.object({
     rfqItemId: z.string(),
-    unitPrice: z.number(),
+    unitPrice: z.number().nullable(),
     confidence: z.number()
   })),
   notes: z.string().optional()
@@ -27,46 +27,73 @@ const AnalyzeQuoteOutputSchema = z.object({
 export type AnalyzeQuoteInput = z.infer<typeof AnalyzeQuoteInputSchema>;
 export type AnalyzeQuoteOutput = z.infer<typeof AnalyzeQuoteOutputSchema>;
 
+/**
+ * قائمة الموديلات المراد تجربتها بالترتيب حسب الاستقرار لعام 2026
+ */
+const SUPPORTED_MODELS = [
+  'googleai/gemini-1.5-flash-002',
+  'googleai/gemini-2.0-flash',
+  'googleai/gemini-1.5-pro-002'
+];
+
 export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<AnalyzeQuoteOutput> {
-  // استخدام استدعاء نصي مباشر لضمان التوافق مع النسخة المستقرة V1 وتجنب خطأ 400
-  const response = await ai.generate({
-    model: 'googleai/gemini-1.5-flash',
-    system: `أنت خبير في تحليل الفواتير وعروض الأسعار الهندسية.
-    مهمتك استخراج "سعر الوحدة" لكل صنف من القائمة المرفقة بناءً على الصورة المزودة.
-    يجب أن يكون ردك عبارة عن كائن JSON فقط داخل النص، بدون أي نصوص توضيحية خارج الـ JSON.`,
-    prompt: [
-      { text: `استخرج الأسعار للأصناف التالية من الصورة المرفقة بدقة عالية:
-      ${input.rfqItems.map(i => `- ${i.name} (المعرف: ${i.id})`).join('\n')}
+  let lastError = null;
+
+  for (const modelName of SUPPORTED_MODELS) {
+    try {
+      console.log(`Attempting analysis with model: ${modelName}`);
       
-      تنسيق الرد المطلوب هو كائن JSON بهذا الهيكل تماماً:
-      {
-        "extractedPrices": [
-          { "rfqItemId": "المعرف هنا", "unitPrice": السعر_كرقم, "confidence": 0.95 }
+      const response = await ai.generate({
+        model: modelName,
+        system: `أنت خبير تقني في تحليل عروض الأسعار الهندسية والمقاولات باللغة العربية.
+        مهمتك هي استخراج "سعر الوحدة" (Unit Price) لكل صنف مطلوب بناءً على الصورة المرفقة.
+        
+        قواعد التحليل:
+        1. ابحث عن اسم الصنف أو ما يشابهه في الصورة.
+        2. استخرج سعر الوحدة كرقـم فقط.
+        3. إذا لم تجد سعراً لصنف معين، اجعل قيمته null وأضف ملاحظة.
+        4. تجاهل الضرائب أو الإجماليات، ركز فقط على سعر الوحدة الصافي.
+        5. الرد يجب أن يكون كائن JSON صالح فقط، بدون أي شرح إضافي.`,
+        prompt: [
+          { text: `استخرج الأسعار للأصناف التالية من صورة عرض السعر:
+          ${input.rfqItems.map(i => `- ${i.name} (المعرف البرمجي: ${i.id})`).join('\n')}
+          
+          تنسيق الرد المطلوب (JSON):
+          {
+            "extractedPrices": [
+              { "rfqItemId": "المعرف هنا", "unitPrice": 150.5, "confidence": 0.98 }
+            ],
+            "notes": "أي ملاحظات عن العملة أو وضوح بنود معينة"
+          }` },
+          { media: { url: input.quoteFileDataUri } }
         ],
-        "notes": "أي ملاحظات حول الوضوح أو العملة"
-      }` },
-      { media: { url: input.quoteFileDataUri } }
-    ],
-  });
+      });
 
-  const rawText = response.text;
-  if (!rawText) throw new Error('لم يستطع الموديل قراءة البيانات من الصورة.');
+      const rawText = response.text;
+      if (!rawText) continue;
 
-  try {
-    // استخراج الـ JSON من الرد النصي باستخدام Regex لضمان العمل حتى لو أضاف الموديل علامات Markdown
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("تنسيق البيانات المستخرجة غير صالح.");
-    
-    const parsedData = JSON.parse(jsonMatch[0]);
-    
-    // التأكد من أن البيانات تطابق الهيكل المطلوب
-    if (!parsedData.extractedPrices || !Array.isArray(parsedData.extractedPrices)) {
-        throw new Error("البيانات المستخرجة ناقصة.");
+      // استخراج الـ JSON باستخدام Regex لضمان الاستقرار
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Could not find JSON in response");
+      
+      const parsedData = JSON.parse(jsonMatch[0]);
+      
+      // التأكد من جودة البيانات
+      if (parsedData.extractedPrices && Array.isArray(parsedData.extractedPrices)) {
+        console.log(`Success with model: ${modelName}`);
+        return parsedData as AnalyzeQuoteOutput;
+      }
+
+    } catch (e: any) {
+      console.warn(`Model ${modelName} failed:`, e.message);
+      lastError = e;
+      // إذا كان الخطأ ليس 404 (مثل خطأ في الصورة)، توقف فوراً ولا تجرب موديلات أخرى
+      if (!e.message.includes('404') && !e.message.includes('not found')) {
+        throw e;
+      }
     }
-
-    return parsedData as AnalyzeQuoteOutput;
-  } catch (e) {
-    console.error("AI Stable Parsing Error. Raw response was:", rawText);
-    throw new Error("تعذر تحليل الأسعار بدقة. يرجى التأكد من وضوح صورة عرض السعر ومطابقتها للأصناف.");
   }
+
+  console.error("All models failed analysis.");
+  throw new Error(lastError?.message || "تعذر تحليل الصورة باستخدام الموديلات المتاحة. يرجى التأكد من وضوح الصورة.");
 }

@@ -91,7 +91,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
                 
                 const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
-                // FIXED: Corrected parenthesis in map call below
                 setProjects(projSnap.docs.map(d => ({
                     ...d.data(), 
                     id: d.id, 
