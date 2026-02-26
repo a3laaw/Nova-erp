@@ -15,13 +15,14 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Table as TableIcon } from 'lucide-react';
+import { Loader2, Save, Table as TableIcon, Sparkles } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cleanFirestoreData } from '@/lib/utils';
+import { analyzeSupplierQuote } from '@/ai/flows/analyze-supplier-quote';
 
 interface SupplierQuotationFormProps {
   isOpen: boolean;
@@ -53,6 +54,7 @@ export function SupplierQuotationForm({
   const [paymentTerms, setPaymentTerms] = useState('');
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -85,6 +87,35 @@ export function SupplierQuotationForm({
     setItems((prev) =>
       prev.map((item) => (item.rfqItemId === rfqItemId ? { ...item, unitPrice: price } : item))
     );
+  };
+
+  const handleAutoAnalyze = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzing(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const dataUri = e.target?.result as string;
+        const result = await analyzeSupplierQuote({
+          quoteFileDataUri: dataUri,
+          rfqItems: rfq.items.map(i => ({ id: i.id!, name: i.itemName }))
+        });
+
+        setItems(prev => prev.map(item => {
+          const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
+          return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
+        }));
+
+        toast({ title: 'تم التحليل بنجاح', description: 'تم استخراج الأسعار من الصورة وتعبئتها آلياً.' });
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: 'فشل التحليل الذكي', description: err.message });
+      } finally {
+        setIsAnalyzing(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,8 +158,22 @@ export function SupplierQuotationForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl" dir="rtl">
         <DialogHeader className="p-6 bg-muted/20 border-b">
-          <DialogTitle className="text-xl font-black">إدخال عرض سعر المورد: {vendor.name}</DialogTitle>
-          <DialogDescription>طلب تسعير رقم: {rfq.rfqNumber}</DialogDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <DialogTitle className="text-xl font-black">إدخال عرض سعر المورد: {vendor.name}</DialogTitle>
+              <DialogDescription>طلب تسعير رقم: {rfq.rfqNumber}</DialogDescription>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <Button variant="outline" className="gap-2 border-primary/50 text-primary hover:bg-primary/5" asChild disabled={isAnalyzing}>
+                <label className="cursor-pointer">
+                  {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4"/>}
+                  بدء التحليل التلقائي للصورة
+                  <input type="file" className="sr-only" onChange={handleAutoAnalyze} accept="image/*" />
+                </label>
+              </Button>
+              <p className="text-[10px] text-muted-foreground italic">ارفع صورة الفاتورة لاستخراج الأسعار آلياً</p>
+            </div>
+          </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6">
@@ -155,7 +200,7 @@ export function SupplierQuotationForm({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-muted-foreground" />
-                <Label className="text-lg font-black">إدخال الأسعار يدوياً</Label>
+                <Label className="text-lg font-black">أسعار الأصناف</Label>
               </div>
               
               <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">

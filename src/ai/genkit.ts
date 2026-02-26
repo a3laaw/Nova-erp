@@ -1,17 +1,14 @@
+'use client';
 /**
- * @fileOverview كائن وهمي (Mock) لمحرك Genkit.
- * يسمح هذا الكائن للنظام بالبناء والعمل بنجاح عند تعطيل ميزات الذكاء الاصطناعي،
- * حيث يوفر دوال تُرجع وظائف فارغة تمنع حدوث خطأ "is not a function" أثناء التشغيل.
+ * @fileOverview تهيئة محرك Genkit الأساسي للذكاء الاصطناعي.
+ * يستخدم هذا الملف لتصدير كائن ai الذي يدير كافة نداءات الموديلات اللغوية.
  */
 
-export const ai = {
-  definePrompt: () => {
-    return () => Promise.resolve({ output: null, text: '' });
-  },
-  defineFlow: () => {
-    return () => Promise.resolve(null);
-  },
-  defineTool: () => ({}),
-  generate: () => Promise.resolve({ output: null, text: '', media: null }),
-  checkOperation: () => Promise.resolve({ done: true }),
-};
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+
+export const ai = genkit({
+  plugins: [
+    googleAI(), // سيبحث تلقائياً عن GOOGLE_GENAI_API_KEY في البيئة
+  ],
+});
