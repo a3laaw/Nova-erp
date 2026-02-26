@@ -1,7 +1,6 @@
 'use server';
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار باستخدام Gemini 1.5 Flash.
- * يستخرج الأسعار من صور الفواتير ويربطها بأصناف طلب التسعير.
+ * @fileOverview محرك تحليل صور عروض الأسعار - مطور ليكون أكثر استقراراً مع Gemini 1.5 Flash.
  */
 
 import { ai } from '@/ai/genkit';
@@ -30,36 +29,27 @@ export type AnalyzeQuoteOutput = z.infer<typeof AnalyzeQuoteOutputSchema>;
 export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<AnalyzeQuoteOutput> {
   const { output } = await ai.generate({
     model: 'googleai/gemini-1.5-flash',
+    system: `أنت خبير في تحليل الفواتير وعروض الأسعار الهندسية باللغة العربية.
+    مهمتك استخراج "سعر الوحدة" لكل صنف من القائمة المرفقة.
+    يجب أن تكون مخرجاتك بتنسيق JSON فقط دون أي نصوص إضافية.`,
     prompt: [
-      { text: `أنت خبير في استخراج البيانات من فواتير الموردين باللغة العربية.
-      المهمة: استخرج سعر الوحدة (Unit Price) لكل صنف من الأصناف المذكورة أدناه والموجودة في صورة الفاتورة المرفقة.
+      { text: `استخرج الأسعار للأصناف التالية من الصورة المرفقة:
+      ${input.rfqItems.map(i => `- ${i.name} (المعرف: ${i.id})`).join('\n')}
       
-      الأصناف المطلوب البحث عنها:
-      ${input.rfqItems.map(i => `- ${i.name} (ID: ${i.id})`).join('\n')}
-      
-      المخرجات المطلوبة:
-      يجب أن يكون الرد بصيغة JSON فقط، ويحتوي على مصفوفة extractedPrices، كل عنصر فيها يحتوي على:
-      - rfqItemId: معرف الصنف من القائمة أعلاه.
-      - unitPrice: السعر المستخرج كرقم.
-      - confidence: نسبة الثقة في الاستخراج (0-1).
-      
-      التزم بالصيغة التالية بدقة:
-      { "extractedPrices": [{ "rfqItemId": "...", "unitPrice": 0.0, "confidence": 0.95 }] }` },
+      تنسيق الرد المطلوب:
+      { "extractedPrices": [ { "rfqItemId": "المعرف", "unitPrice": السعر_كرقم, "confidence": 0.9 } ] }` },
       { media: { url: input.quoteFileDataUri } }
     ],
   });
 
-  if (!output?.text) throw new Error('فشل استخراج البيانات من الصورة');
+  if (!output?.text) throw new Error('لم يستطع الذكاء الاصطناعي قراءة الصورة.');
   
   try {
-      // تنظيف الرد لاستخراج الـ JSON فقط في حال وجود نصوص زائدة
       const jsonMatch = output.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as AnalyzeQuoteOutput;
-      }
-      throw new Error("تنسيق الرد غير صالح");
+      if (!jsonMatch) throw new Error("تنسيق الرد غير صالح");
+      return JSON.parse(jsonMatch[0]) as AnalyzeQuoteOutput;
   } catch (e) {
       console.error("Parse error:", output.text);
-      throw new Error("تعذر تحليل بيانات الفاتورة بشكل صحيح.");
+      throw new Error("تعذر تحليل بيانات الفاتورة. تأكد من وضوح الصورة.");
   }
 }

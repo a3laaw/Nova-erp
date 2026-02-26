@@ -7,6 +7,8 @@ import { googleAI } from '@genkit-ai/google-genai';
 
 export const ai = genkit({
   plugins: [
-    googleAI(), // سيبحث تلقائياً عن GOOGLE_GENAI_API_KEY في البيئة
+    googleAI({
+      apiKey: process.env.GOOGLE_GENAI_API_KEY,
+    }),
   ],
 });
