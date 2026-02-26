@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info, AlertTriangle } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, where } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
 import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -85,17 +85,17 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     getDocs(query(collection(firestore, 'employees'))),
                     getDocs(query(collection(firestore, 'departments'))),
                 ]);
+                
                 setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
                 setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
                 setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
                 
                 const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
-                const mappedProjects = projSnap.docs.map(d => ({
+                setProjects(projSnap.docs.map(d => ({
                     ...d.data(), 
                     id: d.id, 
-                    clientName: clientMap.get(d.data().clientId)
-                } as ClientTransaction & { clientName: string }));
-                setProjects(mappedProjects);
+                    clientName: clientMap.get(d.data().clientId) || 'عميل غير معروف'
+                } as ClientTransaction & { clientName: string })));
             } catch(e) {
                 console.error("Error fetching reference data:", e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
@@ -156,7 +156,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         const projectExpenseAccount = accounts.find(a => a.code === '5104') || accounts.find(a => a.code === '51');
 
         if (!inventoryAccount || !projectExpenseAccount) {
-            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'لم يتم العثور على حساب المخزون أو حساب مصاريف المشروع.' });
+            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'حسابات المخزون أو مصاريف المشروع غير معرفة.' });
             return;
         }
 

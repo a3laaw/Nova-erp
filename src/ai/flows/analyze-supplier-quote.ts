@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار.
+ * @fileOverview محرك تحليل صور عروض الأسعار باستخدام Gemini 1.5 Flash.
  * يستخرج الأسعار من صور الفواتير ويربطها بأصناف طلب التسعير.
  */
 
@@ -31,13 +31,35 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
   const { output } = await ai.generate({
     model: 'googleai/gemini-1.5-flash',
     prompt: [
-      { text: `استخرج سعر الوحدة لكل صنف من الصورة المرفقة. 
-      الأصناف المطلوبة: ${input.rfqItems.map(i => `${i.name} (ID: ${i.id})`).join(', ')}` },
+      { text: `أنت خبير في استخراج البيانات من فواتير الموردين باللغة العربية.
+      المهمة: استخرج سعر الوحدة (Unit Price) لكل صنف من الأصناف المذكورة أدناه والموجودة في صورة الفاتورة المرفقة.
+      
+      الأصناف المطلوب البحث عنها:
+      ${input.rfqItems.map(i => `- ${i.name} (ID: ${i.id})`).join('\n')}
+      
+      المخرجات المطلوبة:
+      يجب أن يكون الرد بصيغة JSON فقط، ويحتوي على مصفوفة extractedPrices، كل عنصر فيها يحتوي على:
+      - rfqItemId: معرف الصنف من القائمة أعلاه.
+      - unitPrice: السعر المستخرج كرقم.
+      - confidence: نسبة الثقة في الاستخراج (0-1).
+      
+      التزم بالصيغة التالية بدقة:
+      { "extractedPrices": [{ "rfqItemId": "...", "unitPrice": 0.0, "confidence": 0.95 }] }` },
       { media: { url: input.quoteFileDataUri } }
     ],
-    output: { format: 'json', schema: AnalyzeQuoteOutputSchema }
   });
 
-  if (!output) throw new Error('فشل استخراج البيانات من الصورة');
-  return output;
+  if (!output?.text) throw new Error('فشل استخراج البيانات من الصورة');
+  
+  try {
+      // تنظيف الرد لاستخراج الـ JSON فقط في حال وجود نصوص زائدة
+      const jsonMatch = output.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]) as AnalyzeQuoteOutput;
+      }
+      throw new Error("تنسيق الرد غير صالح");
+  } catch (e) {
+      console.error("Parse error:", output.text);
+      throw new Error("تعذر تحليل بيانات الفاتورة بشكل صحيح.");
+  }
 }
