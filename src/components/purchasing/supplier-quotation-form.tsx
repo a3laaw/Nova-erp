@@ -103,16 +103,20 @@ export function SupplierQuotationForm({
           rfqItems: rfq.items.map(i => ({ id: i.id!, name: i.itemName }))
         });
 
-        setItems(prev => prev.map(item => {
-          const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
-          return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
-        }));
-
-        toast({ title: 'تم التحليل بنجاح', description: 'تم استخراج الأسعار من الصورة وتعبئتها آلياً.' });
+        if (result && result.extractedPrices) {
+            setItems(prev => prev.map(item => {
+                const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
+                return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
+            }));
+            toast({ title: 'نجاح التحليل', description: 'تم استخراج الأسعار من الصورة وتعبئتها آلياً.' });
+        }
       } catch (err: any) {
-        toast({ variant: 'destructive', title: 'فشل التحليل الذكي', description: err.message });
+        console.error("AI Analysis UI Error:", err);
+        toast({ variant: 'destructive', title: 'خطأ في التحليل', description: err.message });
       } finally {
         setIsAnalyzing(false);
+        // Reset file input
+        event.target.value = '';
       }
     };
     reader.readAsDataURL(file);
@@ -156,72 +160,79 @@ export function SupplierQuotationForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl" dir="rtl">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none" dir="rtl">
         <DialogHeader className="p-6 bg-muted/20 border-b">
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-center">
             <div>
-              <DialogTitle className="text-xl font-black">إدخال عرض سعر المورد: {vendor.name}</DialogTitle>
-              <DialogDescription>طلب تسعير رقم: {rfq.rfqNumber}</DialogDescription>
+              <DialogTitle className="text-2xl font-black text-foreground">إدخال عرض السعر: {vendor.name}</DialogTitle>
+              <DialogDescription className="text-sm font-medium">طلب تسعير رقم: {rfq.rfqNumber}</DialogDescription>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Button variant="outline" className="gap-2 border-primary/50 text-primary hover:bg-primary/5" asChild disabled={isAnalyzing}>
+              <Button 
+                variant="outline" 
+                className="gap-2 border-primary/50 text-primary hover:bg-primary/5 h-11 rounded-xl shadow-sm" 
+                asChild 
+                disabled={isAnalyzing}
+              >
                 <label className="cursor-pointer">
-                  {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4"/>}
+                  {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin"/> : <Sparkles className="h-5 w-5 fill-primary/20"/>}
                   بدء التحليل التلقائي للصورة
                   <input type="file" className="sr-only" onChange={handleAutoAnalyze} accept="image/*" />
                 </label>
               </Button>
-              <p className="text-[10px] text-muted-foreground italic">ارفع صورة الفاتورة لاستخراج الأسعار آلياً</p>
+              <p className="text-[10px] text-muted-foreground font-bold italic">ارفع صورة عرض السعر لاستخراج الأسعار آلياً بواسطة AI</p>
             </div>
           </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-2xl border">
+            {/* Header Data Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
               <div className="grid gap-2">
-                <Label className="font-bold pr-2">مرجع المورد</Label>
-                <Input value={reference} onChange={e => setReference(e.target.value)} placeholder="رقم عرض المورد..." className="rounded-xl h-10" />
+                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مرجع المورد</Label>
+                <Input value={reference} onChange={e => setReference(e.target.value)} placeholder="رقم عرض المورد..." className="rounded-xl h-10 border-2" />
               </div>
               <div className="grid gap-2">
-                <Label className="font-bold pr-2">تاريخ العرض</Label>
-                <DateInput value={date} onChange={setDate} className="h-10" />
+                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">تاريخ العرض</Label>
+                <DateInput value={date} onChange={setDate} className="h-10 rounded-xl" />
               </div>
               <div className="grid gap-2">
-                <Label className="font-bold pr-2">مدة التوريد (أيام)</Label>
-                <Input type="number" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="0" className="h-10" />
+                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مدة التوريد (أيام)</Label>
+                <Input type="number" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="0" className="h-10 rounded-xl border-2" />
               </div>
               <div className="grid gap-2">
-                <Label className="font-bold pr-2">شروط الدفع</Label>
-                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="h-10" />
+                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">شروط الدفع</Label>
+                <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="h-10 rounded-xl border-2" />
               </div>
             </div>
 
+            {/* Items Table */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <TableIcon className="h-5 w-5 text-muted-foreground" />
-                <Label className="text-lg font-black">أسعار الأصناف</Label>
+              <div className="flex items-center gap-2 px-2">
+                <TableIcon className="h-5 w-5 text-primary" />
+                <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
               </div>
               
-              <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">
+              <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow className="h-14 border-b-2">
-                            <TableHead className="px-6 font-bold text-base">اسم الصنف المطلوب</TableHead>
-                            <TableHead className="w-48 text-center font-bold text-base">سعر الوحدة (د.ك)</TableHead>
+                            <TableHead className="px-8 font-black text-base">اسم الصنف المطلوب</TableHead>
+                            <TableHead className="w-56 text-center font-black text-base px-6">سعر الوحدة (د.ك)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.map((item) => (
                             <TableRow key={item.rfqItemId} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
-                                <TableCell className="px-6 font-bold text-foreground/80">{item.itemName}</TableCell>
-                                <TableCell className="px-4">
+                                <TableCell className="px-8 font-bold text-foreground/80">{item.itemName}</TableCell>
+                                <TableCell className="px-6">
                                     <Input 
                                         type="number" 
                                         step="0.001" 
                                         value={item.unitPrice} 
                                         onChange={e => handleItemPriceChange(item.rfqItemId, e.target.value)} 
-                                        className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-muted transition-all bg-muted/10 rounded-xl"
+                                        className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30"
                                         placeholder="0.000"
                                     />
                                 </TableCell>
@@ -235,14 +246,14 @@ export function SupplierQuotationForm({
         </ScrollArea>
 
         <DialogFooter className="p-6 border-t bg-muted/10">
-          <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold">إلغاء</Button>
+          <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
           <Button 
             onClick={handleSubmit} 
             disabled={isSaving || items.every(i => !i.unitPrice)}
-            className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 min-w-[180px]"
+            className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[200px]"
           >
             {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
-            {isSaving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}
+            {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ عرض السعر'}
           </Button>
         </DialogFooter>
       </DialogContent>
