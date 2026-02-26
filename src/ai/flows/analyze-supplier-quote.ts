@@ -36,8 +36,12 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
 
 const prompt = ai.definePrompt({
   name: 'analyzeSupplierQuotePrompt',
+  model: 'googleai/gemini-1.5-flash-latest', // تأكيد استخدام النموذج الصحيح هنا أيضاً
   input: { schema: AnalyzeQuoteInputSchema },
   output: { schema: AnalyzeQuoteOutputSchema },
+  config: {
+    temperature: 0.1, // درجة حرارة منخفضة لضمان دقة استخراج الأرقام
+  },
   prompt: `You are a professional procurement auditor AI. Your task is to extract unit prices from the attached supplier quotation document.
 
 Match the items in the document to the following items I am looking for:
@@ -64,7 +68,7 @@ const analyzeSupplierQuoteFlow = ai.defineFlow(
   },
   async input => {
     try {
-      const { output } = await prompt(input);
+      const {output} = await prompt(input);
       if (!output) {
         throw new Error('Failed to analyze the document. No data extracted.');
       }
