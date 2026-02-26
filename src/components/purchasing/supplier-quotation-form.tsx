@@ -136,7 +136,6 @@ export function SupplierQuotationForm({
     setAnalysisError(null);
     
     try {
-        // تحويل الملف إلى Data URI
         const reader = new FileReader();
         const dataUri = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
@@ -144,13 +143,11 @@ export function SupplierQuotationForm({
             reader.readAsDataURL(selectedFile);
         });
         
-        // تجهيز أصناف الطلب للمطابقة
         const rfqItemsForAI = rfq.items.map(item => ({
             id: item.id!,
             name: item.itemName || '',
         }));
         
-        // استدعاء Genkit AI
         const result = await analyzeSupplierQuote({
             quoteFileDataUri: dataUri,
             rfqItems: rfqItemsForAI,
@@ -158,7 +155,6 @@ export function SupplierQuotationForm({
         
         setAnalysisResult(result);
         
-        // ملء الأسعار تلقائياً
         if (result.extractedPrices && result.extractedPrices.length > 0) {
             let matchedCount = 0;
             result.extractedPrices.forEach(extracted => {
