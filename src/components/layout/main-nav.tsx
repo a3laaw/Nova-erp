@@ -44,7 +44,8 @@ import {
   Boxes,
   Construction,
   UserSearch,
-  FileCheck
+  FileCheck,
+  Building2
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -150,9 +151,10 @@ const navItems = {
       roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard',
       children: [
+        { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات والأفرع', icon: Building2 },
+        { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف' },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
-        { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف' },
         { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع' },
         { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
@@ -247,9 +249,10 @@ const navItems = {
       roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard',
       children: [
+        { href: '/dashboard/warehouse/warehouses', label: 'Warehouses & Branches', icon: Building2 },
+        { href: '/dashboard/warehouse/items', label: 'Inventory' },
         { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
-        { href: '/dashboard/warehouse/items', label: 'Inventory' },
         { href: '/dashboard/warehouse/grns', label: 'Goods Receipt', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'Material Issue' },
         { href: '/dashboard/purchasing/vendors', label: 'Vendors' },

@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
 
 const warehouseFeatures = [
     {
-        title: 'إدارة المستودعات',
-        description: 'تعريف المخازن الرئيسية ومخازن المواقع التابعة للمشاريع.',
+        title: 'إدارة المستودعات والأفرع',
+        description: 'تعريف المخازن الرئيسية، المستودعات، ومخازن المواقع التابعة للمشاريع.',
         href: '/dashboard/warehouse/warehouses',
         icon: Building2,
         color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'

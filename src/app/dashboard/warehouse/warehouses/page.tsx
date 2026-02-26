@@ -27,20 +27,20 @@ export default function WarehousesPage() {
     return (
         <div className="space-y-6" dir="rtl">
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="space-y-1">
-                        <CardTitle className="text-2xl font-black flex items-center gap-3">
+                        <CardTitle className="text-2xl font-black flex items-center gap-3 text-foreground">
                             <Building2 className="text-primary h-7 w-7" />
-                            إدارة المستودعات
+                            إدارة المستودعات والأفرع
                         </CardTitle>
-                        <CardDescription>تعريف أماكن التخزين الرئيسية ومخازن المواقع التابعة للمشاريع.</CardDescription>
+                        <CardDescription>تعريف أماكن التخزين الرئيسية، الأفرع، ومخازن المواقع التابعة للمشاريع.</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => router.back()}>
                             <ArrowRight className="ml-2 h-4 w-4" /> العودة
                         </Button>
-                        <Button onClick={handleAdd}>
-                            <PlusCircle className="ml-2 h-4 w-4" /> إضافة مستودع جديد
+                        <Button onClick={handleAdd} className="font-bold gap-2">
+                            <PlusCircle className="h-4 w-4" /> إضافة مستودع/فرع
                         </Button>
                     </div>
                 </CardHeader>
