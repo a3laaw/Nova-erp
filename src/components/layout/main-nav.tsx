@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -42,7 +43,8 @@ import {
   Package,
   Boxes,
   Construction,
-  UserSearch
+  UserSearch,
+  FileCheck
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -81,7 +83,7 @@ const navItems = {
             { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة' },
             { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة' },
             { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين' },
-            { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية' },
+            { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إإضافية' },
           ]
         },
       ]
@@ -151,6 +153,7 @@ const navItems = {
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
         { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف' },
+        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع' },
         { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
       ]
@@ -247,7 +250,9 @@ const navItems = {
         { href: '/dashboard/purchasing/rfqs', label: 'RFQs' },
         { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
         { href: '/dashboard/warehouse/items', label: 'Inventory' },
+        { href: '/dashboard/warehouse/grns', label: 'Goods Receipt', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'Material Issue' },
+        { href: '/dashboard/purchasing/vendors', label: 'Vendors' },
       ]
     },
     { 

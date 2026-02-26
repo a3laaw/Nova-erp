@@ -2,7 +2,7 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, Truck, BarChart3, ShoppingCart, Users, FileText as RfqIcon, ArrowUpFromLine, History, Building2 } from 'lucide-react';
+import { Package, BarChart3, ArrowUpFromLine, History, Building2, FileCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const warehouseFeatures = [
@@ -21,8 +21,15 @@ const warehouseFeatures = [
         color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
     },
     {
+        title: 'استلام بضاعة (GRN)',
+        description: 'تأكيد وصول المواد من الموردين وتحديث الأرصدة.',
+        href: '/dashboard/warehouse/grns',
+        icon: FileCheck,
+        color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
+    },
+    {
         title: 'صرف مواد للمشاريع',
-        description: 'إذن صرف مواد ذكي مرتبط ببنود المقايسة (BOQ) وتصنيفات المواد.',
+        description: 'إذن صرف مواد ذكي مرتبط ببنود المقايسة (BOQ).',
         href: '/dashboard/warehouse/material-issue',
         icon: ArrowUpFromLine,
         color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300'
@@ -32,11 +39,11 @@ const warehouseFeatures = [
         description: 'إدخال الكميات الأولية عند بدء استخدام النظام.',
         href: '/dashboard/warehouse/opening-balances',
         icon: History,
-        color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
+        color: 'bg-muted dark:bg-muted text-foreground'
     },
     {
         title: 'تقارير المخزون',
-        description: 'مجموعة شاملة من التقارير لتحليل المخزون.',
+        description: 'تحليل الكميات والقيم وحركة الأصناف.',
         href: '/dashboard/warehouse/reports',
         icon: BarChart3,
         color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
