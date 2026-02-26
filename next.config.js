@@ -9,7 +9,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb', // زيادة الحد المسموح لمعالجة ملفات PDF الكبيرة
+      bodySizeLimit: '10mb', // زيادة الحد المسموح لمعالجة ملفات PDF الكبيرة للذكاء الاصطناعي
     },
   },
   images: {

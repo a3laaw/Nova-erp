@@ -1,10 +1,13 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
-// استخدام الإعدادات الافتراضية المستقرة لتجنب أخطاء 404 و 400
+/**
+ * تهيئة محرك Genkit مع إضافة دعم Google AI.
+ * نستخدم الإعدادات الافتراضية لضمان أفضل توافق مع الموديلات المستقرة.
+ */
 export const ai = genkit({
   plugins: [
     googleAI()
   ],
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-1.5-flash', // الموديل الأكثر استقراراً ودعماً للغة العربية و OCR
 });

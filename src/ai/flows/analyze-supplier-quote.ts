@@ -1,14 +1,14 @@
 'use server';
 /**
  * @fileOverview AI flow to analyze supplier quote documents (PDF/Images) and extract unit prices.
- * Using stable multimodal gemini-1.5-flash which has built-in OCR capabilities.
+ * نستخدم تقنية Multimodal في Gemini لقراءة الصور والملفات مباشرة واستخراج الجداول.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AnalyzeQuoteInputSchema = z.object({
-  quoteFileDataUri: z.string().describe("The quote document as a data URI (PDF or Image)."),
+  quoteFileDataUri: z.string().describe("The quote document as a data URI (PDF or Image). Format: 'data:<mimetype>;base64,<encoded_data>'."),
   rfqItems: z.array(z.object({
     id: z.string(),
     name: z.string()
@@ -37,22 +37,21 @@ const prompt = ai.definePrompt({
   config: {
     temperature: 0.1,
   },
-  prompt: `You are a professional procurement auditor. Extract unit prices for the requested items from the provided quote document.
+  prompt: `أنت مدقق مشتريات محترف. مهمتك استخراج أسعار الوحدة لكل صنف مطلوب من عرض السعر المرفق.
 
-أنت مدقق مشتريات محترف. استخرج سعر الوحدة لكل صنف من عرض السعر المرفق.
-
-Requested Items:
+الأصناف المطلوبة (ابحث عن هذه الأسماء أو ما يشابهها في المستند):
 {{#each rfqItems}}
 - ID: {{this.id}}, Name: {{this.name}}
 {{/each}}
 
-Instructions:
-1. Scan the document image/PDF.
-2. Find the unit price for each requested item ID.
-3. Return ONLY the data in the requested JSON format.
-4. If an item price is not clear, assign a lower confidence score.
+التعليمات:
+1. قم بمسح المستند المرفق (صورة أو PDF) بدقة.
+2. ابحث عن جدول الأسعار وطابق الأصناف المطلوبة مع الأصناف الموجودة في عرض السعر.
+3. استخرج "سعر الوحدة" (Unit Price) لكل صنف.
+4. إذا لم تجد صنفاً معيناً، لا تضعه في قائمة النتائج.
+5. أرجع النتيجة فقط بصيغة JSON المطلوبة.
 
-Document: {{media url=quoteFileDataUri}}`,
+المستند: {{media url=quoteFileDataUri}}`,
 });
 
 const analyzeSupplierQuoteFlow = ai.defineFlow(
@@ -64,11 +63,11 @@ const analyzeSupplierQuoteFlow = ai.defineFlow(
   async input => {
     try {
       const {output} = await prompt(input);
-      if (!output) throw new Error('No output from AI');
+      if (!output) throw new Error('فشل الذكاء الاصطناعي في استخراج أي بيانات من المستند.');
       return output;
     } catch (error: any) {
       console.error("AI Analysis Flow Error:", error);
-      throw new Error(`AI Analysis failed: ${error.message}`);
+      throw new Error(`فشل التحليل: ${error.message}`);
     }
   }
 );
