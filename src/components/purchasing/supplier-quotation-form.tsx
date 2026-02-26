@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Sparkles, FileUp, FileText as FileTextIcon, X, CheckCircle2, AlertTriangle, Table as TableIcon } from 'lucide-react';
+import { Loader2, Save, Sparkles, FileUp, FileText as FileTextIcon, X, CheckCircle2, Table as TableIcon } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -140,7 +140,7 @@ export function SupplierQuotationForm({
             }));
             toast({ title: 'نجاح التحليل', description: `تم استخراج ${result.extractedPrices.length} سعر من المستند.` });
         } else {
-            toast({ variant: 'destructive', title: 'تنبيه', description: 'لم يتم العثور على مبالغ واضحة في المستند.' });
+            toast({ variant: 'default', title: 'تنبيه', description: 'لم يتم العثور على مبالغ واضحة في المستند.' });
         }
     } catch (error: any) {
         console.error(error);
@@ -196,11 +196,11 @@ export function SupplierQuotationForm({
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
-            {/* AI Magic Section */}
+            {/* AI OCR Section */}
             <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-3xl space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-xl text-primary"><Sparkles className="h-5 w-5" /></div>
-                    <h4 className="font-black text-lg">استخراج الأسعار بالذكاء الاصطناعي</h4>
+                    <h4 className="font-black text-lg">تحليل ذكي للمستند (OCR)</h4>
                 </div>
 
                 <div className="flex flex-col md:flex-row items-center gap-4">
@@ -230,22 +230,22 @@ export function SupplierQuotationForm({
                         className="h-14 px-8 rounded-2xl font-black gap-2 shadow-lg shadow-primary/20"
                     >
                         {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                        {isAnalyzing ? 'جاري التحليل...' : 'تحليل واستخراج'}
+                        {isAnalyzing ? 'جاري التحليل...' : 'بدء التحليل التلقائي'}
                     </Button>
                 </div>
                 
                 {analysisResult && (
                     <Alert className="bg-green-50 border-green-200">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <AlertTitle className="text-green-800 font-bold">تم استخراج البيانات بنجاح</AlertTitle>
+                        <AlertTitle className="text-green-800 font-bold">تم الاستخراج بنجاح</AlertTitle>
                         <AlertDescription className="text-green-700 text-xs">
-                            تم العثور على {analysisResult.extractedPrices.length} صنف من أصل {rfq.items.length}. يرجى مراجعة الجدول أدناه.
+                            تم العثور على {analysisResult.extractedPrices.length} صنف. يرجى مراجعة الأسعار في الجدول أدناه قبل الحفظ.
                         </AlertDescription>
                     </Alert>
                 )}
             </div>
 
-            {/* Form Fields */}
+            {/* Manual Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-2xl border">
               <div className="grid gap-2">
                 <Label className="font-bold pr-2">مرجع المورد</Label>
@@ -265,11 +265,11 @@ export function SupplierQuotationForm({
               </div>
             </div>
 
-            {/* Items Table */}
+            {/* Prices Table */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-muted-foreground" />
-                <Label className="text-lg font-black">جدول الأصناف والأسعار</Label>
+                <Label className="text-lg font-black">جدول مراجعة الأسعار</Label>
               </div>
               
               <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">
@@ -278,7 +278,7 @@ export function SupplierQuotationForm({
                         <TableRow className="h-14 border-b-2">
                             <TableHead className="px-6 font-bold text-base">اسم الصنف المطلوب</TableHead>
                             <TableHead className="w-48 text-center font-bold text-base">سعر الوحدة (د.ك)</TableHead>
-                            <TableHead className="w-32 text-center font-bold text-base">نسبة الثقة</TableHead>
+                            <TableHead className="w-32 text-center font-bold text-base">دقة الذكاء</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -321,7 +321,7 @@ export function SupplierQuotationForm({
             className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 min-w-[180px]"
           >
             {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
-            {isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}
+            {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ العرض'}
           </Button>
         </DialogFooter>
       </DialogContent>
