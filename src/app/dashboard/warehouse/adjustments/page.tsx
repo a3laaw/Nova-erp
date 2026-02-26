@@ -1,8 +1,8 @@
-
 'use client';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Ban } from 'lucide-react';
+import { PlusCircle, Ban, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase, useSubscription } from '@/firebase';
 import { where, orderBy } from 'firebase/firestore';
@@ -16,10 +16,10 @@ import { Badge } from '@/components/ui/badge';
 export default function AdjustmentsPage() {
     const { firestore } = useFirebase();
     
-    const adjQuery = [
+    const adjQuery = useMemo(() => [
         where('type', 'in', ['damage', 'theft', 'other']),
         orderBy('date', 'desc')
-    ];
+    ], []);
     
     const { data: adjustments, loading } = useSubscription<InventoryAdjustment>(firestore, 'inventoryAdjustments', adjQuery);
 
@@ -61,8 +61,8 @@ export default function AdjustmentsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? (
-                                <TableRow><TableCell colSpan={5} className="text-center p-8"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+                            {loading && adjustments.length === 0 ? (
+                                <TableRow><TableCell colSpan={5} className="text-center p-8"><Loader2 className="animate-spin mx-auto text-primary"/></TableCell></TableRow>
                             ) : adjustments.length === 0 ? (
                                 <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">لا توجد تسويات مسجلة.</TableCell></TableRow>
                             ) : (

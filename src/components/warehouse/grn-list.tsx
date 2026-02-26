@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -12,11 +11,10 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
-import type { GoodsReceiptNote } from '@/lib/types';
+import { orderBy } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { Search, FileCheck } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { toFirestoreDate } from '@/services/date-converter';
 
@@ -24,13 +22,16 @@ export function GrnList() {
   const { firestore } = useFirebase();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: grns, loading } = useSubscription<any>(firestore, 'grns', [orderBy('date', 'desc')]);
+  // استقرار الاستعلام عبر useMemo لمنع إعادة التحميل
+  const queryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
+  const { data: grns, loading } = useSubscription<any>(firestore, 'grns', queryConstraints);
 
   const filteredGrns = useMemo(() => {
+    if (!grns) return [];
     if (!searchQuery) return grns;
     const lower = searchQuery.toLowerCase();
     return grns.filter(g => 
-        g.grnNumber.toLowerCase().includes(lower) || 
+        g.grnNumber?.toLowerCase().includes(lower) || 
         g.vendorName?.toLowerCase().includes(lower)
     );
   }, [grns, searchQuery]);
@@ -40,7 +41,14 @@ export function GrnList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
 
-  if (loading) return <Skeleton className="h-64 w-full" />;
+  if (loading && grns.length === 0) {
+    return (
+        <div className="space-y-4">
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -68,7 +76,7 @@ export function GrnList() {
                     {filteredGrns.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                لا توجد أذونات استلام مسجلة.
+                                {loading ? <Loader2 className="animate-spin mx-auto h-6 w-6 text-primary" /> : 'لا توجد أذونات استلام مسجلة.'}
                             </TableCell>
                         </TableRow>
                     ) : (

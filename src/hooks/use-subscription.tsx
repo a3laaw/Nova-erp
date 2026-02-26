@@ -1,21 +1,19 @@
-
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   type Firestore,
   query,
   collection,
   onSnapshot,
-  type DocumentData,
   type QueryConstraint,
 } from 'firebase/firestore';
 
 const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 
 /**
- * A simplified, stable hook for real-time Firestore collection subscriptions.
- * It uses a memoized query key to prevent re-subscriptions on every render.
+ * خطاف مطور ومستقر لجلب البيانات من Firestore في الوقت الفعلي.
+ * تم تحسينه لمنع عمليات التحميل المتكررة (Flickering) وضمان استقرار الواجهة.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -26,28 +24,21 @@ export function useSubscription<T extends { id?: string }>(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
     
-    // Create a stable key from the path and constraints to use in the useEffect dependency array.
-    // This prevents re-subscriptions on every render if the constraints array is a new instance but has the same values.
-    const queryKey = useMemo(() => {
-        if (!collectionPath) return null;
-        try {
-            // A simple string representation for the dependency array.
-            return `${collectionPath}|${JSON.stringify(constraints)}`;
-        } catch (e) {
-            // Fallback for non-serializable constraints, though this should be avoided.
-            return `${collectionPath}|${Date.now()}`;
-        }
-    }, [collectionPath, constraints]);
-
+    // استخدام مراجع داخلية لتجنب إعادة التحميل عند تغير مراجع المصفوفات المتطابقة
+    const lastPath = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!firestore || !collectionPath || !queryKey) {
+        if (!firestore || !collectionPath) {
             setLoading(false);
-            setData([]); // Ensure data is cleared if there's no query
+            setData([]);
             return;
         }
 
-        setLoading(true);
+        // فقط قم بتعيين حالة التحميل إلى true إذا تغير المسار الأساسي للمجموعة
+        if (lastPath.current !== collectionPath) {
+            setLoading(true);
+            lastPath.current = collectionPath;
+        }
 
         const q = query(collection(firestore, collectionPath), ...constraints);
 
@@ -60,15 +51,14 @@ export function useSubscription<T extends { id?: string }>(
                 setError(null);
             },
             (err) => {
-                console.error(`Error listening to ${collectionPath}:`, err);
+                console.error(`Firestore Subscription Error [${collectionPath}]:`, err);
                 setError(err);
                 setLoading(false);
             }
         );
 
         return () => unsubscribe();
-    // The key here includes the stringified constraints, so the effect only re-runs when the query truly changes.
-    }, [firestore, queryKey, collectionPath, constraints]);
+    }, [firestore, collectionPath, constraints]);
 
     return { data, loading, error };
 }

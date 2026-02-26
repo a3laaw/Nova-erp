@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -12,13 +11,12 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { orderBy, where } from 'firebase/firestore';
 import type { InventoryAdjustment } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { ArrowUpFromLine, Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { toFirestoreDate } from '@/services/date-converter';
 
 export function MaterialIssueList() {
@@ -33,10 +31,11 @@ export function MaterialIssueList() {
   const { data: issues, loading } = useSubscription<InventoryAdjustment>(firestore, 'inventoryAdjustments', issueQuery);
 
   const filteredIssues = useMemo(() => {
+    if (!issues) return [];
     if (!searchQuery) return issues;
     const lower = searchQuery.toLowerCase();
     return issues.filter(i => 
-        i.adjustmentNumber.toLowerCase().includes(lower) || 
+        i.adjustmentNumber?.toLowerCase().includes(lower) || 
         i.notes?.toLowerCase().includes(lower)
     );
   }, [issues, searchQuery]);
@@ -46,7 +45,7 @@ export function MaterialIssueList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
 
-  if (loading) return <Skeleton className="h-64 w-full" />;
+  if (loading && issues.length === 0) return <Skeleton className="h-64 w-full" />;
 
   return (
     <div className="space-y-4">
@@ -74,7 +73,7 @@ export function MaterialIssueList() {
                     {filteredIssues.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                لا توجد أذونات صرف مسجلة.
+                                {loading ? <Loader2 className="animate-spin mx-auto h-6 w-6 text-primary" /> : 'لا توجد أذونات صرف مسجلة.'}
                             </TableCell>
                         </TableRow>
                     ) : (
