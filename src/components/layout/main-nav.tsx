@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -74,7 +73,8 @@ import {
   FileSignature,
   Tags,
   PieChart,
-  CreditCard
+  CreditCard,
+  History
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -192,6 +192,14 @@ const navItems = {
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
         { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },
+        { 
+          label: 'تقارير المخزون', 
+          icon: BarChart3,
+          children: [
+            { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
+            { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
+          ]
+        }
       ]
     },
     { 
