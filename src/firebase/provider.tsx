@@ -29,7 +29,6 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
 
 /**
  * A custom hook to access the full Firebase context (app, auth, firestore).
- * Throws an error if used outside of a FirebaseProvider.
  */
 export function useFirebase() {
   const context = useContext(FirebaseContext);
