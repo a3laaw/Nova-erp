@@ -126,7 +126,7 @@ export function SupplierQuotationForm({
             rfqItems: rfq.items.map(i => ({ id: i.id, name: i.itemName }))
         });
 
-        if (result.extractedPrices.length > 0) {
+        if (result && result.extractedPrices && result.extractedPrices.length > 0) {
             setItems(prev => prev.map(item => {
                 const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
                 return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
@@ -144,12 +144,12 @@ export function SupplierQuotationForm({
             });
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("AI Analysis error:", error);
         toast({
             variant: 'destructive',
             title: 'خطأ في التحليل',
-            description: 'حدث خطأ أثناء محاولة قراءة الملف بالذكاء الاصطناعي.',
+            description: error.message || 'حدث خطأ أثناء محاولة قراءة الملف بالذكاء الاصطناعي.',
         });
     } finally {
         setIsAnalyzing(false);

@@ -46,11 +46,12 @@ Match the items in the document to the following items I am looking for:
 {{/each}}
 
 Instructions:
-1. Look at the unit price for each item.
-2. If the supplier used a slightly different name, use your reasoning to find the best match based on keywords.
-3. If an item is not found, skip it.
-4. Return only the unit prices for the requested IDs.
-5. If the document has multiple pages, scan all of them.
+1. Scan the document (image or PDF) and find the table or list of prices.
+2. For each item in my list, find the corresponding unit price in the document.
+3. If the supplier used a slightly different name, use your reasoning to find the best match based on keywords.
+4. Return ONLY the unit prices for the requested IDs in the specified JSON format.
+5. If an item is not found, do not include it in the extractedPrices array.
+6. If the document has multiple pages, scan all of them.
 
 Document: {{media url=quoteFileDataUri}}`,
 });
@@ -62,10 +63,15 @@ const analyzeSupplierQuoteFlow = ai.defineFlow(
     outputSchema: AnalyzeQuoteOutputSchema,
   },
   async input => {
-    const { output } = await prompt(input);
-    if (!output) {
-      throw new Error('Failed to analyze the document. No data extracted.');
+    try {
+      const { output } = await prompt(input);
+      if (!output) {
+        throw new Error('Failed to analyze the document. No data extracted.');
+      }
+      return output;
+    } catch (error: any) {
+      console.error("AI Analysis Flow Error:", error);
+      throw new Error(`AI Analysis failed: ${error.message}`);
     }
-    return output;
   }
 );
