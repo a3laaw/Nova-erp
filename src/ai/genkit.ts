@@ -1,14 +1,13 @@
 /**
- * @fileOverview تهيئة محرك Genkit الأساسي باستخدام Vertex AI في منطقة us-central1.
+ * @fileOverview تهيئة محرك Genkit الأساسي مع الموديل الافتراضي.
  */
 
 import { genkit } from 'genkit';
-import { vertexAI } from '@genkit-ai/vertexai';
+import { googleAI } from '@genkit-ai/googleai';
 
 export const ai = genkit({
   plugins: [
-    vertexAI({
-      location: 'us-central1',
-    }),
+    googleAI(),
   ],
+  model: 'googleai/gemini-1.5-flash', // الموديل الافتراضي للنظام
 });

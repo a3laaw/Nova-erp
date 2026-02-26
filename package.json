@@ -13,8 +13,9 @@
     "fix-deps": "echo 'triggering dependency reinstall'"
   },
   "dependencies": {
-    "genkit": "^1.0.0",
-    "@genkit-ai/googleai": "^0.5.0",
+    "genkit": "^1.0.1",
+    "@genkit-ai/googleai": "^0.5.6",
+    "@genkit-ai/core": "^0.5.6",
     "@genkit-ai/vertexai": "^0.5.0",
     "@google-cloud/vertexai": "^1.9.2",
     "@hookform/resolvers": "3.9.0",
