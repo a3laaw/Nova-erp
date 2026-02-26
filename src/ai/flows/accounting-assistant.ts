@@ -1,8 +1,7 @@
 'use server';
 
 /**
- * @fileOverview المساعد المحاسبي الذكي.
- * يحول الأوامر النصية العربية إلى قيود يومية وسندات منظمة.
+ * @fileOverview المساعد المحاسبي الذكي باستخدام Google AI.
  */
 
 import { ai } from '@/ai/genkit';

@@ -13,8 +13,9 @@
     "fix-deps": "echo 'triggering dependency reinstall'"
   },
   "dependencies": {
-    "genkit": "^1.0.0",
-    "@genkit-ai/googleai": "^0.5.0",
+    "genkit": "1.29.0",
+    "@genkit-ai/google-genai": "1.29.0",
+    "@genkit-ai/vertexai": "1.29.0",
     "@hookform/resolvers": "3.9.0",
     "@radix-ui/react-accordion": "1.2.0",
     "@radix-ui/react-alert-dialog": "1.1.1",

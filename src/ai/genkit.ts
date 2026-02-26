@@ -1,15 +1,12 @@
 /**
- * @fileOverview تهيئة محرك Genkit الأساسي للذكاء الاصطناعي.
+ * @fileOverview تهيئة محرك Genkit الأساسي باستخدام Google AI Plugin.
  */
 
 import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { googleAI } from '@genkit-ai/googleai';
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      // محاولة جلب المفتاح من عدة مسميات شائعة لضمان العمل
-      apiKey: process.env.GOOGLE_GENAI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
-    }),
+    googleAI(),
   ],
 });
