@@ -142,14 +142,14 @@ export function SupplierQuotationForm({
                 }
                 return item;
             }));
-            toast({ title: 'نجاح التحليل', description: `تم استخراج ${result.extractedPrices.length} سعر بنجاح.` });
+            toast({ title: 'نجاح التحليل', description: `تم استخراج الأسعار بنجاح.` });
         } else {
             toast({ variant: 'default', title: 'تنبيه', description: 'لم يتم العثور على مبالغ مطابقة في المستند.' });
         }
     } catch (error: any) {
         console.error(error);
-        setAnalysisError(error.message || 'حدث خطأ غير متوقع أثناء التحليل.');
-        toast({ variant: 'destructive', title: 'فشل التحليل', description: 'تأكد من صلاحية مفتاح الـ API وجودة الصورة.' });
+        setAnalysisError(error.message);
+        toast({ variant: 'destructive', title: 'فشل التحليل', description: error.message });
     } finally {
         setIsAnalyzing(false);
     }
@@ -201,7 +201,6 @@ export function SupplierQuotationForm({
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
-            {/* AI OCR Section */}
             <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-3xl space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-xl text-primary"><Sparkles className="h-5 w-5" /></div>
@@ -258,7 +257,6 @@ export function SupplierQuotationForm({
                 )}
             </div>
 
-            {/* Manual Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-2xl border">
               <div className="grid gap-2">
                 <Label className="font-bold pr-2">مرجع المورد</Label>
@@ -278,7 +276,6 @@ export function SupplierQuotationForm({
               </div>
             </div>
 
-            {/* Prices Table */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-muted-foreground" />

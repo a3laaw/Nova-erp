@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview محرك تحليل عروض الأسعار المطور.
- * تم تبسيط الكود لاستخدام ai.generate مباشرة لضمان أعلى استقرار وتجنب أخطاء التنسيق.
+ * تم تصحيح اسم الموديل ليكون 'googleai/gemini-1.5-flash' لضمان الوصول للمسار المستقر.
  */
 
 import { ai } from '@/ai/genkit';
@@ -45,18 +45,20 @@ ${input.rfqItems.map(i => `${i.id} - ${i.name}`).join('\n')}
 1. ابحث عن السعر المطابق لكل صنف بدقة.
 2. إذا وجدت السعر، ضعه في حقل unitPrice.
 3. حدد نسبة الثقة (confidence) من 0 إلى 1.
-4. لا تخترع أسعاراً غير موجودة.` },
+4. إذا لم تجد السعر تماماً، ضع 0.
+5. الإخراج يجب أن يكون JSON فقط.` },
         { media: { url: input.quoteFileDataUri } }
       ]
     });
 
     if (!output) {
-      throw new Error('لم يرجع الذكاء الاصطناعي نتائج صالحة.');
+      throw new Error('لم يرجع الذكاء الاصطناعي نتائج صالحة. يرجى التأكد من وضوح الصورة.');
     }
 
     return output;
   } catch (error: any) {
     console.error("Critical AI Analysis Error:", error);
-    throw new Error(`فشل التحليل الذكي: ${error.message}`);
+    // إرجاع رسالة خطأ مفهومة للمستخدم
+    throw new Error(`فشل التحليل الذكي: ${error.message.includes('404') ? 'الموديل غير متاح حالياً، جرب مرة أخرى بعد قليل' : error.message}`);
   }
 }
