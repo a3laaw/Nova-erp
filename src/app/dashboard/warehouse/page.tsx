@@ -2,7 +2,7 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, BarChart3, ArrowUpFromLine, History, Building2, FileCheck } from 'lucide-react';
+import { Package, BarChart3, ArrowUpFromLine, History, Building2, FileCheck, ArrowLeftRight, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const warehouseFeatures = [
@@ -33,6 +33,20 @@ const warehouseFeatures = [
         href: '/dashboard/warehouse/material-issue',
         icon: ArrowUpFromLine,
         color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300'
+    },
+    {
+        title: 'التحويلات المخزنية',
+        description: 'نقل المواد بين المستودعات والمواقع المختلفة.',
+        href: '/dashboard/warehouse/transfers',
+        icon: ArrowLeftRight,
+        color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300'
+    },
+    {
+        title: 'تسويات المخزون (تلف/فقد)',
+        description: 'معالجة النقص في المخزون الناتج عن التلف أو الفقد.',
+        href: '/dashboard/warehouse/adjustments',
+        icon: Ban,
+        color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300'
     },
     {
         title: 'أرصدة افتتاحية',

@@ -1,14 +1,33 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+
+'use client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PlusCircle, ArrowLeftRight } from 'lucide-react';
+import Link from 'next/link';
+import { TransferList } from '@/components/warehouse/transfer-list';
 
 export default function TransfersPage() {
     return (
-        <Card>
+        <Card dir="rtl">
             <CardHeader>
-                <CardTitle>التحويلات المخزنية</CardTitle>
-                <CardDescription>سيتم بناء هذه الصفحة لإدارة التحويلات بين المخازن.</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <ArrowLeftRight className="text-primary" />
+                            التحويلات المخزنية
+                        </CardTitle>
+                        <CardDescription>متابعة حركة نقل المواد والعهدة بين المستودعات والأفرع.</CardDescription>
+                    </div>
+                    <Button asChild size="sm">
+                        <Link href="/dashboard/warehouse/transfers/new">
+                            <PlusCircle className="ml-2 h-4 w-4" />
+                            إذن تحويل جديد
+                        </Link>
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
-                <p>قريباً...</p>
+                <TransferList />
             </CardContent>
         </Card>
     );
