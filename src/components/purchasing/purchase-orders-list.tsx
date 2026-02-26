@@ -28,6 +28,7 @@ import { Label } from '../ui/label';
 import { toFirestoreDate } from '@/services/date-converter';
 import { searchPurchaseOrders } from '@/lib/cache/fuse-search';
 import { DateInput } from '../ui/date-input';
+import Link from 'next/link';
 
 
 const statusColors: Record<string, string> = {
@@ -167,7 +168,11 @@ export function PurchaseOrdersList() {
                 ) : (
                     filteredPOs.map((po) => (
                         <TableRow key={po.id}>
-                            <TableCell className="font-mono">{po.poNumber}</TableCell>
+                            <TableCell className="font-mono font-bold">
+                                <Link href={`/dashboard/purchasing/purchase-orders/${po.id}`} className="text-primary hover:underline">
+                                    {po.poNumber}
+                                </Link>
+                            </TableCell>
                             <TableCell>{po.vendorName}</TableCell>
                             <TableCell>{formatDate(po.orderDate)}</TableCell>
                             <TableCell className="text-left font-mono">{formatCurrency(po.totalAmount)}</TableCell>
@@ -181,8 +186,9 @@ export function PurchaseOrdersList() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" dir="rtl">
                                         <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                        <DropdownMenuItem disabled>عرض</DropdownMenuItem>
-                                        <DropdownMenuItem disabled>تعديل</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/purchasing/purchase-orders/${po.id}`)}>
+                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                        </DropdownMenuItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => setItemToDelete(po)} className="text-destructive focus:text-destructive">
                                             <Trash2 className="ml-2 h-4 w-4" /> حذف
@@ -214,4 +220,3 @@ export function PurchaseOrdersList() {
     </>
   );
 }
-    
