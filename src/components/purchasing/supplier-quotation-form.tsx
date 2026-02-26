@@ -98,6 +98,8 @@ export function SupplierQuotationForm({
     reader.onload = async (e) => {
       try {
         const dataUri = e.target?.result as string;
+        
+        // استدعاء محرك الذكاء الاصطناعي الجديد والمستقر
         const result = await analyzeSupplierQuote({
           quoteFileDataUri: dataUri,
           rfqItems: rfq.items.map(i => ({ id: i.id!, name: i.itemName }))
@@ -106,17 +108,25 @@ export function SupplierQuotationForm({
         if (result && result.extractedPrices) {
             setItems(prev => prev.map(item => {
                 const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
+                // تحديث السعر فقط إذا وجده الذكاء الاصطناعي بنجاح
                 return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
             }));
-            toast({ title: 'نجاح التحليل', description: 'تم استخراج الأسعار من الصورة وتعبئتها آلياً.' });
+            
+            toast({ 
+                title: 'تم التحليل بنجاح', 
+                description: `تم استخراج أسعار لـ ${result.extractedPrices.length} أصناف من أصل ${items.length}.`,
+            });
         }
       } catch (err: any) {
         console.error("AI Analysis UI Error:", err);
-        toast({ variant: 'destructive', title: 'خطأ في التحليل', description: err.message });
+        toast({ 
+            variant: 'destructive', 
+            title: 'خطأ في التحليل', 
+            description: err.message || 'فشل استخراج البيانات من الصورة.' 
+        });
       } finally {
         setIsAnalyzing(false);
-        // Reset file input
-        event.target.value = '';
+        if (event.target) event.target.value = '';
       }
     };
     reader.readAsDataURL(file);
@@ -187,7 +197,6 @@ export function SupplierQuotationForm({
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
-            {/* Header Data Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مرجع المورد</Label>
@@ -207,7 +216,6 @@ export function SupplierQuotationForm({
               </div>
             </div>
 
-            {/* Items Table */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-2">
                 <TableIcon className="h-5 w-5 text-primary" />
