@@ -22,6 +22,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { cn, formatCurrency } from '@/lib/utils';
+import { analyzeSupplierQuote } from '@/ai/flows/analyze-supplier-quote';
 
 interface SupplierQuotationFormProps {
   isOpen: boolean;
@@ -93,13 +94,13 @@ export function SupplierQuotationForm({
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (file && file.type === 'application/pdf') {
+      if (file && (file.type === 'application/pdf' || file.type.startsWith('image/'))) {
         setSelectedFile(file);
       } else if (file) {
         toast({
           variant: 'destructive',
           title: 'ملف غير صالح',
-          description: 'الرجاء اختيار ملف PDF فقط.',
+          description: 'الرجاء اختيار ملف PDF أو صورة عرض السعر.',
         });
         setSelectedFile(null);
       }
@@ -110,15 +111,50 @@ export function SupplierQuotationForm({
   const handleAnalyzePdf = useCallback(async () => {
     if (!selectedFile) return;
     setIsAnalyzing(true);
-    // Mocking AI analysis delay
-    setTimeout(() => {
-      toast({
-        title: 'ميزة ذكية قيد التنفيذ',
-        description: 'سيتم قريباً تفعيل الذكاء الاصطناعي لقراءة الأسعار من ملفات PDF المرفوعة.',
-      });
-      setIsAnalyzing(false);
-    }, 1500);
-  }, [selectedFile, toast]);
+    
+    try {
+        const reader = new FileReader();
+        const fileContentPromise = new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedFile);
+        });
+
+        const dataUri = await fileContentPromise;
+        const result = await analyzeSupplierQuote({
+            quoteFileDataUri: dataUri,
+            rfqItems: rfq.items.map(i => ({ id: i.id, name: i.itemName }))
+        });
+
+        if (result.extractedPrices.length > 0) {
+            setItems(prev => prev.map(item => {
+                const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
+                return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
+            }));
+            
+            toast({
+                title: 'اكتمل التحليل',
+                description: `تم استخراج ${result.extractedPrices.length} أسعار بنجاح من الملف.`,
+            });
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'تنبيه',
+                description: 'لم يتمكن الذكاء الاصطناعي من مطابقة الأصناف في هذا الملف. يرجى التأكد من وضوح الجداول.',
+            });
+        }
+
+    } catch (error) {
+        console.error("AI Analysis error:", error);
+        toast({
+            variant: 'destructive',
+            title: 'خطأ في التحليل',
+            description: 'حدث خطأ أثناء محاولة قراءة الملف بالذكاء الاصطناعي.',
+        });
+    } finally {
+        setIsAnalyzing(false);
+    }
+  }, [selectedFile, rfq.items, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,10 +237,10 @@ export function SupplierQuotationForm({
               </div>
               <div className="flex items-end gap-4">
                 <div className="grid gap-2 flex-grow">
-                  <Label className="text-[10px] uppercase font-black text-blue-600/70 pr-1">ارفع ملف المورد (PDF)</Label>
+                  <Label className="text-[10px] uppercase font-black text-blue-600/70 pr-1">ارفع ملف المورد (PDF أو صورة)</Label>
                   <Input
                     type="file"
-                    accept="application/pdf"
+                    accept="application/pdf,image/*"
                     onChange={handleFileChange}
                     className="bg-background rounded-xl border-blue-100 h-11 focus-visible:ring-blue-400"
                   />
@@ -216,7 +252,10 @@ export function SupplierQuotationForm({
                   className="h-11 px-6 rounded-xl font-black bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-200"
                 >
                   {isAnalyzing ? (
-                    <Loader2 className="animate-spin h-4 w-4" />
+                    <>
+                        <Loader2 className="animate-spin ml-2 h-4 w-4" />
+                        جاري التحليل...
+                    </>
                   ) : (
                     "تحليل العرض"
                   )}
