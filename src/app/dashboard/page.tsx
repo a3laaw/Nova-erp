@@ -5,24 +5,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
 import {
-    Activity,
-    ArrowUpRight,
     Briefcase,
     Users,
     CircleDollarSign,
 } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { projects, clients } from '@/lib/data';
 import { formatCurrency } from '@/lib/utils';
 import { RecentActivity } from '@/components/dashboard/recent-activity';
 import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments';
 import { UpcomingAppointmentsCard } from '@/components/dashboard/upcoming-appointments-card';
 import { PendingVisits } from '@/components/dashboard/pending-visits';
-import { TaskPrioritization } from '@/components/dashboard/task-prioritization';
 
 
 export default function DashboardPage() {
@@ -37,40 +31,40 @@ export default function DashboardPage() {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
-                    Total Revenue
+                    إجمالي الإيرادات
                 </CardTitle>
                 <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
                 <p className="text-xs text-muted-foreground">
-                    +20.1% from last month
+                    +20.1% من الشهر الماضي
                 </p>
                 </CardContent>
             </Card>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
-                    Active Projects
+                    المشاريع النشطة
                 </CardTitle>
                 <Briefcase className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                 <div className="text-2xl font-bold">{activeProjects}</div>
                 <p className="text-xs text-muted-foreground">
-                    +2 since last month
+                    +2 منذ الشهر الماضي
                 </p>
                 </CardContent>
             </Card>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+                <CardTitle className="text-sm font-medium">إجمالي العملاء</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                 <div className="text-2xl font-bold">+{totalClients}</div>
                 <p className="text-xs text-muted-foreground">
-                    +1 since last quarter
+                    +1 منذ الربع الأخير
                 </p>
                 </CardContent>
             </Card>
@@ -82,13 +76,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-4 xl:col-span-2">
-           <TaskPrioritization />
-        </div>
-        
-        <div className="grid gap-4">
             <RecentActivity />
         </div>
-
+        
         <div className="grid gap-4 xl:col-span-3">
             <UpcomingAppointments />
         </div>

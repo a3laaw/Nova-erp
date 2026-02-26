@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import dynamic from 'next/dynamic';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
@@ -13,14 +12,6 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { useBranding } from '@/context/branding-context';
 import { cn } from '@/lib/utils';
-
-const SystemExpertChatWidget = dynamic(
-  () => import('@/components/ai/chat-widget').then(mod => mod.SystemExpertChatWidget),
-  {
-    ssr: false,
-    loading: () => <div className="fixed bottom-6 right-6 h-16 w-16 rounded-full bg-primary/50 no-print" />, // Added no-print
-  }
-);
 
 export default function DashboardLayout({
   children,
@@ -41,7 +32,6 @@ export default function DashboardLayout({
     );
   }
 
-  // If there's no user after loading, it's a critical error.
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center">
@@ -92,7 +82,6 @@ export default function DashboardLayout({
           </SidebarInset>
         </div>
       </SidebarProvider>
-      <SystemExpertChatWidget />
     </div>
   );
 }

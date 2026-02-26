@@ -15,16 +15,13 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Sparkles, FileUp, FileText as FileTextIcon, X, CheckCircle2, Table as TableIcon, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, Table as TableIcon } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '../ui/badge';
-import { cn, formatCurrency, cleanFirestoreData } from '@/lib/utils';
-import { analyzeSupplierQuote, type AnalyzeQuoteOutput } from '@/ai/flows/analyze-supplier-quote';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { cleanFirestoreData } from '@/lib/utils';
 
 interface SupplierQuotationFormProps {
   isOpen: boolean;
@@ -38,7 +35,6 @@ interface QuoteItem {
   rfqItemId: string;
   itemName: string;
   unitPrice: number | string;
-  confidence?: number;
 }
 
 export function SupplierQuotationForm({
@@ -57,12 +53,6 @@ export function SupplierQuotationForm({
   const [paymentTerms, setPaymentTerms] = useState('');
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-
-  // AI states
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalyzeQuoteOutput | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -88,9 +78,6 @@ export function SupplierQuotationForm({
         setPaymentTerms('');
         setItems(rfq.items.map((item) => ({ rfqItemId: item.id!, itemName: item.itemName, unitPrice: '' })));
       }
-      setSelectedFile(null);
-      setAnalysisResult(null);
-      setAnalysisError(null);
     }
   }, [isOpen, rfq, existingQuote]);
 
@@ -98,61 +85,6 @@ export function SupplierQuotationForm({
     setItems((prev) =>
       prev.map((item) => (item.rfqItemId === rfqItemId ? { ...item, unitPrice: price } : item))
     );
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-        setSelectedFile(file);
-        setAnalysisResult(null);
-        setAnalysisError(null);
-    }
-  };
-
-  const handleAnalyze = async () => {
-    if (!selectedFile) return;
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    
-    try {
-        const reader = new FileReader();
-        const dataUri = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedFile);
-        });
-        
-        const rfqItemsForAI = rfq.items.map(item => ({
-            id: item.id!,
-            name: item.itemName || '',
-        }));
-        
-        const result = await analyzeSupplierQuote({
-            quoteFileDataUri: dataUri,
-            rfqItems: rfqItemsForAI,
-        });
-        
-        setAnalysisResult(result);
-        
-        if (result.extractedPrices && result.extractedPrices.length > 0) {
-            setItems(prev => prev.map(item => {
-                const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
-                if (extracted) {
-                    return { ...item, unitPrice: extracted.unitPrice, confidence: extracted.confidence };
-                }
-                return item;
-            }));
-            toast({ title: 'نجاح التحليل', description: `تم استخراج الأسعار بنجاح.` });
-        } else {
-            toast({ variant: 'default', title: 'تنبيه', description: 'لم يتم العثور على مبالغ مطابقة في المستند.' });
-        }
-    } catch (error: any) {
-        console.error("Analysis Component Error:", error);
-        setAnalysisError(error.message);
-        toast({ variant: 'destructive', title: 'فشل التحليل الذكي', description: 'يرجى مراجعة رسالة الخطأ الظاهرة.' });
-    } finally {
-        setIsAnalyzing(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -201,64 +133,6 @@ export function SupplierQuotationForm({
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
-            {/* AI Analysis Section */}
-            <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-3xl space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-xl text-primary"><Sparkles className="h-5 w-5" /></div>
-                    <h4 className="font-black text-lg">الاستخراج الذكي من صورة العرض</h4>
-                </div>
-
-                <div className="flex flex-col md:flex-row items-center gap-4">
-                    {!selectedFile ? (
-                        <label className="flex-grow flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer hover:bg-primary/10 transition-all bg-background">
-                            <FileUp className="h-8 w-8 mb-2 text-muted-foreground" />
-                            <p className="text-sm font-bold text-muted-foreground">ارفع صورة عرض السعر</p>
-                            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                        </label>
-                    ) : (
-                        <div className="flex-grow flex items-center justify-between p-4 bg-background rounded-2xl border-2 border-primary/20 shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <FileTextIcon className="h-8 w-8 text-primary" />
-                                <div>
-                                    <p className="text-sm font-black truncate max-w-[200px]">{selectedFile.name}</p>
-                                    <p className="text-[10px] text-muted-foreground">جاهز للتحليل</p>
-                                </div>
-                            </div>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedFile(null)} className="rounded-full"><X className="h-4 w-4" /></Button>
-                        </div>
-                    )}
-                    
-                    <Button 
-                        type="button" 
-                        onClick={handleAnalyze} 
-                        disabled={!selectedFile || isAnalyzing} 
-                        className="h-14 px-8 rounded-2xl font-black gap-2 shadow-lg shadow-primary/20"
-                    >
-                        {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                        {isAnalyzing ? 'جاري التحليل...' : 'بدء التحليل التلقائي'}
-                    </Button>
-                </div>
-                
-                {analysisError && (
-                    <Alert variant="destructive" className="rounded-xl">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>مشكلة تقنية في التحليل</AlertTitle>
-                        <AlertDescription className="text-xs">{analysisError}</AlertDescription>
-                    </Alert>
-                )}
-
-                {analysisResult && !analysisError && (
-                    <Alert className="bg-green-50 border-green-200">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <AlertTitle className="text-green-800 font-bold">تم الاستخراج بنجاح</AlertTitle>
-                        <AlertDescription className="text-green-700 text-xs">
-                            تم العثور على الأسعار في الصورة. يرجى مراجعة الجدول أدناه للتأكد من الدقة قبل الحفظ.
-                        </AlertDescription>
-                    </Alert>
-                )}
-            </div>
-
-            {/* Manual Form Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-2xl border">
               <div className="grid gap-2">
                 <Label className="font-bold pr-2">مرجع المورد</Label>
@@ -278,11 +152,10 @@ export function SupplierQuotationForm({
               </div>
             </div>
 
-            {/* Prices Table */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-muted-foreground" />
-                <Label className="text-lg font-black">مراجعة وتعديل الأسعار</Label>
+                <Label className="text-lg font-black">إدخال الأسعار يدوياً</Label>
               </div>
               
               <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">
@@ -291,7 +164,6 @@ export function SupplierQuotationForm({
                         <TableRow className="h-14 border-b-2">
                             <TableHead className="px-6 font-bold text-base">اسم الصنف المطلوب</TableHead>
                             <TableHead className="w-48 text-center font-bold text-base">سعر الوحدة (د.ك)</TableHead>
-                            <TableHead className="w-32 text-center font-bold text-base">دقة الذكاء</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -307,15 +179,6 @@ export function SupplierQuotationForm({
                                         className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-muted transition-all bg-muted/10 rounded-xl"
                                         placeholder="0.000"
                                     />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    {item.confidence != null ? (
-                                        <Badge variant={item.confidence > 0.8 ? 'default' : 'secondary'} className="font-mono text-[10px]">
-                                            {(item.confidence * 100).toFixed(0)}%
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-[10px] text-muted-foreground italic">-</span>
-                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -334,7 +197,7 @@ export function SupplierQuotationForm({
             className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 min-w-[180px]"
           >
             {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
-            {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ العرض'}
+            {isSaving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}
           </Button>
         </DialogFooter>
       </DialogContent>

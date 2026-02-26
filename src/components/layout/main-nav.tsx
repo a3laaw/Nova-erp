@@ -28,7 +28,6 @@ import {
   Wallet,
   Warehouse,
   Settings,
-  Bell,
   HeartHandshake,
   FileText,
   ChevronDown,
@@ -36,11 +35,9 @@ import {
   LogOut,
   LineChart,
   ClipboardCheck,
-  Bot,
   Scale,
   Building,
   Package,
-  Boxes,
   Construction,
   UserSearch,
   FileCheck,
@@ -111,7 +108,7 @@ const navItems = {
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
         { 
-          label: 'تقارير المتابعة والأداء',
+          label: 'تقارير المتابعة',
           icon: ClipboardCheck,
           children: [
             { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: Clock },
@@ -141,7 +138,6 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
-        { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي', icon: Bot },
         {
           label: 'العمليات المالية',
           icon: CreditCard,
