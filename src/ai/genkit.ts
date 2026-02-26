@@ -1,12 +1,14 @@
 /**
- * @fileOverview تهيئة محرك Genkit الأساسي باستخدام Google AI Plugin.
+ * @fileOverview تهيئة محرك Genkit الأساسي باستخدام Vertex AI في منطقة us-central1.
  */
 
 import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { vertexAI } from '@genkit-ai/vertexai';
 
 export const ai = genkit({
   plugins: [
-    googleAI(),
+    vertexAI({
+      location: 'us-central1',
+    }),
   ],
 });

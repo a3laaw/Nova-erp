@@ -1,69 +1,65 @@
 'use server';
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار باستخدام Google AI Studio.
+ * @fileOverview محرك تحليل صور عروض الأسعار باستخدام Vertex AI و Gemini 1.5 Flash.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { VertexAI } from '@google-cloud/vertexai';
+import { z } from 'zod';
 
-const AnalyzeQuoteInputSchema = z.object({
-  quoteFileDataUri: z.string().describe("صورة عرض السعر كـ Data URI"),
-  rfqItems: z.array(z.object({
-    id: z.string(),
-    name: z.string()
-  })).describe("الأصناف المطلوب تسعيرها"),
-});
+const project = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+const location = 'us-central1';
 
-const AnalyzeQuoteOutputSchema = z.object({
-  extractedPrices: z.array(z.object({
-    rfqItemId: z.string(),
-    unitPrice: z.number().nullable(),
-    confidence: z.number()
-  })),
-  notes: z.string().optional()
-});
+// إعداد Vertex AI مباشرة لضمان أقصى درجات الاستقرار
+const vertex_ai = new VertexAI({ project: project!, location: location });
+const model = vertex_ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-export type AnalyzeQuoteInput = z.infer<typeof AnalyzeQuoteInputSchema>;
-export type AnalyzeQuoteOutput = z.infer<typeof AnalyzeQuoteOutputSchema>;
-
-export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<AnalyzeQuoteOutput> {
+/**
+ * وظيفة تحليل عرض السعر (Invoice/Quotation Processing)
+ * تستخدم المنطق والبرومبت المحاسبي المحدد من قبل المستخدم.
+ */
+export async function analyzeSupplierQuote(input: { quoteFileDataUri: string, rfqItems: { id: string, name: string }[] }) {
   try {
-    const response = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
-      system: `أنت خبير تقني في تحليل عروض الأسعار الهندسية والمقاولات باللغة العربية.
-      مهمتك هي استخراج "سعر الوحدة" (Unit Price) لكل صنف مطلوب بناءً على الصورة المرفقة.
-      
-      قواعد التحليل:
-      1. ابحث عن اسم الصنف أو ما يشابهه في الصورة.
-      2. استخرج سعر الوحدة كرقـم فقط.
-      3. إذا لم تجد سعراً لصنف معين، اجعل قيمته null.
-      4. الرد يجب أن يكون كائن JSON صالح فقط.`,
-      prompt: [
-        { text: `استخرج الأسعار للأصناف التالية من صورة عرض السعر:
-        ${input.rfqItems.map(i => `- ${i.name} (المعرف: ${i.id})`).join('\n')}
-        
-        تنسيق الرد المطلوب (JSON فقط):
-        {
-          "extractedPrices": [
-            { "rfqItemId": "المعرف هنا", "unitPrice": 150.5, "confidence": 0.95 }
-          ],
-          "notes": "أي ملاحظات إضافية"
-        }` },
-        { media: { url: input.quoteFileDataUri } }
+    const prompt = `أنت محاسب خبير ومحلل بيانات. قم بقراءة الصورة المرفقة واستخرج منها: اسم المورد، التاريخ، إجمالي المبلغ، الضرائب، وقائمة الأصناف. المخرجات يجب أن تكون بصيغة JSON فقط بدون أي نص توضيحي.
+    
+    الأصناف المطلوب البحث عن أسعارها بالتحديد وربطها بالمعرفات (ID):
+    ${input.rfqItems.map(i => `- ${i.name} (المعرف: ${i.id})`).join('\n')}
+    
+    تنسيق JSON المطلوب بدقة:
+    {
+      "extractedPrices": [
+        { "rfqItemId": "المعرف هنا", "unitPrice": 150.5 }
       ],
-      config: {
-        temperature: 0.1,
-      }
+      "vendorName": "اسم المورد المستخرج",
+      "date": "YYYY-MM-DD",
+      "totalAmount": 0,
+      "tax": 0
+    }`;
+
+    // تحويل الصورة من Data URI إلى بيانات ثنائية (Base64)
+    const [header, b64Data] = input.quoteFileDataUri.split(';base64,');
+    const mimeType = header.split(':')[1];
+
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData: { data: b64Data, mimeType: mimeType } }
+        ]
+      }]
     });
 
-    const rawText = response.text;
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Could not find JSON in response");
+    const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
-    return JSON.parse(jsonMatch[0]) as AnalyzeQuoteOutput;
+    // استخراج JSON من النص (في حال أضاف الموديل نصاً زائداً بالخطأ)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("لم يتم العثور على بيانات JSON صالحة في استجابة الذكاء الاصطناعي.");
+    
+    const parsedData = JSON.parse(jsonMatch[0]);
+    return parsedData;
 
   } catch (e: any) {
-    console.error("AI Analysis Error:", e.message);
-    throw new Error("فشل تحليل الصورة. يرجى التأكد من وضوح البيانات أو إدخالها يدوياً.");
+    console.error("Vertex AI Error:", e);
+    throw new Error("فشل تحليل المستند. يرجى التأكد من وضوح الصورة أو إدخال البيانات يدوياً.");
   }
 }
