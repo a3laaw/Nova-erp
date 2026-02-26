@@ -5,9 +5,8 @@ export async function GET() {
   
   if (!apiKey) {
     return NextResponse.json({ 
-      error: 'No API key found',
-      checkedVars: ['GOOGLE_GENAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'],
-      allEnvKeys: Object.keys(process.env).filter(k => k.includes('GOOGLE') || k.includes('GEMINI') || k.includes('API'))
+      error: 'API Key is missing from environment variables.',
+      checked: ['GOOGLE_GENAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY']
     });
   }
 
@@ -18,22 +17,21 @@ export async function GET() {
     const data = await response.json();
     
     if (data.error) {
-      return NextResponse.json({ error: data.error, apiKeyPrefix: apiKey.substring(0, 10) + '...' });
+      return NextResponse.json({ 
+        status: 'API Key Error',
+        message: data.error.message,
+        code: data.error.code
+      });
     }
 
-    const models = (data.models || [])
-      .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
-      .map((m: any) => ({
-        name: m.name,
-        displayName: m.displayName,
-        methods: m.supportedGenerationMethods,
-      }));
+    const flashModel = (data.models || []).find((m: any) => m.name.includes('gemini-1.5-flash'));
 
     return NextResponse.json({ 
-      success: true, 
-      totalModels: models.length,
-      models: models,
-      apiKeyPrefix: apiKey.substring(0, 10) + '...'
+      success: true,
+      apiKeyPrefix: apiKey.substring(0, 10) + '...',
+      modelsCount: data.models?.length || 0,
+      stableModelFound: !!flashModel,
+      stableModelName: flashModel?.name || 'Not Found'
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message });
