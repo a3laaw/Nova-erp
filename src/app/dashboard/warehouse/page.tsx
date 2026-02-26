@@ -2,10 +2,17 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, Truck, BarChart3, ShoppingCart, Users, FileText as RfqIcon, ArrowUpFromLine, History } from 'lucide-react';
+import { Package, Truck, BarChart3, ShoppingCart, Users, FileText as RfqIcon, ArrowUpFromLine, History, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const warehouseFeatures = [
+    {
+        title: 'إدارة المستودعات',
+        description: 'تعريف المخازن الرئيسية ومخازن المواقع التابعة للمشاريع.',
+        href: '/dashboard/warehouse/warehouses',
+        icon: Building2,
+        color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
+    },
     {
         title: 'إدارة الأصناف',
         description: 'إضافة وتعديل ومتابعة جميع الأصناف في المخزون.',
@@ -15,7 +22,7 @@ const warehouseFeatures = [
     },
     {
         title: 'صرف مواد للمشاريع',
-        description: 'إذن صرف مواد من المخزن إلى مركز تكلفة (مشروع) محدد.',
+        description: 'إذن صرف مواد ذكي مرتبط ببنود المقايسة (BOQ) وتصنيفات المواد.',
         href: '/dashboard/warehouse/material-issue',
         icon: ArrowUpFromLine,
         color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300'
@@ -26,13 +33,6 @@ const warehouseFeatures = [
         href: '/dashboard/warehouse/opening-balances',
         icon: History,
         color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
-    },
-    {
-        title: 'فئات الأصناف',
-        description: 'تنظيم الأصناف في هيكل شجري متعدد المستويات.',
-        href: '/dashboard/warehouse/categories',
-        icon: Package,
-        color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
     },
     {
         title: 'تقارير المخزون',

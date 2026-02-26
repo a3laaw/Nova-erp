@@ -828,6 +828,7 @@ export type InventoryAdjustment = {
     notes?: string;
     journalEntryId?: string;
     projectId?: string; // NEW: Link to cost center
+    warehouseId?: string; // NEW: Target warehouse
     items: {
         itemId: string;
         itemName: string;
@@ -835,6 +836,7 @@ export type InventoryAdjustment = {
         unitCost: number;
         totalCost: number;
         expiryDate?: any;
+        boqItemId?: string; // NEW: Linked BOQ line item
     }[];
     createdAt?: any;
     createdBy?: string;

@@ -1422,7 +1422,8 @@
       "properties": {
         "name": { "type": "string" },
         "location": { "type": "string" },
-        "isDefault": { "type": "boolean" }
+        "isDefault": { "type": "boolean" },
+        "projectId": { "type": "string", "description": "Link to project if site-specific" }
       },
       "required": ["name"]
     },
@@ -1434,7 +1435,8 @@
         "name": { "type": "string" },
         "parentCategoryId": { "type": "string", "description": "The ID of the parent category, null for root categories." },
         "order": { "type": "number", "description": "The display order." },
-        "activityTypeIds": { "type": "array", "items": { "type": "string" }, "description": "Linked business activity types." }
+        "activityTypeIds": { "type": "array", "items": { "type": "string" } },
+        "boqReferenceItemIds": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["name"]
     },
@@ -1561,9 +1563,11 @@
         "properties": {
             "adjustmentNumber": { "type": "string" },
             "date": { "type": "string", "format": "date-time" },
-            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "other"] },
+            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "material_issue", "other"] },
             "notes": { "type": "string" },
             "journalEntryId": { "type": "string" },
+            "projectId": { "type": "string" },
+            "warehouseId": { "type": "string" },
             "items": {
                 "type": "array",
                 "items": {
@@ -1574,7 +1578,8 @@
                         "quantity": { "type": "number" },
                         "unitCost": { "type": "number" },
                         "totalCost": { "type": "number" },
-                        "expiryDate": { "type": "string", "format": "date" }
+                        "expiryDate": { "type": "string", "format": "date" },
+                        "boqItemId": { "type": "string" }
                     },
                     "required": ["itemId", "itemName", "quantity", "unitCost", "totalCost"]
                 }
@@ -1835,10 +1840,6 @@
         "$ref": "#/entities/Contract"
       },
       "description": "Stores dynamically generated contracts."
-    },
-    "/contracts/{contractId}/clauses/{clauseId}": {
-      "schema": { "$ref": "#/entities/ContractClause" },
-      "description": "Stores the individual payment clauses/milestones for a contract."
     },
     "/contractTemplates/{templateId}": {
       "schema": {
