@@ -1,74 +1,51 @@
 'use server';
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار باستخدام Vertex AI و Gemini 1.5 Flash.
+ * @fileOverview محرك تحليل صور عروض الأسعار باستخدام Genkit و Vertex AI.
+ * يتميز هذا المحرك بالقدرة على فهم الجداول المحاسبية العربية واستخراج الأسعار بدقة.
  */
 
-import { VertexAI } from '@google-cloud/vertexai';
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-const project = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-const location = 'us-central1';
-
-// إعداد Vertex AI مباشرة لضمان أقصى درجات الاستقرار
-const vertex_ai = new VertexAI({ project: project!, location: location });
-const model = vertex_ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
 /**
- * وظيفة تحليل عرض السعر (Invoice/Quotation Processing)
- * تستخدم المنطق والمطالبات المحاسبية المتقدمة لاستخراج البيانات بدقة.
+ * وظيفة تحليل عرض السعر (Supplier Quotation Analysis)
+ * تقوم بقراءة صورة عرض السعر ومطابقتها مع الأصناف المطلوبة في الـ RFQ.
  */
 export async function analyzeSupplierQuote(input: { quoteFileDataUri: string, rfqItems: { id: string, name: string }[] }) {
   try {
-    const prompt = `أنت خبير تحليل مستندات محاسبية عالمي. مهمتك هي قراءة عرض السعر المرفق أياً كان تنسيقه أو ترتيب الجداول فيه واستخراج البيانات المالية بدقة.
-
-القيم المطلوب استخراجها:
-1. المورد: ابحث عن أي اسم شركة أو شعار (Logo) في أعلى الصفحة أو في الترويسة.
-2. الأصناف: ابحث عن أي جدول أو قائمة تحتوي على (كميات وأسعار) واستخرج سعر الوحدة لكل صنف.
-3. القيم المالية: ابحث عن القيمة الكبرى المكتوب بجانبها (إجمالي، صافي، Total، Net) واستخرجها كإجمالي المبلغ.
-
-القاعدة الذهبية للمطابقة:
-- إذا وجدت المسميات تختلف (مثلاً: 'البيان' أو 'الوصف' بدل 'الصنف')، فافهم المقصود وقم بتصنيفه بشكل صحيح.
-- قم بمطابقة الأصناف الموجودة في المستند مع القائمة المطلوبة أدناه وارجع السعر لكل معرف (ID).
-
-الأصناف المطلوب تسعيرها وربطها بالمعرفات:
-${input.rfqItems.map(i => `- ${i.name} (المعرف: ${i.id})`).join('\n')}
-
-المخرجات يجب أن تكون بصيغة JSON فقط بهذا التنسيق الدقيق:
-{
-  "extractedPrices": [
-    { "rfqItemId": "المعرف هنا", "unitPrice": 150.5 }
-  ],
-  "vendorName": "اسم المورد",
-  "date": "YYYY-MM-DD",
-  "totalAmount": 0,
-  "tax": 0
-}`;
-
-    // تحويل الصورة من Data URI إلى بيانات ثنائية (Base64)
-    const [header, b64Data] = input.quoteFileDataUri.split(';base64,');
-    const mimeType = header.split(':')[1];
-
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: prompt },
-          { inlineData: { data: b64Data, mimeType: mimeType } }
-        ]
-      }]
+    const response = await ai.generate({
+      model: 'vertexai/gemini-1.5-flash',
+      config: {
+        responseMimeType: 'application/json',
+      },
+      system: `أنت محاسب خبير ومحلل بيانات مالية. مهمتك هي قراءة صورة عرض السعر المرفقة واستخراج البيانات المالية منها بدقة.
+      
+      المخرجات المطلوبة:
+      1. اسم المورد (من الشعار أو الترويسة).
+      2. تاريخ العرض.
+      3. إجمالي المبلغ (القيمة الكبرى النهائية).
+      4. قائمة الأسعار: قم بمطابقة الأصناف الموجودة في الصورة مع القائمة المزودة إليك واستخرج "سعر الوحدة" لكل صنف.
+      
+      الأصناف المطلوب تسعيرها:
+      ${input.rfqItems.map(i => `- ${i.name} (المعرف البرمجي: ${i.id})`).join('\n')}
+      
+      القاعدة الذهبية: افهم السياق؛ إذا كتب المورد "البيان" فهو يقصد "الصنف"، وإذا كتب "سعر الإفراد" فهو يقصد "سعر الوحدة".`,
+      prompt: [
+        { text: "حلل صورة جدول عروض الأسعار المرفقة. استخرج: البند، الكمية، السعر. المخرجات يجب أن تكون JSON فقط بالتنسيق التالي:" },
+        { text: `{ "vendorName": "...", "date": "YYYY-MM-DD", "totalAmount": 0, "extractedPrices": [ { "rfqItemId": "id", "unitPrice": 0 } ] }` },
+        { media: { url: input.quoteFileDataUri } }
+      ]
     });
 
-    const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const output = response.text;
+    // تنظيف النص المستخرج لضمان أنه JSON صالح
+    const jsonMatch = output.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("لم يتمكن الذكاء الاصطناعي من توليد بيانات منظمة.");
     
-    // استخراج JSON من النص (تنظيف الرد من أي نصوص زائدة)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("لم يتم العثور على بيانات JSON صالحة في استجابة الذكاء الاصطناعي.");
-    
-    const parsedData = JSON.parse(jsonMatch[0]);
-    return parsedData;
+    return JSON.parse(jsonMatch[0]);
 
   } catch (e: any) {
-    console.error("Vertex AI Error:", e);
-    throw new Error("فشل تحليل المستند. يرجى التأكد من وضوح الصورة أو إدخال البيانات يدوياً.");
+    console.error("AI Flow Error:", e);
+    throw new Error("فشل تحليل المستند. يرجى التأكد من وضوح الصورة أو المحاولة لاحقاً.");
   }
 }

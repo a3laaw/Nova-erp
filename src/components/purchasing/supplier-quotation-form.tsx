@@ -99,7 +99,7 @@ export function SupplierQuotationForm({
       try {
         const dataUri = e.target?.result as string;
         
-        // استدعاء محرك الذكاء الاصطناعي الجديد والمستقر
+        // استدعاء محرك الذكاء الاصطناعي المتطور
         const result = await analyzeSupplierQuote({
           quoteFileDataUri: dataUri,
           rfqItems: rfq.items.map(i => ({ id: i.id!, name: i.itemName }))
@@ -107,18 +107,19 @@ export function SupplierQuotationForm({
 
         if (result && result.extractedPrices) {
             setItems(prev => prev.map(item => {
-                const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
-                // تحديث السعر فقط إذا وجده الذكاء الاصطناعي بنجاح
+                const extracted = result.extractedPrices.find((ep: any) => ep.rfqItemId === item.rfqItemId);
                 return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
             }));
             
+            if (result.date) setDate(new Date(result.date));
+            if (result.vendorName && !reference) setReference(`Ref: ${result.vendorName}`);
+
             toast({ 
-                title: 'تم التحليل بنجاح', 
-                description: `تم استخراج أسعار لـ ${result.extractedPrices.length} أصناف من أصل ${items.length}.`,
+                title: 'اكتمل التحليل الذكي', 
+                description: `تم استخراج الأسعار بنجاح. يرجى مراجعة الجدول قبل الحفظ.`,
             });
         }
       } catch (err: any) {
-        console.error("AI Analysis UI Error:", err);
         toast({ 
             variant: 'destructive', 
             title: 'خطأ في التحليل', 
