@@ -106,7 +106,7 @@ const navItems = {
       label: 'إدارة علاقات العملاء (CRM)', 
       icon: LineChart, 
       roles: ['Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
-      hrefPrefix: '/dashboard',
+      hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
@@ -184,7 +184,7 @@ const navItems = {
       label: 'المخازن والمشتريات',
       icon: Warehouse,
       roles: ['Admin', 'Accountant'],
-      hrefPrefix: '/dashboard',
+      hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات والأفرع', icon: Building2 },
         { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
@@ -223,7 +223,6 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    // Simplified for brevity, English pattern follows the same logic
   ]
 };
 
@@ -248,7 +247,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   }
   
   if (item.children) {
-    const isActive = currentPath.startsWith(item.hrefPrefix);
+    const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : false;
 
     if (sidebarState === 'collapsed') {
       return (
@@ -308,7 +307,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     }
     
     return (
-      <Collapsible defaultOpen={isActive}>
+      <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton as="button" isActive={isActive} className="h-8 w-full justify-between pr-2">
