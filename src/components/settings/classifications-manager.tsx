@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup } from 'firebase/firestore';
-import type { ItemCategory, CompanyActivityType } from '@/lib/types';
+import type { ItemCategory, CompanyActivityType, BoqReferenceItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -112,12 +112,14 @@ export function ClassificationsManager() {
 
     const { data: categories, loading: categoriesLoading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
     const { data: activityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes', useMemo(() => [orderBy('name')], []));
+    const { data: boqReferenceItems, loading: boqItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', useMemo(() => [orderBy('name')], []));
     
     const [openCategories, setOpenCategories] = useState(new Set<string>());
     const [activityFilter, setActivityFilter] = useState('all');
 
     const activityTypeMap = useMemo(() => new Map(activityTypes.map(t => [t.id, t.name])), [activityTypes]);
     const activityTypeOptions: MultiSelectOption[] = useMemo(() => activityTypes.map(t => ({ value: t.id, label: t.name })), [activityTypes]);
+    const boqItemOptions: MultiSelectOption[] = useMemo(() => boqReferenceItems.map(item => ({ value: item.id!, label: item.name })), [boqReferenceItems]);
 
     const categoryTree = useMemo(() => {
         if (!categories) return [];
@@ -162,10 +164,46 @@ export function ClassificationsManager() {
     
     const [itemName, setItemName] = useState('');
     const [selectedActivityTypeIds, setSelectedActivityTypeIds] = useState<string[]>([]);
+    const [selectedBoqItemIds, setSelectedBoqItemIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
+    // Logic to determine if current item is a leaf and follows construction
+    const isLeafAndConstruction = useMemo(() => {
+        if (!editingItem && !parentCategory) return false; // Initial root add is not a leaf usually
+        
+        // 1. Is it a leaf? (No other category has this ID as its parent)
+        const isCurrentlyALeaf = editingItem ? !categories.some(c => c.parentCategoryId === editingItem.id) : true;
+        if (!isCurrentlyALeaf) return false;
+
+        // 2. Finding Root Parent
+        const getRootParent = (currentId: string | null): ItemCategory | null => {
+            if (!currentId) return null;
+            const current = categories.find(c => c.id === currentId);
+            if (!current) return null;
+            if (!current.parentCategoryId) return current;
+            return getRootParent(current.parentCategoryId);
+        };
+
+        const rootParent = getRootParent(editingItem?.parentCategoryId || parentCategory?.id || null);
+        if (!rootParent) {
+            // If it's a root category itself
+            const selfIsRoot = editingItem && !editingItem.parentCategoryId;
+            if (selfIsRoot) {
+                return selectedActivityTypeIds.some(id => activityTypeMap.get(id)?.includes('مقاولات') || activityTypeMap.get(id)?.toLowerCase().includes('construction'));
+            }
+            return false;
+        }
+
+        // 3. Check if root parent follows construction
+        return rootParent.activityTypeIds?.some(id => 
+            activityTypeMap.get(id)?.includes('مقاولات') || 
+            activityTypeMap.get(id)?.toLowerCase().includes('construction')
+        ) || false;
+
+    }, [editingItem, parentCategory, categories, activityTypeMap, selectedActivityTypeIds]);
+
     const categoryOptions = useMemo(() => {
         if (!categories) return [];
         return categories
@@ -176,7 +214,6 @@ export function ClassificationsManager() {
     const openDialog = (item: ItemCategory | null, parent: ItemCategory | null = null) => {
         setEditingItem(item);
         
-        // FIX: If we are editing, find the current parent category if not explicitly provided
         let effectiveParent = parent;
         if (item && !parent && item.parentCategoryId) {
             effectiveParent = categories.find(c => c.id === item.parentCategoryId) || null;
@@ -184,8 +221,8 @@ export function ClassificationsManager() {
         
         setParentCategory(effectiveParent);
         setItemName(item?.name || '');
-        // Inherit activity types from parent if creating new, or use existing if editing
         setSelectedActivityTypeIds(item?.activityTypeIds || effectiveParent?.activityTypeIds || []);
+        setSelectedBoqItemIds(item?.boqReferenceItemIds || []);
         setIsDialogOpen(true);
     };
 
@@ -195,6 +232,7 @@ export function ClassificationsManager() {
         setParentCategory(null);
         setItemName('');
         setSelectedActivityTypeIds([]);
+        setSelectedBoqItemIds([]);
     };
 
     const handleSave = async () => {
@@ -204,7 +242,8 @@ export function ClassificationsManager() {
             const dataToSave: Partial<ItemCategory> = { 
                 name: itemName,
                 activityTypeIds: selectedActivityTypeIds,
-                parentCategoryId: parentCategory?.id || null // Explicitly set null for root items
+                parentCategoryId: parentCategory?.id || null,
+                boqReferenceItemIds: isLeafAndConstruction ? selectedBoqItemIds : []
             };
 
             if (editingItem) {
@@ -265,7 +304,7 @@ export function ClassificationsManager() {
         }
     }
 
-    const loading = categoriesLoading || activityTypesLoading;
+    const loading = categoriesLoading || activityTypesLoading || boqItemsLoading;
 
     return (
         <Card dir="rtl">
@@ -274,7 +313,7 @@ export function ClassificationsManager() {
                     <div>
                         <CardTitle>إدارة تصنيفات الأصناف</CardTitle>
                         <CardDescription>
-                            تنظيم الأصناف في هيكل شجري وربطها بأنواع أنشطة الشركة.
+                            تنظيم الأصناف في هيكل شجري وربطها بأنواع أنشطة الشركة وبنود الـ BOQ.
                         </CardDescription>
                     </div>
                     <div className="flex gap-2">
@@ -336,6 +375,7 @@ export function ClassificationsManager() {
             <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
                 <DialogContent 
                     dir="rtl"
+                    className="max-w-2xl"
                     onInteractOutside={(e) => {
                         const target = e.target as HTMLElement;
                         if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
@@ -369,8 +409,23 @@ export function ClassificationsManager() {
                                 onChange={setSelectedActivityTypeIds}
                                 placeholder="اختر نشاطًا واحدًا أو أكثر..."
                             />
-                            <p className="text-[10px] text-muted-foreground mt-1">يتم توريث الأنشطة تلقائياً للفئات الفرعية لتسهيل العمل.</p>
                         </div>
+
+                        {isLeafAndConstruction && (
+                            <div className="p-4 border-2 border-primary/10 bg-primary/5 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-2">
+                                    <Badge className="bg-primary/20 text-primary border-none">قسم المقاولات</Badge>
+                                    <Label className="font-bold">ربط مع بنود جداول الكميات (BOQ)</Label>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">بما أن هذا التصنيف هو "ابن أخير" ويتبع نشاط المقاولات، يمكنك ربطه ببنود المقايسات المرجعية.</p>
+                                <MultiSelect 
+                                    options={boqItemOptions}
+                                    selected={selectedBoqItemIds}
+                                    onChange={setSelectedBoqItemIds}
+                                    placeholder="اختر البنود المرجعية المرتبطة..."
+                                />
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={closeDialog} disabled={isSaving}>إلغاء</Button>
@@ -389,7 +444,7 @@ export function ClassificationsManager() {
                         <AlertDialogDescription>
                             سيتم حذف التصنيف "{itemToDelete?.name}" بشكل دائم. 
                             <br />
-                            <span className="text-destructive font-semibold">تنبيه: سيؤدي هذا إلى فصل الأصناف المرتبطة بهذا التصنيف.</span>
+                            <span className="text-destructive font-semibold">تنبيه: سيؤدي هذا إلى فصل الأصناف والروابط المرتبطة بهذا التصنيف.</span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

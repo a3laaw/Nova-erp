@@ -800,7 +800,8 @@ export interface ItemCategory {
     name: string;
     parentCategoryId: string | null;
     order?: number;
-    activityTypeIds?: string[]; // NEW: Linked activity types
+    activityTypeIds?: string[]; // Linked activity types
+    boqReferenceItemIds?: string[]; // NEW: Linked BOQ items for leaf nodes in construction
 }
 
 export interface Item {
