@@ -824,11 +824,13 @@ export type InventoryAdjustment = {
     id?: string;
     adjustmentNumber: string;
     date: any;
-    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'other';
+    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'other';
     notes?: string;
     journalEntryId?: string;
     projectId?: string; // NEW: Link to cost center
-    warehouseId?: string; // NEW: Target warehouse
+    warehouseId?: string; // For adjustments
+    fromWarehouseId?: string; // For transfers
+    toWarehouseId?: string; // For transfers
     items: {
         itemId: string;
         itemName: string;
