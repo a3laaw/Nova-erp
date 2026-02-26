@@ -54,6 +54,7 @@ export function SupplierQuotationForm({
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // AI states
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export function SupplierQuotationForm({
         setPaymentTerms('');
         setItems(rfq.items.map((item) => ({ rfqItemId: item.id!, unitPrice: '' })));
       }
+      // Reset AI states
       setSelectedFile(null);
       setFilePreview(null);
       setAnalysisResult(null);
@@ -134,7 +136,6 @@ export function SupplierQuotationForm({
     setAnalysisError(null);
     
     try {
-        // تحويل الملف إلى Data URI
         const reader = new FileReader();
         const dataUri = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
@@ -142,13 +143,11 @@ export function SupplierQuotationForm({
             reader.readAsDataURL(selectedFile);
         });
         
-        // تجهيز أصناف الطلب للمطابقة
         const rfqItemsForAI = rfq.items.map(item => ({
             id: item.id!,
             name: item.itemName || '',
         }));
         
-        // استدعاء Genkit AI
         const result = await analyzeSupplierQuote({
             quoteFileDataUri: dataUri,
             rfqItems: rfqItemsForAI,
@@ -156,7 +155,6 @@ export function SupplierQuotationForm({
         
         setAnalysisResult(result);
         
-        // ملء الأسعار تلقائياً
         if (result.extractedPrices && result.extractedPrices.length > 0) {
             let matchedCount = 0;
             result.extractedPrices.forEach(extracted => {
@@ -272,7 +270,7 @@ export function SupplierQuotationForm({
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
-            {/* Smart AI Section */}
+            {/* AI Assistant Section */}
             <div className="bg-gradient-to-br from-primary/5 to-violet-500/5 border-2 border-dashed border-primary/20 p-6 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
