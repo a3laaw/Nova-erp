@@ -3,9 +3,7 @@ import {googleAI} from '@genkit-ai/google-genai';
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      apiVersion: 'v1', // الحل لمشكلة 404 في بعض المناطق
-    })
+    googleAI() // إزالة apiVersion: 'v1' لحل مشكلة 400 Bad Request
   ],
   model: 'googleai/gemini-1.5-flash',
 });
