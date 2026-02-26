@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار - مطور ليكون أكثر استقراراً مع Gemini 1.5 Flash.
+ * @fileOverview محرك تحليل صور عروض الأسعار - إصدار فائق الاستقرار.
  */
 
 import { ai } from '@/ai/genkit';
@@ -27,29 +27,39 @@ export type AnalyzeQuoteInput = z.infer<typeof AnalyzeQuoteInputSchema>;
 export type AnalyzeQuoteOutput = z.infer<typeof AnalyzeQuoteOutputSchema>;
 
 export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<AnalyzeQuoteOutput> {
-  const { output } = await ai.generate({
+  // الحل الجذري: نستخدم generate بدون تحديد مخرجات منظمة لتجنب خطأ الـ Payload (400 Bad Request)
+  const response = await ai.generate({
     model: 'googleai/gemini-1.5-flash',
     system: `أنت خبير في تحليل الفواتير وعروض الأسعار الهندسية باللغة العربية.
-    مهمتك استخراج "سعر الوحدة" لكل صنف من القائمة المرفقة.
-    يجب أن تكون مخرجاتك بتنسيق JSON فقط دون أي نصوص إضافية.`,
+    مهمتك استخراج "سعر الوحدة" لكل صنف من القائمة المرفقة بناءً على الصورة المزودة.
+    يجب أن يكون ردك عبارة عن كائن JSON فقط ولا شيء غيره.`,
     prompt: [
-      { text: `استخرج الأسعار للأصناف التالية من الصورة المرفقة:
-      ${input.rfqItems.map(i => `- ${i.name} (المعرف: ${i.id})`).join('\n')}
+      { text: `استخرج الأسعار للأصناف التالية من الصورة:
+      ${input.rfqItems.map(i => `- ${i.name} (المعرف البرمجي: ${i.id})`).join('\n')}
       
-      تنسيق الرد المطلوب:
-      { "extractedPrices": [ { "rfqItemId": "المعرف", "unitPrice": السعر_كرقم, "confidence": 0.9 } ] }` },
+      تنسيق الرد المطلوب (JSON فقط):
+      {
+        "extractedPrices": [
+          { "rfqItemId": "المعرف البرمجي هنا", "unitPrice": السعر_كرقم, "confidence": 0.95 }
+        ],
+        "notes": "أي ملاحظات إضافية حول القراءة"
+      }` },
       { media: { url: input.quoteFileDataUri } }
     ],
   });
 
-  if (!output?.text) throw new Error('لم يستطع الذكاء الاصطناعي قراءة الصورة.');
-  
+  const rawText = response.text;
+  if (!rawText) throw new Error('لم يستطع الموديل استخراج أي نص من الصورة.');
+
   try {
-      const jsonMatch = output.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("تنسيق الرد غير صالح");
-      return JSON.parse(jsonMatch[0]) as AnalyzeQuoteOutput;
+    // تنظيف النص المستخرج لضمان وجود JSON فقط (إزالة أي Markdown أو نصوص زائدة)
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("تنسيق البيانات المستخرجة غير صالح.");
+    
+    const parsedData = JSON.parse(jsonMatch[0]);
+    return parsedData as AnalyzeQuoteOutput;
   } catch (e) {
-      console.error("Parse error:", output.text);
-      throw new Error("تعذر تحليل بيانات الفاتورة. تأكد من وضوح الصورة.");
+    console.error("AI Raw Response:", rawText);
+    throw new Error("تعذر تحليل بيانات الأسعار بدقة. يرجى التأكد من وضوح صورة الفاتورة.");
   }
 }
