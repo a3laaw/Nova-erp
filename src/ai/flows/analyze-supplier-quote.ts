@@ -31,7 +31,7 @@ const prompt = ai.definePrompt({
   output: { schema: AnalyzeQuoteOutputSchema },
   prompt: `أنت خبير في تدقيق عروض أسعار الموردين. مهمتك استخراج أسعار الوحدة لكل صنف مطلوب من المستند المرفق.
 
-الأصناف المطلوبة:
+الأصناف المطلوبة التي يجب البحث عنها:
 {{#each rfqItems}}
 - المعرف: {{this.id}}، الاسم: {{this.name}}
 {{/each}}
@@ -39,20 +39,19 @@ const prompt = ai.definePrompt({
 التعليمات:
 1. ابحث عن جدول الأسعار في المستند.
 2. طابق الأصناف المطلوبة مع الأصناف الموجودة في عرض السعر.
-3. استخرج "سعر الوحدة" (Unit Price) بدقة.
-4. إذا لم تجد سعراً لصنف معين، لا تدرجه في النتائج.
-5. أرجع النتائج فقط بصيغة JSON المحددة.
+3. استخرج "سعر الوحدة" (Unit Price) بدقة لكل صنف.
+4. أرجع النتائج بصيغة JSON المحددة فقط.
 
-المستند: {{media url=quoteFileDataUri}}`,
+المستند للتحليل: {{media url=quoteFileDataUri}}`,
 });
 
 export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<AnalyzeQuoteOutput> {
   try {
     const { output } = await prompt(input);
-    if (!output) throw new Error('فشل الذكاء الاصطناعي في تحليل المستند.');
+    if (!output) throw new Error('لم يتمكن الذكاء الاصطناعي من استخراج بيانات صالحة.');
     return output;
   } catch (error: any) {
     console.error("AI Analysis Flow Error:", error);
-    throw new Error(`فشل التحليل: ${error.message}`);
+    throw new Error(`فشل التحليل الذكي: ${error.message}`);
   }
 }

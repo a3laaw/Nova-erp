@@ -2,8 +2,8 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * تهيئة محرك Genkit.
- * تم استخدام الإعدادات الافتراضية المستقرة لضمان دعم استخراج البيانات المنظمة.
+ * تهيئة محرك Genkit باستخدام الموديل المستقر gemini-1.5-flash.
+ * الموديل يدعم الـ OCR واستخراج البيانات المنظمة بفعالية عالية.
  */
 export const ai = genkit({
   plugins: [
