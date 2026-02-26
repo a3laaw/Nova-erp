@@ -52,6 +52,9 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'classifications': 'الفئات',
     'balances': 'أرصدة الأصناف',
     'item-movement': 'بطاقة حركة الصنف',
+    'item-cost': 'تحليل التكلفة والبيع',
+    'stagnant-items': 'الأصناف الراكدة',
+    'best-sellers': 'الأكثر طلباً',
   },
   en: {
     dashboard: 'Dashboard',
@@ -98,6 +101,9 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'classifications': 'Categories',
     'balances': 'Stock Balances',
     'item-movement': 'Item Movement Card',
+    'item-cost': 'Cost & Sales Analysis',
+    'stagnant-items': 'Stagnant Items',
+    'best-sellers': 'Most Requested',
   },
 };
 

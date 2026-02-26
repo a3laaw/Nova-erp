@@ -74,7 +74,9 @@ import {
   Tags,
   PieChart,
   CreditCard,
-  History
+  History,
+  DollarSign,
+  TrendingDown
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -198,6 +200,9 @@ const navItems = {
           children: [
             { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
             { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
+            { href: '/dashboard/warehouse/reports/item-cost', label: 'تكلفة وأسعار الأصناف', icon: DollarSign },
+            { href: '/dashboard/warehouse/reports/stagnant-items', label: 'الأصناف الراكدة', icon: TrendingDown },
+            { href: '/dashboard/warehouse/reports/best-sellers', label: 'الأصناف الأكثر طلباً', icon: Star },
           ]
         }
       ]
@@ -225,7 +230,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   const { setOpenMobile, state: sidebarState } = useSidebar();
 
   if (!item.roles || !item.roles.includes(userRole)) {
-    // If roles is missing, assume public or handle error. Here we allow public for dashboard if missing.
     if (item.roles) return null;
   }
 
