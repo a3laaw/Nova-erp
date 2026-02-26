@@ -234,11 +234,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   }
 
   if (!item.children && item.href) {
+    const isActive = currentPath === item.href;
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={currentPath === item.href} asChild tooltip={item.label} className="transition-all duration-200">
+        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-200">
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {item.icon && <item.icon />}
+            {item.icon && <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-inherit")} strokeWidth={2.5} />}
             <span className="group-data-[state=collapsed]:hidden">{item.label}</span>
           </Link>
         </SidebarMenuButton>
@@ -255,7 +256,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label} className="transition-all duration-200">
-                <item.icon />
+                <item.icon className="size-5" strokeWidth={2.5} />
                 <span className="sr-only">{item.label}</span>
               </SidebarMenuButton>
             </DropdownMenuTrigger>
@@ -268,7 +269,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <DropdownMenuSub key={`${child.label}-${index}`}>
                       <DropdownMenuSubTrigger>
                         <div className="flex items-center gap-2">
-                            {child.icon && <child.icon className="h-4 w-4" />}
+                            {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
                             <span>{child.label}</span>
                         </div>
                       </DropdownMenuSubTrigger>
@@ -278,7 +279,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                             <DropdownMenuItem key={subChild.href} asChild>
                               <Link href={subChild.href}>
                                 <div className="flex items-center gap-2">
-                                    {subChild.icon && <subChild.icon className="h-3.5 w-3.5" />}
+                                    {subChild.icon && <subChild.icon className="h-3.5 w-3.5" strokeWidth={2} />}
                                     <span>{subChild.label}</span>
                                 </div>
                               </Link>
@@ -293,7 +294,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   <DropdownMenuItem key={child.href} asChild>
                     <Link href={child.href}>
                         <div className="flex items-center gap-2">
-                            {child.icon && <child.icon className="h-4 w-4" />}
+                            {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
                             <span>{child.label}</span>
                         </div>
                     </Link>
@@ -310,34 +311,34 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-9 w-full justify-between pr-2 transition-all duration-200">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-10 w-full justify-between pr-2 transition-all duration-200">
               <div className='flex items-center gap-2'>
-                <item.icon className={cn(isActive ? "text-primary" : "text-muted-foreground")} />
-                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-bold text-primary" : "font-medium")}>{item.label}</span>
+                <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-inherit")} strokeWidth={2.5} />
+                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-bold" : "font-medium")}>{item.label}</span>
               </div>
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />
             </SidebarMenuButton>
           </CollapsibleTrigger>
         </SidebarMenuItem>
         <CollapsibleContent>
-          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1">
+          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-primary/10">
             {item.children.map((child: any, index: number) => {
               if (child.children) {
                 return (
                   <SidebarMenuSubItem key={`${child.label}-${index}`} className="mt-2">
                      <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md mb-1 bg-muted/20">
                         <div className="flex items-center gap-2">
-                            {child.icon && <child.icon className="h-3.5 w-3.5 text-sidebar-foreground/50" />}
+                            {child.icon && <child.icon className="h-4 w-4 text-sidebar-foreground/50" strokeWidth={2.2} />}
                             <span className="text-xs font-bold text-sidebar-foreground/70">{child.label}</span>
                         </div>
                     </div>
-                    <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-2 pr-2 space-y-1">
+                    <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-2 pr-2 space-y-1 border-primary/5">
                       {child.children.map((subChild: any) => (
                         <SidebarMenuSubItem key={subChild.href}>
                             <SidebarMenuSubButton isActive={currentPath === subChild.href} asChild className="h-8">
                                 <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
                                     <div className="flex items-center gap-2">
-                                        {subChild.icon && <subChild.icon className="h-3 w-3" />}
+                                        {subChild.icon && <subChild.icon className="h-3.5 w-3.5" strokeWidth={2} />}
                                         <span className="truncate">{subChild.label}</span>
                                     </div>
                                 </Link>
@@ -348,12 +349,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   </SidebarMenuSubItem>
                 );
               }
+              const isChildActive = currentPath === child.href;
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <SidebarMenuSubButton isActive={currentPath === child.href} asChild className="h-8">
+                   <SidebarMenuSubButton isActive={isChildActive} asChild className="h-8">
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-2">
-                                {child.icon && <child.icon className="h-3.5 w-3.5" />}
+                                {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
                                 <span>{child.label}</span>
                             </div>
                         </Link>
