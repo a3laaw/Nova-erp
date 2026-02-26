@@ -47,7 +47,8 @@ import {
   FileCheck,
   Building2,
   ArrowLeftRight,
-  Ban
+  Ban,
+  ArrowUpFromLine
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
