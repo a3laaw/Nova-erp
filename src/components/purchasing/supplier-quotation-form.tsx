@@ -298,7 +298,7 @@ export function SupplierQuotationForm({
                                 <p className="font-bold text-sm">اضغط لاختيار ملف أو اسحبه هنا</p>
                                 <p className="text-[11px] text-muted-foreground mt-1">PDF, JPG, PNG, WebP — حد أقصى 10 ميجا</p>
                             </div>
-                            <input type="file" accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
+                            <Input type="file" accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
                         </label>
                     ) : (
                         <div className="space-y-3">

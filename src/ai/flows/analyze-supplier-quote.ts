@@ -1,10 +1,6 @@
 'use server';
 /**
  * @fileOverview AI flow to analyze supplier quote documents (PDF/Images) and extract unit prices.
- *
- * - analyzeSupplierQuote - Main function to process the document.
- * - AnalyzeQuoteInput - Input including the document data and target item names.
- * - AnalyzeQuoteOutput - Extracted prices mapped to item IDs.
  */
 
 import { ai } from '@/ai/genkit';
@@ -42,20 +38,23 @@ const prompt = ai.definePrompt({
   config: {
     temperature: 0.1,
   },
-  prompt: `You are a professional procurement auditor AI. Your task is to extract unit prices from the attached supplier quotation document.
+  prompt: `You are a professional procurement auditor AI specialized in extracting prices from Arabic and English supplier quotations.
 
-Match the items in the document to the following items I am looking for:
+أنت مدقق مشتريات محترف. مهمتك استخراج أسعار الوحدة من عرض أسعار المورد.
+
+Match the items in the document to the following items (ابحث عن هذه الأصناف في المستند):
 {{#each rfqItems}}
 - ID: {{this.id}}, Name: {{this.name}}
 {{/each}}
 
-Instructions:
-1. Scan the document (image or PDF) and find the table or list of prices.
-2. For each item in my list, find the corresponding unit price in the document.
-3. If the supplier used a slightly different name, use your reasoning to find the best match based on keywords.
-4. Return ONLY the unit prices for the requested IDs in the specified JSON format.
-5. If an item is not found, do not include it in the extractedPrices array.
-6. If the document has multiple pages, scan all of them.
+Instructions / التعليمات:
+1. Scan the document (image or PDF) and find the table or list of prices / افحص المستند وابحث عن جدول الأسعار
+2. For each item in my list, find the corresponding unit price / لكل صنف، ابحث عن سعر الوحدة المقابل
+3. If the supplier used a slightly different name, use your reasoning to find the best match / إذا استخدم المورد اسم مختلف قليلاً، استخدم الذكاء للمطابقة
+4. Extract the numeric price only (remove currency symbols) / استخرج الرقم فقط بدون رمز العملة
+5. Return ONLY the unit prices for the requested IDs in JSON format / أرجع فقط الأسعار بصيغة JSON
+6. If an item is not found, do not include it / إذا لم تجد صنف، لا تضمنه في النتيجة
+7. Common Arabic terms: د.ك (دينار كويتي), ر.س (ريال سعودي), ج.م (جنيه مصري)
 
 Document: {{media url=quoteFileDataUri}}`,
 });
