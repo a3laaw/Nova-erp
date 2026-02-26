@@ -1,6 +1,7 @@
 'use server';
 /**
  * @fileOverview AI flow to analyze supplier quote documents and extract unit prices.
+ * يستخدم هذا الملف الموديل المستقر gemini-1.5-flash لحل أخطاء التوفر.
  */
 
 import { ai } from '@/ai/genkit';
@@ -27,6 +28,8 @@ export type AnalyzeQuoteOutput = z.infer<typeof AnalyzeQuoteOutputSchema>;
 
 const prompt = ai.definePrompt({
   name: 'analyzeSupplierQuotePrompt',
+  // تم تحديد الموديل هنا بشكل صريح لضمان استقرار الاستدعاء
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: AnalyzeQuoteInputSchema },
   output: { schema: AnalyzeQuoteOutputSchema },
   prompt: `أنت خبير في تدقيق عروض أسعار الموردين. مهمتك استخراج أسعار الوحدة لكل صنف مطلوب من المستند المرفق.
@@ -52,6 +55,7 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
     return output;
   } catch (error: any) {
     console.error("AI Analysis Flow Error:", error);
+    // إظهار رسالة خطأ واضحة للمستخدم في حال فشل الـ API
     throw new Error(`فشل التحليل الذكي: ${error.message}`);
   }
 }
