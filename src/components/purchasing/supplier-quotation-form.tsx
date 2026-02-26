@@ -15,14 +15,14 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Sparkles, FileUp, Calendar, Clock, CreditCard, Hash } from 'lucide-react';
+import { Loader2, Save, Sparkles, FileUp, Calendar, Clock, CreditCard, Hash, CheckCircle2, AlertTriangle, ImageIcon, FileText as FileTextIcon, X } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { cn, formatCurrency } from '@/lib/utils';
-import { analyzeSupplierQuote } from '@/ai/flows/analyze-supplier-quote';
+import { analyzeSupplierQuote, type AnalyzeQuoteOutput } from '@/ai/flows/analyze-supplier-quote';
 
 interface SupplierQuotationFormProps {
   isOpen: boolean;
@@ -56,6 +56,9 @@ export function SupplierQuotationForm({
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalyzeQuoteOutput | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -82,6 +85,9 @@ export function SupplierQuotationForm({
         setItems(rfq.items.map((item) => ({ rfqItemId: item.id!, unitPrice: '' })));
       }
       setSelectedFile(null);
+      setFilePreview(null);
+      setAnalysisResult(null);
+      setAnalysisError(null);
     }
   }, [isOpen, rfq, existingQuote]);
 
@@ -91,70 +97,107 @@ export function SupplierQuotationForm({
     );
   }, []);
 
-  const handleFileChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file && (file.type === 'application/pdf' || file.type.startsWith('image/'))) {
-        setSelectedFile(file);
-      } else if (file) {
-        toast({
-          variant: 'destructive',
-          title: 'ملف غير صالح',
-          description: 'الرجاء اختيار ملف PDF أو صورة عرض السعر.',
-        });
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        toast({ variant: 'destructive', title: 'ملف غير مدعوم', description: 'الأنواع المدعومة: PDF, JPG, PNG, WebP' });
         setSelectedFile(null);
-      }
-    },
-    [toast]
-  );
+        return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        toast({ variant: 'destructive', title: 'ملف كبير جداً', description: 'الحد الأقصى 10 ميجابايت' });
+        setSelectedFile(null);
+        return;
+    }
+    
+    setSelectedFile(file);
+    setAnalysisResult(null);
+    setAnalysisError(null);
+    
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => setFilePreview(e.target?.result as string);
+        reader.readAsDataURL(file);
+    } else {
+        setFilePreview(null);
+    }
+  };
 
-  const handleAnalyzePdf = useCallback(async () => {
+  const handleAnalyzePdf = async () => {
     if (!selectedFile) return;
     setIsAnalyzing(true);
+    setAnalysisResult(null);
+    setAnalysisError(null);
     
     try {
+        // تحويل الملف إلى Data URI
         const reader = new FileReader();
-        const fileContentPromise = new Promise<string>((resolve, reject) => {
+        const dataUri = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(selectedFile);
         });
-
-        const dataUri = await fileContentPromise;
+        
+        // تجهيز أصناف الطلب للمطابقة
+        const rfqItemsForAI = rfq.items.map(item => ({
+            id: item.id!,
+            name: item.itemName || '',
+        }));
+        
+        // استدعاء Genkit AI
         const result = await analyzeSupplierQuote({
             quoteFileDataUri: dataUri,
-            rfqItems: rfq.items.map(i => ({ id: i.id, name: i.itemName }))
+            rfqItems: rfqItemsForAI,
         });
-
-        if (result && result.extractedPrices && result.extractedPrices.length > 0) {
-            setItems(prev => prev.map(item => {
-                const extracted = result.extractedPrices.find(ep => ep.rfqItemId === item.rfqItemId);
-                return extracted ? { ...item, unitPrice: extracted.unitPrice } : item;
-            }));
+        
+        setAnalysisResult(result);
+        
+        // ملء الأسعار تلقائياً
+        if (result.extractedPrices && result.extractedPrices.length > 0) {
+            let matchedCount = 0;
+            result.extractedPrices.forEach(extracted => {
+                const matchingItem = items.find(i => i.rfqItemId === extracted.rfqItemId);
+                if (matchingItem && extracted.unitPrice > 0) {
+                    handleItemPriceChange(extracted.rfqItemId, String(extracted.unitPrice));
+                    matchedCount++;
+                }
+            });
             
             toast({
-                title: 'اكتمل التحليل',
-                description: `تم استخراج ${result.extractedPrices.length} أسعار بنجاح من الملف.`,
+                title: '✅ تم التحليل بنجاح',
+                description: `تم استخراج ومطابقة ${matchedCount} سعر من ${result.extractedPrices.length} صنف. راجع الأسعار قبل الحفظ.`,
             });
         } else {
             toast({
                 variant: 'destructive',
-                title: 'تنبيه',
-                description: 'لم يتمكن الذكاء الاصطناعي من مطابقة الأصناف في هذا الملف. يرجى التأكد من وضوح الجداول.',
+                title: 'لم يتم استخراج أسعار',
+                description: result.notes || 'تأكد من وضوح المستند وأنه يحتوي على جدول أسعار.',
             });
         }
-
     } catch (error: any) {
-        console.error("AI Analysis error:", error);
+        console.error('AI Analysis error:', error);
+        const errorMessage = error?.message || 'فشل تحليل المستند';
+        setAnalysisError(errorMessage);
         toast({
             variant: 'destructive',
             title: 'خطأ في التحليل',
-            description: error.message || 'حدث خطأ أثناء محاولة قراءة الملف بالذكاء الاصطناعي.',
+            description: errorMessage,
         });
     } finally {
         setIsAnalyzing(false);
     }
-  }, [selectedFile, rfq.items, toast]);
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    setAnalysisResult(null);
+    setAnalysisError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,37 +273,107 @@ export function SupplierQuotationForm({
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
             {/* Smart AI Section */}
-            <div className="bg-blue-50/50 border-2 border-dashed border-blue-200 p-6 rounded-[2rem] space-y-4">
-              <div className="flex items-center gap-3">
-                <Sparkles className="h-5 w-5 text-blue-600 animate-pulse" />
-                <h4 className="font-black text-blue-700">المساعد الذكي لقراءة العروض</h4>
-              </div>
-              <div className="flex items-end gap-4">
-                <div className="grid gap-2 flex-grow">
-                  <Label className="text-[10px] uppercase font-black text-blue-600/70 pr-1">ارفع ملف المورد (PDF أو صورة)</Label>
-                  <Input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    onChange={handleFileChange}
-                    className="bg-background rounded-xl border-blue-100 h-11 focus-visible:ring-blue-400"
-                  />
+            <div className="bg-gradient-to-br from-primary/5 to-violet-500/5 border-2 border-dashed border-primary/20 p-6 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-xl">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-primary">الاستخراج الذكي للأسعار</h4>
+                            <p className="text-[11px] text-muted-foreground">حمّل صورة أو PDF وسيتم استخراج الأسعار تلقائياً</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-1">
+                        <Badge variant="outline" className="text-[10px] gap-1"><ImageIcon className="h-3 w-3" /> صور</Badge>
+                        <Badge variant="outline" className="text-[10px] gap-1"><FileTextIcon className="h-3 w-3" /> PDF</Badge>
+                    </div>
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleAnalyzePdf}
-                  disabled={!selectedFile || isAnalyzing}
-                  className="h-11 px-6 rounded-xl font-black bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-200"
-                >
-                  {isAnalyzing ? (
-                    <>
-                        <Loader2 className="animate-spin ml-2 h-4 w-4" />
-                        جاري التحليل...
-                    </>
-                  ) : (
-                    "تحليل العرض"
-                  )}
-                </Button>
-              </div>
+
+                <div className="space-y-3">
+                    {!selectedFile ? (
+                        <label className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-muted-foreground/20 rounded-xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all group">
+                            <div className="p-3 bg-muted rounded-full group-hover:bg-primary/10 transition-colors">
+                                <FileUp className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                            </div>
+                            <div className="text-center">
+                                <p className="font-bold text-sm">اضغط لاختيار ملف أو اسحبه هنا</p>
+                                <p className="text-[11px] text-muted-foreground mt-1">PDF, JPG, PNG, WebP — حد أقصى 10 ميجا</p>
+                            </div>
+                            <Input type="file" accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
+                        </label>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 bg-background rounded-xl border">
+                                <div className="flex items-center gap-3">
+                                    {filePreview ? (
+                                        <img src={filePreview} alt="معاينة" className="h-12 w-12 object-cover rounded-lg border" />
+                                    ) : (
+                                        <div className="h-12 w-12 bg-red-50 rounded-lg border flex items-center justify-center">
+                                            <FileTextIcon className="h-6 w-6 text-red-500" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <p className="font-bold text-sm truncate max-w-[200px]">{selectedFile.name}</p>
+                                        <p className="text-[11px] text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    </div>
+                                </div>
+                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleRemoveFile} disabled={isAnalyzing}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            <Button type="button" onClick={handleAnalyzePdf} disabled={isAnalyzing}
+                                className="w-full h-11 rounded-xl font-bold gap-2 bg-gradient-to-l from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90">
+                                {isAnalyzing ? (
+                                    <><Loader2 className="h-4 w-4 animate-spin" /> جاري تحليل المستند بالذكاء الاصطناعي...</>
+                                ) : (
+                                    <><Sparkles className="h-4 w-4" /> تحليل واستخراج الأسعار تلقائياً</>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+
+                    {analysisResult && analysisResult.extractedPrices && analysisResult.extractedPrices.length > 0 && (
+                        <div className="p-4 rounded-xl border-2 bg-green-50/50 border-green-200 dark:bg-green-950/20">
+                            <div className="flex items-start gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+                                <div className="flex-1">
+                                    <p className="font-bold text-sm text-green-700">تم استخراج {analysisResult.extractedPrices.length} سعر بنجاح</p>
+                                    {analysisResult.currency && <p className="text-xs text-muted-foreground">العملة المكتشفة: {analysisResult.currency}</p>}
+                                    <div className="mt-2 space-y-1">
+                                        {analysisResult.extractedPrices.map((item, idx) => {
+                                            const rfqItem = rfq.items.find(i => i.id === item.rfqItemId);
+                                            return (
+                                                <div key={idx} className="flex justify-between text-xs bg-white/50 dark:bg-black/10 p-2 rounded-lg">
+                                                    <span className="font-medium truncate max-w-[60%]">{rfqItem?.itemName || item.rfqItemId}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono font-bold text-green-700">{item.unitPrice.toFixed(3)}</span>
+                                                        <Badge variant="outline" className="text-[9px]">{Math.round(item.confidence * 100)}%</Badge>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {analysisResult.notes && <p className="text-[11px] text-amber-600 mt-2">📝 {analysisResult.notes}</p>}
+                                    <p className="text-[11px] text-muted-foreground mt-2 font-bold">⚠️ راجع الأسعار أدناه قبل الحفظ — التحليل قد لا يكون دقيقاً 100%</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {analysisError && (
+                        <div className="p-4 rounded-xl border-2 bg-red-50/50 border-red-200 dark:bg-red-950/20">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                                <div>
+                                    <p className="font-bold text-sm text-red-700">فشل التحليل</p>
+                                    <p className="text-xs text-red-600 mt-1">{analysisError}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Basic Info Grid */}

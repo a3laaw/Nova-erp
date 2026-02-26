@@ -36,7 +36,7 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
 
 const prompt = ai.definePrompt({
   name: 'analyzeSupplierQuotePrompt',
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-2.0-flash',
   input: { schema: AnalyzeQuoteInputSchema },
   output: { schema: AnalyzeQuoteOutputSchema },
   config: {
