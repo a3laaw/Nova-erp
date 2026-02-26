@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, collectionGroup } from 'firebase/firestore';
 import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account, Appointment } from '@/lib/types';
@@ -18,8 +17,8 @@ interface AnalyticalData {
 }
 
 /**
- * A hook to fetch a comprehensive snapshot of all major data collections
- * for analytical reports. This data is fetched once and is not real-time.
+ * خطاف (Hook) لجلب لقطة شاملة من البيانات للتقارير التحليلية.
+ * تم تعديله ليعمل بشكل مباشر بدون الحاجة لنظام التخزين المؤقت الذكي لضمان استقرار البناء.
  */
 export function useAnalyticalData() {
   const { firestore } = useFirebase();
@@ -70,10 +69,10 @@ export function useAnalyticalData() {
               accounts: accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)),
               appointments: appointmentsSnap.docs.map(doc => ({id: doc.id, ...doc.data()} as Appointment)),
             });
-        } catch (error) {
-            console.error("Error fetching analytical data:", error);
+        } catch (err: any) {
+            console.error("Error fetching analytical data:", err);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات التحليلية.' });
-            setError(error as Error);
+            setError(err);
         } finally {
           setLoading(false);
         }
