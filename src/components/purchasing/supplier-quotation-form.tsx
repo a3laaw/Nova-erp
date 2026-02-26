@@ -147,9 +147,9 @@ export function SupplierQuotationForm({
             toast({ variant: 'default', title: 'تنبيه', description: 'لم يتم العثور على مبالغ مطابقة في المستند.' });
         }
     } catch (error: any) {
-        console.error(error);
+        console.error("Analysis Component Error:", error);
         setAnalysisError(error.message);
-        toast({ variant: 'destructive', title: 'فشل التحليل', description: error.message });
+        toast({ variant: 'destructive', title: 'فشل التحليل الذكي', description: 'يرجى مراجعة رسالة الخطأ الظاهرة.' });
     } finally {
         setIsAnalyzing(false);
     }
@@ -201,10 +201,11 @@ export function SupplierQuotationForm({
 
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-8">
+            {/* AI Analysis Section */}
             <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-3xl space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-xl text-primary"><Sparkles className="h-5 w-5" /></div>
-                    <h4 className="font-black text-lg">التحليل الذكي للصورة (OCR)</h4>
+                    <h4 className="font-black text-lg">الاستخراج الذكي من صورة العرض</h4>
                 </div>
 
                 <div className="flex flex-col md:flex-row items-center gap-4">
@@ -241,7 +242,7 @@ export function SupplierQuotationForm({
                 {analysisError && (
                     <Alert variant="destructive" className="rounded-xl">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>خطأ في التحليل</AlertTitle>
+                        <AlertTitle>مشكلة تقنية في التحليل</AlertTitle>
                         <AlertDescription className="text-xs">{analysisError}</AlertDescription>
                     </Alert>
                 )}
@@ -257,6 +258,7 @@ export function SupplierQuotationForm({
                 )}
             </div>
 
+            {/* Manual Form Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-2xl border">
               <div className="grid gap-2">
                 <Label className="font-bold pr-2">مرجع المورد</Label>
@@ -276,10 +278,11 @@ export function SupplierQuotationForm({
               </div>
             </div>
 
+            {/* Prices Table */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-muted-foreground" />
-                <Label className="text-lg font-black">جدول مراجعة الأسعار</Label>
+                <Label className="text-lg font-black">مراجعة وتعديل الأسعار</Label>
               </div>
               
               <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">

@@ -1,18 +1,18 @@
 'use server';
 /**
  * @fileOverview محرك تحليل عروض الأسعار المطور.
- * تم تصحيح اسم الموديل ليكون 'googleai/gemini-1.5-flash' لضمان الوصول للمسار المستقر.
+ * تم تحديث الموديل واستخدام الهيكلية المستقرة لضمان نجاح التحليل.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AnalyzeQuoteInputSchema = z.object({
-  quoteFileDataUri: z.string(),
+  quoteFileDataUri: z.string().describe("صورة عرض السعر بصيغة Data URI"),
   rfqItems: z.array(z.object({
     id: z.string(),
     name: z.string()
-  })),
+  })).describe("الأصناف المطلوب استخراج أسعارها"),
 });
 
 const AnalyzeQuoteOutputSchema = z.object({
@@ -36,29 +36,30 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
         format: 'json'
       },
       prompt: [
-        { text: `أنت مساعد محاسبي خبير. استخرج أسعار الوحدة لكل صنف من الأصناف المطلوبة التالية من صورة عرض السعر المرفقة.
+        { text: `أنت مساعد محاسبي خبير في قراءة عروض أسعار الموردين العربية.
+        قم باستخراج "سعر الوحدة" لكل صنف من الأصناف التالية المذكورة في الصورة المرفقة.
         
 الأصناف المطلوبة (المعرف - الاسم):
 ${input.rfqItems.map(i => `${i.id} - ${i.name}`).join('\n')}
 
 التعليمات:
-1. ابحث عن السعر المطابق لكل صنف بدقة.
-2. إذا وجدت السعر، ضعه في حقل unitPrice.
-3. حدد نسبة الثقة (confidence) من 0 إلى 1.
-4. إذا لم تجد السعر تماماً، ضع 0.
-5. الإخراج يجب أن يكون JSON فقط.` },
+1. ابحث عن السعر المطابق لكل صنف بدقة من الصورة.
+2. أرجع النتيجة كقائمة JSON تحتوي على المعرف (rfqItemId) والسعر (unitPrice).
+3. حدد نسبة الثقة (confidence) لكل سعر مستخرج (من 0 إلى 1).
+4. إذا لم تجد سعراً لصنف ما، ضع السعر 0.
+5. لا تضف أي نص شرح خارج الـ JSON.` },
         { media: { url: input.quoteFileDataUri } }
       ]
     });
 
     if (!output) {
-      throw new Error('لم يرجع الذكاء الاصطناعي نتائج صالحة. يرجى التأكد من وضوح الصورة.');
+      throw new Error('لم يتمكن الذكاء الاصطناعي من قراءة البيانات. يرجى التأكد من وضوح الصورة ومطابقتها للأصناف.');
     }
 
     return output;
   } catch (error: any) {
-    console.error("Critical AI Analysis Error:", error);
-    // إرجاع رسالة خطأ مفهومة للمستخدم
-    throw new Error(`فشل التحليل الذكي: ${error.message.includes('404') ? 'الموديل غير متاح حالياً، جرب مرة أخرى بعد قليل' : error.message}`);
+    console.error("AI Analysis Error:", error);
+    // إرجاع رسالة خطأ تقنية واضحة للتشخيص
+    throw new Error(`فشل التحليل الذكي: ${error.message}`);
   }
 }
