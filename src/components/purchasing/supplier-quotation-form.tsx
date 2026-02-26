@@ -136,6 +136,7 @@ export function SupplierQuotationForm({
     setAnalysisError(null);
     
     try {
+        // تحويل الملف إلى Data URI
         const reader = new FileReader();
         const dataUri = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
@@ -143,11 +144,13 @@ export function SupplierQuotationForm({
             reader.readAsDataURL(selectedFile);
         });
         
+        // تجهيز أصناف الطلب للمطابقة
         const rfqItemsForAI = rfq.items.map(item => ({
             id: item.id!,
             name: item.itemName || '',
         }));
         
+        // استدعاء Genkit AI
         const result = await analyzeSupplierQuote({
             quoteFileDataUri: dataUri,
             rfqItems: rfqItemsForAI,
@@ -155,6 +158,7 @@ export function SupplierQuotationForm({
         
         setAnalysisResult(result);
         
+        // ملء الأسعار تلقائياً
         if (result.extractedPrices && result.extractedPrices.length > 0) {
             let matchedCount = 0;
             result.extractedPrices.forEach(extracted => {
@@ -298,7 +302,7 @@ export function SupplierQuotationForm({
                                 <p className="font-bold text-sm">اضغط لاختيار ملف أو اسحبه هنا</p>
                                 <p className="text-[11px] text-muted-foreground mt-1">PDF, JPG, PNG, WebP — حد أقصى 10 ميجا</p>
                             </div>
-                            <Input type="file" accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
+                            <input type="file" accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
                         </label>
                     ) : (
                         <div className="space-y-3">
