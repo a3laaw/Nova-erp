@@ -48,7 +48,33 @@ import {
   Building2,
   ArrowLeftRight,
   Ban,
-  ArrowUpFromLine
+  ArrowUpFromLine,
+  Clock,
+  Hourglass,
+  UserX,
+  ShoppingBag,
+  ClipboardList,
+  HardHat,
+  Network,
+  BookOpen,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Receipt,
+  CalendarDays,
+  Book,
+  BarChart3,
+  TrendingUp,
+  Landmark,
+  CalendarX,
+  Banknote,
+  FileBarChart,
+  FileSearch,
+  Truck,
+  Settings2,
+  FileSignature,
+  Tags,
+  PieChart,
+  CreditCard
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -83,11 +109,12 @@ const navItems = {
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
         { 
           label: 'تقارير المتابعة والأداء',
+          icon: ClipboardCheck,
           children: [
-            { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة' },
-            { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة' },
-            { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين' },
-            { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إإضافية' },
+            { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: Clock },
+            { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: Hourglass },
+            { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
+            { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ShoppingBag },
           ]
         },
       ]
@@ -98,9 +125,9 @@ const navItems = {
       roles: ['Admin', 'Engineer'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية' },
-        { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات' },
-        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين' },
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
+        { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات', icon: ClipboardList },
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: HardHat },
       ]
     },
     { 
@@ -109,28 +136,30 @@ const navItems = {
       roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار' },
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات' },
-        { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي' },
+        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
+        { href: '/dashboard/accounting/assistant', label: 'المساعد المحاسبي', icon: Bot },
         {
           label: 'العمليات المالية',
+          icon: CreditCard,
           children: [
-            { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية' },
-            { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض' },
-            { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف' },
-            { href: '/dashboard/accounting/invoices', label: 'الفواتير' },
+            { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
+            { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+            { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+            { href: '/dashboard/accounting/invoices', label: 'الفواتير', icon: Receipt },
           ]
         },
         {
           label: 'التقارير والقوائم',
+          icon: BarChart3,
           children: [
-            { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير اليومي' },
-            { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية' },
-            { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ' },
-            { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة' },
-            { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية' },
-            { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل' },
-            { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي' },
+            { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير اليومي', icon: CalendarDays },
+            { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: Scale },
+            { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: Book },
+            { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
+            { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
+            { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل', icon: TrendingUp },
+            { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
           ]
         }
       ]
@@ -141,11 +170,11 @@ const navItems = {
       roles: ['Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين' },
-        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات' },
-        { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان' },
-        { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب' },
-        { href: '/dashboard/hr/reports', label: 'تقارير الموظفين' },
+        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
+        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarX },
+        { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان', icon: Clock },
+        { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموظفين', icon: FileBarChart },
       ]
     },
     { 
@@ -156,13 +185,13 @@ const navItems = {
       children: [
         { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات والأفرع', icon: Building2 },
         { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)' },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء' },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
         { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
-        { href: '/dashboard/purchasing/vendors', label: 'الموردون' },
+        { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },
       ]
     },
     { 
@@ -171,24 +200,25 @@ const navItems = {
       roles: ['Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
-        { href: '/dashboard/settings', label: 'الإعدادات العامة' },
-        { href: '/dashboard/settings/companies', label: 'إدارة الشركات' },
-        { href: '/dashboard/contracts', label: 'نماذج العقود' },
-        { href: '/dashboard/settings/classifications', label: 'التصنيفات' },
+        { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
+        { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
+        { href: '/dashboard/contracts', label: 'نماذج العقود', icon: FileSignature },
+        { href: '/dashboard/settings/classifications', label: 'التصنيفات', icon: Tags },
       ]
     },
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    // Simplified for brevity, same pattern follows...
+    // Simplified for brevity, English pattern follows the same logic
   ]
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile, state: sidebarState } = useSidebar();
 
-  if (!item.roles.includes(userRole)) {
-    return null;
+  if (!item.roles || !item.roles.includes(userRole)) {
+    // If roles is missing, assume public or handle error. Here we allow public for dashboard if missing.
+    if (item.roles) return null;
   }
 
   if (!item.children && item.href) {
@@ -224,12 +254,22 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 if (child.children) {
                   return (
                     <DropdownMenuSub key={`${child.label}-${index}`}>
-                      <DropdownMenuSubTrigger>{child.label}</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>
+                        <div className="flex items-center gap-2">
+                            {child.icon && <child.icon className="h-4 w-4" />}
+                            <span>{child.label}</span>
+                        </div>
+                      </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
                           {child.children.map((subChild: any) => (
                             <DropdownMenuItem key={subChild.href} asChild>
-                              <Link href={subChild.href}>{subChild.label}</Link>
+                              <Link href={subChild.href}>
+                                <div className="flex items-center gap-2">
+                                    {subChild.icon && <subChild.icon className="h-3.5 w-3.5" />}
+                                    <span>{subChild.label}</span>
+                                </div>
+                              </Link>
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuSubContent>
@@ -239,7 +279,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 }
                 return (
                   <DropdownMenuItem key={child.href} asChild>
-                    <Link href={child.href}>{child.label}</Link>
+                    <Link href={child.href}>
+                        <div className="flex items-center gap-2">
+                            {child.icon && <child.icon className="h-4 w-4" />}
+                            <span>{child.label}</span>
+                        </div>
+                    </Link>
                   </DropdownMenuItem>
                 );
               })}
@@ -269,14 +314,20 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 return (
                   <SidebarMenuSubItem key={`${child.label}-${index}`}>
                      <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md">
-                        <span className="text-sm font-semibold text-sidebar-foreground/70">{child.label}</span>
+                        <div className="flex items-center gap-2">
+                            {child.icon && <child.icon className="h-3.5 w-3.5 text-sidebar-foreground/50" />}
+                            <span className="text-xs font-bold text-sidebar-foreground/70">{child.label}</span>
+                        </div>
                     </div>
                     <SidebarMenuSub>
                       {child.children.map((subChild: any) => (
                         <SidebarMenuSubItem key={subChild.href}>
                             <SidebarMenuSubButton isActive={currentPath === subChild.href} asChild>
                                 <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
-                                    {subChild.label}
+                                    <div className="flex items-center gap-2">
+                                        {subChild.icon && <subChild.icon className="h-3 w-3" />}
+                                        <span className="truncate">{subChild.label}</span>
+                                    </div>
                                 </Link>
                             </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -291,7 +342,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-2">
                                 {child.icon && <child.icon className="h-3.5 w-3.5" />}
-                                {child.label}
+                                <span>{child.label}</span>
                             </div>
                         </Link>
                     </SidebarMenuSubButton>
