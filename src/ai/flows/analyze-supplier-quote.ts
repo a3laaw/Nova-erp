@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview AI flow to analyze supplier quote documents (PDF/Images) and extract unit prices.
- * This flow is updated to use the latest gemini-2.0-flash model.
+ * This flow is updated to use the stable gemini-1.5-flash model.
  */
 
 import { ai } from '@/ai/genkit';
@@ -33,7 +33,7 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
 
 const prompt = ai.definePrompt({
   name: 'analyzeSupplierQuotePrompt',
-  model: 'googleai/gemini-2.0-flash',
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: AnalyzeQuoteInputSchema },
   output: { schema: AnalyzeQuoteOutputSchema },
   config: {
