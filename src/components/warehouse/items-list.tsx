@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -14,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, where } from 'firebase/firestore';
 import type { Item, ItemCategory } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { Package, MoreHorizontal, Pencil, Trash2, Search, PlusCircle, History } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
