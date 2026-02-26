@@ -15,7 +15,7 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Sparkles, FileUp, FileText as FileTextIcon, X, CheckCircle2, Table as TableIcon } from 'lucide-react';
+import { Loader2, Save, Sparkles, FileUp, FileText as FileTextIcon, X, CheckCircle2, Table as TableIcon, AlertTriangle } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -62,6 +62,7 @@ export function SupplierQuotationForm({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeQuoteOutput | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +90,7 @@ export function SupplierQuotationForm({
       }
       setSelectedFile(null);
       setAnalysisResult(null);
+      setAnalysisError(null);
     }
   }, [isOpen, rfq, existingQuote]);
 
@@ -103,12 +105,14 @@ export function SupplierQuotationForm({
     if (file) {
         setSelectedFile(file);
         setAnalysisResult(null);
+        setAnalysisError(null);
     }
   };
 
   const handleAnalyze = async () => {
     if (!selectedFile) return;
     setIsAnalyzing(true);
+    setAnalysisError(null);
     
     try {
         const reader = new FileReader();
@@ -138,13 +142,14 @@ export function SupplierQuotationForm({
                 }
                 return item;
             }));
-            toast({ title: 'نجاح التحليل', description: `تم استخراج ${result.extractedPrices.length} سعر من المستند.` });
+            toast({ title: 'نجاح التحليل', description: `تم استخراج ${result.extractedPrices.length} سعر بنجاح.` });
         } else {
-            toast({ variant: 'default', title: 'تنبيه', description: 'لم يتم العثور على مبالغ واضحة في المستند.' });
+            toast({ variant: 'default', title: 'تنبيه', description: 'لم يتم العثور على مبالغ مطابقة في المستند.' });
         }
     } catch (error: any) {
         console.error(error);
-        toast({ variant: 'destructive', title: 'فشل التحليل', description: error.message });
+        setAnalysisError(error.message || 'حدث خطأ غير متوقع أثناء التحليل.');
+        toast({ variant: 'destructive', title: 'فشل التحليل', description: 'تأكد من صلاحية مفتاح الـ API وجودة الصورة.' });
     } finally {
         setIsAnalyzing(false);
     }
@@ -200,15 +205,15 @@ export function SupplierQuotationForm({
             <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-6 rounded-3xl space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-xl text-primary"><Sparkles className="h-5 w-5" /></div>
-                    <h4 className="font-black text-lg">تحليل ذكي للمستند (OCR)</h4>
+                    <h4 className="font-black text-lg">التحليل الذكي للصورة (OCR)</h4>
                 </div>
 
                 <div className="flex flex-col md:flex-row items-center gap-4">
                     {!selectedFile ? (
-                        <label className="flex-grow flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer hover:bg-primary/10 transition-all">
+                        <label className="flex-grow flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer hover:bg-primary/10 transition-all bg-background">
                             <FileUp className="h-8 w-8 mb-2 text-muted-foreground" />
-                            <p className="text-sm font-bold text-muted-foreground">ارفع عرض السعر (PDF أو صورة)</p>
-                            <input type="file" accept="application/pdf,image/*" onChange={handleFileChange} className="hidden" />
+                            <p className="text-sm font-bold text-muted-foreground">ارفع صورة عرض السعر</p>
+                            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                         </label>
                     ) : (
                         <div className="flex-grow flex items-center justify-between p-4 bg-background rounded-2xl border-2 border-primary/20 shadow-sm">
@@ -234,12 +239,20 @@ export function SupplierQuotationForm({
                     </Button>
                 </div>
                 
-                {analysisResult && (
+                {analysisError && (
+                    <Alert variant="destructive" className="rounded-xl">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>خطأ في التحليل</AlertTitle>
+                        <AlertDescription className="text-xs">{analysisError}</AlertDescription>
+                    </Alert>
+                )}
+
+                {analysisResult && !analysisError && (
                     <Alert className="bg-green-50 border-green-200">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <AlertTitle className="text-green-800 font-bold">تم الاستخراج بنجاح</AlertTitle>
                         <AlertDescription className="text-green-700 text-xs">
-                            تم العثور على {analysisResult.extractedPrices.length} صنف. يرجى مراجعة الأسعار في الجدول أدناه قبل الحفظ.
+                            تم العثور على الأسعار في الصورة. يرجى مراجعة الجدول أدناه للتأكد من الدقة قبل الحفظ.
                         </AlertDescription>
                     </Alert>
                 )}
