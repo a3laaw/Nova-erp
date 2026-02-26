@@ -21,7 +21,7 @@ import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { analyzeSupplierQuote, type AnalyzeQuoteOutput } from '@/ai/flows/analyze-supplier-quote';
 
 interface SupplierQuotationFormProps {
@@ -224,10 +224,10 @@ export function SupplierQuotationForm({
 
       if (existingQuote) {
         const quoteRef = doc(firestore, 'supplierQuotations', existingQuote.id!);
-        await updateDoc(quoteRef, dataToSave);
+        await updateDoc(quoteRef, cleanFirestoreData(dataToSave));
         toast({ title: 'نجاح', description: 'تم تحديث عرض السعر بنجاح.' });
       } else {
-        await addDoc(collection(firestore, 'supplierQuotations'), dataToSave);
+        await addDoc(collection(firestore, 'supplierQuotations'), cleanFirestoreData(dataToSave));
         toast({ title: 'نجاح', description: 'تم حفظ عرض سعر المورد.' });
       }
       onClose();
