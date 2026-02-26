@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,14 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info, AlertTriangle } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, where } from 'firebase/firestore';
-import type { Item, ClientTransaction, Account, InventoryAdjustment, Employee, Department, Boq, BoqItem, ItemCategory, Warehouse } from '@/lib/types';
+import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Badge } from '../ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const lineSchema = z.object({
   boqItemId: z.string().min(1, "بند المقايسة مطلوب."),
@@ -52,12 +50,10 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [loadingRefs, setLoadingRefs] = useState(true);
 
-    // ─── Data Subscriptions ───
     const { data: allItems = [], loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     const { data: categories = [] } = useSubscription<ItemCategory>(firestore, 'itemCategories');
     const { data: warehouses = [], loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
 
-    // ─── Project-specific state ───
     const [boqItems, setBoqItems] = useState<BoqItem[]>([]);
     const [loadingBoq, setLoadingBoq] = useState(false);
 
@@ -77,7 +73,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
-    // ─── Load Reference Data ───
     useEffect(() => {
         if (!firestore) return;
         const fetchRefData = async () => {
@@ -95,8 +90,14 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
                 
                 const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
-                setProjects(projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
+                const mappedProjects = projSnap.docs.map(d => ({
+                    ...d.data(), 
+                    id: d.id, 
+                    clientName: clientMap.get(d.data().clientId)
+                } as ClientTransaction & { clientName: string }));
+                setProjects(mappedProjects);
             } catch(e) {
+                console.error("Error fetching reference data:", e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
             } finally {
                 setLoadingRefs(false);
@@ -105,7 +106,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         fetchRefData();
     }, [firestore, toast]);
 
-    // ─── Load BOQ items for selected project ───
     useEffect(() => {
         if (!selectedProjectId || !firestore) {
             setBoqItems([]);
@@ -121,9 +121,9 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 }
                 const itemsSnap = await getDocs(query(collection(firestore, `boqs/${project.boqId}/items`), orderBy('itemNumber')));
                 const items = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem));
-                setBoqItems(items.filter(i => !i.isHeader)); // Only non-header items can be charged
+                setBoqItems(items.filter(i => !i.isHeader));
             } catch (error) {
-                console.error(error);
+                console.error("Error fetching BOQ:", error);
             } finally {
                 setLoadingBoq(false);
             }
@@ -135,16 +135,13 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
     const boqItemOptions = useMemo(() => boqItems.map(i => ({ value: i.id!, label: `${i.itemNumber} - ${i.description}` })), [boqItems]);
 
-    // ─── Smart Filtering: Get allowed items for a BOQ item ───
     const getFilteredItemOptions = useCallback((boqItemId: string) => {
         const boqItem = boqItems.find(i => i.id === boqItemId);
-        if (!boqItem || !boqItem.itemId) return []; // If not found, allow nothing or everything? We choose nothing for strictness.
+        if (!boqItem || !boqItem.itemId) return [];
 
-        // Find categories that reference this BOQ item
-        const allowedCategories = categories.filter(cat => 
-            cat.boqReferenceItemIds?.includes(boqItem.itemId!)
+        const allowedCategoryIds = new Set(
+            categories.filter(cat => cat.boqReferenceItemIds?.includes(boqItem.itemId!)).map(c => c.id)
         );
-        const allowedCategoryIds = new Set(allowedCategories.map(c => c.id));
 
         return allItems
             .filter(item => allowedCategoryIds.has(item.categoryId))
@@ -203,7 +200,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     };
                 });
 
-                const issueData = {
+                transaction.set(newIssueRef, cleanFirestoreData({
                     adjustmentNumber: issueNumber,
                     date: data.date,
                     type: 'material_issue',
@@ -214,9 +211,9 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     journalEntryId: newJournalEntryRef.id,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
-                };
-                
-                const jeData = {
+                }));
+
+                transaction.set(newJournalEntryRef, cleanFirestoreData({
                     entryNumber: `JE-${issueNumber}`,
                     date: data.date,
                     narration: `صرف مواد لمشروع: ${project?.transactionType} (${data.notes || ''})`,
@@ -231,18 +228,16 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     transactionId: data.projectId,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
-                };
+                }));
 
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-                transaction.set(newIssueRef, cleanFirestoreData(issueData));
-                transaction.set(newJournalEntryRef, cleanFirestoreData(jeData));
             });
 
             toast({ title: 'نجاح', description: 'تم حفظ إذن الصرف وتحميل التكلفة على المشروع.' });
             router.push('/dashboard/warehouse/material-issue');
 
         } catch (error) {
-            console.error(error);
+            console.error("Error saving issue:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ إذن الصرف.' });
         } finally {
             setIsSaving(false);
@@ -299,11 +294,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-black flex items-center gap-2"><Search className="h-5 w-5 text-primary"/> بنود الصرف</h3>
-                    {selectedProjectId && !loadingBoq && boqItems.length === 0 && (
-                        <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                            <AlertTriangle className="h-3 w-3" /> هذا المشروع لا يحتوي على جدول كميات معتمد.
-                        </div>
-                    )}
                 </div>
 
                 <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">
@@ -339,7 +329,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                                         value={boqField.value} 
                                                         onSelect={(val) => {
                                                             boqField.onChange(val);
-                                                            setValue(`items.${index}.itemId`, ''); // Reset item when BOQ changes
+                                                            setValue(`items.${index}.itemId`, '');
                                                         }} 
                                                         options={boqItemOptions}
                                                         placeholder={loadingBoq ? "جاري التحميل..." : !selectedProjectId ? "اختر مشروعاً أولاً" : "اختر بند المقايسة..."}
@@ -350,31 +340,24 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <div className="space-y-1">
-                                                <Controller
-                                                    control={control}
-                                                    name={`items.${index}.itemId`}
-                                                    render={({ field: itemField }) => (
-                                                        <InlineSearchList 
-                                                            value={itemField.value} 
-                                                            onSelect={(val) => {
-                                                                itemField.onChange(val);
-                                                                const itemData = allItems.find(i => i.id === val);
-                                                                if (itemData) setValue(`items.${index}.unitCost`, itemData.costPrice || 0);
-                                                            }}
-                                                            options={allowedItems}
-                                                            placeholder={!lineItem?.boqItemId ? "حدد بند المقايسة أولاً" : "اختر مادة مطابقة..."}
-                                                            disabled={!lineItem?.boqItemId || isSaving}
-                                                            className="border-none shadow-none focus-visible:ring-0 text-lg font-bold"
-                                                        />
-                                                    )}
-                                                />
-                                                {lineItem?.boqItemId && allowedItems.length === 0 && (
-                                                    <p className="text-[10px] text-amber-600 px-3 flex items-center gap-1">
-                                                        <Info className="h-3 w-3" /> لا توجد مواد مرتبطة بهذا البند في الإعدادات.
-                                                    </p>
+                                            <Controller
+                                                control={control}
+                                                name={`items.${index}.itemId`}
+                                                render={({ field: itemField }) => (
+                                                    <InlineSearchList 
+                                                        value={itemField.value} 
+                                                        onSelect={(val) => {
+                                                            itemField.onChange(val);
+                                                            const itemData = allItems.find(i => i.id === val);
+                                                            if (itemData) setValue(`items.${index}.unitCost`, itemData.costPrice || 0);
+                                                        }}
+                                                        options={allowedItems}
+                                                        placeholder={!lineItem?.boqItemId ? "حدد بند المقايسة أولاً" : "اختر مادة..."}
+                                                        disabled={!lineItem?.boqItemId || isSaving}
+                                                        className="border-none shadow-none focus-visible:ring-0 text-lg font-bold"
+                                                    />
                                                 )}
-                                            </div>
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr text-center border-none shadow-none text-xl font-black font-mono focus-visible:ring-0" />
@@ -406,23 +389,14 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
 
             <div className="grid gap-3">
                 <Label htmlFor="notes" className="font-bold text-muted-foreground pr-2">ملاحظات الإذن</Label>
-                <Textarea id="notes" {...register('notes')} placeholder="أي تفاصيل إضافية عن سبب الصرف أو الشخص المستلم..." className="rounded-2xl border-2" rows={3}/>
+                <Textarea id="notes" {...register('notes')} placeholder="تفاصيل إضافية..." className="rounded-2xl border-2" rows={3}/>
             </div>
 
             <div className="flex justify-end gap-4 pt-8 border-t">
-                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[220px]">
-                    {isSaving ? (
-                        <>
-                            <Loader2 className="ml-3 h-5 w-5 animate-spin"/>
-                            جاري الحفظ...
-                        </>
-                    ) : (
-                        <>
-                            <Save className="ml-3 h-5 w-5"/>
-                            حفظ وترحيل التكلفة
-                        </>
-                    )}
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20">
+                    {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin"/> : <Save className="ml-3 h-5 w-5"/>}
+                    حفظ وترحيل التكلفة
                 </Button>
             </div>
         </form>
