@@ -76,7 +76,8 @@ import {
   CreditCard,
   History,
   DollarSign,
-  TrendingDown
+  TrendingDown,
+  Star
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
