@@ -36,11 +36,11 @@ export async function analyzeSupplierQuote(input: AnalyzeQuoteInput): Promise<An
 
 const prompt = ai.definePrompt({
   name: 'analyzeSupplierQuotePrompt',
-  model: 'googleai/gemini-1.5-flash-latest', // تأكيد استخدام النموذج الصحيح هنا أيضاً
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: AnalyzeQuoteInputSchema },
   output: { schema: AnalyzeQuoteOutputSchema },
   config: {
-    temperature: 0.1, // درجة حرارة منخفضة لضمان دقة استخراج الأرقام
+    temperature: 0.1,
   },
   prompt: `You are a professional procurement auditor AI. Your task is to extract unit prices from the attached supplier quotation document.
 
