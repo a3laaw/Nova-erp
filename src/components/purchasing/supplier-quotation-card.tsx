@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -34,7 +35,6 @@ export function SupplierQuotationCard({ rfq, vendor, existingQuote }: SupplierQu
       }, 0)
     : 0;
 
-  // إصلاح #4: حماية التاريخ
   const formattedDate = (() => {
     if (!existingQuote?.date) return '-';
     try {
@@ -88,10 +88,12 @@ export function SupplierQuotationCard({ rfq, vendor, existingQuote }: SupplierQu
                   <span className="text-muted-foreground">التاريخ:</span>
                   <span className="font-bold">{formattedDate}</span>
                 </div>
-                {existingQuote.deliveryTimeDays && (
+                {(existingQuote.deliveryTimeDays !== undefined && existingQuote.deliveryTimeDays !== null) && (
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">التوريد:</span>
-                    <span className="font-bold">{existingQuote.deliveryTimeDays} يوم</span>
+                    <span className="font-bold">
+                        {existingQuote.deliveryTimeDays === 0 ? 'في نفس اليوم' : `${existingQuote.deliveryTimeDays} يوم`}
+                    </span>
                   </div>
                 )}
               </div>

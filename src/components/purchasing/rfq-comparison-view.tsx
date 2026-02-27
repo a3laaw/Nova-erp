@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -222,7 +223,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     }
   };
 
-  const rfqDate = toFirestoreDate(rfq.date);
   const loading = vendorsLoading || quotesLoading;
 
   if (loading) return <div className="p-8"><Skeleton className="h-[500px] w-full rounded-2xl" /></div>;
@@ -270,7 +270,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           .desc-col-print { 
             width: 1% !important; 
             white-space: normal !important; 
-            min-width: 250px !important; 
+            min-width: 200px !important; 
             text-align: right !important;
           }
           .qty-col-print { 
@@ -302,7 +302,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto">بيان الصنف المطلوب</TableHead>
+                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto min-w-[200px]">بيان الصنف المطلوب</TableHead>
                 <TableHead className="text-center font-bold px-4 w-auto whitespace-nowrap">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
@@ -327,7 +327,12 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                           </Button>
                         </div>
                         <div className="space-y-1 bg-background/50 p-2 rounded-xl border shadow-inner">
-                          <div className="flex justify-between text-[9px]"><span className="text-muted-foreground">التوريد:</span> <span className="font-bold">{quote?.deliveryTimeDays || '-'} يوم</span></div>
+                          <div className="flex justify-between text-[9px]">
+                            <span className="text-muted-foreground">التوريد:</span> 
+                            <span className="font-bold">
+                                {quote?.deliveryTimeDays === 0 ? 'في نفس اليوم' : quote?.deliveryTimeDays ? `${quote.deliveryTimeDays} يوم` : '-'}
+                            </span>
+                          </div>
                           <div className="flex justify-between text-[9px]"><span className="text-muted-foreground">الدفع:</span> <span className="font-bold text-blue-600 truncate max-w-[80px]">{quote?.paymentTerms || 'نقدي'}</span></div>
                           <div className="flex justify-between text-[9px] text-green-600"><span>الخصم:</span> <span className="font-bold">{formatCurrency(quote?.discountAmount || 0)}</span></div>
                           <div className="flex justify-between text-[9px] text-red-600"><span>التوصيل:</span> <span className="font-bold">{formatCurrency(quote?.deliveryFees || 0)}</span></div>
@@ -435,7 +440,9 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         <div className="space-y-1 min-w-[150px]">
                           <p className="font-black text-blue-print border-b-2 pb-1 mb-2 text-sm">{vendor.name}</p>
                           <div className="text-[8pt] font-normal space-y-1 text-right px-2">
-                            <div><span className="opacity-60">التوريد:</span> <b>{quote?.deliveryTimeDays || '-'} يوم</b></div>
+                            <div><span className="opacity-60">التوريد:</span> <b>
+                                {quote?.deliveryTimeDays === 0 ? 'في نفس اليوم' : quote?.deliveryTimeDays ? `${quote.deliveryTimeDays} يوم` : '-'}
+                            </b></div>
                             <div className="text-blue-print"><span className="opacity-60">الدفع:</span> <b>{quote?.paymentTerms || 'نقدي'}</b></div>
                             <div className="text-green-print"><span className="opacity-60">الخصم:</span> <b>{formatCurrency(quote?.discountAmount || 0)}</b></div>
                             <div className="text-red-print"><span className="opacity-60">التوصيل:</span> <b>{formatCurrency(quote?.deliveryFees || 0)}</b></div>
