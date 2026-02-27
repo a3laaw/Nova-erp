@@ -1,12 +1,6 @@
-import { genkit } from 'genkit';
-import { googleAI, gemini15Flash } from '@genkit-ai/googleai';
-
 /**
- * تهيئة محرك Genkit 1.x باستخدام بلجن Google AI المحدث وتحديد الموديل الافتراضي.
+ * @fileOverview ملف تهيئة Genkit (تم إيقافه لصالح الاستخدام المباشر لمكتبة Google AI).
  */
-export const ai = genkit({
-  plugins: [
-    googleAI(),
-  ],
-  model: gemini15Flash, // إعداد gemini15Flash كموديل افتراضي
-});
+
+// تم إفراغ هذا الملف لمنع أخطاء الاستيراد بعد إزالة مكتبة Genkit
+export const ai = {} as any;

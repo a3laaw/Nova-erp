@@ -1,48 +1,62 @@
 'use server';
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 /**
- * @fileOverview محرك تحليل صور عروض الأسعار المطور.
- * يستخدم الموديل المستورد مباشرة ويقوم بتنظيف بيانات Base64 لضمان أعلى دقة.
+ * @fileOverview محرك تحليل صور عروض الأسعار باستخدام مكتبة Google الرسمية المباشرة.
  */
 
-import { ai } from '../genkit';
-import { gemini15Flash } from '@genkit-ai/googleai';
+// استخدام المفتاح من ملف البيئة
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || "");
 
 export async function analyzeSupplierQuote(input: { 
-  quoteFileDataUri: string, 
-  rfqItems: { id: string, name: string }[] 
+   quoteFileDataUri: string, 
+   rfqItems: { id: string, name: string }[] 
 }) {
   try {
-    // تنظيف الـ Data URI لاستخراج Base64 صافي كما طلب المستخدم
-    const base64Data = input.quoteFileDataUri.includes(',') 
-      ? input.quoteFileDataUri.split(',')[1] 
-      : input.quoteFileDataUri;
-
-    const response = await ai.generate({
-      model: gemini15Flash, // استخدام المتغير المستورد بدلاً من النص
-      prompt: [
-        { text: "أنت محاسب ومهندس خبير ومحلل بيانات. قم بقراءة صورة جدول عروض الأسعار المرفقة. حلل الجدول وحوله لـ JSON فقط بالتنسيق التالي:" },
-        { text: `{ "vendorName": "...", "date": "YYYY-MM-DD", "totalAmount": 0, "extractedPrices": [ { "rfqItemId": "id", "unitPrice": 0 } ] }` },
-        { 
-          media: { 
-            url: `data:image/jpeg;base64,${base64Data}`, 
-            contentType: 'image/jpeg' // تحديد نوع المحتوى بدقة
-          } 
-        }
-      ],
-      config: {
-        responseMimeType: 'application/json',
-      },
+    // تهيئة الموديل مباشرة (gemini-1.5-flash)
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
     });
 
-    const output = response.text;
-    
-    // تنظيف المخرجات من أي علامات Markdown قد يضيفها الموديل لضمان نجاح الـ Parse
-    const cleanJson = output.replace(/```json|```/g, '').trim();
-    
-    return JSON.parse(cleanJson);
+    // تنظيف بيانات الصورة لاستخراج Base64 والـ MimeType
+    const parts = input.quoteFileDataUri.split(",");
+    const base64Data = parts[1];
+    const mimeType = parts[0].split(":")[1].split(";")[0];
 
-  } catch (e: any) {
-    console.error("AI Flow Error:", e);
-    throw new Error("حدث خطأ في معالجة الصورة، يرجى التأكد من وضوح الصورة وتوافق إصدارات المكتبات.");
+    const prompt = `أنت محاسب ومهندس خبير. قم بتحليل صورة جدول عرض السعر المرفقة واستخرج البيانات المالية بدقة كـ JSON.
+    المطلوب هو مطابقة الأصناف الموجودة في الصورة مع قائمة الـ RFQ المقدمة: ${JSON.stringify(input.rfqItems)}
+    
+    التنسيق المطلوب للمخرجات:
+    {
+      "vendorName": "string",
+      "date": "YYYY-MM-DD",
+      "totalAmount": number,
+      "extractedPrices": [ 
+        { 
+          "rfqItemId": "string (معرف الصنف من القائمة أعلاه)", 
+          "unitPrice": number 
+        } 
+      ]
+    }`;
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        }
+      }
+    ]);
+
+    const response = await result.response;
+    const text = response.text();
+    
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Direct AI Analysis Error:", error);
+    throw new Error("فشل التحليل الذكي لعرض السعر. يرجى التأكد من وضوح الصورة وتوفر مفتاح الـ API.");
   }
 }
