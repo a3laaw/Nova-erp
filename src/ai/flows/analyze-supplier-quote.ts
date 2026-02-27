@@ -7,7 +7,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * تم تحسينه للتعامل مع أخطاء المفاتيح وتنظيف مخرجات JSON بشكل متطور.
  */
 
-const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
+const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || "";
 
 export async function analyzeSupplierQuote(input: { 
    quoteFileDataUri: string, 
@@ -53,7 +53,9 @@ export async function analyzeSupplierQuote(input: {
     }`;
 
     const result = await model.generateContent([
-      prompt,
+      {
+        text: prompt
+      },
       {
         inlineData: {
           data: base64Data,

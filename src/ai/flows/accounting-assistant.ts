@@ -6,7 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * @fileOverview المساعد المحاسبي الذكي باستخدام مكتبة Google الرسمية المباشرة.
  */
 
-const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
+const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || "";
 
 export async function runAccountingAssistant(input: { command: string, currentDate: string }) {
   const apiKey = getApiKey();
