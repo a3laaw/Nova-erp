@@ -19,6 +19,7 @@ import {
   getDocs,
   where,
   writeBatch,
+  updateDoc,
 } from 'firebase/firestore';
 import type { RequestForQuotation } from '@/lib/types';
 import { format } from 'date-fns';
@@ -30,6 +31,7 @@ import {
   Search,
   ClipboardList,
   Loader2,
+  Undo2,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import {
@@ -39,7 +41,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import {
@@ -80,6 +82,7 @@ export function RfqsList() {
 
   const [itemToDelete, setItemToDelete] = useState<RequestForQuotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const rfqQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
@@ -103,19 +106,28 @@ export function RfqsList() {
     }
   }, []);
 
-  // إصلاح #1: حذف RFQ مع حذف جميع عروض الأسعار المرتبطة باستخدام writeBatch
+  const handleReopen = async (rfqId: string) => {
+    if (!firestore || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await updateDoc(doc(firestore, 'rfqs', rfqId), { status: 'sent' });
+      toast({ title: 'تمت العملية', description: 'تم إعادة فتح الطلب لاستقبال عروض إضافية.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إعادة فتح الطلب.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
     setIsDeleting(true);
     try {
       const rfqId = itemToDelete.id!;
-
-      // البحث عن جميع عروض الأسعار المرتبطة بهذا الطلب
       const quotesRef = collection(firestore, 'supplierQuotations');
       const quotesQuery = query(quotesRef, where('rfqId', '==', rfqId));
       const quotesSnap = await getDocs(quotesQuery);
 
-      // حذف الطلب وعروضه في batch واحد
       const batch = writeBatch(firestore);
       batch.delete(doc(firestore, 'rfqs', rfqId));
       quotesSnap.docs.forEach((quoteDoc) => {
@@ -225,8 +237,8 @@ export function RfqsList() {
                   <TableCell className="text-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isProcessing}>
+                          {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" dir="rtl">
@@ -236,8 +248,14 @@ export function RfqsList() {
                         >
                           <Eye className="ml-2 h-4 w-4" /> إدارة العروض
                         </DropdownMenuItem>
+                        
+                        {rfq.status === 'closed' && (
+                          <DropdownMenuItem onClick={() => handleReopen(rfq.id!)} className="text-orange-600 focus:text-orange-700">
+                            <Undo2 className="ml-2 h-4 w-4" /> إعادة فتح للتحرير
+                          </DropdownMenuItem>
+                        )}
+
                         <DropdownMenuSeparator />
-                        {/* إصلاح #5: منع حذف الطلبات المغلقة */}
                         <DropdownMenuItem
                           onClick={() => setItemToDelete(rfq)}
                           disabled={rfq.status === 'closed'}
@@ -278,7 +296,6 @@ export function RfqsList() {
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold"
             >
-              {/* إصلاح #2: تم استيراد Loader2 في الأعلى */}
               {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'نعم، حذف نهائي'}
             </AlertDialogAction>
           </AlertDialogFooter>

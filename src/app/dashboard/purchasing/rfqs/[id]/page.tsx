@@ -8,7 +8,7 @@ import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertTriangle, UserPlus, Loader2, Search, PlusCircle } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -55,7 +55,6 @@ export default function RfqDetailsPage() {
     const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef ? rfqRef.path : null);
 
-    // Fetch all system vendors for the "Add Vendor" feature
     const { data: allSystemVendors } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
 
     useEffect(() => {
@@ -180,11 +179,16 @@ export default function RfqDetailsPage() {
                                 </Button>
                             )}
                             {rfq.status === 'closed' && (
-                                <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2 rounded-xl font-bold">
-                                    <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
-                                        <BarChart className="h-4 w-4" /> مصفوفة المقارنة
-                                    </Link>
-                                </Button>
+                                <>
+                                    <Button onClick={() => handleChangeStatus('sent')} disabled={isUpdatingStatus} variant="outline" className="gap-2 rounded-xl font-bold border-orange-200 text-orange-700 hover:bg-orange-50">
+                                        <Undo2 className="h-4 w-4" /> إعادة فتح
+                                    </Button>
+                                    <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2 rounded-xl font-bold">
+                                        <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
+                                            <BarChart className="h-4 w-4" /> مصفوفة المقارنة
+                                        </Link>
+                                    </Button>
+                                </>
                             )}
                             <Button variant="ghost" onClick={() => router.back()} className="gap-2 rounded-xl"><ArrowRight className="h-4 w-4"/> العودة</Button>
                          </div>
