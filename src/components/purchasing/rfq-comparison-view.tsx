@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
-import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2, Ban } from 'lucide-react';
+import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2, Ban, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -48,8 +49,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [loadingData, setLoadingData] = useState(true);
   
   const [isAwarding, setIsAwarding] = useState(false);
-  const [isUndoing, setIsUndoing] = useState(false);
-  const [vendorToAward, setVendorToAward] = useState<any | null>(null);
+  const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); // itemId -> vendorId
 
   useEffect(() => {
     if (!firestore || !rfq.id) {
@@ -66,21 +66,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
         const vendorIds = rfq.vendorIds || [];
         if (vendorIds.length > 0) {
-            const chunks = [];
+            const fetchedVendors: Vendor[] = [];
             for (let i = 0; i < vendorIds.length; i += 30) {
-              chunks.push(vendorIds.slice(i, i + 30));
+              const chunk = vendorIds.slice(i, i + 30);
+              const snap = await getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)));
+              snap.forEach(d => fetchedVendors.push({ id: d.id, ...d.data() } as Vendor));
             }
-
-            const vendorPromises = chunks.map(chunk => 
-              getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
-            );
-            const vendorSnapshots = await Promise.all(vendorPromises);
-            const fetchedVendors = vendorSnapshots.flatMap(snap => 
-              snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
-            );
             setRegisteredVendors(fetchedVendors);
         }
-
       } catch (err) {
         console.error("Error fetching comparison data:", err);
       } finally {
@@ -91,392 +84,234 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     fetchData();
   }, [firestore, rfq.id, rfq.vendorIds]);
 
-  const comparisonData = useMemo(() => {
-    if (loadingData || !rfq) {
-      return { data: [], vendors: [], totals: {} };
-    }
+  const allVendors = useMemo(() => [
+    ...registeredVendors,
+    ...(rfq.prospectiveVendors || [])
+  ], [registeredVendors, rfq.prospectiveVendors]);
 
-    const allAvailableVendors = [
-        ...registeredVendors,
-        ...(rfq.prospectiveVendors || [])
-    ];
-
-    const participatingVendors = allAvailableVendors.filter((v) =>
-      supplierQuotations.some((q) => q.vendorId === v.id)
-    );
-
-    const tempTotals: Record<string, number> = {};
-    participatingVendors.forEach((v) => {
-      tempTotals[v.id!] = 0;
-    });
-
-    const tableRows = rfq.items.map((item) => {
-      const quotes = participatingVendors.map((vendor) => {
-        const vendorQuote = supplierQuotations.find((q) => q.vendorId === vendor.id);
-        const quoteItem = vendorQuote?.items.find((qi) => qi.rfqItemId === item.id);
-        const unitPrice = quoteItem?.unitPrice ?? Infinity;
-
-        if (unitPrice !== Infinity) {
-          tempTotals[vendor.id!] += unitPrice * item.quantity;
-        }
-
-        return {
-          vendorId: vendor.id!,
-          vendorName: vendor.name,
-          unitPrice: unitPrice,
-        };
+  // منطق اختيار السعر الأفضل
+  const tableData = useMemo(() => {
+    return rfq.items.map(item => {
+      const quotesPerVendor = allVendors.map(vendor => {
+        const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
+        const itemPrice = quote?.items.find(i => i.rfqItemId === item.id)?.unitPrice || 0;
+        return { vendorId: vendor.id!, price: itemPrice };
       });
-      return { rfqItem: item, quotes };
+
+      const validPrices = quotesPerVendor.filter(q => q.price > 0).map(q => q.price);
+      const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : Infinity;
+
+      return {
+        item,
+        quotes: quotesPerVendor,
+        minPrice
+      };
     });
+  }, [rfq.items, allVendors, supplierQuotations]);
 
-    return { data: tableRows, vendors: participatingVendors, totals: tempTotals };
-  }, [loadingData, rfq, supplierQuotations, registeredVendors]);
-
-  // منطق الفلترة: تحديد الأصناف المستبعدة لأن سعرها صفر أو غير موجودة
-  const awardedItemsInfo = useMemo(() => {
-    if (!vendorToAward) return { toAward: [], excluded: [] };
-    
-    const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
-    if (!quote) return { toAward: [], excluded: [] };
-
-    const toAward: any[] = [];
-    const excluded: any[] = [];
-
-    rfq.items.forEach(item => {
-        const quoteItem = quote.items.find(qi => qi.rfqItemId === item.id);
-        if (quoteItem && quoteItem.unitPrice > 0) {
-            toAward.push({ ...item, unitPrice: quoteItem.unitPrice });
-        } else {
-            excluded.push(item);
-        }
-    });
-
-    return { toAward, excluded };
-  }, [vendorToAward, rfq.items, supplierQuotations]);
-
-  const handleAwardClick = (vendor: any) => {
-      setVendorToAward(vendor);
+  const handleCellClick = (itemId: string, vendorId: string, price: number) => {
+    if (price <= 0 || !!rfq.awardedVendorId) return;
+    setSelectedAwards(prev => ({
+      ...prev,
+      [itemId]: prev[itemId] === vendorId ? '' : vendorId
+    }));
   };
 
-  const handleConfirmAward = async () => {
-    if (!firestore || !vendorToAward || !currentUser || !rfq.id) return;
+  const handleAwardToVendor = (vendorId: string) => {
+    if (!!rfq.awardedVendorId) return;
+    const newAwards = { ...selectedAwards };
+    tableData.forEach(row => {
+      const quote = row.quotes.find(q => q.vendorId === vendorId);
+      if (quote && quote.price > 0) {
+        newAwards[row.item.id] = vendorId;
+      }
+    });
+    setSelectedAwards(newAwards);
+  };
+
+  const handleConfirmSplitAward = async () => {
+    if (!firestore || !currentUser || !rfq.id) return;
     
-    const { toAward } = awardedItemsInfo;
-    if (toAward.length === 0) {
-        toast({ variant: 'destructive', title: 'لا يمكن الترسية', description: 'المورد لم يقم بتسعير أي من الأصناف المطلوبة بسعر أكبر من صفر.' });
+    const itemIds = Object.keys(selectedAwards).filter(id => !!selectedAwards[id]);
+    if (itemIds.length === 0) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى اختيار مورد واحد على الأقل لترسية بند واحد.' });
         return;
     }
 
     setIsAwarding(true);
-
     try {
-        const isProspective = String(vendorToAward.id).startsWith('prospective-');
-        
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
             const poCounterRef = doc(firestore, 'counters', 'purchaseOrders');
             const poCounterDoc = await transaction.get(poCounterRef);
-            
-            const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
-            if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
+            let nextPoSeq = (poCounterDoc.data()?.counts?.[currentYear] || 0) + 1;
 
-            const rfqRefDoc = doc(firestore, 'rfqs', rfq.id!);
-            let finalVendorId = vendorToAward.id;
+            const vendorsToProcess = [...new Set(Object.values(selectedAwards).filter(Boolean))];
+            const newPoIds: string[] = [];
 
-            if (isProspective) {
-                const newVendorRef = doc(collection(firestore, 'vendors'));
-                finalVendorId = newVendorRef.id;
-                
-                transaction.set(newVendorRef, {
-                    name: vendorToAward.name,
-                    contactPerson: 'تم التحويل من طلب تسعير (مورد محتمل سابقاً)',
+            for (const vId of vendorsToProcess) {
+                const vendorData = allVendors.find(v => v.id === vId)!;
+                const quote = supplierQuotations.find(q => q.vendorId === vId)!;
+                const awardedItemsInThisPo = rfq.items.filter(ri => selectedAwards[ri.id] === vId);
+
+                const poItems = awardedItemsInThisPo.map(item => {
+                    const price = quote.items.find(qi => qi.rfqItemId === item.id)!.unitPrice;
+                    return {
+                        internalItemId: item.internalItemId,
+                        itemName: item.itemName,
+                        quantity: item.quantity,
+                        unitPrice: price,
+                        total: price * item.quantity
+                    };
+                });
+
+                const poNumber = `PO-${currentYear}-${String(nextPoSeq).padStart(4, '0')}`;
+                const newPoRef = doc(collection(firestore, 'purchaseOrders'));
+                newPoIds.push(newPoRef.id);
+
+                transaction.set(newPoRef, {
+                    poNumber,
+                    orderDate: serverTimestamp(),
+                    vendorId: vId,
+                    vendorName: vendorData.name,
+                    projectId: rfq.projectId || null,
+                    items: poItems,
+                    totalAmount: poItems.reduce((sum, i) => sum + i.total, 0),
+                    status: 'draft',
+                    rfqId: rfq.id,
+                    supplierQuotationId: quote.id,
+                    paymentTerms: quote.paymentTerms || '',
                     createdAt: serverTimestamp(),
+                    createdBy: currentUser.id
                 });
 
-                const quoteRef = doc(firestore, 'supplierQuotations', quote.id!);
-                transaction.update(quoteRef, { vendorId: finalVendorId });
-
-                transaction.update(rfqRefDoc, {
-                    prospectiveVendors: arrayRemove({ id: vendorToAward.id, name: vendorToAward.name }),
-                    vendorIds: arrayUnion(finalVendorId)
-                });
+                nextPoSeq++;
             }
 
-            let nextPoNumber = 1;
-            if (poCounterDoc.exists()) {
-                const counts = poCounterDoc.data()?.counts || {};
-                nextPoNumber = (counts[currentYear] || 0) + 1;
-            }
-            const poNumber = `PO-${currentYear}-${String(nextPoNumber).padStart(4, '0')}`;
-
-            // استخدام القائمة المفلترة فقط
-            const poItems = toAward.map(item => ({
-                internalItemId: item.internalItemId,
-                itemName: item.itemName,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                total: item.unitPrice * item.quantity
-            }));
-
-            const totalAmount = poItems.reduce((sum, item) => sum + item.total, 0);
-
-            const newPoRef = doc(collection(firestore, 'purchaseOrders'));
-            const poData = {
-                poNumber,
-                orderDate: serverTimestamp(),
-                vendorId: finalVendorId,
-                vendorName: vendorToAward.name,
-                projectId: rfq.projectId || null,
-                items: poItems,
-                totalAmount,
-                status: 'draft',
-                rfqId: rfq.id,
-                supplierQuotationId: quote.id,
-                createdAt: serverTimestamp(),
-                createdBy: currentUser.id
-            };
-
-            transaction.set(newPoRef, cleanFirestoreData(poData));
-            transaction.set(poCounterRef, { counts: { [currentYear]: nextPoNumber } }, { merge: true });
-            
-            transaction.update(rfqRefDoc, { 
+            transaction.set(poCounterRef, { counts: { [currentYear]: nextPoSeq - 1 } }, { merge: true });
+            transaction.update(doc(firestore, 'rfqs', rfq.id!), {
                 status: 'closed',
-                awardedVendorId: finalVendorId,
-                awardedPoId: newPoRef.id
+                awardedVendorId: vendorsToProcess.length === 1 ? vendorsToProcess[0] : 'multiple',
+                awardedPoIds: newPoIds
             });
         });
 
-        toast({ title: 'اكتملت عملية الترسية', description: `تم إنشاء مسودة أمر شراء للأصناف المسعرة فقط.` });
-        setVendorToAward(null);
-    } catch (error: any) {
-        console.error("Awarding failed:", error);
-        toast({ variant: 'destructive', title: 'فشل الترسية', description: error.message });
+        toast({ title: 'نجاح الترسية', description: 'تم إنشاء أوامر الشراء للموردين المختارين.' });
+        router.push('/dashboard/purchasing/purchase-orders');
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل الترسية', description: e.message });
     } finally {
         setIsAwarding(false);
     }
   };
 
-  const handleUndoAward = async () => {
-    if (!firestore || !rfq.id || !rfq.awardedPoId) return;
-    
-    setIsUndoing(true);
-    try {
-        const poRef = doc(firestore, 'purchaseOrders', rfq.awardedPoId);
-        const rfqRefDoc = doc(firestore, 'rfqs', rfq.id);
-
-        await runTransaction(firestore, async (transaction) => {
-            const poSnap = await transaction.get(poRef);
-            if (poSnap.exists()) {
-                transaction.delete(poRef);
-            }
-            transaction.update(rfqRefDoc, {
-                status: 'sent',
-                awardedVendorId: null,
-                awardedPoId: null
-            });
-        });
-
-        toast({ title: 'تم التراجع', description: 'تم حذف أمر الشراء وإعادة فتح طلب التسعير للمقارنة.' });
-    } catch (error: any) {
-        console.error("Undo failed:", error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الترسية.' });
-    } finally {
-        setIsUndoing(false);
-    }
-  };
-
-  if (loadingData)
-    return (
-      <div className="p-8">
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
-
-  if (comparisonData.vendors.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground gap-4 border-2 border-dashed rounded-2xl m-6">
-        <AlertCircle className="h-12 w-12 opacity-20" />
-        <p className="font-bold">لم يتم استلام أي عروض أسعار لهذا الطلب بعد.</p>
-      </div>
-    );
-  }
-
-  const isAlreadyAwarded = !!rfq.awardedVendorId;
+  if (loadingData) return <div className="p-8"><Skeleton className="h-96 w-full rounded-2xl" /></div>;
 
   return (
-    <div className="space-y-4">
-      <div className="overflow-x-auto print:overflow-visible">
+    <div className="space-y-6">
+      <div className="overflow-x-auto">
         <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col className="w-[250px]" />
-            <col className="w-[80px]" />
-            {comparisonData.vendors.map((v) => (
-              <col key={v.id} className="w-[180px]" />
-            ))}
+            <col className="w-[220px]" />
+            <col className="w-[70px]" />
+            {allVendors.map(v => <col key={v.id} className="w-[180px]" />)}
           </colgroup>
-          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-20">
-            <TableRow className="h-16 border-b-2">
-              <TableHead className="font-black text-foreground px-4 sticky right-0 bg-muted/95 border-l">
-                اسم الصنف المطلوب
-              </TableHead>
-              <TableHead className="text-center font-bold text-xs uppercase px-1">الكمية</TableHead>
-              {comparisonData.vendors.map((vendor) => (
-                <TableHead key={vendor.id} className="text-center px-4 font-black text-primary border-r">
-                  <div className="flex flex-col items-center">
-                    <span className="truncate w-full text-center">{vendor.name}</span>
-                    <span className="text-[10px] text-muted-foreground font-normal">عرض المورد</span>
-                  </div>
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {comparisonData.data.map(({ rfqItem, quotes }) => {
-              const prices = quotes.map((q) => q.unitPrice).filter((p) => p !== Infinity);
-              const minPrice = prices.length > 0 ? Math.min(...prices) : Infinity;
-
-              return (
-                <TableRow key={rfqItem.id} className="h-14 hover:bg-transparent transition-colors border-b">
-                  <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l">
-                    {rfqItem.itemName}
-                  </TableCell>
-                  <TableCell className="text-center font-mono font-bold bg-muted/5">
-                    {rfqItem.quantity}
-                  </TableCell>
-                  {comparisonData.vendors.map((vendor) => {
-                    const quote = quotes.find((q) => q.vendorId === vendor.id);
-                    const isBestPrice = quote?.unitPrice === minPrice && minPrice !== Infinity;
-                    const isWinner = rfq.awardedVendorId === vendor.id;
-
-                    return (
-                      <TableCell
-                        key={vendor.id}
-                        className={cn(
-                          'text-center font-mono font-bold border-r px-4',
-                          isWinner ? 'bg-primary/5 text-primary' : isBestPrice ? 'bg-green-500/10 text-green-700' : 'text-foreground/70'
-                        )}
-                      >
-                        {quote?.unitPrice === Infinity || quote?.unitPrice === 0 ? (
-                          <span className="text-muted-foreground/30 italic text-xs">- غير مسعر -</span>
-                        ) : (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {(isWinner || isBestPrice) && <Award className={cn("h-4 w-4", isWinner ? "text-primary fill-primary/20" : "text-green-600 fill-green-600/20")} />}
-                              <span>{formatCurrency(quote!.unitPrice)}</span>
-                            </div>
-                            <span className="text-[9px] text-muted-foreground font-normal">
-                              إجمالي: {formatCurrency(quote!.unitPrice * rfqItem.quantity)}
-                            </span>
-                          </div>
-                        )}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-          <TableFooter className="bg-muted/30">
-            <TableRow className="h-24 border-t-4 border-primary/20">
-              <TableCell colSpan={2} className="text-right px-8 font-black text-lg">
-                إجمالي العرض / الترسية:
-              </TableCell>
-              {comparisonData.vendors.map((vendor) => {
-                const isWinner = rfq.awardedVendorId === vendor.id;
+          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
+            <TableRow className="h-24 border-b-2">
+              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground">بيان الصنف المطلوب</TableHead>
+              <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
+              {allVendors.map(vendor => {
+                const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
+                const isCredit = quote?.paymentTerms?.toLowerCase().includes('credit') || quote?.paymentTerms?.includes('آجل') || quote?.paymentTerms?.includes('حساب');
                 
                 return (
-                  <TableCell
-                    key={vendor.id}
-                    className={cn("text-center border-r px-2", isWinner ? "bg-primary/10" : "bg-primary/5")}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <span className={cn("font-mono text-xl font-black", isWinner ? "text-primary" : "text-foreground/60")}>
-                          {formatCurrency(comparisonData.totals[vendor.id!] || 0)}
-                      </span>
-                      
-                      {isAlreadyAwarded ? (
-                          isWinner ? (
-                              <Button 
-                                size="sm" 
-                                variant="destructive"
-                                className="h-8 rounded-lg text-[10px] font-bold gap-1 px-3 shadow-md no-print"
-                                onClick={handleUndoAward}
-                                disabled={isUndoing}
-                              >
-                                {isUndoing ? <Loader2 className="h-3 w-3 animate-spin"/> : <Undo2 className="h-3 w-3" />}
-                                تراجع عن الترسية
-                              </Button>
-                          ) : (
-                              <div className="h-8 flex items-center justify-center">
-                                  <Badge variant="secondary" className="text-[9px] opacity-50">تمت الترسية لمورد آخر</Badge>
-                              </div>
-                          )
-                      ) : (
+                  <TableHead key={vendor.id} className="p-2 border-r">
+                    <div className="flex flex-col h-full gap-2">
+                      <div className="text-center">
+                        <p className="font-black text-primary truncate text-sm">{vendor.name}</p>
                         <Button 
+                            variant="ghost" 
                             size="sm" 
-                            variant="default"
-                            className="h-8 rounded-xl text-[10px] font-bold gap-1 px-3 bg-green-600 hover:bg-green-700 no-print"
-                            onClick={() => handleAwardClick(vendor)}
-                            disabled={isAwarding}
-                        >
-                            {isAwarding && vendorToAward?.id === vendor.id ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShoppingCart className="h-3 w-3" />}
-                            ترسية وإنشاء أمر شراء
-                        </Button>
-                      )}
+                            className="h-6 text-[10px] text-muted-foreground hover:text-primary mt-1"
+                            onClick={() => handleAwardToVendor(vendor.id!)}
+                            disabled={!!rfq.awardedVendorId}
+                        >ترسية الكل هنا</Button>
+                      </div>
+                      <div className="flex justify-center gap-1 mt-auto">
+                        <Badge variant="outline" className={cn("text-[9px] px-1 h-5 gap-1", isCredit ? "bg-green-50 text-green-700 border-green-200" : "bg-orange-50 text-orange-700")}>
+                            {isCredit ? <CreditCard className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                            {isCredit ? 'آجل' : 'نقدي'}
+                        </Badge>
+                        {quote?.deliveryTimeDays && (
+                            <Badge variant="secondary" className="text-[9px] px-1 h-5">{quote.deliveryTimeDays} يوم</Badge>
+                        )}
+                      </div>
                     </div>
-                  </TableCell>
+                  </TableHead>
                 );
               })}
             </TableRow>
-          </TableFooter>
+          </TableHeader>
+          <TableBody>
+            {tableData.map(({ item, quotes, minPrice }) => (
+              <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b">
+                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
+                <TableCell className="text-center font-mono font-bold bg-muted/5">{item.quantity}</TableCell>
+                {allVendors.map(vendor => {
+                  const quote = quotes.find(q => q.vendorId === vendor.id);
+                  const isBest = quote?.price === minPrice && minPrice !== Infinity;
+                  const isSelected = selectedAwards[item.id] === vendor.id;
+                  const isLocked = !!rfq.awardedVendorId;
+
+                  return (
+                    <TableCell
+                      key={vendor.id}
+                      className={cn(
+                        "text-center cursor-pointer transition-all border-r p-0",
+                        isSelected ? "bg-primary/10" : isBest ? "bg-green-500/5" : "",
+                        isLocked && "cursor-default"
+                      )}
+                      onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
+                    >
+                      {quote?.price ? (
+                        <div className="flex flex-col items-center justify-center h-14 relative">
+                          <div className={cn("flex items-center gap-1 font-mono font-black", isSelected ? "text-primary text-lg" : isBest ? "text-green-700" : "text-foreground/60")}>
+                            {isSelected && <CheckCircle2 className="h-4 w-4 fill-primary/20" />}
+                            {formatCurrency(quote.price)}
+                          </div>
+                          {isBest && !isSelected && <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter">أفضل سعر</div>}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/20 italic">-</span>
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
         </Table>
       </div>
 
-      <AlertDialog open={!!vendorToAward} onOpenChange={() => setVendorToAward(null)}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-xl font-black text-primary">
-                <Award className="h-6 w-6" />
-                تأكيد الترسية والتحويل لأمر شراء
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base space-y-4 pt-4">
-              <p>أنت على وشك اختيار المورد <span className="font-bold text-foreground">"{vendorToAward?.name}"</span> لتوريد البضاعة.</p>
-              
-              {awardedItemsInfo.excluded.length > 0 && (
-                  <div className="p-4 bg-orange-50 text-orange-800 rounded-2xl border border-orange-100 space-y-2">
-                      <div className="flex items-center gap-2 font-bold">
-                          <Ban className="h-4 w-4" />
-                          أصناف سيتم استبعادها:
-                      </div>
-                      <p className="text-xs">المورد لم يقم بتسعير الأصناف التالية (أو سعرها 0)، ولن تظهر في أمر الشراء:</p>
-                      <ul className="list-disc list-inside text-xs pr-2">
-                          {awardedItemsInfo.excluded.map(item => <li key={item.id}>{item.itemName}</li>)}
-                      </ul>
-                  </div>
-              )}
-
-              {vendorToAward && String(vendorToAward.id).startsWith('prospective-') && (
-                  <div className="p-4 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-sm flex items-start gap-3">
-                      <UserPlus className="h-5 w-5 mt-0.5 shrink-0 text-blue-600" />
-                      <p>هذا المورد سيتم تسجيله تلقائياً كمورد رسمي في النظام.</p>
-                  </div>
-              )}
-              <p className="text-sm text-muted-foreground italic">سيتم إنشاء مسودة أمر شراء (Draft PO) فوراً.</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel disabled={isAwarding} className="rounded-xl">إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmAward}
-              disabled={isAwarding}
-              className="bg-primary hover:bg-primary/90 font-bold rounded-xl px-8"
+      {!rfq.awardedVendorId && (
+        <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg mx-4">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Award className="h-8 w-8" /></div>
+                <div>
+                    <h4 className="font-black text-lg text-primary">اعتماد الترسية المختارة</h4>
+                    <p className="text-xs text-muted-foreground">تم اختيار موردين لـ {Object.values(selectedAwards).filter(Boolean).length} من أصل {rfq.items.length} بنود.</p>
+                </div>
+            </div>
+            <Button 
+                onClick={handleConfirmSplitAward} 
+                disabled={isAwarding || Object.values(selectedAwards).filter(Boolean).length === 0}
+                className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3"
             >
-              {isAwarding ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <ShoppingCart className="h-4 w-4 ml-2"/>}
-              تأكيد وإنشاء الأمر
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                {isAwarding ? <Loader2 className="h-6 w-6 animate-spin" /> : <ShoppingCart className="h-6 w-6" />}
+                اعتماد وتحويل لأوامر شراء
+            </Button>
+        </div>
+      )}
     </div>
   );
 }

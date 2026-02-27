@@ -654,6 +654,7 @@ export type RequestForQuotation = {
   createdAt: any;
   awardedVendorId?: string;
   awardedPoId?: string;
+  awardedPoIds?: string[]; // NEW: For multiple awards
 };
 
 export type SupplierQuotation = {
