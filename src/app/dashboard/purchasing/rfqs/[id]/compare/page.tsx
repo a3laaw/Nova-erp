@@ -7,10 +7,9 @@ import type { RequestForQuotation } from '@/lib/types';
 import { RfqComparisonView } from '@/components/purchasing/rfq-comparison-view';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BarChart, Printer, LayoutHorizontal, LayoutVertical } from 'lucide-react';
+import { ArrowRight, BarChart, Printer, RectangleHorizontal, RectangleVertical } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function CompareRfqPage() {
     const params = useParams();
@@ -68,7 +67,7 @@ export default function CompareRfqPage() {
                                 className="h-8 gap-2 rounded-lg"
                                 onClick={() => setOrientation('portrait')}
                             >
-                                <LayoutVertical className="h-4 w-4" />
+                                <RectangleVertical className="h-4 w-4" />
                                 <span className="text-xs">رأسي (A4)</span>
                             </Button>
                             <Button 
@@ -77,7 +76,7 @@ export default function CompareRfqPage() {
                                 className="h-8 gap-2 rounded-lg"
                                 onClick={() => setOrientation('landscape')}
                             >
-                                <LayoutHorizontal className="h-4 w-4" />
+                                <RectangleHorizontal className="h-4 w-4" />
                                 <span className="text-xs">أفقي (A3)</span>
                             </Button>
                         </div>
