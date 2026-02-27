@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
+import type { RequestForQuotation, Vendor, SupplierQuotation, Item } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -39,6 +39,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [isAwarding, setIsAwarding] = useState(false);
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
+  // جلب البيانات الأساسية (الموردين وعروضهم)
   useEffect(() => {
     if (!firestore || !rfq.id) {
       setLoadingData(false);
@@ -77,6 +78,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     ...(rfq.prospectiveVendors || [])
   ], [registeredVendors, rfq.prospectiveVendors]);
 
+  // تجهيز مصفوفة البيانات
   const tableData = useMemo(() => {
     return rfq.items.map(item => {
       const quotesPerVendor = allVendors.map(vendor => {
@@ -96,6 +98,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     });
   }, [rfq.items, allVendors, supplierQuotations]);
 
+  // التعامل مع النقر للترسية الحية
   const handleCellClick = (itemId: string, vendorId: string, price: number) => {
     if (price <= 0 || !!rfq.awardedVendorId) return;
     setSelectedAwards(prev => ({
@@ -104,6 +107,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     }));
   };
 
+  // ترسية كل بنود المورد بنقرة واحدة
   const handleAwardToVendor = (vendorId: string) => {
     if (!!rfq.awardedVendorId) return;
     const newAwards = { ...selectedAwards };
@@ -116,6 +120,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     setSelectedAwards(newAwards);
   };
 
+  // تنفيذ عملية الترسية النهائية وإنشاء أوامر الشراء
   const handleConfirmSplitAward = async () => {
     if (!firestore || !currentUser || !rfq.id) return;
     
@@ -197,7 +202,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   return (
     <div className="space-y-6">
       <div className="overflow-x-auto print:overflow-visible">
-        <Table className="w-full border-collapse print:table-fixed" style={{ tableLayout: 'fixed' }}>
+        <Table className="w-full border-collapse print:table-fixed print:border-none" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col className="w-[220px]" />
             <col className="w-[70px]" />
@@ -212,7 +217,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 const isCredit = quote?.paymentTerms?.toLowerCase().includes('credit') || quote?.paymentTerms?.includes('آجل') || quote?.paymentTerms?.includes('حساب');
                 
                 return (
-                  <TableHead key={vendor.id} className="p-2 border-r align-top print:border-b-2">
+                  <TableHead key={vendor.id} className="p-2 border-r align-top print:border-b-2 print:static">
                     <div className="flex flex-col h-full gap-2 min-h-[100px]">
                       <div className="text-center px-1">
                         <p className="font-black text-primary text-sm whitespace-normal leading-tight break-words">
@@ -256,8 +261,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     <TableCell
                       key={vendor.id}
                       className={cn(
-                        "text-center cursor-pointer transition-all border-r p-0 print:border",
-                        isSelected ? "bg-primary/10 print:bg-blue-50 print:border-2 print:border-primary" : isBest ? "bg-green-500/5 print:bg-green-50" : "",
+                        "text-center cursor-pointer transition-all border-r p-0 print:border print:static",
+                        isSelected ? "bg-primary/10 border-primary/40 print:bg-blue-50 print:border-2 print:border-primary" : isBest ? "bg-green-500/5 print:bg-green-50" : "",
                         isLocked && "cursor-default"
                       )}
                       onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
@@ -274,7 +279,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                           {/* تمييز في الطباعة */}
                           {isSelected && (
                             <div className="hidden print:block absolute -top-1 right-1 text-[7px] font-black text-primary uppercase border border-primary px-1 rounded-sm bg-white">
-                              مختـــار
+                              [ مختـــار ]
                             </div>
                           )}
                           {isBest && !isSelected && (

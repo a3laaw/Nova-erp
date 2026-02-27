@@ -29,7 +29,7 @@ export default function CompareRfqPage() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Card className="rounded-2xl border-none shadow-sm overflow-hidden print:shadow-none print:border-none">
+            <Card className="rounded-2xl border-none shadow-sm overflow-hidden print:shadow-none print:border-none print:bg-transparent">
                 <CardHeader className="flex flex-col md:flex-row justify-between items-center bg-muted/30 px-8 py-6 gap-4 no-print">
                     <div className="space-y-1">
                         <CardTitle className="text-2xl font-black flex items-center gap-3">
@@ -51,7 +51,7 @@ export default function CompareRfqPage() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="p-0 print:p-0">
                     <div className="bg-white p-4 print:p-0">
                         <RfqComparisonView rfq={rfq} />
                     </div>
@@ -59,7 +59,7 @@ export default function CompareRfqPage() {
                 <CardFooter className="p-6 border-t bg-muted/10 no-print">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground italic">
                         <div className="h-3 w-3 rounded-full bg-green-500/20 border border-green-500" />
-                        يتم تمييز أفضل سعر مقدم لكل صنف باللون الأخضر. يمكنك تغيير اتجاه الورقة (أفقي/رأسي) من إعدادات الطباعة في المتصفح.
+                        يتم تمييز أفضل سعر مقدم لكل صنف باللون الأخضر. البنود المختارة للترسية تظهر بإطار ملون واضح.
                     </div>
                 </CardFooter>
             </Card>
