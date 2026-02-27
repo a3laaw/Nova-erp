@@ -8,7 +8,7 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Table as TableIcon, Info } from 'lucide-react';
+import { Loader2, Save, Table as TableIcon } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -104,11 +104,11 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مدة التوريد (أيام)</Label>
-                <Input type="number" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="0" className="h-10 rounded-xl border-2" />
+                <Input type="number" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="0" className="rounded-xl h-10 border-2" />
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">شروط الدفع</Label>
-                <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="h-10 rounded-xl border-2" />
+                <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="rounded-xl h-10 border-2" />
               </div>
             </div>
             <div className="space-y-4">
