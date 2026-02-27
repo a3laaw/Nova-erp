@@ -91,8 +91,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
           </div>
         </DialogHeader>
         
-        {/* Content Area with absolute scroll fix */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
               <div className="grid gap-2">
@@ -122,7 +121,7 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow className="h-14 border-b-2">
-                      <TableHead className="px-8 font-black text-base">اسم الصنف المطلوب</TableHead>
+                      <TableHead className="px-8 font-black text-base text-right">اسم الصنف المطلوب</TableHead>
                       <TableHead className="w-56 text-center font-black text-base px-6">سعر الوحدة (د.ك)</TableHead>
                     </TableRow>
                   </TableHeader>
